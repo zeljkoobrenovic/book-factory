@@ -88,8 +88,12 @@ Rules that give the page its character:
   book describes it (not a forecast), and the closing paragraph says how many
   parties, records and promises now stand behind the simple act the page
   started with, then hands off to the failure-patterns page.
-- **One figure that shows accumulation**: the same simple act at the bottom,
-  with a layer added per step. One or two more only if a step needs one.
+- **One figure per step, as a series.** Each step gets one small human scene
+  that shows its gain and its price together (the baker and the coin; the
+  shopkeeper, the notebook and the calendar with payday circled). The scenes
+  share one visual language, so the reader sees the same customer and seller
+  with one more thing between them each time. Add one overview figure that
+  shows accumulation: the same simple act at the bottom, one band per step.
 
 ## Evidence discipline
 
