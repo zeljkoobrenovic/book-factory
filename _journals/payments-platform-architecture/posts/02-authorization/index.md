@@ -41,19 +41,8 @@ Visa's rules define **Authorization** as "A process where an Issuer, a VisaNet P
 
 The request for Mila's pass makes a round trip. Her phone's wallet hands the member app a payment credential; Larkfield's payment service sends it to Adyen, the provider for Studio Noord; Adyen, on the acquiring side of the network, the side that collects for the merchant ([[acquiring-and-network-connectivity]]), passes it to Visa; Visa passes it to Mila's bank. Visa's annual report (Form 10-K) for fiscal 2026, filed in November 2026, describes the same path: "Through VisaNet, the acquirer presents the transaction data to Visa, which in turn sends the transaction data to the issuer to check the account holder’s account balance or credit line for authorization." The answer returns over the same four hops, and any of them can lose it.
 
-<!-- illustration-placeholder
-{
-  "id": "02-authorization-round-trip",
-  "status": "pending",
-  "asset": "assets/images/02-authorization/02-authorization-round-trip.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on the request's round trip",
-  "visual_goal": "Show a question crossing four hops to the bank and an answer crossing back, changing only a hold.",
-  "prompt": "Create a structural explainer diagram of a round trip. Five elements in a row from left to right: a smartphone labeled \"Member app\", a small server labeled \"Platform\", a larger server block labeled \"Provider\", a hub of connected nodes labeled \"Card network\", and a bank building labeled \"Issuer\". A blue arrow labeled \"request\" runs along the top from the smartphone through each element to the bank. A green arrow labeled \"response\" runs along the bottom from the bank back to the smartphone. Inside the bank, a small account card shows a padlock on a coin stack labeled \"hold €120\". The arrows carry only small envelope icons, no coins. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Diagram of a request travelling from a member app to the issuer and a response travelling back, with a hold of 120 euros at the issuer.",
-  "caption": "An authorization is a request and a response across four hops; it changes only a hold of €120 at the issuer, and no money travels."
-}
--->
+![Diagram of a request travelling from a member app to the issuer and a response travelling back, with a hold of 120 euros at the issuer.](assets/images/02-authorization/02-authorization-round-trip.jpeg)
+**Figure 1:** *An authorization is a request and a response across four hops; it changes only a hold of €120 at the issuer, and no money travels.*
 
 | Requirement | What the card system provides | What is left to you |
 | --- | --- | --- |
@@ -148,19 +137,8 @@ Which should you use? My rule: ask for the exact amount and capture at once unle
 | Partial approval accepted | Customers pay from prepaid or low debit balances | The approved amount; a second payment for the rest |
 | Zero-value check | A card is stored now and charged later | The customer's agreement; the first real charge can still be declined |
 
-<!-- illustration-placeholder
-{
-  "id": "02-life-of-an-approval",
-  "status": "pending",
-  "asset": "assets/images/02-authorization/02-life-of-an-approval.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the trade-off table of the five variants",
-  "visual_goal": "Show the life of an approval as a small state machine.",
-  "prompt": "Create a structural explainer diagram of a state machine drawn as rounded boxes connected by arrows. On the left a blue box labeled \"Requested\". Three arrows leave it to the right: a green arrow to a green box labeled \"Approved\", an orange arrow to an orange box labeled \"Declined\", and a dashed grey arrow to a grey box with a question mark labeled \"Unknown\". From the \"Approved\" box three arrows fan out further right: to a teal box labeled \"Captured\" with a coin icon, to a box labeled \"Reversed\" with an open padlock icon, and to a box labeled \"Expired\" with an hourglass icon. Two dashed grey arrows with a magnifying glass icon lead from the \"Unknown\" box toward \"Approved\" and \"Declined\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "State diagram in which a request becomes approved, declined or unknown, and an approval is then captured, reversed or expired.",
-  "caption": "A request ends approved, declined or unknown; an approval ends captured, reversed or expired, and only the first of those is the merchant's claim."
-}
--->
+![State diagram in which a request becomes approved, declined or unknown, and an approval is then captured, reversed or expired.](assets/images/02-authorization/02-life-of-an-approval.jpeg)
+**Figure 2:** *A request ends approved, declined or unknown; an approval ends captured, reversed or expired, and only the first of those is the merchant's claim.*
 
 ## Who Is Asking: Customer-Initiated, Merchant-Initiated and Stored Credentials
 
@@ -176,19 +154,8 @@ Who puts the label on the request differs by provider. On Stripe you pass hints 
 
 Everything so far assumed that an answer arrived; the Double Charge happened when none did. A request has **three outcomes, not two**: approved, declined and unknown. The reply crosses four hops on its way back and can be lost on any of them after the issuer has decided. Then the hold exists at the bank while your code holds nothing. Stripe's documentation (n.d., accessed November 2026) names the state: "When a connection fails, you might not know whether Stripe received or executed the request." Even an error is not a no: "Treat the outcome of a request that returns `500` as indeterminate: the operation might have produced side effects even though you received an error."
 
-<!-- illustration-placeholder
-{
-  "id": "02-three-answers",
-  "status": "pending",
-  "asset": "assets/images/02-authorization/02-three-answers.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on three outcomes",
-  "visual_goal": "Make the unknown outcome memorable: the answer is lost on the way back while the hold stays in place.",
-  "prompt": "Create a conceptual explainer illustration. On the right, a bank building with a small account card in front of it showing a locked padlock on a coin stack labeled \"hold\". On the left, a merchant at a desk with a laptop and an empty inbox tray. Three curved lanes lead from the bank to the merchant. On the top lane a green envelope labeled \"yes\" arrives at the merchant. On the middle lane an orange envelope labeled \"no\" arrives at the merchant. On the bottom lane a grey envelope has fallen off beside a broken segment of the path, and a dashed outline at the merchant's end, labeled \"no answer\", shows where it should have arrived. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Three envelopes travel from a bank to a merchant: yes and no arrive, and a third is lost while a hold stays locked at the bank.",
-  "caption": "A request has three outcomes: yes, no and no answer; in the third the bank may have placed the hold while the merchant holds nothing."
-}
--->
+![Three envelopes travel from a bank to a merchant: yes and no arrive, and a third is lost while a hold stays locked at the bank.](assets/images/02-authorization/02-three-answers.jpeg)
+**Figure 3:** *A request has three outcomes: yes, no and no answer; in the third the bank may have placed the hold while the merchant holds nothing.*
 
 On Stripe the way out starts with the idempotency key, the identifier that lets the provider recognize a repeat ([[idempotency-and-retries]]): "Retry with the same idempotency key and parameters within the first 24 hours after the original request." Stripe keeps keys "for at least 24 hours" and answers a repeat with the saved response, so the retry returns the first attempt's result instead of creating a second payment. Beyond that window, or in any doubt: "Don’t retry with a new idempotency key until you’ve resolved the original outcome. Retrieve the relevant object". The payment is an object you can fetch.
 

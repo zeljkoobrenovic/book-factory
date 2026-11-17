@@ -51,19 +51,8 @@ A law adds a third placement, a partition by country. The three cost a money pat
 | Active-active | No idle region; losing one removes a share of capacity | A rule for which region writes which record | Stripe: not found for payments; for billing usage events, two regions at once (2025). Adyen: "active/active", with failover between data centers (documentation, n.d., accessed November 2026); the write rule: Not public |
 | Partition by jurisdiction | Compliance with a localization law | Identifiers and features that stop at the border | Stripe, India (page updated 2023); Adyen, an "isolated India environment" (n.d., accessed November 2026) |
 
-<!-- illustration-placeholder
-{
-  "id": "39-three-placements",
-  "status": "pending",
-  "asset": "assets/images/39-multi-region-and-data-residency/39-three-placements.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of the three placements",
-  "visual_goal": "Show the three ways to place payment data across regions: one writer with a standby, several writers, and a country walled off by law.",
-  "prompt": "Three-panel structural diagram with thin dividers, panels tagged \"Active-passive\", \"Active-active\" and \"Partitioned\". Panel one: two generic server racks side by side; the left rack is bright blue with a pen icon above it labeled \"writes\", the right rack is pale gray with a small clock icon labeled \"waits\"; a thin dashed arrow labeled \"copy\" runs from the left rack to the right rack. Panel two: two bright blue server racks, each with a pen icon above it labeled \"writes\"; a double-headed teal arrow labeled \"agree\" connects them, with a small orange question mark sitting on the arrow. Panel three: two server racks separated by a tall green wall with a small courthouse icon on top labeled \"law\"; each rack holds its own stack of records; an orange arrow labeled \"blocked\" starts at the left rack and stops at the wall. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Three panels: one server writes while a second waits; two servers both write and must agree; two servers stand on either side of a wall set by law, and a copy is blocked at the wall.",
-  "caption": "Three placements: one region writes and another waits, several regions write and must agree, or a law walls one country's data off from the rest."
-}
--->
+![Three panels: one server writes while a second waits; two servers both write and must agree; two servers stand on either side of a wall set by law, and a copy is blocked at the wall.](assets/images/39-multi-region-and-data-residency/39-three-placements.jpeg)
+**Figure 1:** *Three placements: one region writes and another waits, several regions write and must agree, or a law walls one country's data off from the rest.*
 
 ## When a Law Decides: India's Storage Rule
 
@@ -75,19 +64,8 @@ The fingerprint is the telling line. It is an identifier that lets a merchant re
 
 > **INFERENCE, NOT DOCUMENTED:** Stripe documents the two fingerprints and the end of cloning, not what follows for a merchant's own logic. I infer that duplicate-card checks, block lists and fraud signals keyed on the fingerprint stop matching between Indian and other accounts, and that saved cards have to be collected again on the other side of the border.
 
-<!-- illustration-placeholder
-{
-  "id": "39-one-card-two-fingerprints",
-  "status": "pending",
-  "asset": "assets/images/39-multi-region-and-data-residency/39-one-card-two-fingerprints.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the inference block on the fingerprint",
-  "visual_goal": "Make memorable that a localization law turns one global identifier for a card into two that do not match.",
-  "prompt": "Conceptual before-and-after illustration in two halves separated by a thin vertical divider, the left half tagged \"Before\" and the right half tagged \"After\". Left half: one generic unbranded payment card at the top; a single teal arrow runs down from it to one round fingerprint icon labeled \"one ID\"; beneath the fingerprint a wide flat world map strip in pale blue with no borders drawn. Right half: the same generic payment card at the top; two arrows run down from it, a teal arrow to a fingerprint icon on the left labeled \"ID A\" and an orange arrow to a differently patterned fingerprint icon on the right labeled \"ID B\"; between the two fingerprints stands a tall green wall with a small courthouse icon on top labeled \"law\"; a dashed gray line labeled \"no match\" runs from one fingerprint toward the other and stops at the wall. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Before: one card maps to one identifier across the world. After: the same card maps to two different identifiers on either side of a wall set by law, and they no longer match.",
-  "caption": "A localization law turns one global identifier for a card into two that do not match across the border."
-}
--->
+![Before: one card maps to one identifier across the world. After: the same card maps to two different identifiers on either side of a wall set by law, and they no longer match.](assets/images/39-multi-region-and-data-residency/39-one-card-two-fingerprints.jpeg)
+**Figure 2:** *A localization law turns one global identifier for a card into two that do not match across the border.*
 
 ## What Each Company Has Published About Where It Runs
 
@@ -97,19 +75,8 @@ Adyen's hosting is owned. Its 2021 architecture post says: "We manage our own in
 
 What an integrator can see of that estate is a set of regions. Adyen's documentation for web integrations (n.d., accessed November 2026) serves its client-side library per region: "Europe (EU) live", "United States (US) live", "Australia (AU) live", "Northeast Asia (NEA) live" and "India (IN) live". The live endpoints page (n.d., accessed November 2026) says that in the Customer Area, Adyen's merchant dashboard, "you can see the configured data centres and prefixes for your company account" (the top level of an Adyen account), and that a merchant who needs "a certain data center" can ask support for location-based endpoints. For terminals, the cloud integration page (n.d., accessed November 2026) assigns each country to a data center region, the Netherlands and Germany to EU, and tells merchants to "select the data center closest to your geographical location". On rerouting, the live endpoints page says "alternative routing can be enabled to backup infrastructure", not where that is, and an incident update dated 21 April 2025 describes a denial-of-service attack on "our European datacenters" and names no other region. The storage sentence is not a promise that data stays put: Adyen's privacy statement (version of 4 August 2025) says information "may be disclosed to other Adyen group companies outside of the European Economic Area". On India, its compliance guide (n.d., accessed November 2026) requires "a separate company account for your business in India", and its go-live checklist for India (n.d., accessed November 2026) shows a cost: velocity risk rules, which count attempts over time, "will not work as well for your India company account at first, because they rely on historical transaction data".
 
-<!-- illustration-placeholder
-{
-  "id": "39-two-shapes-of-answer",
-  "status": "pending",
-  "asset": "assets/images/39-multi-region-and-data-residency/39-two-shapes-of-answer.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on Adyen's five regions",
-  "visual_goal": "Show that the documented answer to 'where is the data' has a different shape for each provider: a rented cloud with unnamed regions, and five named integration regions on sites listed by continent or country, with no cities.",
-  "prompt": "Structural comparison in two halves separated by a thin vertical divider, the left half tagged \"Provider A\" and the right half tagged \"Provider B\". Left half: one large soft blue cloud shape labeled \"rented cloud\"; inside the cloud three small server racks, each covered by a gray question mark instead of a name; below the cloud a single thick teal line leads down to one plug icon labeled \"one address\". Right half: five separate small server buildings in a row, each with a flag-shaped tag reading \"EU\", \"US\", \"AU\", \"NEA\" and \"IN\"; a bracket above the five buildings labeled \"own sites\"; below the buildings a wide pale blue map strip with no borders drawn, carrying six solid teal map pins labeled \"Europe\", \"United States\", \"India\", \"Singapore\", \"Japan\" and \"Australia\", and beside the strip a small gray tag labeled \"no cities\". At the bottom center, spanning both halves, a small studio owner holding a clipboard looks up at both sides. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Provider A is a rented cloud whose regions are question marks behind one address; Provider B is five named regions on its own sites, with six map pins at continent or country level and a tag reading no cities.",
-  "caption": "Two shapes of answer: Provider A (Stripe) is a rented cloud whose regions are not named; Provider B (Adyen) names five integration regions and lists its own data centers by continent or country, with no cities."
-}
--->
+![Provider A is a rented cloud whose regions are question marks behind one address; Provider B is five named regions on its own sites, with six map pins at continent or country level and a tag reading no cities.](assets/images/39-multi-region-and-data-residency/39-two-shapes-of-answer.jpeg)
+**Figure 3:** *Two shapes of answer: Provider A (Stripe) is a rented cloud whose regions are not named; Provider B (Adyen) names five integration regions and lists its own data centers by continent or country, with no cities.*
 
 ## Stripe and Adyen: Where They Differ
 

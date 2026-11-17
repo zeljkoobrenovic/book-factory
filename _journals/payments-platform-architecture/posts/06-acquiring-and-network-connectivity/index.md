@@ -71,19 +71,8 @@ The network also limits the model by seller size. "An Acquirer that contracts wi
 
 Together the definitions give the chapter's central distinction: **a direct technical connection to a network and being the acquirer of record are different facts, and a company can have either without the other.** "Directly or indirectly" lets a member acquire without running the link. The non-member processor runs the link without the membership. Block, a large US payment facilitator, has neither for most of its volume; its annual report for 2025 says: "For a majority of our transactions, we do not directly access the payment card networks". The figure below draws the two facts as two lines.
 
-<!-- illustration-placeholder
-{
-  "id": "06-connection-versus-membership",
-  "status": "pending",
-  "asset": "assets/images/06-acquiring-and-network-connectivity/06-connection-versus-membership.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the connection-versus-membership paragraph",
-  "visual_goal": "Show the message path and the membership as separate things held by different parties.",
-  "prompt": "Create a wide explainer diagram with two layers. Bottom layer, left to right: a shop icon labeled \"Merchant\", a rounded box labeled \"Provider\", a hub shape labeled \"Card network\", a bank building labeled \"Issuer\". A solid blue arrow labeled \"message\" runs from Merchant to Provider, a solid blue arrow labeled \"direct link\" from Provider to Card network, and a solid blue arrow from Card network to Issuer. Top layer, above Provider and Card network: a second bank building labeled \"Sponsor bank\" holding a round orange badge labeled \"Membership\". A dashed orange line labeled \"answers for it\" runs from the badge down to the Card network. A thin dashed teal line labeled \"contract\" joins Provider and Sponsor bank. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A payment message travels from merchant through provider to the card network and issuer, while a separate sponsor bank above holds the membership badge.",
-  "caption": "The wire and the membership are separate: a provider can exchange messages with the network directly while a sponsoring bank is the member that answers for the transaction."
-}
--->
+![A payment message travels from merchant through provider to the card network and issuer, while a separate sponsor bank above holds the membership badge.](assets/images/06-acquiring-and-network-connectivity/06-connection-versus-membership.jpeg)
+**Figure 1:** *The wire and the membership are separate: a provider can exchange messages with the network directly while a sponsoring bank is the member that answers for the transaction.*
 
 ## What the Acquirer of Record Changes: Domestic Payments and an Unmeasured Uplift
 
@@ -91,19 +80,8 @@ Start with what "domestic" means to a network. Visa's glossary defines a Domesti
 
 The acquirer enters through a second rule, section 1.5.1.1 of Visa's Core Rules: "An Acquirer must accept Transactions only from a Merchant Outlet within the Acquirer's Country of Domicile (and that country's territories and possessions) unless any of the following". One listed exception matters in Europe: "In the Europe Region: An Acquirer has passported its license in line with EU passporting regulations." Passporting lets an institution licensed in one EEA country serve the others. Read with the definition above, the rule gives **local acquiring** its meaning: a business can sell as a local merchant in a country only if its provider has an acquirer whose license reaches that country, whether a single country or the whole EEA. Otherwise it sells from wherever its acquirer is, and that country's cards arrive at their issuers as international payments.
 
-<!-- illustration-placeholder
-{
-  "id": "06-local-door-foreign-door",
-  "status": "pending",
-  "asset": "assets/images/06-acquiring-and-network-connectivity/06-local-door-foreign-door.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the local-acquiring paragraph",
-  "visual_goal": "Same card, same bank: local or foreign depending on the acquirer.",
-  "prompt": "Create a wide conceptual illustration. On the left, one customer holding one payment card. On the right, one bank building labeled \"Issuer\" with two doors. Two paths lead from the card to the bank. The upper path passes a small building flying the same plain green flag as the bank, labeled \"Local acquirer\", and enters through a wide green door labeled \"Domestic\". The lower path passes a small building flying a plain orange flag, labeled \"Acquirer abroad\", crosses a dotted border line, and enters through a narrower orange door labeled \"International\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "One card reaching one issuing bank by two paths: through a local acquirer into a door marked domestic, and through an acquirer abroad into a door marked international.",
-  "caption": "One card, one issuer, two arrivals: whether the issuer sees a domestic or an international payment depends on where the merchant's acquirer is licensed."
-}
--->
+![One card reaching one issuing bank by two paths: through a local acquirer into a door marked domestic, and through an acquirer abroad into a door marked international.](assets/images/06-acquiring-and-network-connectivity/06-local-door-foreign-door.jpeg)
+**Figure 2:** *One card, one issuer, two arrivals: whether the issuer sees a domestic or an international payment depends on where the merchant's acquirer is licensed.*
 
 That a domestic payment is approved more often and costs less than an international one is accepted across the industry. An issuer's risk checks commonly treat a foreign merchant with more suspicion, and networks charge extra for crossing a border ([[payment-economics]]). Stripe's guide to local acquiring (last updated August 2023) says: "Because the transaction is local, the chances of approval are typically higher compared to an international transaction". **(Evidence age: 3 years.)** Adyen's acquiring page (n.d., accessed November 2026) says: "Local processing can increase authorization rates and reduce cross-border fees." Neither gives a number.
 
@@ -137,19 +115,8 @@ No route is better in general. A sponsor fits a market the provider is entering;
 | Narrow license per market | None | Its own membership | One license or charter per market or region; few permitted activities | Stripe's e-money institutions in the EEA and the UK; Georgia's MALPB charter |
 | Bank license with branches | None | One permission reused across markets and products | Capital, supervision and lead time *(author's judgement)* | Adyen: 2017, 2021, 2023 |
 
-<!-- illustration-placeholder
-{
-  "id": "06-three-routes-to-a-network",
-  "status": "pending",
-  "asset": "assets/images/06-acquiring-and-network-connectivity/06-three-routes-to-a-network.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table that compares the three routes",
-  "visual_goal": "Show three ways to hold a membership as lanes; only the first has an extra party.",
-  "prompt": "Create a wide diagram with three horizontal lanes stacked top to bottom, each running from a shop icon labeled \"Merchant\" on the left to a hub shape labeled \"Network\" on the right. Lane one, labeled \"Sponsor bank\": Merchant, then a rounded box labeled \"Provider\", then a bank building labeled \"Bank\" holding a small orange badge, then Network; arrows join each element to the next. Lane two, labeled \"Narrow license\": Merchant, then a rounded box labeled \"Provider\" that itself holds the orange badge and a one-page document icon, then Network; arrows join each element to the next; no bank appears. Lane three, labeled \"Bank license\": Merchant, then a larger building labeled \"Provider bank\" holding the orange badge, with two smaller buildings labeled \"Branch\" attached by short lines, then Network; arrows join Merchant to Provider bank and Provider bank to Network. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Three lanes from merchant to network: a provider with a sponsoring bank, a provider holding its own narrow license, and a provider that is a bank with branches.",
-  "caption": "Three ways to hold a membership: under a sponsor bank a second party stands between the merchant and the network; under a narrow license or a bank license the provider holds the membership itself."
-}
--->
+![Three lanes from merchant to network: a provider with a sponsoring bank, a provider holding its own narrow license, and a provider that is itself a bank.](assets/images/06-acquiring-and-network-connectivity/06-three-routes-to-a-network.jpeg)
+**Figure 3:** *Three ways to hold a membership: under a sponsor bank a second party stands between the merchant and the network; under a narrow license or a bank license the provider holds the membership itself.*
 
 ## Adyen's Route: One Banking License, Extended by Branches
 

@@ -101,19 +101,8 @@ Between its product and those two providers Larkfield runs nine systems of its o
 
 Each of the nine was added for the need of its year, so the landscape records several moments and no single design. In 2017 Daniel Osei wrote the Stripe integration, with its webhook receiver and one secret key. Stripe Billing followed in 2018 for the studio plans. In 2024 Tom Hendriks built the payment service for the Adyen launch. The ledger arrived in 2025 after a first unexplained difference, and the reconciliation job after the audit finding described below. No addition revisited what was already there, so the older paths kept working beside the newer ones.
 
-<!-- illustration-placeholder
-{
-  "id": "meet-larkfield-systems-landscape",
-  "status": "pending",
-  "asset": "assets/images/meet-larkfield/meet-larkfield-systems-landscape.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that says each of the nine systems was added for the need of its year",
-  "visual_goal": "Show Larkfield's nine systems of January 2027 between the booking app and two payment providers, with two paths that reach a provider without passing through the payment service and with reports reconciled from only one provider.",
-  "prompt": "Create a structural architecture diagram on a light background with three horizontal bands. Top band: a wide box labeled \"Booking app\" on the left with a small phone and a small desk screen beside it, and a tablet next to a card terminal labeled \"Front-desk app\" on the right. Middle band, center: a large box labeled \"Payment service\" with two small plugs on its lower edge. Middle band, left of it: a box labeled \"Billing\" and a small gear box labeled \"Renewal job\". Middle band, right of it: a cylinder labeled \"Payment records\", a book labeled \"Ledger\", a magnifier box labeled \"Reconciliation\" and a second cylinder labeled \"Warehouse\". Bottom band: two large generic provider blocks, the left labeled \"Provider A\" and the right labeled \"Provider B\", and between the middle and bottom bands two small bell icons labeled \"Receivers\". Arrows: a blue arrow labeled \"pay\" from the booking app down to the payment service; two blue arrows from the payment service plugs down to Provider A and Provider B; an orange arrow from Billing straight down to Provider A and an orange arrow from Renewal job straight down to Provider A, both passing beside the payment service and not through it; teal arrows labeled \"events\" from each provider up through the bells into Payment records; a green arrow labeled \"reports\" from Provider B up to Reconciliation; a dotted grey arrow with a question mark from Provider A toward Reconciliation that stops short; a thin arrow from the front-desk terminal down to Provider B only. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Architecture diagram of Larkfield's nine systems between a booking app and two payment providers, with two orange paths reaching one provider beside the payment service and reports reconciled from only the other provider.",
-  "caption": "Larkfield's landscape in January 2027: nine systems, two providers (Provider A is Stripe, since 2017; Provider B is Adyen, since 2024), two paths that reach a provider beside the payment service, and a reconciliation job that reads one provider's reports."
-}
--->
+![Architecture diagram of Larkfield's nine systems between a booking app and two payment providers, with two orange paths reaching one provider beside the payment service and reports reconciled from only the other provider.](assets/images/meet-larkfield/meet-larkfield-systems-landscape.jpeg)
+**Figure 1:** *Larkfield's landscape in January 2027: nine systems, two providers (Provider A is Stripe, since 2017; Provider B is Adyen, since 2024), two paths that reach a provider beside the payment service, and a reconciliation job that reads one provider's reports.*
 
 What the new head of payments engineering finds between the systems is four missing joins. **Money-moving calls have more than one writer.** One unrestricted Stripe secret key from 2017 is shared by five systems, and the booking app's renewal job generates a fresh idempotency key at each network call. **The record's `paid` rests on events nobody confirms.** The payment service's only read call returns Larkfield's own row. **Reconciliation covers one provider**, and the ledger has no entries for refunds made after payout, chargeback fees or currency conversion. **Billing sits outside the payments team.** Each gap is the mechanism of an incident below.
 
@@ -167,19 +156,8 @@ Set side by side, the eight have one cause. In each, what decided the outcome wa
 | The Renewal Wave | The First of the Month (platform and scale) | An unpaced job that read a refusal as a failed payment |
 | The Double Charge | The Double Charge (money truth) | A retry sent with a new key |
 
-<!-- illustration-placeholder
-{
-  "id": "meet-larkfield-incidents-on-own-side",
-  "status": "pending",
-  "asset": "assets/images/meet-larkfield/meet-larkfield-incidents-on-own-side.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table that names what on Larkfield's side decided each incident",
-  "visual_goal": "Show that all eight incidents sit on the platform's own side of the provider's API and none on the providers' side.",
-  "prompt": "Create a conceptual explainer illustration divided by one tall vertical dashed line slightly right of center, labeled \"API\" at its top. The wide left area is labeled \"Own side\" and shows a tidy office floor plan seen from above in soft blue. The narrow right area is labeled \"Providers\" and shows two generic unbranded building blocks side by side, calm and plain, with nothing marked on them. On the left area place eight round orange warning markers, each with a simple icon inside and spread evenly: a key with a small plus sign, a bell with a slash through it, a paper form, a calendar page, a turnstile left open, a stopwatch, an envelope, and an open ledger book. From each of the eight markers draw a thin grey arrow pointing right toward the dashed line; every arrow stops just before the line and none crosses it. Above the left area place one large badge with the number \"8\". Above the right area place one large badge with the number \"0\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A dashed line labeled API separates a platform's own side, holding eight warning markers, from two plain provider blocks with none.",
-  "caption": "All eight incidents were decided on Larkfield's own side of the provider's API: a key, a receiver, a form, a version, a widget, a job, a reminder and a ledger."
-}
--->
+![A dashed line labeled API separates a platform's own side, holding eight warning markers, from two plain provider blocks with none.](assets/images/meet-larkfield/meet-larkfield-incidents-on-own-side.jpeg)
+**Figure 2:** *All eight incidents were decided on Larkfield's own side of the provider's API: a key, a receiver, a form, a version, a widget, a job, a reminder and a ledger.*
 
 None of this tells you anything about Stripe or Adyen. A provider's behavior is established only by a dated source in the chapter that discusses it. Stripe appears in four of the eight (the Version Cliff, the Frozen Studios, the Silent Webhook and the Renewal Wave) because Larkfield's Stripe integration is seven years older than its Adyen one, which is no judgement of either company. In the Double Charge and the Card-Testing Weekend the provider is deliberately left unnamed.
 
@@ -227,19 +205,8 @@ Chapters show their mechanisms, and test Keel, on a small set of payments from e
 | leaving Larkfield | €1.92 | |
 | Had Studio Noord been on Stripe | €0.87 cost, €1.66 left | *(assumption)*: one blended rate of 0.6% + €0.15 |
 
-<!-- illustration-placeholder
-{
-  "id": "meet-larkfield-milas-pass-timeline",
-  "status": "pending",
-  "asset": "assets/images/meet-larkfield/meet-larkfield-milas-pass-timeline.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table that divides Mila's €120.00",
-  "visual_goal": "Show on one line how far apart the instant approval of Mila's €120 and the end of the payment are: seconds, two days, two weeks, about four months.",
-  "prompt": "Create a horizontal timeline illustration on a light background. One line runs left to right with five round stations; the gaps between them grow visibly from left to right and the last gap is a long dotted stretch. Station one, far left: a generic person holding a phone near a yoga mat, with a green check mark above the phone, labeled \"9 March 19:42\" and beneath it \"€120 approved\". Station two, close to the first: a small yoga studio shopfront with a speech bubble containing a question mark, labeled \"10 March\". Station three: a coin stack sliding from a generic unbranded provider block into a small bank building, labeled \"11 March\" and beneath it \"€117.47 paid out\". Station four: a database cylinder with a tick, labeled \"25 March\" and beneath it \"marked arrived\". Station five, far right after the dotted stretch: a calendar page labeled \"about 7 July\" with a closing padlock. Above the long dotted stretch draw a curved orange arrow pointing backward from station five toward station one, labeled \"dispute\". Below station one draw a small teal tag labeled \"€2.53 fee\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Timeline of one €120 payment: approved at 19:42 on 9 March, the studio's question on 10 March, €117.47 paid out on 11 March, marked arrived on 25 March, and a dispute window open until about 7 July.",
-  "caption": "Mila's €120.00 is approved at 19:42 on 9 March 2027, pays Studio Noord €117.47 on 11 March, is marked arrived on 25 March and can be disputed until about 7 July."
-}
--->
+![Timeline of one €120 payment: approved at 19:42 on 9 March, the studio's question on 10 March, €117.47 paid out on 11 March, marked arrived on 25 March, and a dispute window open until about 7 July.](assets/images/meet-larkfield/meet-larkfield-milas-pass-timeline.jpeg)
+**Figure 3:** *Mila's €120.00 is approved at 19:42 on 9 March 2027, pays Studio Noord €117.47 on 11 March, is marked arrived on 25 March and can be disputed until about 7 July.*
 
 **Mila's membership renewal, the recurring failure.** Mila also holds a **€49.00 monthly membership** at Studio Noord. She set it up on **12 January 2027** by typing in the same card and passing a 3-D Secure challenge in her banking app. It renews on the 1st of each month as a merchant-initiated payment, one the merchant starts without the cardholder present. On **1 April 2027** the renewal is declined for insufficient funds, and Larkfield emails her the same day. The retry on **4 April** succeeds. It is scheduled attempt 2 and carries its own idempotency key (K1), and she keeps access to classes in between. ([[journey-failed-renewal]]).
 

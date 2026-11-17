@@ -64,19 +64,8 @@ Three rules therefore have to be chosen before the first invoice, and the seller
 | Billing cut-off | Until when does an event for a period change that period's invoice? | Invoices that keep changing, or usage that is never charged |
 | Correction path | What happens to an event that was wrong, or that arrived after the cut-off? | Manual edits that nobody can trace |
 
-<!-- illustration-placeholder
-{
-  "id": "28-three-time-rules",
-  "status": "pending",
-  "asset": "assets/images/28-usage-metering-and-rating/28-three-time-rules.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of the three rules",
-  "visual_goal": "Show a billing period on a timeline with the billing cut-off shortly after its end and the acceptance window reaching much further, so that the gap between accepted and billed is visible.",
-  "prompt": "Create a structural timeline diagram. A horizontal time axis runs left to right. On the left, a wide blue bar labeled \"Billing period\" sits on the axis. Immediately after its right end, a short teal bar labeled \"Grace period\" ends at a vertical green line with a lock icon labeled \"Invoice closes\". A long pale orange bracket above the axis starts at the end of the blue bar and extends far to the right, labeled \"Accepted\". Three small envelope icons represent events: one lands inside the teal bar with a green arrow named \"Billed\" pointing down into an invoice sheet below the lock; one lands to the right of the green line, under the orange bracket, with an orange arrow named \"Not billed\" pointing to a tray labeled \"Correction\"; one lands beyond the right end of the bracket with a gray arrow named \"Rejected\" pointing to a bin. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Timeline of a billing period followed by a short grace period and a line where the invoice closes, with a much longer acceptance window; one event is billed, one is accepted but not billed, one is rejected.",
-  "caption": "The billing cut-off and the acceptance window are different lines in time: an event that lands between them is accepted and never billed unless a correction path exists."
-}
--->
+![Timeline of a billing period followed by a short grace period and a line where the invoice closes, with a much longer acceptance window; one event is billed, one is accepted but not billed, one is rejected.](assets/images/28-usage-metering-and-rating/28-three-time-rules.jpeg)
+**Figure 1:** *The billing cut-off and the acceptance window are different lines in time: an event that lands between them is accepted and never billed unless a correction path exists.*
 
 ## The Three Rules as Stripe's Meters Document Them
 
@@ -123,19 +112,8 @@ Consequently the choice comes down to what you expect to happen after the events
 | Where it strains | When rules change after the fact | Storage and query cost at extreme volume |
 | Right when | Volume is extreme and prices are simple and stable | Prices are negotiated or change often, or invoices are audited |
 
-<!-- illustration-placeholder
-{
-  "id": "28-aggregate-or-query",
-  "status": "pending",
-  "asset": "assets/images/28-usage-metering-and-rating/28-aggregate-or-query.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the trade-off table of the two designs",
-  "visual_goal": "Contrast the two designs: events folded into running totals on arrival versus events stored whole and queried when the invoice is needed.",
-  "prompt": "Create a side-by-side structural comparison diagram with two horizontal lanes. Top lane: on the left a stream of small envelope icons labeled \"Events\"; a blue arrow named \"On arrival\" leads to a funnel that feeds a small counter dial labeled \"Running total\"; a green arrow named \"Read\" leads from the dial to an invoice sheet labeled \"Invoice\" on the right; the envelopes fade out after the funnel. Bottom lane: the same stream of envelopes labeled \"Events\"; a blue arrow named \"Store\" leads to a tall cabinet of stacked drawers labeled \"Raw events\" in which the envelopes remain visible; a teal arrow named \"Query\" leads from the cabinet through a magnifying glass to an invoice sheet labeled \"Invoice\" on the right; a thin dotted orange arrow named \"Explain\" runs back from the invoice to the cabinet. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two lanes: in the first, events are funneled into a running total from which the invoice is read and the events disappear; in the second, events are stored whole and the invoice is produced by a query that can be traced back to them.",
-  "caption": "Aggregating on arrival makes the invoice a cheap read and discards the events; keeping raw events makes the invoice a query that can be re-run and traced back."
-}
--->
+![Two lanes: in the first, events are funneled into a running total from which the invoice is read and the events disappear; in the second, events are stored whole and the invoice is produced by a query that can be traced back to them.](assets/images/28-usage-metering-and-rating/28-aggregate-or-query.jpeg)
+**Figure 2:** *Aggregating on arrival makes the invoice a cheap read and discards the events; keeping raw events makes the invoice a query that can be re-run and traced back.*
 
 ## Rating, Credits and Commitments: When the Count Meets the Price
 
@@ -147,19 +125,8 @@ For example, suppose a customer has bought €50 of prepaid credit. Can the cust
 
 As a result, these are two consistency requirements with two costs. **Invoice-time rating** needs only a count that is correct eventually, and leaves the seller carrying credit risk for whatever was used beyond the balance. A **real-time balance check** puts a read of a nearly current total into the product's request path, and the seller's code must decide what happens when that read is slow or unavailable. It still overshoots. Stripe's 2025 post says its 30-second fast path is what triggers alerts “when someone has spent too much money or is running out of credits”, with a “P95 latency under 30 seconds”. Real time, as documented, bounds the overshoot to a window of seconds; it does not remove it. I would ask for it only when unpaid usage costs real money per unit, as model inference does.
 
-<!-- illustration-placeholder
-{
-  "id": "28-prepaid-credit-two-readings",
-  "status": "pending",
-  "asset": "assets/images/28-usage-metering-and-rating/28-prepaid-credit-two-readings.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on the cost of the two balance checks",
-  "visual_goal": "Make the difference between a real-time balance check and invoice-time rating memorable with one prepaid amount read at two different moments.",
-  "prompt": "Create a conceptual before-and-after illustration in two panels side by side. Left panel: a transparent tank labeled \"€50 credit\" drains through a pipe to a running tap; the tank is empty but the tap keeps flowing into a measuring jug marked \"€80\"; at the far right of the panel an invoice sheet shows a line labeled \"€30 owed\"; a small clock icon sits next to the invoice with an arrow named \"Checked later\" pointing from the jug to the invoice. Right panel: the same tank labeled \"€50 credit\" drains through a pipe with a closed gate valve; a small gauge on the tank shows empty and a red-orange stop sign sits at the valve; the jug below is marked \"€50\"; an arrow named \"Checked now\" points from the gauge to the valve. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two panels with a €50 credit tank: in the first the tap keeps running to €80 and an invoice later shows €30 owed; in the second a valve closes when the tank is empty and usage stops at €50.",
-  "caption": "With €50 of prepaid credit, invoice-time rating lets usage run to €80 and bills €30 afterwards; a real-time balance check stops it at €50."
-}
--->
+![Two panels with a €50 credit tank: in the first the tap keeps running to €80 and an invoice later shows €30 owed; in the second a valve closes when the tank is empty and usage stops at €50.](assets/images/28-usage-metering-and-rating/28-prepaid-credit-two-readings.jpeg)
+**Figure 3:** *With €50 of prepaid credit, invoice-time rating lets usage run to €80 and bills €30 afterwards; a real-time balance check stops it at €50.*
 
 ## Two Acquisitions in 2026: Metronome at Stripe, Orb at Adyen
 

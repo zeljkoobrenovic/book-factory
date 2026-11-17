@@ -76,19 +76,8 @@ Six states describe the model, and each is ended by a different party. The names
 | Succeeded | The provider reports the payment collected | Nothing; refunds and disputes are separate records |
 | Canceled | Closed without payment | Nothing |
 
-<!-- illustration-placeholder
-{
-  "id": "08-payment-state-machine",
-  "status": "pending",
-  "asset": "assets/images/08-payment-state-machines/08-payment-state-machine.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the preceding paragraph",
-  "visual_goal": "Show the six states, who moves each transition, and a failed attempt returning to the first state.",
-  "prompt": "State-machine diagram. Six rounded boxes in two rows. Top row, left to right: \"needs details\", \"needs action\", \"processing\", \"succeeded\". Bottom row: \"authorized\" under processing, and \"canceled\" at the far right bottom. Arrows: from \"needs details\" to \"needs action\" labeled \"confirm\"; from \"needs action\" to \"processing\" labeled \"customer\"; from \"processing\" to \"succeeded\" labeled \"bank\"; from \"processing\" down to \"authorized\" labeled \"hold\"; from \"authorized\" up to \"succeeded\" labeled \"capture\"; a curved orange arrow from \"processing\" back to \"needs details\" labeled \"attempt failed\"; a grey arrow from \"authorized\" to \"canceled\" labeled \"cancel\". Under \"succeeded\" hang two small separate cards on thin lines labeled \"refund\" and \"dispute\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "State diagram of a payment record with six states and labeled transitions.",
-  "caption": "Each state of a payment is ended by a different party, a failed attempt returns the payment to its first state, and refunds and disputes hang off the payment as separate records."
-}
--->
+![State diagram of a payment record with six states and labeled transitions.](assets/images/08-payment-state-machines/08-payment-state-machine.jpeg)
+**Figure 1:** *Each state of a payment is ended by a different party, a failed attempt returns the payment to its first state, and refunds and disputes hang off the payment as separate records.*
 
 The second and third states are the ones most often merged into one "pending". A customer action takes seconds or minutes and may never happen: the customer puts the phone down. A bank debit takes days and almost always resolves. The first needs a prompt and an expiry; the second needs patience and no prompt. One word for both forces the wrong follow-up on one of them.
 
@@ -197,19 +186,8 @@ Seven aspects separate what each company documents from what the difference sugg
 
 On Stripe, treat an event as a prompt and read the object before you change state. On Adyen there is nothing to read back for an online payment: store every result code and webhook as received, key your record by your own reference and the PSP reference, and close what the events leave open with the settlement reports ([[payment-reconciliation-and-reporting]]).
 
-<!-- illustration-placeholder
-{
-  "id": "08-two-exposures-one-record",
-  "status": "pending",
-  "asset": "assets/images/08-payment-state-machines/08-two-exposures-one-record.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the preceding paragraph",
-  "visual_goal": "Show one integrator record fed two ways: by re-reading an object, and by assembling results and events.",
-  "prompt": "Component layout in three columns. Left column: a generic payment provider box labeled \"Provider A\" containing one document card with a status tag, labeled \"object\". Right column: a generic payment provider box labeled \"Provider B\" emitting a row of four small envelopes labeled \"result\", \"event\", \"event\", \"event\". Center column: a database cylinder labeled \"your record\". Arrows: from Provider A to the center a thin dashed arrow labeled \"event\" and a thick solid two-way arrow labeled \"read again\"; from Provider B to the center a thick solid arrow passing through a small tray labeled \"inbox\" and ending at the record, labeled \"assemble\"; under Provider B a small report sheet with a thin arrow to the record labeled \"report\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "One integrator record fed by two providers in different ways.",
-  "caption": "With Provider A (Stripe) an event prompts a read of the provider's object; with Provider B (Adyen) the integrator's record is assembled from result codes, events and reports."
-}
--->
+![One integrator record fed by two providers in different ways.](assets/images/08-payment-state-machines/08-two-exposures-one-record.jpeg)
+**Figure 2:** *With Provider A (Stripe) an event prompts a read of the provider's object; with Provider B (Adyen) the integrator's record is assembled from result codes, events and reports.*
 
 ## In Practice at Larkfield: Mila's Payments in Five States
 
@@ -241,19 +219,8 @@ Next, different events arrive in the wrong order, which neither provider rules o
 
 Then the contradiction the table must accept. Two days after a row became `paid`, Adyen sends `CAPTURE_FAILED`. This is a legal transition, because `paid` was never terminal. The capture's child row becomes `failed`, the payment returns to `authorized`, and whatever acted on `paid` (the member's access, the studio's expected payout) is told. The same event a minute later is a repeat. The payment may come back: "Technical failures are automatically re-captured by Adyen within 10 business days."
 
-<!-- illustration-placeholder
-{
-  "id": "08-late-capture-failure",
-  "status": "pending",
-  "asset": "assets/images/08-payment-state-machines/08-late-capture-failure.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the preceding paragraph",
-  "visual_goal": "Show a success state legally left on a late contradicting event, and a repeat changing nothing.",
-  "prompt": "A horizontal timeline with three day markers labeled \"day 0\", \"day 2\", \"day 2 +1 min\". Above the timeline at each marker an envelope arriving from a generic payment provider box at the top left: the first envelope labeled \"captured\" in green, the second labeled \"capture failed\" in orange, the third an identical orange envelope with a small duplicate mark labeled \"same again\". Below the timeline a single record card shown three times: under day 0 with a green tag \"paid\"; under day 2 with a blue tag \"authorized\" and a curved arrow stepping back from the first card labeled \"legal step back\"; under the third marker the same card unchanged labeled \"no change\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Timeline of a paid record stepping back to authorized after a late capture failure.",
-  "caption": "A capture reported failed after the record said paid is a legal step back, and the same event arriving again changes nothing."
-}
--->
+![Timeline of a paid record stepping back to authorized after a late capture failure.](assets/images/08-payment-state-machines/08-late-capture-failure.jpeg)
+**Figure 3:** *A capture reported failed after the record said paid is a legal step back, and the same event arriving again changes nothing.*
 
 Some events never arrive. A sweep finds rows still `pending` past the time their `waiting_on` allows, and what it can do next depends on the provider. On Stripe it retrieves the PaymentIntent. On Adyen, with no read endpoint, it relies on redelivery, the Customer Area's transaction list, the settlement report and documented expiries, such as card offers that "expire after 12 hours by default".
 

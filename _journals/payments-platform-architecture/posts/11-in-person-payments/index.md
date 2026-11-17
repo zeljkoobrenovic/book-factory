@@ -44,19 +44,8 @@ A **card-present** payment is one where a terminal reads the physical card, or a
 
 A cryptogram helps only if it reaches the party that can check it, the issuer. So the card-present flow is the authorization of [[payment-authorization]], the issuer's yes or no to a payment request, with one added load. The terminal reads the chip, and the chip data travels inside the authorization request through the provider and its acquirer, across the card network (Visa or Mastercard, for example), to the issuer, which verifies the cryptogram before it answers. The figure below shows the two places where that data can be lost.
 
-<!-- illustration-placeholder
-{
-  "id": "11-chip-data-path",
-  "status": "pending",
-  "asset": "assets/images/11-in-person-payments/11-chip-data-path.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on the chip data path",
-  "visual_goal": "Show that the chip's one-time code must travel from card to issuer and can be lost at two points.",
-  "prompt": "A left-to-right message-flow diagram with five elements in one row. Far left: a payment card with a gold chip, labeled \"Card\". Next: a countertop card terminal, labeled \"Terminal\". Center: a rounded box with a bank column icon, labeled \"Acquirer\". Next: a ring of small nodes, labeled \"Network\". Far right: a bank building, labeled \"Issuer\". A solid blue arrow labeled \"chip data\" runs from the card through the terminal, the acquirer and the network to the issuer, carrying a small key-shaped token. A solid green arrow labeled \"answer\" runs back underneath from the issuer to the terminal. Two small orange warning triangles sit on the blue arrow, one at the terminal and one at the acquirer, each with a short dashed line dropping away to show the token falling out. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Chip data traveling from a card through a terminal, an acquirer and a network to the issuer, with warning marks at the terminal and the acquirer.",
-  "caption": "The chip's one-time code protects a payment only if it reaches the issuer; it can be lost at a terminal that does not read the chip or at an acquirer that does not pass it on."
-}
--->
+![Chip data traveling from a card through a terminal, an acquirer and a network to the issuer, with warning marks at the terminal and the acquirer.](assets/images/11-in-person-payments/11-chip-data-path.jpeg)
+**Figure 1:** *The chip's one-time code protects a payment only if it reaches the issuer; it can be lost at a terminal that does not read the chip or at an acquirer that does not pass it on.*
 
 The networks attach money to that path through the **EMV liability shift**. A liability shift is a network rule that moves a fraud loss from one side of a payment to the other depending on whether a named security step was taken; online, the step is 3-D Secure, the card networks' protocol for authenticating the cardholder ([[three-d-secure-and-sca]]). It works through disputes ([[refunds-reversals-and-disputes]]) and is not a law. In Visa's public rules (edition of 24 October 2026), an issuer may dispute under "Dispute Condition 10.1: EMV Liability Shift Counterfeit Fraud" when the transaction "was completed with a Counterfeit Card in a Card-Present Environment", "The Cardholder denies authorization", "The Card is a Chip Card", and one of three things is true: "The Transaction did not take place at a Chip-Reading Device", or it "was Chip-initiated and, if the Transaction was authorized Online, the Acquirer did not transmit the Full-Chip Data to Visa in the Authorization Request", or it "was approved offline, and the Acquirer did not transmit the Full-Chip Data to Visa in the Clearing Record". Which transactions take part varies by Visa region (Table 11-1 of the same rules).
 
@@ -95,19 +84,8 @@ Set side by side, the four shapes pair up. The two that stay inside the store ke
 | Adyen, cloud | Till to Adyen to terminal | Platform credentials | Offline "not very useful", in Adyen's words |
 | Stripe, server-driven | Back end to Stripe API to reader | API calls only | Offline card payments not supported |
 
-<!-- illustration-placeholder
-{
-  "id": "11-local-versus-cloud-path",
-  "status": "pending",
-  "asset": "assets/images/11-in-person-payments/11-local-versus-cloud-path.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the four-shapes table",
-  "visual_goal": "Show the in-shop path and the cloud path, which crosses the shop's internet link twice.",
-  "prompt": "A split diagram with two panels side by side, each showing a small shop as a simple outlined room. Left panel, labeled \"Local\" at the bottom: a tablet on a counter labeled \"Till\" and a card terminal labeled \"Terminal\", joined by one short solid blue arrow labeled \"request\" that stays inside the room. Right panel, labeled \"Cloud\" at the bottom: the same tablet labeled \"Till\" and terminal labeled \"Terminal\" inside the room, and above the room a cloud shape labeled \"Provider\". A solid teal arrow labeled \"request\" rises from the till through the roof to the cloud, and a second solid teal arrow labeled \"forwarded\" comes down from the cloud through the roof to the terminal. Where each teal arrow crosses the roof sits a small orange plug icon, two in total. No arrow joins till and terminal directly in the right panel. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two shops: in one a till talks directly to a terminal; in the other the request goes up to a provider's cloud and back down to the terminal.",
-  "caption": "A till reaches its terminal either inside the shop or through the provider's cloud; the cloud path is simpler to build and stops when the shop's internet link does."
-}
--->
+![Two shops: in one a till talks directly to a terminal; in the other the request goes up to a provider's cloud and back down to the terminal.](assets/images/11-in-person-payments/11-local-versus-cloud-path.jpeg)
+**Figure 2:** *A till reaches its terminal either inside the shop or through the provider's cloud; the cloud path is simpler to build and stops when the shop's internet link does.*
 
 The rule I use: take the cloud path for many small sites whose networks nobody manages, and the in-store path where a shop must keep selling through an outage. The in-store path needs a reserved address per terminal, a certificate in the till software and someone who can debug a shop's router; across thousands of small sites, that work is the cost. The cloud path needs none of it and fails when the shop's link fails. The rule flips when the till itself works offline, or when lost sales in an outage cost more than running the networks.
 
@@ -117,19 +95,8 @@ The rule I use: take the cloud path for many small sites whose networks nobody m
 
 The second is **store-and-forward**, and it is a different thing: "the payment terminal or Mobile SDK approves payments without any verification", stores them, and sends them for authorization when the connection returns. The goods have left before any issuer has answered. I call that **credit extended by the merchant**, and both providers say whose loss it is. Adyen: "You are fully liable for the risk of failed captures, chargebacks, and disputes related to payments that you process offline." (A chargeback is a payment taken back through the issuer after the cardholder disputes it.) Stripe, which documents store-and-forward only: "You, as the user, assume all decline and tamper-related risks associated with an offline transaction". Adyen puts the later authorization rate at "95% in some industries to several percentage points higher", a vendor's statement with no published method.
 
-<!-- illustration-placeholder
-{
-  "id": "11-store-and-forward-credit",
-  "status": "pending",
-  "asset": "assets/images/11-in-person-payments/11-store-and-forward-credit.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the store-and-forward paragraph",
-  "visual_goal": "Show that the customer leaves with the goods before any bank has answered, so the shop is lending.",
-  "prompt": "A horizontal timeline drawn as a thick gray line across the middle, with four stations. Station one at the far left: a customer walking away from a shop counter carrying a bag, labeled \"Goods leave\". Station two: a card terminal with a small clock and a stack of three paper slips, labeled \"Stored\". Station three: a plug reconnecting to a socket, labeled \"Back online\". Station four at the far right: a bank building with two small speech bubbles above it, a green one with a check mark and an orange one with a cross, labeled \"Issuer answers\". An orange bracket spans the timeline from station one to station four, labeled \"Shop's credit\". A thin solid blue arrow labeled \"forwarded\" runs from the terminal at station two to the bank at station four. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Timeline of an offline payment: the customer leaves with the goods, the payment waits on the terminal, the connection returns, and only then does the issuer answer.",
-  "caption": "In store-and-forward the goods leave first and the issuer answers last; for the time in between, the only party that has promised anything is the shop."
-}
--->
+![Timeline of an offline payment: the customer leaves with the goods, the payment waits on the terminal, the connection returns, and only then does the issuer answer.](assets/images/11-in-person-payments/11-store-and-forward-credit.jpeg)
+**Figure 3:** *In store-and-forward the goods leave first and the issuer answers last; for the time in between, the only party that has promised anything is the shop.*
 
 Because the exposure is the merchant's, its size is set by limits, and the two providers put the limits in different hands. Adyen has the merchant choose them: a floor limit (the largest amount a terminal may approve offline), a "Store-and-forward max. amount" and a "Max. payments" count per terminal, and "you need to set a transaction floor limit before your integration can make offline payments". Stripe sets one ceiling itself, "the Stripe-enforced offline maximum of 10,000 USD or equivalent in your operating currency", and lets the integration add stricter limits. Its entry rules are tighter by default: in the European Economic Area "customers are required to insert their card and enter a PIN".
 
@@ -157,19 +124,8 @@ Each check has its own test and its own way of failing, which is why passing one
 | Cross-channel refund | Buy online; refund at the counter to the original card without presenting it | The refund needs the card, or goes out unreferenced |
 | One settlement report | Find one online, one counter and one stored offline payment in one report, with fees and store | Counter payments in another file; the stored payment missing from its day |
 
-<!-- illustration-placeholder
-{
-  "id": "11-three-checks-bridge",
-  "status": "pending",
-  "asset": "assets/images/11-in-person-payments/11-three-checks-bridge.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the three-tests table",
-  "visual_goal": "Show three separate links between store and online payments, one of them missing.",
-  "prompt": "Two platforms facing each other across a gap. On the left platform: a shop counter with a card terminal, labeled \"Store\". On the right platform: a laptop showing a shopping cart, labeled \"Online\". Three separate narrow footbridges span the gap, stacked from top to bottom. Top bridge, complete, in blue, with a small badge icon, labeled \"Same payer\". Middle bridge, complete, in teal, with a small curved return arrow icon, labeled \"Refund\". Bottom bridge in orange, drawn with a missing plank in the middle so it does not connect, with a small document icon, labeled \"One report\". A generic customer figure stands on the left platform looking across. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A store and an online shop joined by three footbridges labeled same payer, refund and one report; the third bridge has a gap.",
-  "caption": "A store payment and an online payment are joined by three separate links, and a provider can deliver two of them while the third is missing."
-}
--->
+![A store and an online shop joined by three footbridges labeled same payer, refund and one report; the third bridge has a gap.](assets/images/11-in-person-payments/11-three-checks-bridge.jpeg)
+**Figure 4:** *A store payment and an online payment are joined by three separate links, and a provider can deliver two of them while the third is missing.*
 
 ## Stripe and Adyen: Where They Differ
 

@@ -16,19 +16,8 @@ timetoread: 5 min read
 <br>
 On 18 March 2027 Mila Janssen asks for €84.00 back: the seven classes she has not used on a €120.00 pass. She bought the pass from Studio Noord through **Larkfield, the fictional studio-software platform this book follows**. The studio was paid its €117.47 a week earlier, on Thursday 11 March, and Larkfield never held any of the money. Mila will get her €84.00. The open question is **whose balance it comes out of today**, and that was decided long before she asked.
 
-<!-- illustration-placeholder
-{
-  "id": "part-7-who-funds-the-refund",
-  "status": "pending",
-  "asset": "assets/images/part-7-intro/part-7-who-funds-the-refund.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the opening paragraph",
-  "visual_goal": "Show a refund requested after the seller was paid, with three parties that could be the one whose balance funds it.",
-  "prompt": "Create a wide explainer illustration. Across the top, a horizontal timeline with three markers from left to right: a green flag labeled \"Sale\", a blue flag with a small bank icon labeled \"Paid out\", and an orange flag labeled \"Refund\". Far left below the timeline: a generic studio member holding a phone. An orange curved arrow named \"€84.00\" points toward the member from a large orange question mark in the center. Below the question mark, three figures in a row, each beside an empty tray: a small studio storefront labeled \"Seller\", a software window labeled \"Platform\", and a building with a shield labeled \"Provider\". Three thin dashed arrows, each named \"pays?\", run from the three trays up to the question mark. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A timeline of a sale, a payout and a later refund request; below it a seller, a platform and a provider, each a candidate to fund the €84.00 going back to the member.",
-  "caption": "The seller was paid a week before the member asked for €84.00 back, and three parties could be the one whose balance funds it."
-}
--->
+![A timeline of a sale, a payout and a later refund request; below it a seller, a platform and a provider, each a candidate to fund the €84.00 going back to the member.](assets/images/part-7-intro/part-7-who-funds-the-refund.jpeg)
+**Figure 1:** *The seller was paid a week before the member asked for €84.00 back, and three parties could be the one whose balance funds it.*
 
 Parts I to VI never had to ask that question. The business that took the payment was the business that owed the refund. [[part-6]] ended on the one arrangement that moves the seller's role, the merchant of record, in which a provider sells in its own name and takes over the indirect tax and the handling of fraud and disputes ([[merchant-of-record]]). Part VII takes the opposite arrangement. The seller stays the seller, a platform stands between it and the payer, and the liability is **divided among three parties by the account model**: the way the platform sets up its sellers' accounts and payments at the provider.
 
@@ -36,19 +25,8 @@ That division is the part's claim. **A platform takes on its sellers' unpaid ref
 
 The same assignment settles three more things: who the provider lets collect sellers' verification data, where a refund after payout is booked, and whether the platform may offer its sellers accounts and cards at all. So the part describes **one decision seen four times**, and I would decide who bears seller losses first and derive the rest. Larkfield's figure for what that decision exposes it to is about €156 million: the online card volume that, at any time, has been paid out and can still be disputed.
 
-<!-- illustration-placeholder
-{
-  "id": "part-7-one-decision-four-chapters",
-  "status": "pending",
-  "asset": "assets/images/part-7-intro/part-7-one-decision-four-chapters.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that says the part is one decision seen four times",
-  "visual_goal": "Show one decision, who bears seller losses, at the center, with the four subjects of the part's chapters following from it in reading order.",
-  "prompt": "Create a wide conceptual diagram. Left of center: a large rounded orange box labeled \"Loss bearer\" with a small scale icon. From it, four solid blue arrows fan out to the right to four teal cards stacked top to bottom, each with a round numbered badge and an icon: badge \"1\" with three small figures around a euro coin, labeled \"Model\"; badge \"2\" with an ID badge and a calendar, labeled \"Verification\"; badge \"3\" with a euro coin cut into two parts, labeled \"Split\"; badge \"4\" with a plain payment card and a safe, labeled \"Products\". Each arrow is named \"decides\". A thin green dashed arrow named \"reading order\" runs down the right edge from card 1 to card 4. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "One box labeled Loss bearer with arrows to four numbered cards labeled Model, Verification, Split and Products, read from top to bottom.",
-  "caption": "The shape of Part VII: who bears seller losses is one decision, and the four chapters follow it into the account model, verification, the split and the products a platform may offer."
-}
--->
+![One box labeled Loss bearer with arrows to four numbered cards labeled Model, Verification, Split and Products, read from top to bottom.](assets/images/part-7-intro/part-7-one-decision-four-chapters.jpeg)
+**Figure 2:** *The shape of Part VII: who bears seller losses is one decision, and the four chapters follow it into the account model, verification, the split and the products a platform may offer.*
 
 The claim rests on what Stripe and Adyen publish, and the comparison stops in named places. Stripe documents the provider as a standing option for the loss bearer. Adyen's default is the platform, and it documents bearing a seller's losses itself only as a pilot program. Neither company publishes a completion rate for seller sign-up. Accounts for a platform's sellers were in preview at Stripe and in development at Adyen in November 2026, on documentation pages that carry no date. Each chapter says where its evidence stops.
 

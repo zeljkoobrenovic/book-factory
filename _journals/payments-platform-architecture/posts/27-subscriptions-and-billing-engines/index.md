@@ -55,19 +55,8 @@ The first decision is the day. A **billing cycle** is the repeating period a sub
 
 The second decision is the instant. A period is an interval between two points in time, and "the first of the month" is a different instant depending on where you stand. 1 April 2027 at 00:00 Coordinated Universal Time (UTC) is 02:00 on 1 April in Utrecht and 20:00 on 31 March in New York. One stored instant gives two local dates, so the business must decide whose midnight counts.
 
-<!-- illustration-placeholder
-{
-  "id": "27-one-instant-two-dates",
-  "status": "pending",
-  "asset": "assets/images/27-subscriptions-and-billing-engines/27-one-instant-two-dates.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on the instant and time zones",
-  "visual_goal": "Show that one stored renewal instant falls on two different local calendar dates.",
-  "prompt": "Conceptual illustration in three zones. Center: a large server clock labeled \"00:00 UTC\" with a small tag \"1 April\". Left: a yoga studio storefront at night under a moon, with a wall clock showing two o'clock and a tear-off calendar page labeled \"1 April\"; a teal arrow labeled \"02:00\" runs from the center clock to this studio. Right: a climbing gym storefront in evening light with a wall clock showing eight o'clock and a tear-off calendar page labeled \"31 March\"; an orange arrow labeled \"20:00\" runs from the center clock to this gym. A thin dotted vertical line under the center clock is labeled \"one instant\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A central clock at 00:00 UTC on 1 April points to a studio where it is 02:00 on 1 April and to another where it is 20:00 on 31 March.",
-  "caption": "One renewal instant, 1 April at 00:00 UTC, is 02:00 on 1 April in Utrecht and 20:00 on 31 March in New York."
-}
--->
+![A central clock at 00:00 UTC on 1 April points to a studio where it is 02:00 on 1 April and to another where it is 20:00 on 31 March.](assets/images/27-subscriptions-and-billing-engines/27-one-instant-two-dates.jpeg)
+**Figure 1:** *One renewal instant, 1 April at 00:00 UTC, is 02:00 on 1 April in Utrecht and 20:00 on 31 March in New York.*
 
 The third decision is **proration**: charging or crediting a fraction of a price because the customer changed plan part-way through a period. It is a rule with choices. Is time counted in seconds or in days? Is the difference charged now or added to the next invoice? Is a credit computed from the current price or from what the customer actually paid? Three engines can produce three amounts for the same upgrade, and the customer was promised one of them. That makes the rule part of the agreement.
 
@@ -75,37 +64,15 @@ The fourth decision is what the subscription *is* at any moment, because the pro
 
 The fifth decision is identity. Something must record that one amount is owed for one period, once, before any payment is attempted. That record is the **invoice**: a statement of what a customer owes and for which period. The Double Charge happened because no record said "November for this membership has already been asked for", so the retry was a new payment instead of a second attempt at the same debt. This chapter defines the invoice by that job; [[invoicing-collections-and-dunning]] follows its life from draft to paid.
 
-<!-- illustration-placeholder
-{
-  "id": "27-one-debt-two-attempts",
-  "status": "pending",
-  "asset": "assets/images/27-subscriptions-and-billing-engines/27-one-debt-two-attempts.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that defines the invoice as the record of one debt per period",
-  "visual_goal": "Contrast a retry with no invoice (two payments) against a retry under one invoice (two attempts, one debt).",
-  "prompt": "Two-panel before/after illustration with a thin divider. Left panel: a wall calendar page labeled \"November\"; below it a membership card sends two separate orange arrows, each labeled \"charge\", to two identical payment receipts side by side, each stamped with a green check; a small worried customer figure looks at the two receipts. Right panel: the same calendar page labeled \"November\"; below it one document with a folded corner labeled \"Invoice\" sits between the membership card and the receipts; a grey arrow labeled \"attempt 1\" ends in a receipt with a red cross, and a blue arrow labeled \"attempt 2\" ends in one receipt with a green check; both arrows start from the invoice. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Left: one month, two charges, two successful payments. Right: one month, one invoice, a failed first attempt and a successful second attempt.",
-  "caption": "Without a record of one debt per period a retry is a second payment; with an invoice it is a second attempt at the same debt."
-}
--->
+![Left: one month, two charges, two successful payments. Right: one month, one invoice, a failed first attempt and a successful second attempt.](assets/images/27-subscriptions-and-billing-engines/27-one-debt-two-attempts.jpeg)
+**Figure 2:** *Without a record of one debt per period a retry is a second payment; with an invoice it is a second attempt at the same debt.*
 
 ## The Engine: A Scheduler, a Price Calculator and a State Machine
 
 A billing engine is the system that makes those five decisions, and it has three parts. A **scheduler** decides when. A **price calculator** decides how much. A **subscription state machine** decides what the subscription now is. Their joint output is an invoice, which a payment engine is then asked to collect. What follows is a reference design, not either company's; the figure below shows the layout.
 
-<!-- illustration-placeholder
-{
-  "id": "27-billing-engine-parts",
-  "status": "pending",
-  "asset": "assets/images/27-subscriptions-and-billing-engines/27-billing-engine-parts.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that names the three parts of the engine",
-  "visual_goal": "Show the three parts of a billing engine, the invoice as the only object that crosses to the payment engine, and the result coming back.",
-  "prompt": "Component layout, left to right. Far left, two inputs stacked: a wall clock labeled \"Clock\" and a price tag list labeled \"Price list\". Center, a large rounded container labeled \"Billing engine\" holding three boxes in a row: a box with an alarm bell labeled \"Scheduler\", a box with a calculator labeled \"Price calculator\", a box with a small circle-and-arrow diagram labeled \"State machine\". A blue arrow labeled \"period ended\" runs from the clock to the scheduler; a blue arrow labeled \"prices\" runs from the price list to the calculator; a short arrow runs from scheduler to calculator. To the right of the container a vertical dashed boundary line. One document with a folded corner labeled \"Invoice\" crosses the line on a green arrow labeled \"collect\" into a box on the far right with a card icon labeled \"Payment engine\". A teal return arrow labeled \"paid or failed\" runs from the payment engine back under the line to the state machine. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A clock and a price list feed a billing engine made of a scheduler, a price calculator and a state machine; an invoice crosses a boundary to the payment engine, and a result returns to the state machine.",
-  "caption": "A billing engine is a scheduler, a price calculator and a state machine; the invoice is the only object that crosses to the payment engine, and the payment's result comes back to the state machine."
-}
--->
+![A clock and a price list feed a billing engine made of a scheduler, a price calculator and a state machine; an invoice crosses a boundary to the payment engine, and a result returns to the state machine.](assets/images/27-subscriptions-and-billing-engines/27-billing-engine-parts.jpeg)
+**Figure 3:** *A billing engine is a scheduler, a price calculator and a state machine; the invoice is the only object that crosses to the payment engine, and the payment's result comes back to the state machine.*
 
 The scheduler acts first. It finds every subscription whose period has ended and creates exactly one invoice for that subscription and period. Its hard requirements are about being neither late nor twice:
 
@@ -201,19 +168,8 @@ The table sets the two companies side by side. Each Stripe and Adyen cell repeat
 
 On Stripe, your work is to choose the rules on purpose (anchor, proration behavior, billing mode, what follows failed retries) and to read them back per subscription instead of trusting defaults. On Adyen, your work starts earlier: before the first renewal runs, name the system that holds the schedule, the amount and the invoice, and give Adyen a reference per period.
 
-<!-- illustration-placeholder
-{
-  "id": "27-where-the-engine-lives",
-  "status": "pending",
-  "asset": "assets/images/27-subscriptions-and-billing-engines/27-where-the-engine-lives.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that says what an integrator does differently on each provider",
-  "visual_goal": "Show that with Provider A the schedule, amount and invoice sit inside the provider, and with Provider B they sit in the merchant's own system above a token and a payment.",
-  "prompt": "Two-panel comparison with a thin divider. Left panel, headed by a small tag \"Provider A\": a large rounded platform box containing four stacked items from top to bottom, a calendar icon labeled \"Schedule\", a calculator icon labeled \"Amount\", a document icon labeled \"Invoice\", a card icon labeled \"Payment\"; above the box a small laptop labeled \"Your system\" sends one thin teal arrow labeled \"configure\" down into the box. Right panel, headed by a small tag \"Provider B\": a taller laptop-and-server group labeled \"Your system\" containing the calendar icon labeled \"Schedule\", the calculator icon labeled \"Amount\" and the document icon labeled \"Invoice\"; below it a smaller rounded platform box containing a key icon labeled \"Token\" and a card icon labeled \"Payment\"; an orange arrow labeled \"charge\" runs down from your system into the platform box. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Left: a provider's platform contains schedule, amount, invoice and payment, and the merchant only configures it. Right: the merchant's system contains schedule, amount and invoice and sends a charge to a provider that holds a token and a payment.",
-  "caption": "Where the engine lives in each provider's documentation: Provider A (Stripe) holds the schedule, the amount, the invoice and the payment; Provider B (Adyen) holds the token and the payment, and the rest sits in the merchant's system."
-}
--->
+![Left: a provider's platform contains schedule, amount, invoice and payment, and the merchant only configures it. Right: the merchant's system contains schedule, amount and invoice and sends a charge to a provider that holds a token and a payment.](assets/images/27-subscriptions-and-billing-engines/27-where-the-engine-lives.jpeg)
+**Figure 4:** *Where the engine lives in each provider's documentation: Provider A (Stripe) holds the schedule, the amount, the invoice and the payment; Provider B (Adyen) holds the token and the payment, and the rest sits in the merchant's system.*
 
 ## In Practice at Larkfield: One Upgrade, One Renewal
 

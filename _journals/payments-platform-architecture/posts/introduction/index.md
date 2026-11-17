@@ -44,19 +44,8 @@ Behind Mila's two seconds stand five promises, made in turn by her bank, the stu
 | Payout | The provider: “this is yours to withdraw” | Thursday 11 March |
 | Dispute window | None: until it closes, nothing is final | Until about 7 July 2027 |
 
-<!-- illustration-placeholder
-{
-  "id": "introduction-two-seconds-and-the-slow-truth",
-  "status": "pending",
-  "asset": "assets/images/introduction/introduction-two-seconds-and-the-slow-truth.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of five promises in the section The Argument",
-  "visual_goal": "Show how small the instant answer is beside the time the payment really takes: an approval after two seconds, a payout two days later, and a dispute window that stays open for about 120 days.",
-  "prompt": "Create a conceptual timeline illustration. A long horizontal line runs from left to right across the image. At the far left, a smartphone shows one green check mark, with a small stopwatch beside it labeled \"2 seconds\". Close to it on the line, a small bank building with a speech bubble containing a handshake icon, labeled \"Promise\". Further right, at about one fifth of the line, a yoga studio shopfront receiving a euro coin from a blue office block, labeled \"Day 2: paid\". The rest of the line, most of its length, is drawn as a dashed orange stretch ending at a calendar page at the far right labeled \"Day 120\". Above the dashed stretch, a curved orange arrow labeled \"Dispute\" runs from the calendar page back toward the studio, carrying a coin labeled \"€120\". Under the whole line, a thin teal bracket labeled \"Slow truth\" spans from the bank building to the calendar page. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A timeline with a two-second approval at the far left, a payout on day 2, and a long dashed stretch to day 120 from which a dispute arrow carries €120 back.",
-  "caption": "The answer arrives in two seconds; the studio is paid on Thursday, and the €120 can be taken back for about 120 days."
-}
--->
+![A timeline with a two-second approval at the far left, a payout on day 2, and a long dashed stretch to day 120 from which a dispute arrow carries €120 back.](assets/images/introduction/introduction-two-seconds-and-the-slow-truth.jpeg)
+**Figure 1:** *The answer arrives in two seconds; the studio is paid on Thursday, and the €120 can be taken back for about 120 days.*
 
 It follows that **the API's answer is not the outcome**. A payment is done when it is settled and every record of it agrees. Every major component in this book exists to close the gap between the instant answer and that slow truth without losing or duplicating money: payment state machines, idempotency keys (identifiers that let a provider recognize a repeated request), ledgers, reconciliation (matching one record against another that someone else wrote), tokens that stand in for card numbers, risk scoring and the accounts a platform gives its sellers.
 
@@ -96,19 +85,8 @@ The book has four preface pages, ten parts and four reference pages.
 
 The parts are in prerequisite order. Part I, the one part not to skip, gives the parties and the timeline. Approval (II) needs both; the ledger (III) records them; the API (IV) exposes the ledger's balances and the payment's states; the controls of Part V sit in the API's path. Billing (VI) follows because collecting a failed renewal uses stored cards. Platforms (VII) and scale (VIII) widen the view to many sellers and to the system under load. The journeys and the two companies come last: put first, the cases would ask you to judge two architectures before you knew the problem they solve.
 
-<!-- illustration-placeholder
-{
-  "id": "introduction-map-of-the-book",
-  "status": "pending",
-  "asset": "assets/images/introduction/introduction-map-of-the-book.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that explains the order of the parts in the section How the Book Is Organized",
-  "visual_goal": "Show the shape of the book as one path: a preface, eight mechanism parts in order, then whole payments and the two companies, and a reference shelf at the end.",
-  "prompt": "Create a structural map drawn as a winding path from the lower left to the upper right. At the start of the path, a small open book labeled \"Preface\". Along the path, ten round numbered stations with the numbers \"1\" to \"10\" inside them. Stations 1 to 8 are blue and teal and sit inside one long, lightly shaded band labeled \"Mechanisms\"; a small icon stands beside each: a euro coin moving between two bank buildings at 1, a green check mark at 2, an open ledger book at 3, a pair of angle brackets at 4, a shield at 5, a repeating calendar at 6, three connected shopfronts at 7, a server rack with a gauge at 8. Station 9 is green and sits in a second band labeled \"Whole payments\", with an icon of one long arrow passing through four small dots. Station 10 is orange and sits in a third band labeled \"Two companies\", with an icon of two different buildings side by side marked \"A\" and \"B\". At the end of the path, a small bookshelf labeled \"Reference\". One thin blue arrow labeled \"read in order\" follows the path from the open book to the bookshelf. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A path from a preface through ten numbered stations to a reference shelf; stations 1 to 8 are grouped as mechanisms, station 9 as whole payments and station 10 as two companies.",
-  "caption": "The book as one path: a preface, eight parts that each explain a group of mechanisms, a part that follows whole payments, a part on the two companies (A is Stripe, B is Adyen), and the reference pages."
-}
--->
+![A path from a preface through ten numbered stations to a reference shelf; stations 1 to 8 are grouped as mechanisms, station 9 as whole payments and station 10 as two companies.](assets/images/introduction/introduction-map-of-the-book.jpeg)
+**Figure 2:** *The book as one path: a preface, eight parts that each explain a group of mechanisms, a part that follows whole payments, a part on the two companies (A is Stripe, B is Adyen), and the reference pages.*
 
 Inside Parts I to VIII every chapter has the same anatomy. It opens on a scene at Larkfield and a short paragraph headed **“Where we are in the payment's journey”**, which places it on the path of Mila's pass. It states the problem before the mechanism, then the designs and their trade-offs. A section titled **“Stripe and Adyen: Where They Differ”** compares the two companies, and the failure cases follow. It ends with “What to Take Away”, questions for a design review, and its sources.
 

@@ -20,35 +20,13 @@ The four have one cause. [[part-3]] showed the provider from inside, where every
 
 This part's answer is that an API can make a slow payment with several parties look like one call only on two conditions. It must give the developer **a contract for each case the call hides**: an identity and a state for each payment, a key that makes a request safe to repeat, a pinned version, and events for outcomes that arrive after the response. And it must **state the limit within which each contract holds**. The limits are concrete, and they differ. By documentation read in November 2026, Stripe's API v1 keeps a key for at least 24 hours and retries an undelivered event for up to three days; Adyen keeps a key for 7 to 14 days and retries for up to 30 days. An integration is therefore built to its provider's terms, with its own record for whatever falls outside them.
 
-<!-- illustration-placeholder
-{
-  "id": "part-4-one-call-four-contracts",
-  "status": "pending",
-  "asset": "assets/images/part-4-intro/part-4-one-call-four-contracts.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that states the part's claim",
-  "visual_goal": "Show one simple call on the surface and, behind it, four contracts that each end at a marked limit, with the integrator's own record beyond the limits.",
-  "prompt": "Create a wide conceptual diagram. On the left, a laptop labeled \"Your code\" sends one bold blue arrow labeled \"One call\" to a rounded server box on the right labeled \"Provider\". Below that arrow, drawn like the hidden part of an iceberg under a thin waterline, four horizontal bars of different lengths start at the laptop side and run toward the right, each ending in a small orange fence post. From top to bottom the bars are teal, green, blue and teal and are labeled \"State\", \"Key\", \"Version\" and \"Events\". A single vertical dashed orange line joins the four fence posts loosely and is labeled \"Limits\". To the right of the fence posts, under the provider box, a database cylinder labeled \"Your record\" with a green check mark. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "One arrow labeled one call runs from a developer's code to a provider; beneath it four bars labeled State, Key, Version and Events each end at a limit, and beyond the limits sits the developer's own record.",
-  "caption": "The shape of Part IV: one call hides four contracts, each contract ends at a limit, and beyond the limits only your own record of the payment remains."
-}
--->
+![One arrow labeled one call runs from a developer's code to a provider; beneath it four bars labeled State, Key, Version and Events each end at a limit, and beyond the limits sits the developer's own record.](assets/images/part-4-intro/part-4-one-call-four-contracts.jpeg)
+**Figure 1:** *The shape of Part IV: one call hides four contracts, each contract ends at a limit, and beyond the limits only your own record of the payment remains.*
 
 Five chapters take these contracts in the order each depends on the last: what the API exposes (objects, identifiers, errors); how a request is made safe to repeat; how the API changes without breaking integrations; how the provider reports what happens after the response; and the keys, test environments and limits around all of it. Each sets Stripe's and Adyen's documented terms side by side. Each also says where the public record of their implementation stops, which is early: much of it is Stripe engineering posts from 2017.
 
-<!-- illustration-placeholder
-{
-  "id": "part-4-five-chapters-widening",
-  "status": "pending",
-  "asset": "assets/images/part-4-intro/part-4-five-chapters-widening.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the roadmap paragraph",
-  "visual_goal": "Show the five chapters as a scope that widens from one payment object to every caller of the API.",
-  "prompt": "Create a wide structural diagram of five panels in a row from left to right, each slightly larger than the one before, joined by thin blue arrows pointing right. Panel 1: a single document card with a small tag, labeled \"Objects\". Panel 2: one envelope with a key attached and a looping arrow, labeled \"One request\". Panel 3: a calendar with several pages fanned out behind a laptop, labeled \"Years\". Panel 4: a server sending many small orange envelopes to a mailbox, labeled \"Every event\". Panel 5: a crowd of many laptops facing a turnstile in front of a server, labeled \"All callers\". Under the whole row, a long thin teal arrow from left to right labeled \"wider\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Five panels of growing size: a payment object, one request with a key, an integration over years, every event a provider sends, and all callers at a turnstile.",
-  "caption": "The five chapters widen in scope: the objects, one request, one integration over years, every event the provider sends, and all callers of the API at once."
-}
--->
+![Five panels of growing size: a payment object, one request with a key, an integration over years, every event a provider sends, and all callers at a turnstile.](assets/images/part-4-intro/part-4-five-chapters-widening.jpeg)
+**Figure 2:** *The five chapters widen in scope: the objects, one request, one integration over years, every event the provider sends, and all callers of the API at once.*
 
 ## Chapters in this part
 

@@ -36,19 +36,8 @@ For years the renewal job had a simple shape. On the 1st of each month, 38% of L
 
 Because of what the job did, the review looked for a bug and found none. When Femke de Graaf, who joined as head of payments engineering in January 2027, went through the incident with Tom Hendriks, the engineer who built the payment service, they found three questions that nobody had asked. Which key was the job using? It was an unrestricted Stripe secret key from 2017, shared with four other systems, and it could refund or pay out anything in the account. What had the test run shown? The job's tests sent a few hundred renewals to the test environment, never a wave. And which limit applied, and where was it written? The key did no harm that day; it is here because the review found it in the same place as the limit, among the terms of the API that nobody had read. The figure below shows the three.
 
-<!-- illustration-placeholder
-{
-  "id": "21-three-terms-around-the-api",
-  "status": "pending",
-  "asset": "assets/images/21-developer-platform/21-three-terms-around-the-api.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph listing the review's three questions",
-  "visual_goal": "Show a key, a rehearsal and a turnstile as three things a caller passes before reaching the API.",
-  "prompt": "Conceptual scene, left to right. Far left: a small software-window icon with a worker figure beside it, the caller. Next: a wall rack holding five keys of different sizes, one large and four small, labeled \"Keys\". Next: a small stage with a curtain and a cardboard cut-out of a bank building, labeled \"Test\". Next: a turnstile with a counter display, labeled \"Limit\". Far right: a service counter with a clerk and a euro coin on it, labeled \"API\". A single blue arrow labeled \"request\" runs from the caller past the key rack and through the turnstile to the counter; a dashed teal arrow labeled \"rehearsal\" loops from the caller to the stage and back. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A caller's request passes a rack of keys and a turnstile on its way to a service counter, with a side loop to a rehearsal stage.",
-  "caption": "Three terms stand between a caller and a payment API: the key it holds, the rehearsal it ran and the limit it sends into."
-}
--->
+![A caller's request passes a rack of keys and a turnstile on its way to a service counter, with a side loop to a rehearsal stage.](assets/images/21-developer-platform/21-three-terms-around-the-api.jpeg)
+**Figure 1:** *Three terms stand between a caller and a payment API: the key it holds, the rehearsal it ran and the limit it sends into.*
 
 ## Credentials: What One Key Is Allowed to Do
 
@@ -80,19 +69,8 @@ The third term is the one the renewal job met. One API serves every customer of 
 
 That post is also the only limiter design I found from either company. **(Evidence age: 9 years; the current system may differ.)** "At Stripe, we operate 4 different types of limiters in production", wrote its author, Paul Tarjan. Two act per user. The request rate limiter "restricts each user to N requests per second". The concurrent requests limiter caps work in progress: "You can only have 20 API requests in progress at the same time". Two are load shedders. The fleet usage load shedder splits traffic into "critical API methods (e.g. creating charges) and non-critical methods (e.g. listing charges.)" and reserves capacity for the first kind: with a 20% reservation, "any non-critical request over their 80% allocation would be rejected with status code 503". The worker utilization load shedder "is the final line of defense" and sheds by priority, "starting with test mode traffic" and reaching critical methods last. The post names its mechanism: "We use the token bucket algorithm", implemented with Redis. The figure below shows the four in one path.
 
-<!-- illustration-placeholder
-{
-  "id": "21-four-limiters-in-one-path",
-  "status": "pending",
-  "asset": "assets/images/21-developer-platform/21-four-limiters-in-one-path.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph describing the four limiters of 2017",
-  "visual_goal": "Show two per-caller limiters followed by two system-wide load shedders, with critical requests passing and lower-priority ones turned away.",
-  "prompt": "Structural diagram, a horizontal path from left to right. Left: three stacks of envelopes of different heights, the callers; the tallest stack is orange. Four gates stand in a row on the path. Gate one, labeled \"Rate\": an orange arrow labeled \"too fast\" bends away from it back to the tallest stack. Gate two, labeled \"Concurrency\": a second orange arrow labeled \"too many open\" bends away. A bracket under gates one and two is labeled \"Per caller\". Gate three, labeled \"Fleet shedder\", and gate four, labeled \"Worker shedder\", share a bracket labeled \"Whole system\"; from each a gray arrow labeled \"low priority\" bends away downward. A thick green arrow labeled \"critical\" passes straight through all four gates to a row of worker figures at desks on the right. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Requests pass four gates in a row: a rate gate and a concurrency gate that turn back one fast caller, then two shedding gates that turn away low-priority requests while critical ones reach the workers.",
-  "caption": "The four limiters Stripe described in 2017: two refuse one caller's excess, two shed lower-priority requests from everyone so that critical requests still reach a worker."
-}
--->
+![Requests pass four gates in a row: a rate gate and a concurrency gate that turn back one fast caller, then two shedding gates that turn away low-priority requests while critical ones reach the workers.](assets/images/21-developer-platform/21-four-limiters-in-one-path.jpeg)
+**Figure 2:** *The four limiters Stripe described in 2017: two refuse one caller's excess, two shed lower-priority requests from everyone so that critical requests still reach a worker.*
 
 Nine years later, Stripe's documentation (n.d., accessed November 2026) confirms part of that account. It confirms rate limits and concurrency limits per account, and it still speaks of the "concurrency limiter" shedding new requests. It contradicts one sentence: in 2017 "Our API provides the same rate limiting behavior in both test and live modes"; today sandbox limits are lower. It says nothing about the two load shedders, and no current source confirms that they still exist. What it adds is the numbers an integrator plans against. A refused request returns 429 with a `Stripe-Rate-Limited-Reason` header whose value names the limit that was hit, for example `global-rate` or `endpoint-rate`, and a large increase should be requested "at least 6 weeks in advance". Note the third row of the table: a batch that sends one kind of request meets the 25, not the 100.
 
@@ -134,19 +112,8 @@ So on Stripe, plan from the published page and ask only when your computed rate 
 
 Start with Larkfield's arithmetic. The wave is about 357,000 renewals in six hours, which is 21,600 seconds: an average of about 17 requests a second, far below 100. Assume the wave splits between providers as volume does, 44% to Stripe and 56% to Adyen *(assumption)*: about 157,000 renewals on Stripe, or 7 a second, and about 200,000 on Adyen, or 9 a second. The average was never the problem. Each renewal is one request to the endpoint that creates a payment. Assume a call takes half a second *(assumption)*: 12 workers then send at most 24 requests a second, under Stripe's 25 per endpoint by luck, and 48 workers send up to 96. The rule: **requests ÷ seconds gives the average; workers ÷ seconds per call gives the burst; compare both with the per-endpoint and the per-account limit.**
 
-<!-- illustration-placeholder
-{
-  "id": "21-burst-versus-paced",
-  "status": "pending",
-  "asset": "assets/images/21-developer-platform/21-burst-versus-paced.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that computes the wave's average and burst rates",
-  "visual_goal": "Show that the same number of requests crosses a limit when sent in a burst and stays under it when paced.",
-  "prompt": "Two-panel before/after chart illustration with a thin divider. Both panels share a horizontal dashed orange line labeled \"Limit\" at the same height and a horizontal time axis with a small clock icon. Left panel, labeled \"Burst\": one tall narrow blue block that rises far above the dashed line; the part above the line is hatched orange, with an orange arrow labeled \"refused\" pointing away from it. Right panel, labeled \"Paced\": a long low teal band of the same area, well under the dashed line, with a small funnel-and-bucket icon at its left edge releasing evenly spaced dots. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Left: a tall burst of requests crosses a limit line and its top is refused. Right: the same requests spread as a low band under the line.",
-  "caption": "The same renewals sent as a burst cross the limit and are refused; paced over a longer window they stay under it."
-}
--->
+![Left: a tall burst of requests crosses a limit line and its top is refused. Right: the same requests spread as a low band under the line.](assets/images/21-developer-platform/21-burst-versus-paced.jpeg)
+**Figure 3:** *The same renewals sent as a burst cross the limit and are refused; paced over a longer window they stay under it.*
 
 Decision K5 of Keel, Larkfield's 2027 program for its payment systems, answers the burst: renewals are spread and rate-limited by Larkfield, not by the provider. The wave now runs over 18 hours (64,800 seconds), which needs about 2.4 requests a second on Stripe and 3.1 on Adyen. The payment service holds one token bucket per provider and endpoint. The Stripe bucket for creating payments is set to 10 a second, well under 25, because members buying a pass in the app use the same endpoint and are waiting; they are served before the batch. The Adyen bucket is set to 5 a second, and is raised only after Larkfield has asked Adyen what its company account may send. A 429 changes no payment state: the renewal returns to the queue and is sent again after a backoff with the same idempotency key, as K1 requires ([[idempotency-and-retries]]). Stripe documents why that is safe: "Errors that occur before execution begins, such as invalid parameters, an invalid API key, or rate limiting, don’t cache a result."
 

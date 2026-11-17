@@ -54,19 +54,8 @@ Routing across providers is the other level, and the industry calls it **payment
 
 Whoever builds it, a routing layer has five parts. One **payment API** that the rest of the business calls. A **rule engine** that picks a provider. An **adapter** per provider, which translates the request into that provider's API and its answers into one vocabulary of outcomes ([[payment-state-machines]]). A **credential store**: some way for every adapter to reach the card being charged. And an **attempt record** of which provider was tried and what it answered. The figure below draws these above a line; below it is what each provider keeps.
 
-<!-- illustration-placeholder
-{
-  "id": "10-routing-layer-anatomy",
-  "status": "pending",
-  "asset": "assets/images/10-routing-and-orchestration/10-routing-layer-anatomy.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that lists the five parts of a routing layer",
-  "visual_goal": "Show the line between the shared layer and what each provider keeps.",
-  "prompt": "Create a component-layout illustration split by a bold horizontal dashed line. Above the line, a wide rounded box holds five small blocks in a row labeled 'Payment API', 'Rules', 'Adapters', 'Card store', 'Attempt record'. An arrow named 'payment request' enters the wide box from a small shop icon at the top left. From the 'Adapters' block two arrows named 'authorization' go down across the dashed line, one to a blue box labeled 'Provider A' on the lower left, one to a teal box labeled 'Provider B' on the lower right. Under each provider box draw the same four small items: a folder labeled 'Disputes', a calendar labeled 'Settlement', a coin stack labeled 'Balance', a sheet labeled 'Reports'. Left edge: a bracket above the line labeled 'Shared', one below labeled 'Per provider'. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Five shared parts above a dashed line; two providers below, each with its own back office.",
-  "caption": "A routing layer shares five parts; disputes, settlement, the balance and the reports stay one set per provider."
-}
--->
+![Five shared parts above a dashed line; two providers below, each with its own back office.](assets/images/10-routing-and-orchestration/10-routing-layer-anatomy.jpeg)
+**Figure 1:** *A routing layer shares five parts; disputes, settlement, the balance and the reports stay one set per provider.*
 
 The most precise public description of where the line runs comes from a company that sells such a layer. Stripe previewed **Stripe Orchestration** on 7 May 2025, and its documentation still said "Orchestration is in private preview" on 17 November 2026. It routes card payments to Adyen, Braintree or Worldpay's WPG gateway. A rule is a condition on the amount, the currency, the card's country, issuer, type or BIN (bank identification number: the leading digits of the card number, which identify the issuer), or metadata attached to the payment. "Stripe executes the conditions in order, from left to right, and applies the first action that matches a payment's condition", and each action names a main processor and, optionally, one retry processor.
 
@@ -90,19 +79,8 @@ When a customer saves a card, your systems receive a **provider token**: a refer
 
 The vault can live in three places, shown in the figure below. **At one provider**: the second provider reaches those cards only if the first passes them along. **At an independent vault or orchestrator in front of both**: this is what Spreedly's homepage (n.d., accessed November 2026) sells, "Hold every credential in your own vault, use it with any provider", at the price of a new vendor on which every payment depends. **At each provider separately**: every card stored twice and kept in step.
 
-<!-- illustration-placeholder
-{
-  "id": "10-where-the-vault-lives",
-  "status": "pending",
-  "asset": "assets/images/10-routing-and-orchestration/10-where-the-vault-lives.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that names the three places a vault can live",
-  "visual_goal": "Make the location of the card vault the visible design decision.",
-  "prompt": "Create a three-panel conceptual illustration, panels side by side, separated by thin vertical lines. Each panel shows a merchant shop icon at the top holding a small key tag labeled 'token', and two provider buildings at the bottom, a blue one on the left and a teal one on the right. An orange safe with a card symbol on its door is the card vault. Panel 1, labeled 'At one provider': the safe sits inside the blue building, and a thin dotted arrow named 'forward' runs from the safe to the teal building. Panel 2, labeled 'In front of both': the safe sits between the shop and the buildings, with two solid arrows named 'charge' going down from it, one to each building. Panel 3, labeled 'At each provider': one safe inside each building, joined by a double-headed dashed arrow named 'keep in step'. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A card safe at one provider, in front of two, and at each.",
-  "caption": "The card vault can live at one provider, in front of both, or at each; the merchant holds only tokens in every case."
-}
--->
+![A card safe at one provider, in front of two, and at each.](assets/images/10-routing-and-orchestration/10-where-the-vault-lives.jpeg)
+**Figure 2:** *The card vault can live at one provider, in front of both, or at each; the merchant holds only tokens in every case.*
 
 For the first arrangement both companies document a **forwarding proxy**. You send a request addressed to a third party with placeholders for the card details; the provider fills them in from its vault and sends it on. Stripe's Vault and Forward API (n.d., accessed November 2026) is "available only to businesses with a dedicated Stripe account team" and forwards to a published list of destinations that includes Adyen, Braintree, Worldpay and Spreedly. Adyen's documentation (n.d., accessed November 2026) says: "You can forward payment details that you stored with Adyen to a PCI compliant third party, like a payment service provider (PSP). We support forwarding card details, and network tokens." Adyen's support must enable it; the page lists no destinations.
 
@@ -182,19 +160,8 @@ The rehearsal exercises the per-provider column. Each quarter, for each of the 5
 
 The first failure is the expensive one. The layer sends a payment to provider A and gets no answer. It is configured to retry failed payments on provider B, so it does, and B approves. But A had approved too; its answer was lost in the timeout. The customer has two charges at two providers that cannot see each other. Inside one provider an idempotency key lets a retry be recognized as a repeat ([[idempotency-and-retries]]); across two there is no shared key, so this is Larkfield's Double Charge of 1 November 2026 (1,840 members charged twice, €71,300 refunded) without the remedy. **A timeout is an unknown outcome, not a failure. Retry on another provider only when the first attempt is known to have failed**; until then, ask the first provider what happened. Stripe's product holds back in a similar case: when 3-D Secure (the protocol by which the issuer authenticates the cardholder; [[three-d-secure-and-sca]]) was attempted and the payment still failed, "Orchestration doesn't retry the transaction on the retry processor".
 
-<!-- illustration-placeholder
-{
-  "id": "10-cross-provider-retry",
-  "status": "pending",
-  "asset": "assets/images/10-routing-and-orchestration/10-cross-provider-retry.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on retrying a timeout on another provider",
-  "visual_goal": "Show how a timeout followed by a retry elsewhere produces two charges.",
-  "prompt": "Create a sequence-style illustration with four vertical lanes from left to right: a customer with a phone, a box labeled 'Routing layer', a blue building labeled 'Provider A', a teal building labeled 'Provider B'. Arrow 1 named 'pay' goes from the customer to the routing layer. Arrow 2 named 'attempt 1' goes from the routing layer to Provider A. A return arrow named 'approved' leaves Provider A toward the routing layer but breaks off halfway at an orange lightning mark beside a small clock labeled 'timeout'. Arrow 3 named 'retry' goes from the routing layer past Provider A to Provider B, and a return arrow named 'approved' comes back from Provider B to the routing layer. At the bottom left, beside the customer, a phone screen shows two identical orange charge lines, each with a euro sign, under a small label 'Charged twice'. Above the broken arrow, a tag labeled 'Unknown, not failed'. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A timed-out approval at Provider A, a retry approved at Provider B, a customer charged twice.",
-  "caption": "A timeout is an unknown outcome: retried on Provider B while Provider A had approved, one purchase becomes two charges."
-}
--->
+![A timed-out approval at Provider A, a retry approved at Provider B, a customer charged twice.](assets/images/10-routing-and-orchestration/10-cross-provider-retry.jpeg)
+**Figure 3:** *A timeout is an unknown outcome: retried on Provider B while Provider A had approved, one purchase becomes two charges.*
 
 The second failure appears on the day of the outage. A failover that has never carried traffic meets three per-provider facts at once. The second merchant account is cold; Canva spoke of three months of warm-up. A feature the payment uses is missing on the other side; in Stripe's product such a request "fails with a `400` error code `orchestration_unsupported`". And 3-D Secure authentication was set up for the other acquirer; Stripe makes the merchant responsible for supplying the acquirer BIN of the processor a payment is routed to. This is The Single Rail with a second rail nobody has driven on, and only a rehearsal with real payments detects it.
 

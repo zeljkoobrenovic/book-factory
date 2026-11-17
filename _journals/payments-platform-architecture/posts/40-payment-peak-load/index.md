@@ -36,19 +36,8 @@ In April 2027 a review of Keel, Larkfield's 2027 program to put its payments est
 
 Femke de Graaf, head of payments engineering since January 2027, accepted his arithmetic and disputed what it compared. The 152,000 is what the provider carried for all its customers together on its busiest minute. What one customer may send is a different number, and [[payment-developer-platform]] gave it: Stripe's documentation (n.d., accessed November 2026) allows an account 100 requests a second, and 25 a second to one endpoint unless noted otherwise; Adyen publishes no figure for payments. Her answer left two questions, and they are this chapter's: what do the published figures count, and where does a merchant's own peak fail? The figure below shows the distinction she drew.
 
-<!-- illustration-placeholder
-{
-  "id": "40-the-share-not-the-pipe",
-  "status": "pending",
-  "asset": "assets/images/40-payment-peak-load/40-the-share-not-the-pipe.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph with Femke's answer in the scene section",
-  "visual_goal": "Show that a provider's large total capacity is divided into small per-customer shares, and that one customer's burst hits its own small gate, not the big channel.",
-  "prompt": "Conceptual illustration of a wide canal seen from above at an angle, flowing left to right, labeled \"Capacity\". Along its near bank stand six small sluice gates of equal size, each with a narrow feeder channel coming from a small building; one bracket over the gates is labeled \"One share each\". Five feeder channels carry a thin calm blue stream through their gates into the canal. The sixth feeder channel, colored orange, carries a tall surge of water that piles up behind its small gate and spills back toward its building; an orange arrow labeled \"refused\" points back from that gate to the building. The wide canal behind the gates is calm and only half full, with a teal arrow labeled \"room left\" pointing at the empty part. A small figure of a studio staff member stands at the orange building looking at the gate. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A wide half-empty canal fed through six small equal gates; one feeder channel surges and backs up behind its own gate while the canal has room left.",
-  "caption": "A merchant's burst is stopped at its own small gate while the provider's capacity has room left."
-}
--->
+![A wide half-empty canal fed through six small equal gates; one feeder channel surges and backs up behind its own gate while the canal has room left.](assets/images/40-payment-peak-load/40-the-share-not-the-pipe.jpeg)
+**Figure 1:** *A merchant's burst is stopped at its own small gate while the provider's capacity has room left.*
 
 ## Peak Profiles: Who Creates the Peak and Who Is Waiting
 
@@ -62,19 +51,8 @@ A **peak profile** describes a peak by three things: its shape over time, who cr
 
 Those three properties decide what can be done. A shared peak is the provider's to carry: the provider plans for the sum of every merchant's rise, and a merchant can only prepare its own systems ([[peak-load-and-reliability]] covers that side for retail). A merchant's own peak arrives alone. On the first of the month one merchant's traffic rises many times over while the provider's total barely moves, so the only limit in play is the per-customer one. And whether anyone is waiting decides whether the load may be late: a renewal can be charged at 14:00 instead of 02:00 without anyone noticing, while a ticket buyer cannot be asked to come back in the afternoon. The figure below shows the three shapes and the line each one meets.
 
-<!-- illustration-placeholder
-{
-  "id": "40-three-peak-profiles",
-  "status": "pending",
-  "asset": "assets/images/40-payment-peak-load/40-three-peak-profiles.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that separates a shared peak from a merchant's own peak",
-  "visual_goal": "Show three peak shapes over time and that the shared retail peak approaches the provider's capacity line while the two single-merchant peaks hit a much lower per-customer line.",
-  "prompt": "Three small charts side by side in one frame, each with a horizontal time axis and no numbers. Left chart, labeled \"Four days\": a broad raised plateau built from many thin stacked bands in different blues and teals, as if many merchants are stacked together; a high dashed teal line above it labeled \"Capacity\"; the plateau stays just under that line. Middle chart, labeled \"Sale\": one narrow tall orange spike; a low dashed orange line labeled \"Share\" cuts the spike near its base, and the part above the line is hatched; small figures of customers queue beneath the spike. Right chart, labeled \"First of month\": one solid blue block at the left edge of the axis, taller than the same low dashed orange line labeled \"Share\", with the part above the line hatched; a small calendar page showing the number 1 sits beside it and no people. A thin arrow labeled \"everyone\" points at the left plateau; a thin arrow labeled \"one merchant\" points at each of the other two shapes. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Three charts: a four-day plateau made of many merchants under a high capacity line, a narrow sale spike and a first-of-month block that both cross a low per-customer line.",
-  "caption": "The shared retail peak is measured against the provider's capacity; a sale or a first-of-month run by one merchant is measured against that merchant's share."
-}
--->
+![Three charts: a four-day plateau made of many merchants under a high capacity line, a narrow sale spike and a first-of-month block that both cross a low per-customer line.](assets/images/40-payment-peak-load/40-three-peak-profiles.jpeg)
+**Figure 2:** *The shared retail peak is measured against the provider's capacity; a sale or a first-of-month run by one merchant is measured against that merchant's share.*
 
 ## What the Published Peak Figures Count
 
@@ -112,19 +90,8 @@ Because the share is per customer, a merchant's own peak fails at the share and 
 
 **Backpressure** is a slow part of a system making the faster part upstream slow down. Over an HTTP API it reaches you in three forms: a refusal for volume (429), a shed request (Stripe's 2017 design answered lower-priority requests with 503 when the whole system was overloaded), and slower answers. A refusal for volume means the provider did not attempt the payment. Stripe's documentation says so for its own API: "Errors that occur before execution begins, such as invalid parameters, an invalid API key, or rate limiting, don’t cache a result." No bank was asked, so a refusal is lateness and never a decline. Any other error or a timeout is an unknown outcome until the provider's record says otherwise. The third form is quieter, because a cap on requests in progress turns slowness into a lower rate. Assume a call takes half a second: 50 slots carry 100 requests a second. If calls slow to two seconds, the same 50 slots carry 25 *(latencies are assumptions)*. No limit changed, and your rate fell by three quarters. The figure below shows the path and the signals that come back along it.
 
-<!-- illustration-placeholder
-{
-  "id": "40-backpressure-path",
-  "status": "pending",
-  "asset": "assets/images/40-payment-peak-load/40-backpressure-path.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that defines backpressure and its three forms",
-  "visual_goal": "Show the forward path of payment requests from a merchant's batch and checkout through its own pacing valve to the provider, the card network and the bank, and the three signals that travel back to the caller.",
-  "prompt": "Structural diagram, a horizontal path from left to right. Far left, two sources stacked vertically: on top a phone with a person beside it, labeled \"Checkout\"; below it a tall stack of envelopes, labeled \"Batch\". Both feed a single valve with a small dial, labeled \"Pacing\"; the checkout line enters the valve from above and is drawn thicker to show it goes first. Next, a gate with a counter display, labeled \"Provider\". Next, a hub with several spokes, labeled \"Network\". Far right, a building with columns, labeled \"Bank\". Blue arrows labeled \"request\" run left to right between each pair of elements. Three orange dashed arrows run right to left back to the valve: one from the provider gate labeled \"refused\", one from the provider gate drawn with a small clock labeled \"slower\", and one from the bank labeled \"unavailable\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Requests flow from checkout and a batch through a pacing valve to the provider, the network and the bank; dashed arrows carry refused, slower and unavailable signals back to the valve.",
-  "caption": "Slowness anywhere past your own pacing comes back as a refusal, a slower answer or an issuer-unavailable decline, and the pacing is where you respond to it."
-}
--->
+![Requests flow from checkout and a batch through a pacing valve to the provider, the network and the bank; dashed arrows carry refused, slower and unavailable signals back to the valve.](assets/images/40-payment-peak-load/40-backpressure-path.jpeg)
+**Figure 3:** *Slowness anywhere past your own pacing comes back as a refusal, a slower answer or an issuer-unavailable decline, and the pacing is where you respond to it.*
 
 What you may do with those signals depends on who is waiting. Where a customer is waiting, a queue can absorb only seconds before a late answer becomes an abandoned payment or a second press of the pay button. Where nobody is waiting, it can absorb hours. So the requirement on each path is written separately, as in the table below; the time budgets are my assumptions. Adyen has described using a queue this way on a path where nobody waits: after moving an Adyen for Platforms API from synchronous to asynchronous processing, its 2020 engineering post says, "we have better control over how and when the requests are executed". **(Evidence age: 6 years; about a platform API, not card authorization.)** In every row, the thing that may not give way is the record of the payment.
 
@@ -180,19 +147,8 @@ Where do the eighteen hours come from? From the Adyen side. Assume the wave spli
 
 Inside the run Larkfield is the one dividing a share. The payment service serves three lanes in strict order: members at checkout first, then confirmations and retries of requests whose outcome is unknown, then the batch. The batch is ordered by a hash of membership and billing period, so the order changes every month and no studio's members are always charged last. And the batch responds to backpressure: on a 429, or when the slowest 5% of calls take twice as long as usual, its bucket rate is halved, then restored in steps.
 
-<!-- illustration-placeholder
-{
-  "id": "40-three-lanes-eighteen-hours",
-  "status": "pending",
-  "asset": "assets/images/40-payment-peak-load/40-three-lanes-eighteen-hours.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph describing the three lanes inside the run",
-  "visual_goal": "Show three lanes of work merging through one paced valve in priority order, with the batch as the longest lane spread along a clock that runs for 18 hours.",
-  "prompt": "Structural illustration. On the left, three horizontal lanes stacked top to bottom, each ending at the same valve in the center. Top lane, short, with two phone icons, labeled \"Checkout\" and marked with a small number 1. Middle lane, short, with three envelopes carrying question marks, labeled \"Unknown\" and marked with a small number 2. Bottom lane, very long, filled with many small identical envelopes in shuffled blue and teal shades, labeled \"Batch\" and marked with a small number 3. The valve in the center has a dial and is labeled \"Pacing\"; a teal arrow labeled \"request\" leaves it to the right toward a plain gate. Above the bottom lane, a long horizontal bar with a clock at each end and the label \"18 hours\". From the gate, one orange dashed arrow labeled \"slow down\" curves back to the valve's dial. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Three lanes numbered one to three (checkout, unknown outcomes, a long shuffled batch) merge through one pacing valve; a slow-down signal returns from the provider's gate, and the batch spans 18 hours.",
-  "caption": "Checkout goes first, unknown outcomes second and the shuffled batch last, through one paced valve, over 18 hours."
-}
--->
+![Three lanes numbered one to three (checkout, unknown outcomes, a long shuffled batch) merge through one pacing valve; a slow-down signal returns from the provider's gate, and the batch spans 18 hours.](assets/images/40-payment-peak-load/40-three-lanes-eighteen-hours.jpeg)
+**Figure 4:** *Checkout goes first, unknown outcomes second and the shuffled batch last, through one paced valve, over 18 hours.*
 
 The long run costs a later charge and nothing else. A member charged at 17:00 instead of 02:00 keeps access all day, because her membership's record for the period is open and not failed ([[subscriptions-and-billing-engines]]). No message goes out for a renewal not yet attempted; the dunning email, the reminder sent after a failed payment, now follows only a real decline ([[invoicing-collections-and-dunning]]). The slower pace also protects Larkfield's own side. Assume three provider events per renewal *(assumption)*: the six-hour wave produced about 50 events a second for the webhook receivers, and the paced one about 17. The team rehearsed that side against a mock with sampled latencies, then watched the first paced wave in production.
 

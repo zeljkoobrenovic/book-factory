@@ -58,37 +58,15 @@ None of these checks is finished at sign-up, because each has a trigger that run
 | Transaction monitoring | Do the transactions fit what is known about the business? | Every transaction, looked at over time | A case for an analyst; possibly a confidential report |
 | Periodic review | Is what we hold still true? | The calendar | Confirmed, or a requirement |
 
-<!-- illustration-placeholder
-{
-  "id": "26-gate-versus-loop",
-  "status": "pending",
-  "asset": "assets/images/26-kyc-aml-and-regulation/26-gate-versus-loop.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of checks and what runs them again",
-  "visual_goal": "Show that verification is not a gate passed once at sign-up but a loop that passes the same checks again on four triggers.",
-  "prompt": "Two-panel conceptual illustration with a thin divider. Left panel: a small shop owner walking once through a single open gate labeled \"Sign-up\" toward a storefront, with a faded check mark above the gate; the panel is drawn in muted gray-blue to show it is the mistaken picture. Right panel: the same storefront at the center of a circular track drawn in teal; on the track are three checkpoints as small booths labeled \"Identity\", \"Lists\" and \"Activity\"; four orange arrows enter the track from outside, labeled \"Data change\", \"New list\", \"Threshold\" and \"Calendar\", each pushing a small token around the loop again; a green arrow labeled \"Payouts on\" leaves the loop toward the storefront. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Left: a business passes one gate at sign-up. Right: the business sits inside a loop of identity, list and activity checks that four triggers start again.",
-  "caption": "Onboarding is the first run of a loop: a data change, a new list entry, a threshold or the calendar sends an approved business through the checks again."
-}
--->
+![Left: a business passes one gate at sign-up. Right: the business sits inside a loop of identity, list and activity checks that four triggers start again.](assets/images/26-kyc-aml-and-regulation/26-gate-versus-loop.jpeg)
+**Figure 1:** *Onboarding is the first run of a loop: a data change, a new list entry, a threshold or the calendar sends an approved business through the checks again.*
 
 ## How Verification Becomes Software: Requirements, Deadlines, Capabilities
 
 A one-time "verified" flag cannot represent a loop. Both providers therefore hold the result of verification as three things. A **capability** is a named permission on an account, such as taking card payments or receiving payouts. A **requirement** is a missing fact or document. A **deadline** is the date by which a requirement must be met, and an unmet requirement at its deadline switches a capability off. Capabilities are computed from two inputs, the facts held about the business and the rules in force, and either input can change after onboarding. The figure shows the resulting state machine; [[platform-onboarding-and-verification]] covers what a platform does with it at sign-up.
 
-<!-- illustration-placeholder
-{
-  "id": "26-capability-state-machine",
-  "status": "pending",
-  "asset": "assets/images/26-kyc-aml-and-regulation/26-capability-state-machine.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that defines capability, requirement and deadline",
-  "visual_goal": "Show a capability's states and that an active capability can move back to a restricted state with a deadline, and then to off, without the seller acting.",
-  "prompt": "State-machine diagram with four rounded state boxes in a row from left to right: \"Pending\" (gray), \"Active\" (green), \"Due\" (orange, with a small clock icon), \"Off\" (dark blue, with a pause icon). A blue arrow labeled \"verified\" runs from Pending to Active. An orange arrow labeled \"new requirement\" runs from Active to Due. A green arrow labeled \"resolved\" curves back from Due to Active. An orange arrow labeled \"deadline passed\" runs from Due to Off. A green arrow labeled \"resolved\" curves from Off back to Active along the bottom. Above the Active-to-Due arrow, four small icons feed into it: a document with a pencil, a list with a new line, a rising bar chart and a calendar page. Under the Off box, a small bank building with a paused coin stream to show payouts stopped. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A capability moves from pending to active, from active to due when a new requirement appears, and from due to off when the deadline passes; resolving the requirement returns it to active.",
-  "caption": "A capability that is active can become due and then switched off: a new requirement starts a deadline, and a passed deadline stops payouts until the requirement is resolved."
-}
--->
+![A capability moves from pending to active, from active to due when a new requirement appears, and from due to off when the deadline passes; resolving the requirement returns it to active.](assets/images/26-kyc-aml-and-regulation/26-capability-state-machine.jpeg)
+**Figure 2:** *A capability that is active can become due and then switched off: a new requirement starts a deadline, and a passed deadline stops payouts until the requirement is resolved.*
 
 Stripe publishes the outstanding work as lists on the account. Its documentation on handling verification with the API (n.d., accessed November 2026) defines a `requirements` structure, and a platform learns of changes through the `account.updated` webhook. Six of its fields carry the contract between Stripe and a platform about one seller:
 
@@ -125,19 +103,8 @@ Verification asks who the business is. Monitoring asks what it does, and an engi
 | Output | Allow, block or challenge | A case for a person; possibly a report to an authority, or a freeze |
 | Is the customer told? | Yes: the payment is declined | Possibly not: the law can forbid it |
 
-<!-- illustration-placeholder
-{
-  "id": "26-two-lanes",
-  "status": "pending",
-  "asset": "assets/images/26-kyc-aml-and-regulation/26-two-lanes.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table comparing fraud scoring and money-laundering monitoring",
-  "visual_goal": "Show fraud scoring as a fast lane inside the payment and money-laundering monitoring as a slow lane after it, sharing data but ending in different outputs.",
-  "prompt": "Two horizontal lanes, one above the other, sharing a cylinder data store on the far left labeled \"Shared data\". Top lane in blue, short: a payment card icon enters a small gauge labeled \"Score\" with a stopwatch icon above it, and three short arrows leave to three small round signs: a green check labeled \"Allow\", a red-orange stop labeled \"Block\", a teal shield labeled \"Challenge\". Bottom lane in teal, long: a stack of many small payment icons flows into a calendar page icon, then into a magnifying glass over a line chart labeled \"Pattern\", then to a desk with an analyst and a folder labeled \"Case\", and from the folder two orange arrows leave: one to a sealed envelope labeled \"Report\" and one to a padlock on a coin stack labeled \"Hold\". A thin dashed line from the data store feeds both lanes. No arrow connects the top lane's outputs to the bottom lane. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A short top lane scores one payment and ends in allow, block or challenge. A long bottom lane looks for patterns over time and ends in a case, a report and a hold. Both draw on the same data.",
-  "caption": "Fraud scoring decides one payment in milliseconds; money-laundering monitoring studies behavior afterwards and ends in a case, a confidential report or a hold. They share data, not a decision path."
-}
--->
+![A short top lane scores one payment and ends in allow, block or challenge. A long bottom lane looks for patterns over time and ends in a case, a report and a hold. Both draw on the same data.](assets/images/26-kyc-aml-and-regulation/26-two-lanes.jpeg)
+**Figure 3:** *Fraud scoring decides one payment in milliseconds; money-laundering monitoring studies behavior afterwards and ends in a case, a confidential report or a hold. They share data, not a decision path.*
 
 Neither Stripe nor Adyen publishes its monitoring scenarios, its sanctions-screening logic or its re-verification intervals. What is public is the effect on an account. Stripe has the requirement types `legal_hold` and `other_compliance_inquiry` cited above, and its Radar documentation (n.d., accessed November 2026) says of its account-level fraud models: "We calculate account-level risk using KYC information, transactions, geographic risk factors, and behavior patterns." Adyen's verification overview has one sentence: "Verification deadlines may be adjusted based on ongoing account monitoring and subsequent verification checks." Each also says so as policy. Stripe's financial-crimes policy statement (support site, dated November 2023) reports "ongoing screening of its users against sanctions lists administered by the UN, US, EU, UK, Canada, and other applicable jurisdictions" and "ongoing transaction monitoring of user activity". Adyen's privacy statement on compliance obligations (n.d., accessed November 2026) says it will "Monitor your behavior and transactions across the Adyen platform, including by using automated systems such as machine learning models", and its glossary defines party screening as checking the people and entities behind an account "against global sanctions lists, Politically Exposed Persons (PEP) databases, and adverse media sources". Each company confirms that accounts are watched after onboarding and says nothing about how; Stripe's Radar sentence is about fraud risk, not money laundering. A Stripe guide for platforms (last updated 31 August 2026) lists patterns that monitoring commonly looks for, such as transactions kept just under a review threshold, but it is general education, not a description of Stripe's own system. Part of that silence is required: Article 73, quoted earlier, forbids telling a customer that an analysis is under way.
 
@@ -208,19 +175,8 @@ Femke's team replayed the incident against the fields above. It had four stages,
 | Passed | The requirement in `past_due`; payouts disabled | Learned from support tickets | Expected to be empty; any studio here is an open item with an owner |
 | Resolved | The requirement gone; payouts enabled | Up to 12 days later for the 230 | When the studio submits and the provider verifies |
 
-<!-- illustration-placeholder
-{
-  "id": "26-frozen-studios-replayed",
-  "status": "pending",
-  "asset": "assets/images/26-kyc-aml-and-regulation/26-frozen-studios-replayed.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table that replays the four stages of the incident",
-  "visual_goal": "Show the same four stages on two tracks: in 2026 nobody watches and 230 studios are paused for up to 12 days; under the mirror an owner acts before the deadline.",
-  "prompt": "A horizontal timeline with four evenly spaced markers along the middle, labeled \"Announced\", \"Due\", \"Passed\" and \"Resolved\", the third marker drawn as an orange flag for the deadline. Above the timeline, a top track in muted gray-blue: at the first marker one envelope flying into a dusty mailbox with a cobweb; at the second marker an empty desk; after the third marker a row of small studio storefronts with pause icons and the label \"230 paused\", and a bracket reaching to the fourth marker labeled \"12 days\". Below the timeline, a bottom track in teal and green: at the first marker a screen with a banner icon and a person with a badge labeled \"Owner\"; at the second marker a headset support person calling a studio; before the third marker a green check on a document; after it, the same row of storefronts with flowing euro coins and the label \"Payouts on\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A timeline of four stages with two tracks. Top: one email to an unread mailbox, then 230 studios paused for 12 days after the deadline. Bottom: a banner, an owner and a support call resolve the requirement before the deadline, and payouts stay on.",
-  "caption": "The same four stages twice: in 2026 one email and no owner left 230 studios paused for up to 12 days; with stored state and an owner the requirement is resolved before the deadline."
-}
--->
+![A timeline of four stages with two tracks. Top: one email to an unread mailbox, then 230 studios paused for 12 days after the deadline. Bottom: a banner, an owner and a support call resolve the requirement before the deadline, and payouts stay on.](assets/images/26-kyc-aml-and-regulation/26-frozen-studios-replayed.jpeg)
+**Figure 4:** *The same four stages twice: in 2026 one email and no owner left 230 studios paused for up to 12 days; with stored state and an owner the requirement is resolved before the deadline.*
 
 Under K6 the payment service keeps one verification record per studio in Larkfield's own vocabulary: the requirement, its due date, the capability at risk, the status, the owner, and when the studio was last told. For a studio on Stripe, such as Ravi Shah's Ironworks Climbing in Manchester, the record is filled from the requirement lists and their deadline. For a studio on Adyen, such as Ines Bakker's Studio Noord, it is filled from the capability's problems and deadlines; if Adyen asks Studio Noord for a periodic review, the record shows "confirm your business details" with the date from the webhook. It is one internal vocabulary over two provider vocabularies, as the payment record store is for payments.
 

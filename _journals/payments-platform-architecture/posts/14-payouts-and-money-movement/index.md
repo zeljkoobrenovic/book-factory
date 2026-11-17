@@ -54,35 +54,13 @@ The second process starts there. The provider, or a bank it works with, submits 
 
 Because a batch rail sends the sender no confirmation that the payee was credited, the status a provider shows after sending describes **the provider's own action**. Both say so. Stripe's status table for its third-party payout product (n.d., accessed November 2026) reads: "A posted status doesn’t guarantee that your recipient has received money, because their bank might delay the release of funds." Adyen gives a bank transfer on a non-instant route a `tracking.estimatedArrivalTime`, which is a forecast.
 
-<!-- illustration-placeholder
-{
-  "id": "14-two-clocks",
-  "status": "pending",
-  "asset": "assets/images/14-payouts-and-money-movement/14-two-clocks.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that says the provider's status describes its own action",
-  "visual_goal": "Show a payout as two processes: accounting that ends with a debit, and delivery that ends later with a credit or a return.",
-  "prompt": "Two horizontal timelines, one above the other. Upper timeline, blue, labeled \"Provider ledger\": three nodes left to right labeled \"Instructed\", \"Reserved\", \"Debited\", with a flag above the last node labeled \"Paid\". An orange arrow named \"instruction\" drops from \"Debited\" to the start of the lower timeline. Lower timeline, teal, labeled \"Bank rail\" and visibly longer: nodes labeled \"Submitted\", \"Cut-off\", \"Receiving bank\". From \"Receiving bank\" a green arrow named \"credit\" runs to a bank-account icon labeled \"Arrived\", and an orange curved arrow named \"return\" bends back up to the upper timeline, ending at a plus sign labeled \"New credit\". A clock icon ends each timeline; the lower clock shows a later time. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two timelines: the provider's ledger ends at a debit flagged paid; the bank rail ends later in a credit or a return.",
-  "caption": "The provider's accounting ends with a debit it reports as paid; the bank rail's delivery ends later, with a credit or with a return that arrives as a new credit."
-}
--->
+![Two timelines: the provider's ledger ends at a debit flagged paid; the bank rail ends later in a credit or a return.](assets/images/14-payouts-and-money-movement/14-two-clocks.jpeg)
+**Figure 1:** *The provider's accounting ends with a debit it reports as paid; the bank rail's delivery ends later, with a credit or with a return that arrives as a new credit.*
 
 The second process does send one signal back. A **payout return** is the receiving bank sending the money back after the rail accepted the transfer. Stripe's Global Payouts documentation (n.d., accessed November 2026) gives the usual causes: "Incorrect destination information causes most returned payouts (for example, the provided bank account is closed, or the account holder’s details don’t match the recipient’s information)." The return travels a rail too, so it reaches the sender as a new transaction, days after the payout was marked sent.
 
-<!-- illustration-placeholder
-{
-  "id": "14-letter-in-the-post",
-  "status": "pending",
-  "asset": "assets/images/14-payouts-and-money-movement/14-letter-in-the-post.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that defines a payout return",
-  "visual_goal": "A posting receipt proves sending, not delivery; an undeliverable letter comes back days later.",
-  "prompt": "A three-part scene read left to right. Left: a person at a post-office counter holding a small receipt slip labeled \"Sent\", with a blue arrow named \"posted\" leaving toward the middle. Middle: a van on a road under a small calendar icon, labeled \"In transit\". Right: a house with a closed mailbox and a question mark above it, labeled \"Arrived?\". Below the road, an orange arrow named \"return to sender\" curves from the house back to the left, ending at the sender's own mailbox, which holds an envelope labeled \"Returned\" and a second calendar icon showing a later day. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A sender holds a receipt marked sent; the letter travels to a house and comes back to the sender's mailbox days later.",
-  "caption": "A receipt for posting proves the letter was sent; whether it was delivered is known only if it comes back, days later, as a new item in the sender's own mailbox."
-}
--->
+![A sender holds a receipt marked sent; the letter travels to a house and comes back to the sender's mailbox days later.](assets/images/14-payouts-and-money-movement/14-letter-in-the-post.jpeg)
+**Figure 2:** *A receipt for posting proves the letter was sent; whether it was delivered is known only if it comes back, days later, as a new item in the sender's own mailbox.*
 
 ## The Rails a Payout Travels On
 
@@ -167,19 +145,8 @@ The simplest record copies the provider's status into one field and treats "paid
 
 The second design keeps four states (instructed, sent, arrived, returned) and leaves a sent payout open for a **return window**; if the window passes with no return, the payout is marked arrived, by inference. The window's length is partly documented (all three pages n.d., accessed November 2026): Stripe's `paid` can become `failed` within 5 business days, Global Payouts returns "typically" take 2–3, and Adyen advises looking for a returned instruction five business days after the batch closed. No source gives an upper bound, so the window is a policy you choose, and a later return must still be handled.
 
-<!-- illustration-placeholder
-{
-  "id": "14-payout-states",
-  "status": "pending",
-  "asset": "assets/images/14-payouts-and-money-movement/14-payout-states.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that describes the four-state design and its return window",
-  "visual_goal": "Show the payout record as four states, with arrival confirmed or inferred and a return reopening the debt.",
-  "prompt": "A state-machine diagram with four rounded boxes. Left to right: a blue box labeled \"Instructed\"; a teal box labeled \"Sent\" with an hourglass icon labeled \"Window\"; upper right, a green box labeled \"Arrived\"; lower right, an orange box labeled \"Returned\". Arrows: a blue arrow named \"debit\" from \"Instructed\" to \"Sent\"; a green arrow named \"confirmed\" and, below it, a dashed green arrow named \"window closed\", both from \"Sent\" to \"Arrived\"; an orange arrow named \"return\" from \"Sent\" to \"Returned\"; a thin dashed orange arrow named \"late return\" from \"Arrived\" down to \"Returned\"; a curved orange arrow from \"Returned\" to a ledger-page icon labeled \"Owed again\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "State machine with four payout states: instructed, sent, arrived and returned, with a late return possible after arrived.",
-  "caption": "A payout record with four states: arrival is confirmed or inferred when the return window closes, and a return, even a late one, makes the amount owed again."
-}
--->
+![State machine with four payout states: instructed, sent, arrived and returned, with a late return possible after arrived.](assets/images/14-payouts-and-money-movement/14-payout-states.jpeg)
+**Figure 3:** *A payout record with four states: arrival is confirmed or inferred when the return window closes, and a return, even a late one, makes the amount owed again.*
 
 The third design buys certainty from a rail that reports the credit, and both providers sell it with a fee and a ceiling. Stripe's Instant Payouts (n.d., accessed November 2026) "typically settle in the associated payout account within 30 minutes"; an account may make at most 10 a day, each up to 9,999 EUR in the euro area, and "Stripe assesses a fee on each Instant Payout". The pricing page for Connect, Stripe's platform product, as shown in euros in November 2026, lists 1% of payout volume; I did not check other countries. At Adyen instant is a transfer priority: "A payout with a higher priority incurs higher fees", no price list is public, and `credited` is the confirmation. At 1%, receiving Mila's €117.47 instantly would cost about €1.17 *(illustration)*.
 

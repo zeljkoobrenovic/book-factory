@@ -69,19 +69,8 @@ While the products multiplied, the first line of Stripe's press releases changed
 
 > **INFERENCE, NOT DOCUMENTED:** The dates give an order of construction. Payments for developers came first, platforms second, and the products around the payment seven years after launch. The purchases fill gaps near the payment (tax, reconciliation, usage billing, credit), until OpenRouter, which sits outside payments. Stripe has not described this as a strategy; the order is my reading of the dates, drawn in the figure below.
 
-<!-- illustration-placeholder
-{
-  "id": "46-interface-first-two-directions",
-  "status": "pending",
-  "asset": "assets/images/46-case-stripe/46-interface-first-two-directions.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the inference block that closes the history section",
-  "visual_goal": "Show one interface built first, with products added outward around it and regulated permissions added downward beneath it.",
-  "prompt": "Conceptual layered diagram. Center: a wide blue block shaped like a code window with angle brackets, labeled \"Interface\", with a small flag reading \"2011\". Two teal arrows labeled \"outward\" leave the block to the left and right toward a ring of six small unlabeled product tiles (icons: a repeating calendar, a receipt, a payment card, a card reader, a coin stack, a chain link); above the ring a small flag reads \"2018–2026\". Some tiles have a small orange puzzle-piece corner to suggest they were bought. One green arrow labeled \"downward\" leaves the bottom of the block toward a foundation strip labeled \"Regulated layer\" made of three different-shaped stone blocks: a shield, a bank building with columns, a small certificate. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A central block labeled Interface, dated 2011, with arrows outward to a ring of product tiles dated 2018 to 2026 and an arrow downward to a foundation labeled Regulated layer made of three different blocks.",
-  "caption": "Stripe's order of construction: the interface in 2011, products added outward around it from 2018 to 2026, some of them bought, and a regulated layer assembled beneath it from different kinds of permission."
-}
--->
+![A central block labeled Interface, dated 2011, with arrows outward to a ring of product tiles dated 2018 to 2026 and an arrow downward to a foundation labeled Regulated layer made of three different blocks.](assets/images/46-case-stripe/46-interface-first-two-directions.jpeg)
+**Figure 1:** *Stripe's order of construction: the interface in 2011, products added outward around it from 2018 to 2026, some of them bought, and a regulated layer assembled beneath it from different kinds of permission.*
 
 ## The Interface Was the First Product
 
@@ -140,19 +129,8 @@ What no page states is why, or how much. The four annual letters and the newsroo
 
 > **INFERENCE, NOT DOCUMENTED:** Read together, the pages suggest that Stripe took the smallest permission sufficient for each market and each function: an e-money license where one license covers acquiring and balances, partner banks where membership in practice requires a bank, and from 2025 narrow charters where a partner was the constraint. Stripe has not said so, and nothing public shows whether the motive was speed, cost or regulation. The figure below shows the two positions.
 
-<!-- illustration-placeholder
-{
-  "id": "46-regulated-layer-by-region",
-  "status": "pending",
-  "asset": "assets/images/46-case-stripe/46-regulated-layer-by-region.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the inference block that closes the regulated-layer section",
-  "visual_goal": "Show the same provider standing in two different positions between merchant and card network depending on the region.",
-  "prompt": "Two-panel structural diagram with a thin vertical divider. Both panels show the same chain from left to right: a small shop labeled \"Merchant\", then a blue software-window block labeled \"Provider\", then a globe-and-wires icon labeled \"Card network\". Left panel, with a small map-pin tag reading \"Region A\": the Provider block carries a shield badge labeled \"Acquirer\" and a solid blue arrow labeled \"submits\" runs directly from Provider to Card network; beneath the Provider a small vault labeled \"Safeguarded\" holds euro coins. Right panel, with a map-pin tag reading \"Region B\": a bank building with columns labeled \"Partner bank\" stands between Provider and Card network and carries the shield badge labeled \"Acquirer\"; a thin dashed teal arrow labeled \"messages\" runs from Provider straight to Card network, passing above the bank, while a solid orange arrow labeled \"membership\" runs from Partner bank to Card network; the vault with euro coins sits inside the bank. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Left: the provider itself carries the acquirer badge and connects to the card network, with safeguarded funds beneath it. Right: a partner bank between provider and network carries the acquirer badge and holds the funds, while the provider only exchanges messages with the network.",
-  "caption": "One provider, two positions: in Region A (for Stripe, the EEA and the United Kingdom) the provider's own entity is the acquirer; in Region B (for Stripe, the United States with five of its six named acquirers) a partner bank is, even where the provider exchanges messages with the network directly."
-}
--->
+![Left: the provider itself carries the acquirer badge and connects to the card network, with safeguarded funds beneath it. Right: a partner bank between provider and network carries the acquirer badge and holds the funds, while the provider only exchanges messages with the network.](assets/images/46-case-stripe/46-regulated-layer-by-region.jpeg)
+**Figure 2:** *One provider, two positions: in Region A (for Stripe, the EEA and the United Kingdom) the provider's own entity is the acquirer; in Region B (for Stripe, the United States with five of its six named acquirers) a partner bank is, even where the provider exchanges messages with the network directly.*
 
 ## The Figures, and What Each One Is
 
@@ -217,19 +195,8 @@ The same team should leave the rest. Two thousand shards exist because of five m
 
 Larkfield took the practices and none of the machinery. Its Keel program, described in [[meet-larkfield]], reads like the first four rows at the size of one payment service: K1 derives one idempotency key from each business event; K7 upgrades each provider's API version on a calendar; K2 confirms a state change against the provider's own record; K3 writes a ledger entry for every movement and requires clearing accounts to return to zero. On the regulated layer Larkfield copied nothing and asked. Its acquirer inventory, started in [[acquiring-and-network-connectivity]], records, as data with a date, Stripe Technology Europe, Ltd. for its Dutch, German and Belgian studios on Stripe, Stripe Payments UK, Ltd. for the United Kingdom, and for the United States an open question it has put to Stripe: which of the six named acquirers applies. Larkfield is fictional; the entity names are from Stripe's disclosure. The figure below sums up the sorting.
 
-<!-- illustration-placeholder
-{
-  "id": "46-take-the-practices-leave-the-machinery",
-  "status": "pending",
-  "asset": "assets/images/46-case-stripe/46-take-the-practices-leave-the-machinery.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on what Larkfield took",
-  "visual_goal": "Show a small team carrying four hand tools out of a very large factory and leaving the heavy machinery behind.",
-  "prompt": "Conceptual before/after scene in one frame. Right two-thirds: a very large factory hall with rows of identical tall server cabinets, a long conveyor of test tubes, and a wall of small gauges, all in muted blue-grey, with a floor label \"Sized for scale\". Left third: a small workshop with three generic professionals at one bench, in warmer light. A teal arrow labeled \"take\" curves from the factory door to the workshop bench, carrying four small distinct tools drawn in green: a key labeled \"One key\", a wall calendar labeled \"Dated version\", a magnifying glass over a document labeled \"Read again\", and a balance scale labeled \"Clears to zero\". An orange dashed arrow labeled \"leave\" points from the workshop back at the heavy machinery and ends in a small stop bar. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A small workshop takes four hand tools (a key, a dated calendar, a magnifying glass over a document, a balance scale) from a huge factory and leaves the rows of heavy machinery behind.",
-  "caption": "What transfers from Stripe's record is four practices a small team can hold in one service; the machinery around them is sized for five million queries a second and stays where it is."
-}
--->
+![A small workshop takes four hand tools (a key, a dated calendar, a magnifying glass over a document, a balance scale) from a huge factory and leaves the rows of heavy machinery behind.](assets/images/46-case-stripe/46-take-the-practices-leave-the-machinery.jpeg)
+**Figure 3:** *What transfers from Stripe's record is four practices a small team can hold in one service; the machinery around them is sized for five million queries a second and stays where it is.*
 
 ## Where the Evidence Stops
 

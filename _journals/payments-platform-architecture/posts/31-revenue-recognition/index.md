@@ -60,19 +60,8 @@ Step two introduces the term this chapter owns. A **performance obligation** is,
 
 A promise satisfied over time splits an up-front payment in two. The part not yet earned is **deferred revenue**: a liability, because the seller owes either the service or the money back. The **revenue schedule** is the dated plan by which that liability becomes revenue. On 31 March 2027, 59 of the 365 days of Ironworks' plan have been delivered, so €305.51 is revenue and €1,584.49 is deferred. Counted as two of twelve equal months, the figures are €315.00 and €1,575.00. By the day or by the month is a convention that finance chooses once and applies consistently; this chapter counts by the day. [[accounting-for-architects]], in this book's finance-side sibling, covers the standard in more depth.
 
-<!-- illustration-placeholder
-{
-  "id": "31-cash-is-not-revenue",
-  "status": "pending",
-  "asset": "assets/images/31-revenue-recognition/31-cash-is-not-revenue.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that defines deferred revenue and the revenue schedule",
-  "visual_goal": "Show that the money for an annual plan arrives once while the revenue arrives month by month.",
-  "prompt": "Wide conceptual illustration with two horizontal lanes sharing a twelve-step timeline along the bottom. Top lane, labeled \"Cash\": one tall stack of coins standing on the first step only, with an orange arrow labeled \"paid once\" pointing down to it; the remaining eleven steps of this lane are empty. Bottom lane, labeled \"Revenue\": twelve small equal green blocks, one on each step, with a teal arrow labeled \"earned monthly\" running left to right above them. Between the lanes, on the left, a glass jar labeled \"Deferred\" that is nearly full of blue liquid; a thin blue dashed arrow labeled \"released\" leads from the jar to the row of green blocks. Under the first step a small calendar icon labeled \"1 Feb\"; under the last step a small calendar icon labeled \"31 Jan\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Top lane: one stack of coins on the first of twelve steps. Bottom lane: twelve equal blocks of revenue, one per step, fed from a jar labeled Deferred.",
-  "caption": "The €1,890 arrives on 1 February; the revenue is released from deferred revenue over the 365 days that follow."
-}
--->
+![Top lane: one stack of coins at the start of a year-long timeline. Bottom lane: a continuous band of thin revenue slices across the whole year, fed from a jar labeled Deferred.](assets/images/31-revenue-recognition/31-cash-is-not-revenue.jpeg)
+**Figure 1:** *The €1,890 arrives on 1 February; the revenue is released from deferred revenue over the 365 days that follow.*
 
 ## How an Invoice Line Becomes a Schedule
 
@@ -89,19 +78,8 @@ Those entries need four inputs per invoice line, and a missing input does not ra
 
 Money that goes back is a dated adjustment, and it splits in two. A refund, a dispute (the cardholder's bank takes the money back; [[refunds-reversals-and-disputes]]) or a credit note (a document that reduces a finalized invoice) can arrive months into the period. The part of the amount already recognized becomes **contra revenue**, an account that reduces revenue without deleting the original entry. The part still deferred is removed from the liability. Stripe's example: "if you issue a 120 USD refund on an annual subscription during the second month, 20 USD for the first 2 months is contra revenue. The remaining 100 USD is adjusted and reflected in your deferred revenue balance". Had Ironworks disputed its whole €1,890 on 1 August 2027 (a hypothetical), 181 days would have been delivered: €937.23 would become contra revenue and €952.77 would leave deferred revenue. The split cannot be computed at all unless the adjustment carries its own date and points at the original line.
 
-<!-- illustration-placeholder
-{
-  "id": "31-line-to-schedule",
-  "status": "pending",
-  "asset": "assets/images/31-revenue-recognition/31-line-to-schedule.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on refunds, disputes and credit notes",
-  "visual_goal": "Show the mechanism: an invoice line fills deferred revenue, time releases it into revenue, and a refund draws from both sides.",
-  "prompt": "Left-to-right flow diagram with four elements. Far left: a document icon with one highlighted row, labeled \"Invoice line\". Center: a tall transparent tank labeled \"Deferred\", about half full of blue liquid, with a small clock icon on its side. Right: a row of green blocks on a shelf labeled \"Revenue\". Bottom right: a small red-orange tray labeled \"Contra revenue\". Arrows: a blue arrow labeled \"finalized\" from the invoice line into the top of the tank; a teal arrow labeled \"each day\" from the bottom of the tank to the revenue shelf; an orange arrow labeled \"refund\" entering from the lower left and forking in two, one branch labeled \"unearned part\" drawing liquid out of the tank, the other branch labeled \"earned part\" dropping one green block from the shelf into the contra revenue tray. A separate small coin icon labeled \"paid\" sits below the invoice line with no arrow to the tank or the shelf. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "An invoice line fills a deferred-revenue tank that drains daily into revenue; a refund forks into an unearned part taken from the tank and an earned part moved to contra revenue.",
-  "caption": "A finalized invoice line fills deferred revenue, each day of the service period releases a slice into revenue, and a refund is split between the part still deferred and the part already earned; the payment itself moves neither."
-}
--->
+![An invoice line fills a deferred-revenue tank that drains daily into revenue; a refund forks into an unearned part taken from the tank and an earned part moved to contra revenue.](assets/images/31-revenue-recognition/31-line-to-schedule.jpeg)
+**Figure 2:** *A finalized invoice line fills deferred revenue, each day of the service period releases a slice into revenue, and a refund is split between the part still deferred and the part already earned; the payment itself moves neither.*
 
 Usage runs the other way: it is earned first and invoiced later. The text messages a studio sends on 30 March are March revenue, though the invoice that carries them is dated April ([[usage-metering-and-rating]] owns the counting). So at every month end some revenue belongs to a month whose invoice does not exist yet, and the schedule needs the **date of use** as well as the date of the invoice. Orb states both the problem and its own rule. Recognizing usage "requires understanding exactly when usage occurs. This can be particularly difficult when invoicing and accounting periods do not align", and "Revenue is recognized for usage as it occurs on a daily basis, regardless of the associated line item’s service period."
 
@@ -152,19 +130,8 @@ So where should a billing system stop? My answer: it may compute the schedule wh
 | Each refund, dispute and credit note, with its own date and the line it applies to | The earned and unearned parts are split at that date | The adjustment lands in the wrong period or on no line |
 | For usage, the date of use | Usage is earned when it happens | A month of usage is counted in the next month |
 
-<!-- illustration-placeholder
-{
-  "id": "31-billing-finance-boundary",
-  "status": "pending",
-  "asset": "assets/images/31-revenue-recognition/31-billing-finance-boundary.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the export specification table",
-  "visual_goal": "Show the hand-off from billing to finance as an interface with named contents.",
-  "prompt": "Two-zone illustration divided by a vertical dashed line labeled \"Hand-off\". Left zone, labeled \"Billing\": a machine with a calendar and gears producing a stack of documents. Right zone, labeled \"Finance\": a desk with an open ledger book and a person in office clothes reviewing it. Crossing the dashed line, a conveyor belt carries one open parcel from left to right, drawn with a blue arrow labeled \"export\". Above the parcel, five small tags fan out, each with a simple icon and a short label: a coin tag labeled \"Net amount\", a two-date calendar tag labeled \"Service period\", a box tag labeled \"Product\", a curved-back-arrow tag labeled \"Adjustments\", a gauge tag labeled \"Usage date\". In the lower left corner, far from the belt, a small faded stack of coins labeled \"Payments\" with a thin gray dotted arrow that stops at the dashed line and does not cross it. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A parcel crosses from a billing machine to a finance desk carrying five tags: net amount, service period, product, adjustments, usage date. A stack of payments stays behind the line.",
-  "caption": "What billing owes finance for each invoice line: the net amount, the service period, the product, every adjustment with its own date and, for usage, the date of use; a total of payments does not cross the line."
-}
--->
+![A parcel crosses from a billing machine to a finance desk carrying five tags: net amount, service period, product, adjustments, usage date. A stack of payments stays behind the line.](assets/images/31-revenue-recognition/31-billing-finance-boundary.jpeg)
+**Figure 3:** *What billing owes finance for each invoice line: the net amount, the service period, the product, every adjustment with its own date and, for usage, the date of use; a total of payments does not cross the line.*
 
 ## Stripe and Adyen: Where They Differ
 

@@ -20,35 +20,13 @@ The record that [[part-2]] ended with could not have contained that difference. 
 
 Part III argues that a provider knows where money is, and whose it is, only from a **double-entry ledger** it keeps itself: an append-only record in which every movement is written as lines that balance, so that a missing movement shows up as an account that does not empty. And that record counts as knowledge only while it is **matched against records the provider did not write**, the networks' files and the banks' statements. The rest of the part is that ledger seen from one side at a time. A balance and a report are the ledger read at a given moment, a payout is one of its entries becoming a bank transfer, and the provider's license decides which accounts it must contain. The view to give up is that the money is simply “at the provider” and that a dashboard balance counts cash the way a bank balance does.
 
-<!-- illustration-placeholder
-{
-  "id": "part-3-one-ledger-seen-from-four-sides",
-  "status": "pending",
-  "asset": "assets/images/part-3-intro/part-3-one-ledger-seen-from-four-sides.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that states the part's claim",
-  "visual_goal": "Show the ledger at the center, with the balance, the payout and the report read from it, outside records proving it, and the license as the frame around it.",
-  "prompt": "Create a wide structural explainer diagram. At the center, a large open ledger book labeled \"Ledger\", its pages showing pairs of plus and minus lines of equal length. To the right of the book, three items stacked vertically, each joined to the book by a thin blue arrow labeled once as \"read from\": a small gauge labeled \"Balance\", an envelope with a euro coin labeled \"Payout\", and an itemized sheet labeled \"Report\". From the envelope a teal arrow labeled \"transfer\" continues right to a small generic bank building. To the left of the book, two documents, a file labeled \"Network file\" and a sheet labeled \"Bank statement\", each joined to the book by a green double-headed arrow labeled once as \"matched\". Around the ledger book only, a dashed orange frame with a small shield on its top edge, labeled \"License\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A ledger book at the center; a balance, a payout and a report are read from it on the right; a network file and a bank statement are matched against it on the left; a dashed frame labeled license surrounds the ledger.",
-  "caption": "The shape of Part III: the balance, the payout and the report are read from one ledger, records written by others prove it, and the license decides what it must contain."
-}
--->
+![A ledger book at the center; a balance, a payout and a report are read from it on the right; a network file and a bank statement are matched against it on the left; a dashed frame labeled license surrounds the ledger.](assets/images/part-3-intro/part-3-one-ledger-seen-from-four-sides.jpeg)
+**Figure 1:** *The shape of Part III: the balance, the payout and the report are read from one ledger, records written by others prove it, and the license decides what it must contain.*
 
 Five chapters take five questions, and each needs the one before. They ask how a provider builds the ledger that records every movement twice; what a merchant's balance says and does not say; how money leaves the provider, and what happens when it does not arrive; how the provider proves its books against networks and banks, and what it gives customers to prove theirs; and who is legally allowed to hold the money. **The ledger comes first because balances, payouts and reports are all read from it.** Licenses come last because safeguarding, the legal duty to keep customers' money apart from the firm's own, is by then one more comparison between a ledger and a bank account, this time required by law.
 
-<!-- illustration-placeholder
-{
-  "id": "part-3-five-questions-in-order",
-  "status": "pending",
-  "asset": "assets/images/part-3-intro/part-3-five-questions-in-order.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that gives the five questions and the reason for their order",
-  "visual_goal": "Show the reading order as five steps that each stand on the one before, starting with the ledger.",
-  "prompt": "Create a wide explainer illustration of a staircase of five broad steps rising from left to right, each step resting on the one before it. On each step stands one icon with one label beneath it. Step one: an open ledger book, labeled \"Ledger\". Step two: a gauge with a euro sign, labeled \"Balance\". Step three: an envelope with a euro coin flying toward a small bank building, labeled \"Payout\". Step four: two documents joined by a green check mark, labeled \"Proof\". Step five: a shield with a small keyhole, labeled \"License\". A single blue arrow labeled \"read in order\" runs along the foot of the staircase from the first step to the last. The first step is drawn slightly wider and in a stronger blue than the others to show that the rest stand on it. No people. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A staircase of five steps labeled Ledger, Balance, Payout, Proof and License, with an arrow along its foot showing the reading order.",
-  "caption": "Five chapters in the order each needs the one before: the ledger, the balance read from it, the payout that leaves it, the proof against outside records, and the license."
-}
--->
+![A staircase of five steps labeled Ledger, Balance, Payout, Proof and License, with an arrow along its foot showing the reading order.](assets/images/part-3-intro/part-3-five-questions-in-order.jpeg)
+**Figure 2:** *Five chapters in the order each needs the one before: the ledger, the balance read from it, the payout that leaves it, the proof against outside records, and the license.*
 
 ## Chapters in this part
 

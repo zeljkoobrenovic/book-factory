@@ -16,37 +16,15 @@ timetoread: 5 min read
 <br>
 At 1,140 studios in the Netherlands and Germany that run on **Larkfield, the fictional studio-software platform this book follows**, a member who renews her membership online is charged through Stripe. When she taps the same card at the front desk, she is charged through Adyen. One card, one studio, one bank deciding; two providers, two routes to that bank, and two records of what “approved” meant. Even the sender differs: by Stripe's public pages the online request comes from an Irish e-money institution, and by my reading of Adyen's license page the counter request comes from a Dutch bank ([[acquiring-and-network-connectivity]]).
 
-<!-- illustration-placeholder
-{
-  "id": "part-2-one-card-two-stacks",
-  "status": "pending",
-  "asset": "assets/images/part-2-intro/part-2-one-card-two-stacks.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the opening paragraph",
-  "visual_goal": "Show one member and one card reaching one bank by two different provider stacks, each leaving its own record.",
-  "prompt": "Create a wide explainer illustration. Far left: one generic studio member holding one payment card. Far right: one bank building labeled \"Issuer\". Two paths run from the member to the bank. Upper path: the member's phone, then a blue rounded box labeled \"Provider A\", then the bank; a solid blue arrow labeled \"online\" joins them. Lower path: a counter with a card terminal, then a teal rounded box labeled \"Provider B\", then the bank; a solid teal arrow labeled \"front desk\" joins them. Under each provider box sits a small document card with a green check mark, labeled \"Record\", two in total. Between the two paths, near the member, a small tag labeled \"One card\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "One member with one card reaches one issuing bank by two paths: from a phone through Provider A and from a counter terminal through Provider B, each leaving its own record.",
-  "caption": "At 1,140 Larkfield studios the same card reaches the same bank through Provider A (Stripe) online and Provider B (Adyen) at the front desk, and each keeps its own record of the approval."
-}
--->
+![One member with one card reaches one issuing bank by two paths: from a phone through Provider A and from a counter terminal through Provider B, each leaving its own record.](assets/images/part-2-intro/part-2-one-card-two-stacks.jpeg)
+**Figure 1:** *At 1,140 Larkfield studios the same card reaches the same bank through Provider A (Stripe) online and Provider B (Adyen) at the front desk, and each keeps its own record of the approval.*
 
 Those two routes are what [[part-1]] left out. It treated the authorization as a message that goes to the issuer (the cardholder's bank) and comes back with an answer: the first of several promises, and one every party is paid for only when it is a yes. Part II turns to **the provider's side of that message**: who is allowed to send it, in what form, how many times, and what the answer is recorded as.
 
 Seen from that side, **a “yes” is produced in six layers that sit around the issuer's decision**. They are the licensed entity that acquires the payment; the payment method and what its scheme (its body of rules) lets “yes” mean; the provider's model of the payment between request and outcome; the changes and retries the provider makes inside the authorization call; the choice among providers; and, when the card is in the room, the terminal. Each layer changes how often the answer is yes, or whether that yes can later be taken back.
 
-<!-- illustration-placeholder
-{
-  "id": "part-2-six-layers-of-yes",
-  "status": "pending",
-  "asset": "assets/images/part-2-intro/part-2-six-layers-of-yes.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that states the part's claim",
-  "visual_goal": "Show the issuer's decision at the center with six layers around it, which a payment request must cross.",
-  "prompt": "Create a wide conceptual diagram. At the center, a small bank building with a green check mark above it, labeled \"Issuer decides\". Around it, six concentric half-rings opening to the left, like layers of an onion cut in half, alternating blue and teal, with the outermost in orange. From the outside in, the rings are labeled \"Device\", \"Providers\", \"Optimization\", \"State model\", \"Method\", \"Acquirer\". On the far left, a shop icon labeled \"Merchant\". One solid blue arrow labeled \"request\" runs from the merchant straight through all six rings to the bank. One solid green arrow labeled \"yes\" returns from the bank through the rings to the merchant. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A payment request crossing six layers labeled Device, Providers, Optimization, State model, Method and Acquirer on its way to the issuer's decision, and a yes returning through them.",
-  "caption": "The shape of Part II: six layers sit around the issuer's decision, and a “yes” is what comes back through all of them."
-}
--->
+![A payment request crossing six layers labeled Device, Providers, Optimization, State model, Method and Acquirer on its way to the issuer's decision, and a yes returning through them.](assets/images/part-2-intro/part-2-six-layers-of-yes.jpeg)
+**Figure 2:** *The shape of Part II: six layers sit around the issuer's decision, and a “yes” is what comes back through all of them.*
 
 The layers also have two holders. The provider holds the license, models the payment and makes the changes inside the call. The merchant chooses the methods it offers, the providers it uses and the devices it deploys. So an approval is **an outcome both help produce**, not a verdict the network hands back, and an approval rate describes a setup more than it describes the customers. I would not compare two providers' rates before lining up the acquirer, the method mix and the metric.
 

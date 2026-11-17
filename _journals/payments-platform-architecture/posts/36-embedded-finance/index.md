@@ -51,19 +51,8 @@ The first question needs vocabulary. **Banking-as-a-service** means a licensed i
 | Issued card | Spend the balance wherever the card network is accepted | Issuing a card and approving each use | Spending rules, an authorization endpoint or a default, cardholder support |
 | Financing | Receive an advance, repaid as a share of future sales | Lending, or buying future receivables | Showing the provider's offers; explaining smaller payouts during repayment |
 
-<!-- illustration-placeholder
-{
-  "id": "36-keep-spend-advance",
-  "status": "pending",
-  "asset": "assets/images/36-embedded-finance/36-keep-spend-advance.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table that defines the three products",
-  "visual_goal": "Show the seller balance as one pool with the usual payout exit and three further things done with it: keep, spend, advance.",
-  "prompt": "Structural diagram. Center: a large glass tank of euro coins inside a building with a shield, labeled \"Seller balance\". Left: a customer with a phone; a blue arrow labeled \"sales\" runs from the customer into the tank. Bottom: a thin grey arrow labeled \"payout\" runs from the tank down to a small bank building. Right, three exits stacked vertically, each with an icon: top, a safe labeled \"Keep\" with a teal arrow from the tank; middle, a plain payment card labeled \"Spend\" with a green arrow from the tank; bottom, a coin stack with a clock labeled \"Advance\" with an orange arrow pointing from it INTO the tank and a thin dashed orange arrow labeled \"repaid from sales\" curving from the sales arrow back to it. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A seller balance at a licensed provider, filled by sales and normally emptied by payout, with three further uses: keep it in an account, spend it with a card, or receive an advance repaid from sales.",
-  "caption": "Three products on one balance: an account keeps it, a card spends it, and financing advances money that is repaid from later sales."
-}
--->
+![A seller balance at a licensed provider, filled by sales and normally emptied by payout, with three further uses: keep it in an account, spend it with a card, or receive an advance repaid from sales.](assets/images/36-embedded-finance/36-keep-spend-advance.jpeg)
+**Figure 1:** *Three products on one balance: an account keeps it, a card spends it, and financing advances money that is repaid from later sales.*
 
 Who performs the regulated act differs between the two companies. Adyen's H1 2026 shareholder letter says: "We also capture post-transaction value through our embedded financial products, enabled by our banking licenses. By offering native business accounts, card issuing, and capital within a single integration..." Its documentation speaks of "business financing offers from Adyen" (Adyen for Platforms, n.d.): Adyen is the lender. Stripe's Treasury page (n.d.) says the opposite about itself: "Stripe is not a bank. Checking accounts are provided exclusively by Fifth Third Bank, National Association, Member FDIC" (the FDIC is the US deposit insurer). For cards it partners "with multiple trusted banks". US loans come from "Celtic Bank or Lead Bank", and other financing from outside lenders: Fundbox in Australia and Canada; YouLend in Germany, France and the United Kingdom, and for US cash advances. One company puts its own licenses behind three products; the other assembles each from partners that change with the country. [[licences-and-safeguarding]] explains the licenses themselves.
 
@@ -73,19 +62,8 @@ Neither arrangement takes the operating work off the platform. The license cover
 
 One of those duties is new in kind. In [[payment-authorization]] your system sent an authorization request and an **issuer** answered: the licensed institution that gives someone a card and approves or declines each use. With an issued card the roles are reversed. A studio owner taps the card at a wholesaler, and the request travels through the card network to the issuer, which is your provider. The provider checks first (authorization pages, n.d.). On Stripe, "If your Issuing balance has insufficient funds for the incoming authorization, the authorization will be denied and your webhook endpoint won't receive the `issuing_authorization.request` event"; stored spending controls can block merchant categories or countries. On Adyen, internal checks cover "The available balance in your account", then stored transaction rules approve or decline automatically. Only then, if you configured it, does the provider ask your server: Stripe "sends it to your configured endpoint for your approval", and Adyen "sends a webhook to your server", which it calls relayed authorisation. On both, your server comes last, as the figure below shows.
 
-<!-- illustration-placeholder
-{
-  "id": "36-issuer-side-authorization",
-  "status": "pending",
-  "asset": "assets/images/36-embedded-finance/36-issuer-side-authorization.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that describes the order of checks in an issuing authorization",
-  "visual_goal": "Show the platform's server inside the card authorization path, asked last, with a two-second timer and a default that replaces its answer.",
-  "prompt": "Left-to-right message flow diagram. Far left: a studio owner holding a plain payment card at a shop terminal. A blue arrow labeled \"request\" runs to a cloud-shaped node labeled \"Card network\", then on to a building with a shield labeled \"Provider as issuer\". Inside the building, two small stacked boxes: \"Balance check\" and \"Stored rules\". From the building a teal arrow labeled \"ask\" runs right to a server rack labeled \"Platform server\" with a stopwatch above it labeled \"2 seconds\". A green arrow labeled \"approve or decline\" returns from the server to the building. Below the server, a toggle switch labeled \"Default\" with a dashed orange arrow labeled \"no answer\" running from the stopwatch to the switch and from the switch back to the building. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A card purchase travels from a terminal through the card network to the provider acting as issuer, which checks the balance and stored rules and then asks the platform's server; a stopwatch shows 2 seconds, and a default switch answers when the server does not.",
-  "caption": "With an issued card the platform's server is asked last and has 2 seconds; when it gives no answer, the default it configured decides."
-}
--->
+![A card purchase travels from a terminal through the card network to the provider acting as issuer, which checks the balance and stored rules and then asks the platform's server; a stopwatch shows 2 seconds, and a default switch answers when the server does not.](assets/images/36-embedded-finance/36-issuer-side-authorization.jpeg)
+**Figure 2:** *With an issued card the platform's server is asked last and has 2 seconds; when it gives no answer, the default it configured decides.*
 
 Your server then has about two seconds. Stripe: "If Stripe doesn't receive your approve or decline response within 2 seconds, the `Authorization` is automatically approved or declined based on your timeout settings, or Autopilot settings, if configured" (real-time authorizations, n.d.). Adyen: "Your server has up to 2000 milliseconds to respond. If we do not receive a response within this timeframe, we apply your default fallback" (payment authorisation, n.d.). As requirements for your endpoint:
 
@@ -113,19 +91,8 @@ Where a product exists, each provider attaches conditions, and this answers Femk
 
 The public record stops there. Neither company gives a date for general availability of its account product. Their own pages disagree in places. Adyen's product page lists 20 eurozone countries, the United Kingdom and the United States for business accounts, while its verification page lists "BE, DE, ES, FR, GB, NL and US"; I cannot tell which is current. Stripe's two Treasury pages differ on Canada. Its documentation counts 24 issuing countries, while its annual letter of February 2026, nine months older, said "our Issuing product is available in only 22 countries some 7 years after launch". Every documentation page is undated. Read this section as a snapshot of 17 November 2026, and check each cell again before a plan relies on it. The figure below shows the shape of the answer.
 
-<!-- illustration-placeholder
-{
-  "id": "36-switch-versus-grid",
-  "status": "pending",
-  "asset": "assets/images/36-embedded-finance/36-switch-versus-grid.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that says where the public record stops",
-  "visual_goal": "Contrast the expectation of one feature switch with the reality of a grid of products by countries, each cell at its own release stage.",
-  "prompt": "Two-panel before/after illustration with a thin divider. Left panel, tagged \"Expected\": a single large toggle switch in the on position, with three small icons above it in a row: a safe, a plain payment card and a coin stack. Right panel, tagged \"Found\": a grid with three rows marked by the same three icons (safe, payment card, coin stack) and five unlabeled columns each headed by a small map-pin icon; the cells are filled in three ways: solid green cells with a check mark, orange striped cells with an hourglass, and empty grey cells with a dash; the safe row is almost entirely orange striped and grey. Below the grid a small legend with three swatches labeled \"Available\", \"Preview\" and \"Not offered\", and a small calendar icon labeled \"Dated\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Left: one switch turning on accounts, cards and financing together. Right: a grid of the three products by country in which each cell is available, in preview or not offered, with a date.",
-  "caption": "Accounts, cards and financing are not one switch: each product has its own answer per country and release stage, and every answer carries a date."
-}
--->
+![Left: one switch turning on accounts, cards and financing together. Right: a grid of the three products by country in which each cell is available, in preview or not offered, with a date.](assets/images/36-embedded-finance/36-switch-versus-grid.jpeg)
+**Figure 3:** *Accounts, cards and financing are not one switch: each product has its own answer per country and release stage, and every answer carries a date.*
 
 ## Stripe and Adyen: Where They Differ
 

@@ -57,19 +57,8 @@ The table sets the three roles side by side. It is my synthesis of the definitio
 | Who answers a dispute | The business | The business; the facilitator stands behind it toward the networks | The provider; who pays for a lost one depends on its contract |
 | What the business gives up | Nothing but the processing fee | Its own acquiring contract | The checkout, the seller's name and part of the customer relationship |
 
-<!-- illustration-placeholder
-{
-  "id": "32-three-roles-one-seller",
-  "status": "pending",
-  "asset": "assets/images/32-merchant-of-record/32-three-roles-one-seller.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of the three roles",
-  "visual_goal": "Show that the processor and the payment facilitator leave the business as the seller, and only the merchant of record takes the seller's place.",
-  "prompt": "Three-panel structural diagram with thin dividers, panels tagged \"Processor\", \"Facilitator\" and \"Merchant of record\". In every panel a customer with a phone stands on the left and a small software studio building labeled \"Business\" on the right. Panel one: a green arrow labeled \"sells\" runs from the business to the customer, and below it a thin gray pipe labeled \"payment\" passes through a small unbranded box. Panel two: the same green arrow labeled \"sells\" from business to customer, and the business stands under a large blue umbrella held by a generic provider building, with a thin gray pipe labeled \"payment\" below. Panel three: a generic provider storefront stands between customer and business; an orange arrow labeled \"sells\" runs from the storefront to the customer and a teal arrow labeled \"resale\" runs from the business to the storefront; a small receipt icon with a tax symbol sits on the storefront. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Three panels. With a processor and with a payment facilitator the business sells to the customer; with a merchant of record a provider's storefront stands between them and sells to the customer.",
-  "caption": "A processor and a payment facilitator leave the business as the seller; a merchant of record takes the seller's place toward the customer and sells the product in its own name."
-}
--->
+![Three panels. With a processor and with a payment facilitator the business sells to the customer; with a merchant of record a provider's storefront stands between them and sells to the customer.](assets/images/32-merchant-of-record/32-three-roles-one-seller.jpeg)
+**Figure 1:** *A processor and a payment facilitator leave the business as the seller; a merchant of record takes the seller's place toward the customer and sells the product in its own name.*
 
 ## What Changes When the Provider Sells: Stripe Managed Payments
 
@@ -87,19 +76,8 @@ The integration is restricted in the same spirit. The parameter is real, and it 
 
 The customer's data and the money report change hands too. A customer can ask Link to delete their information. Stripe then "Cancels any subscriptions sold to them through Managed Payments" and "Deletes their data from any data objects (including objects in your Stripe account)", and tells the business by email. In the payout and balance reports, "By default, the `fee` column in the following reports includes both Stripe fees and withheld tax"; two optional columns, `withheld_tax` and `fee_net_of_withheld_tax`, separate them. A reconciliation that reads `fee` as the provider's price ([[payment-reconciliation-and-reporting]]) will overstate it by the tax. Both details show that the customer relationship and the money now run through the merchant of record. The figure below sorts what moves and what stays.
 
-<!-- illustration-placeholder
-{
-  "id": "32-what-moves-what-stays",
-  "status": "pending",
-  "asset": "assets/images/32-merchant-of-record/32-what-moves-what-stays.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on customer data and reporting",
-  "visual_goal": "Sort the seller's duties into those the provider takes on as merchant of record and those that stay with the business, with the fee flowing the other way.",
-  "prompt": "Structural diagram split by a vertical dashed line. Left side: a generic provider storefront labeled \"Provider sells\" holding four round tokens in a row labeled \"Tax\", \"Fraud\", \"Disputes\" and \"Receipts\". Right side: a small software studio building labeled \"Business\" holding three round tokens labeled \"Product\", \"Pricing\" and \"Support\". A wide teal arrow labeled \"duties\" runs from the business side across the line to the provider side. A narrower orange arrow labeled \"3.5% fee\" runs in the same direction beneath it, drawn as a few euro coins moving left. At the far left a customer with a phone faces the provider storefront, connected by a green arrow labeled \"buys\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A provider storefront on the left holds tokens for tax, fraud, disputes and receipts and faces the customer; the business on the right keeps product, pricing and support; duties and a 3.5% fee move from the business to the provider.",
-  "caption": "With the provider as merchant of record, the indirect tax, the fraud rules, the handling of disputes and the receipts move to it, and it is paid a 3.5% fee; the product, its pricing, product support and, under Stripe's terms, the cost of disputes and refunds stay with the business."
-}
--->
+![A provider storefront on the left holds tokens for tax, fraud, disputes and receipts and faces the customer; the business on the right keeps product, support and the cost of disputes; duties and a 3.5% fee move from the business to the provider.](assets/images/32-merchant-of-record/32-what-moves-what-stays.jpeg)
+**Figure 2:** *With the provider as merchant of record, the indirect tax, the fraud rules, the handling of disputes and the receipts move to it, and it is paid a 3.5% fee; the product, product support and, under Stripe's terms, the cost of disputes and refunds stay with the business.*
 
 ## A Layer, a Bundle, a Store: Three Forms of the Same Trade
 
@@ -147,19 +125,8 @@ Larkfield's own subscription is a different sale. The product is the kind Manage
 
 Femke's answer to Sofie Vermeer is therefore no, twice. For the subscription the model is available in kind and too expensive at Larkfield's size. For the studios it is not available at any price, because **the studios are the sellers**. Their disputes and their tax have to be handled where they sit: in the account model, which decides whose balance a chargeback debits, and in each studio's own tax position.
 
-<!-- illustration-placeholder
-{
-  "id": "32-two-sales-two-sellers",
-  "status": "pending",
-  "asset": "assets/images/32-merchant-of-record/32-two-sales-two-sellers.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that gives Femke's answer",
-  "visual_goal": "Show that the platform makes two kinds of sale with two different sellers, and that a provider cannot take the seller's place in the larger one.",
-  "prompt": "Two-row conceptual diagram. Top row: a yoga studio storefront labeled \"Studio\" on the left hands a class ticket along a green arrow labeled \"sells class\" to a member holding a phone on the right; a software platform, drawn as a small office with a screen icon, stands below the arrow, connected to it by a thin dotted line and labeled \"Platform\"; a large number \"€1.12 billion\" sits above the row; a generic provider storefront at the far right has a closed gate in front of it labeled \"cannot sell\". Bottom row: the same small office labeled \"Platform\" on the left hands a software box along a teal arrow labeled \"sells software\" to the studio storefront on the right; a smaller number \"€24.5 million\" sits above the row; a small orange price tag labeled \"3.5%\" hangs on the arrow. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Top: a studio sells a class to a member while the platform stands beside the sale and a provider's storefront is gated off. Bottom: the platform sells software to the studio, with a 3.5% price tag on the sale.",
-  "caption": "Larkfield's two sales: studios sell €1.12 billion of classes to members, where no provider can take the seller's place, and Larkfield sells €24.5 million of software to studios, where a provider could at 3.5%."
-}
--->
+![Top: a studio sells a class to a member while the platform stands beside the sale and a provider's storefront is gated off. Bottom: the platform sells software to the studio, with a 3.5% price tag on the sale.](assets/images/32-merchant-of-record/32-two-sales-two-sellers.jpeg)
+**Figure 3:** *Larkfield's two sales: studios sell €1.12 billion of classes to members, where no provider can take the seller's place, and Larkfield sells €24.5 million of software to studios, where a provider could at 3.5%.*
 
 ## When It Goes Wrong
 

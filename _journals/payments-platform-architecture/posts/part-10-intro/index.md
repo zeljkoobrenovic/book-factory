@@ -16,19 +16,8 @@ timetoread: 5 min read
 <br>
 On 9 April 2026 an Adyen press release said: "Unlike many providers that rely on a patchwork of acquired technologies and third-party integrations, Adyen has built its entire financial technology stack on a single platform." Fourteen days later Adyen announced that it would buy Talon.One, a loyalty platform, for €750 million, and on 11 June that it would buy Orb, a usage-billing platform, for $335 million. Both deals closed on 1 July. Stripe's treasury documentation says "Stripe is not a bank." In November 2026 the page on which Stripe lists its US acquirers (the card-network members that submit a merchant's payments and receive the money for them) named, next to five banks, "Stripe MALPB, 505 N Angier Avenue NE, Atlanta": **a limited-purpose bank of Stripe's own**, in business since 28 May 2026.
 
-<!-- illustration-placeholder
-{
-  "id": "part-10-two-dated-facts",
-  "status": "pending",
-  "asset": "assets/images/part-10-intro/part-10-two-dated-facts.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the opening paragraph",
-  "visual_goal": "Show one dated fact per company that the usual shorthand cannot explain: a statement about building everything followed by two purchases, and a list of acquiring banks that includes the provider's own.",
-  "prompt": "Create a wide explainer illustration in two halves separated by a thin vertical divider. Left half: a speech card showing one solid block made of a single piece, with a small calendar tag above it labeled \"April\". A teal arrow labeled \"3 months\" runs to the right to a second calendar tag labeled \"July\", under which two separate orange boxes with puzzle-piece corners stand beside the solid block, each carrying an orange tag labeled \"Bought\". Right half: a generic provider shown as a blue software window with angle brackets, holding a sign labeled \"Not a bank\". Beside it, a vertical list of six small buildings with columns: the first five are plain grey and share one bracket labeled \"5 banks\"; the sixth is drawn in the same blue as the software window, connected to it by a short blue line, and labeled \"Its own\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Left: a single solid block dated April, then two bought boxes standing beside it in July. Right: a provider holding a sign reading Not a bank beside a list of six bank buildings, five plain and a sixth in the provider's own color.",
-  "caption": "Two facts from 2026: Adyen's April sentence about building its whole stack on a single platform was followed by two purchases closed on 1 July, and the US acquirer list of the company that is not a bank names five banks and one of its own."
-}
--->
+![Left: a single solid block dated April, then two bought boxes standing beside it in July. Right: a provider holding a sign reading Not a bank beside a list of six bank buildings, five plain and a sixth in the provider's own color.](assets/images/part-10-intro/part-10-two-dated-facts.jpeg)
+**Figure 1:** *Two facts from 2026: Adyen's April sentence about building its whole stack on a single platform was followed by two purchases closed on 1 July, and the US acquirer list of the company that is not a bank names five banks and one of its own.*
 
 Neither fact fits what most engineers would say about the two companies: the bank and the API, the enterprise one and the startup one. The earlier parts could not test that shorthand. Parts I to VIII ended each chapter with a table, "Stripe and Adyen: Where They Differ", and [[part-9]] found the same payment recorded in two vocabularies: documented differences, and **no account of where they come from**. For Larkfield, the fictional studio-software platform this book follows, the question is practical: in 2026 it ran 44% of its member payment volume on Stripe and 56% on Adyen.
 
@@ -38,19 +27,8 @@ A verdict of that kind depends on how the evidence is read. The sources are comp
 
 Five chapters carry the test, in this order: Stripe as a case; Adyen as a case; the bets compared one by one; three other answers; and what is moving in November 2026, which also closes the book. **The cases come before the comparison** so that every row of it has a dated record behind it.
 
-<!-- illustration-placeholder
-{
-  "id": "part-10-records-then-comparison",
-  "status": "pending",
-  "asset": "assets/images/part-10-intro/part-10-records-then-comparison.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that gives the order of the five chapters",
-  "visual_goal": "Show the part's shape: two dated record folders feed one comparison card, three smaller folders test it, and the result is then set in motion.",
-  "prompt": "Create a wide structural diagram read from left to right. Far left: two thick document folders standing side by side, one blue labeled \"Record A\" and one teal labeled \"Record B\", each with small calendar tabs sticking out of its pages. Two solid arrows, one from each folder, labeled \"dated facts\", meet at a large card in the center divided into rows, labeled \"Comparison\"; most rows of the card show two small matching icons, and two rows are highlighted in orange. Below the card, three smaller green folders stand in a row under a bracket labeled \"3 contrasts\", with one dashed green arrow labeled \"test\" pointing up to the card. Far right: a solid orange arrow labeled \"2026\" leaves the card toward a small cluster of three icons with no text: a robot head, a coin with a chain link, and a lightning bolt over a bank building. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two folders labeled Record A and Record B send dated facts to a central card labeled Comparison; three smaller folders below test the card, and an arrow marked 2026 leads on to icons for agents, stablecoins and instant payments.",
-  "caption": "The shape of Part X: two records (Record A is Stripe, Record B is Adyen), one comparison built from them, three contrast cases that test it, and the changes of 2026 that set it in motion."
-}
--->
+![Two folders labeled Record A and Record B send dated facts to a central card labeled Comparison; three smaller folders below test the card, and an arrow marked 2026 leads on to icons for agents, stablecoins and instant payments.](assets/images/part-10-intro/part-10-records-then-comparison.jpeg)
+**Figure 2:** *The shape of Part X: two records (Record A is Stripe, Record B is Adyen), one comparison built from them, three contrast cases that test it, and the changes of 2026 that set it in motion.*
 
 ## Chapters in this part
 

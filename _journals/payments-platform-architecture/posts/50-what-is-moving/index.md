@@ -50,19 +50,8 @@ The second reading aid is the frame: the table says which promise each change mo
 | Stablecoins | What the money is held and settled in | A bank balance, to a token redeemable for dollars | A balance to record and reconcile; a refund path |
 | Instant payments | When the money has moved | Days, to seconds | Two records of the same money; a refund or dispute process with its own states |
 
-<!-- illustration-placeholder
-{
-  "id": "50-three-promises-three-changes",
-  "status": "pending",
-  "asset": "assets/images/50-what-is-moving/50-three-promises-three-changes.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table that names the promise each change moves",
-  "visual_goal": "Show one payment as a chain of three links and three changes each replacing exactly one link while the chain and the record book beside it stay.",
-  "prompt": "Create a conceptual illustration. Across the middle, a horizontal chain of three large links drawn left to right, labeled in order \"Who authorized\", \"What it is held in\", \"When it moved\". At the left end of the chain a generic customer holds a phone showing a green check mark; at the right end a small studio building with a euro coin above its door. Above the first link, a small friendly robot hand holding a key, with an arrow named \"replaces\" pointing down to the first link. Above the second link, a round token with a euro-free plain ring pattern, with an arrow named \"replaces\" pointing down to the second link. Above the third link, a stopwatch, with an arrow named \"shortens\" pointing down to the third link. Below the whole chain, running its full width, an open ledger book with two columns of tick marks, labeled \"Records still agree\", connected to each link by a thin dotted line. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A chain of three links between a customer and a studio: who authorized, what the money is held in, when it moved. A robot hand with a key, a token and a stopwatch each point at one link; a ledger book runs beneath the whole chain.",
-  "caption": "Each of the three changes replaces or shortens one link of the payment chain; the chain, and the records that must agree about it, remain."
-}
--->
+![A chain of three links between a customer and a studio: who authorized, what the money is held in, when it moved. A robot hand with a key, a token and a stopwatch each point at one link; a ledger book runs beneath the whole chain.](assets/images/50-what-is-moving/50-three-promises-three-changes.jpeg)
+**Figure 1:** *Each of the three changes replaces or shortens one link of the payment chain; the chain, and the records that must agree about it, remain.*
 
 ## Agents That Pay: Who Authorized the Purchase
 
@@ -85,19 +74,8 @@ The second reading aid is the frame: the table says which promise each change mo
 
 Read what each product does underneath, and familiar mechanisms appear. Stripe's April 2026 release on Link for agents says "a one-time-use card is issued per task, and you approve each payment." A single-use card is still a card: an issuer authorizes it and the cardholder can dispute. Stripe's machine payments documentation (n.d., accessed November 2026) says "Payments land directly in your Stripe balance and settle in fiat", with refunds "through the Refunds API". Adyen's April 2026 article on x402 describes "machine-to-machine transactions where agents pay autonomously for the tools, data, and services they consume": a payment embedded in a web request, not a new kind of money. **The authorization promise has a new addressee. It still has to be made, kept and recorded.**
 
-<!-- illustration-placeholder
-{
-  "id": "50-agent-payment-still-an-authorization",
-  "status": "pending",
-  "asset": "assets/images/50-what-is-moving/50-agent-payment-still-an-authorization.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that says each agent product ends in a familiar mechanism",
-  "visual_goal": "Show the message flow of an agent purchase: a person delegates a scoped credential to an agent, and from the merchant onward the flow is the ordinary authorization path.",
-  "prompt": "Create a structural diagram reading left to right with six elements on one line. First, a generic person holding a phone, labeled \"Person\". Second, a small robot icon labeled \"Agent\". Third, a shop-front with a server icon labeled \"Merchant\". Fourth, a rounded platform box labeled \"Provider\". Fifth, a generic hub of connected nodes labeled \"Network\". Sixth, a bank building labeled \"Issuer\". Arrows: from Person to Agent a teal arrow named \"approves\" carrying a small key tag with a clock on it labeled \"Scoped credential\"; from Agent to Merchant an orange arrow named \"orders\"; from Merchant to Provider a blue arrow named \"pay\"; from Provider through Network to Issuer a blue arrow named \"authorize\"; from Issuer back to Provider a green return arrow named \"approved\". Draw a light dashed bracket under the three right-hand elements and the Merchant, labeled \"Unchanged path\", and a second short bracket under Person and Agent labeled \"New\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A person approves a scoped credential for an agent; the agent orders from a merchant; the merchant's provider sends an authorization through the network to the issuer, which approves. The part from merchant to issuer is marked as the unchanged path.",
-  "caption": "In an agent purchase the new part is the delegation from person to agent; from the merchant onward the payment is still an authorization that an issuer approves."
-}
--->
+![A person approves a scoped credential for an agent; the agent orders from a merchant; the merchant's provider sends an authorization through the network to the issuer, which approves. The part from merchant to issuer is marked as the unchanged path.](assets/images/50-what-is-moving/50-agent-payment-still-an-authorization.jpeg)
+**Figure 2:** *In an agent purchase the new part is the delegation from person to agent; from the merchant onward the payment is still an authorization that an issuer approves.*
 
 On this record the two companies stand differently. Stripe co-authored ACP with OpenAI and MPP with Tempo, sells a suite that connects a business to several agents, and runs Link, which a September 2026 release calls "Stripe's consumer network with over 300 million users globally". Adyen authored none of the protocols. It is a founding member of the x402 Foundation, calls itself an early endorser of UCP, AP2 and ACP, and sells one integration across them, in the words of its June 2026 release: "we intentionally designed Adyen Agentic to help retailers integrate once and participate across evolving platforms, protocols, and experiences — without having to bet on which ecosystems ultimately win". Stripe's chief executive said in April 2026 that "in the not-too-distant future agents will account for most transactions online"; neither company has published how many do today.
 
@@ -127,19 +105,8 @@ How much runs on such rails depends on the country. The Federal Reserve's statis
 
 Adyen's Wero documentation (n.d., accessed 17 November 2026) describes an authorization that is a bank's guarantee: "The payment guarantee is the shopper's bank's commitment to pay Adyen. It is not the receipt of funds." The funds follow in a capture over the instant rail, which can fail and produce a `CAPTURE_FAILED` event. And the page announces: "Dispute support starts in February 2027." It says "Wero payments can be disputed by the shopper after they settle", beginning with a pre-dispute "within 120 calendar days of the transaction date" and ending, if it goes that far, in arbitration by the scheme. Shoppers whose account "is based in the Netherlands" cannot raise one "until 1 January 2028". Stripe's page for the same scheme says "Dispute support: No". **An answer, then the money, then a window in which it can come back: the instant rail has all three.**
 
-<!-- illustration-placeholder
-{
-  "id": "50-card-and-instant-timelines",
-  "status": "pending",
-  "asset": "assets/images/50-what-is-moving/50-card-and-instant-timelines.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on the Wero guarantee and its dispute process",
-  "visual_goal": "Compare two timelines of a 120 euro payment: on a card the money arrives after two days, on an instant rail after seconds, and both are followed by a 120-day period in which the payment can come back.",
-  "prompt": "Create a two-row timeline comparison on a light background. Top row, tagged at the left with a small card icon labeled \"Card\": three markers along a horizontal line: a phone with a check mark labeled \"Answer\", then after a medium gap a euro coin landing in a small building labeled \"Money, 2 days\", then a long shaded bar extending to the right labeled \"Can come back, 120 days\". Bottom row, tagged at the left with a small bank-building icon labeled \"Instant\": the same three markers, but the phone labeled \"Answer\" and the euro coin labeled \"Money, seconds\" sit almost on top of each other, joined by a tiny bracket; then the same long shaded bar labeled \"Can come back, 120 days\". Draw a thin vertical dotted line aligning the two \"Answer\" markers. Draw one orange double-headed arrow between the two rows at the gap between answer and money, named \"shorter\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two timelines. On a card, the answer comes first, the money two days later, then a 120-day period in which it can come back. On an instant rail, answer and money are seconds apart, and the same 120-day period follows.",
-  "caption": "An instant rail shortens the interval between the answer and the money from 2 days to seconds; the 120 days in which the payment can come back are a rule of each scheme, and the newest one has them too."
-}
--->
+![Two timelines. On a card, the answer comes first, the money two days later, then a 120-day period in which it can come back. On an instant rail, answer and money are seconds apart, and the same 120-day period follows.](assets/images/50-what-is-moving/50-card-and-instant-timelines.jpeg)
+**Figure 3:** *An instant rail shortens the interval between the answer and the money from 2 days to seconds; the 120 days in which the payment can come back are a rule of each scheme, and the newest one has them too.*
 
 What instant payments do to card economics can be reasoned but not cited. A card payment pays **interchange**, a fee that passes from the merchant's side to the cardholder's bank ([[payment-economics]]); an account-to-account payment has none. On Mila's €120 card payment the illustrative provider cost was €0.61, of which €0.24 was interchange and €0.31 was Adyen's own *(assumptions from the ledger)*. Larkfield's price list already shows the consequence one level up: it charges studios €2.53 on that card payment and a flat €0.35 on an iDEAL payment.
 

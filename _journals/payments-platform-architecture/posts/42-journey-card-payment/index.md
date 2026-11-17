@@ -46,19 +46,8 @@ So the walkthrough reads every record with one question: **which later record co
 | The funding unit | Merchant account and batch number of the sales day | The balance transaction | The payment and the money that became payable |
 | The payout | The transfer from the studio's balance account | The payout ID | The payable money and the bank credit |
 
-<!-- illustration-placeholder
-{
-  "id": "42-reference-thread",
-  "status": "pending",
-  "asset": "assets/images/42-journey-card-payment/42-reference-thread.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of references in the Larkfield scene",
-  "visual_goal": "Show that one payment exists as separate records in separate systems, and that only a shared reference lets anyone find the next record from the previous one.",
-  "prompt": "Create a conceptual explainer illustration. Five paper record cards are pinned in a row from left to right on a light board, each a different shape: a database row card labeled \"Payment row\", an envelope labeled \"Webhook\", a lined sheet labeled \"Report line\", a small ledger book labeled \"Ledger entry\", and a bank slip labeled \"Payout\". One continuous orange thread runs through a punched hole in every card from the first to the last, with a small tag hanging from the thread at the left end labeled \"Reference\". Above each card a small generic building icon shows a different owner: a tablet, a cloud-shaped provider office, the same provider office, the tablet again, a bank. Between the third and fourth cards the thread is drawn slightly thinner with a small magnifying glass over it. No arrows other than the thread. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Five different record cards in a row, a payment row, a webhook, a report line, a ledger entry and a payout slip, joined by one orange thread with a tag labeled Reference.",
-  "caption": "One payment is several records in several systems; a reference that survives every hop is what lets a later record confirm an earlier one."
-}
--->
+![Five different record cards in a row, a payment row, a webhook, a report line, a ledger entry and a payout slip, joined by one orange thread with a tag labeled Reference.](assets/images/42-journey-card-payment/42-reference-thread.jpeg)
+**Figure 1:** *One payment is several records in several systems; a reference that survives every hop is what lets a later record confirm an earlier one.*
 
 ## 19:42, Two Seconds: Five Steps End in One Answer
 
@@ -74,19 +63,8 @@ So the walkthrough reads every record with one question: **which later record co
 
 So the **Payment successful** on Mila's screen reports step five alone. A bank has promised to honor a claim, €120 is reserved in Mila's own account, and no money has moved. Of the five records so far, Larkfield holds one row and one stored webhook. The token is the wallet's, the risk result is the provider's, and the approval and the hold are the bank's. The message covers one promise out of eleven.
 
-<!-- illustration-placeholder
-{
-  "id": "42-message-at-step-five",
-  "status": "pending",
-  "asset": "assets/images/42-journey-card-payment/42-message-at-step-five.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that says the success message reports step five alone",
-  "visual_goal": "Show that the customer's success message sits at the fifth of twelve steps and the merchant's money at the twelfth, seven steps and days later.",
-  "prompt": "Create a conceptual explainer illustration of a path of twelve round stepping stones crossing a wide stream from left to right, numbered 1 to 12 in small numerals. The first five stones are close together and colored blue; stones 6 to 8 are farther apart and colored teal; stones 9 to 12 are colored green. A generic customer stands on stone 5 holding a phone that shows a large green check mark, with a small speech tag labeled \"Paid\". On the far bank beyond stone 12 stands a small yoga studio front beside a bank building, with a euro coin above the studio. A bracket under stones 1 to 5 is labeled \"2 seconds\"; a bracket under stones 6 to 12 is labeled \"days\". A dashed line from the phone points only down to stone 5. Stone 12 carries a small magnifying glass icon. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Twelve numbered stepping stones across a stream; a customer with a phone showing a check mark stands on stone 5, and a studio with a euro coin waits beyond stone 12.",
-  "caption": "The customer's success message stands on the fifth of twelve steps; the studio's money is established only at the twelfth, seven steps later."
-}
--->
+![Twelve numbered stepping stones across a stream; a customer with a phone showing a check mark stands on stone 5, and a studio with a euro coin waits beyond stone 12.](assets/images/42-journey-card-payment/42-message-at-step-five.jpeg)
+**Figure 2:** *The customer's success message stands on the fifth of twelve steps; the studio's money is established only at the twelfth, seven steps later.*
 
 ## Tuesday Night to Thursday: Capture, Clearing and Settlement Send No Message
 
@@ -129,19 +107,8 @@ Set side by side, the twelve steps look like this on Adyen. For each: who acts, 
 | 11. Payout | Adyen, then the banks | Transfer `booked`; payout `sent` | Provider: the money was sent | The receiving bank returns it → [[payouts-and-money-movement]] |
 | 12. Reconciliation | Larkfield's reconciliation job | Match to batch and report; `arrived` | None: this step checks the others | A total forced to tie; an open item nobody owns → [[payment-reconciliation-and-reporting]] |
 
-<!-- illustration-placeholder
-{
-  "id": "42-twelve-step-sequence",
-  "status": "pending",
-  "asset": "assets/images/42-journey-card-payment/42-twelve-step-sequence.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the twelve-row step table",
-  "visual_goal": "Show the twelve steps as a sequence of numbered arrows between six parties, grouped into three time bands, so the reader sees which party each step belongs to and how few steps touch the platform.",
-  "prompt": "Create a sequence-style explainer diagram with six vertical lanes, each headed by a small icon and a label, left to right: a phone labeled \"Member\", a tablet labeled \"Platform\", an office building labeled \"Provider\", a round hub labeled \"Network\", a bank building labeled \"Member's bank\", and a second bank building beside a small studio front labeled \"Studio's bank\". Twelve horizontal arrows run between lanes from top to bottom, each with a small numbered circle from 1 to 12 and no other text: 1 from Member to Platform; 2 from Member to Provider; 3 a short loop on the Provider lane; 4 from Member to Provider, dashed; 5 from Provider through Network to Member's bank and back; 6 from Provider to Network; 7 from Network to Member's bank; 8 from Member's bank through Network to Provider, drawn thicker in orange; 9 from Provider to Platform; 10 a short loop on the Provider lane; 11 from Provider to Studio's bank, drawn thicker in orange; 12 from Platform to Provider with a magnifying glass at its tip. Three horizontal background bands group the arrows: a blue band behind arrows 1 to 5 labeled \"2 seconds\", a teal band behind arrows 6 to 8 labeled \"2 days\", and a green band behind arrows 9 to 12 labeled \"The books\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Sequence diagram with six lanes, Member, Platform, Provider, Network, Member's bank and Studio's bank, and twelve numbered arrows grouped into three bands labeled 2 seconds, 2 days and The books.",
-  "caption": "The twelve steps as a sequence: five within two seconds, three over two days that send the platform nothing, and four in the books, of which only the twelfth checks the others."
-}
--->
+![Sequence diagram with six lanes, Member, Platform, Provider, Network, Member's bank and Studio's bank, and twelve numbered arrows grouped into three bands labeled 2 seconds, 2 days and The books.](assets/images/42-journey-card-payment/42-twelve-step-sequence.jpeg)
+**Figure 3:** *The twelve steps as a sequence: five within two seconds, three over two days that send the platform nothing, and four in the books, of which only the twelfth checks the others.*
 
 Now read the table downward and ask the scene's question of each row. **The record that confirms a row is always in a later row, and usually on another channel.** The approval, an API response and a webhook, is confirmed by the capture surviving and by the report line. The capture is confirmed by the absence of `CAPTURE_FAILED` and by the same line. The split is confirmed by the accounting report. The payout is confirmed by the match and the passing of the return window. Clearing and settlement have no confirming record on the merchant's side at all. A step table of your own system is this exercise: for each row, name the record that confirms the row before it.
 

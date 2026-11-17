@@ -60,19 +60,8 @@ The table below gives all eleven in the form Journey 1 set up: who acts, what re
 
 The same eleven rows look different on a time axis, as the figure below shows. The renewal runs on two clocks. The debt for April is open for three days without a break. The two payment attempts are events of a few seconds each, and between them the payment lanes are empty. On 2 and 3 April only the billing lane holds anything.
 
-<!-- illustration-placeholder
-{
-  "id": "43-renewal-sequence",
-  "status": "pending",
-  "asset": "assets/images/43-journey-failed-renewal/43-renewal-sequence.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that says the renewal runs on two clocks",
-  "visual_goal": "Show the renewal as a sequence across five lanes, with two short payment attempts and one open debt that spans the three days between them.",
-  "prompt": "Create a sequence-style diagram with five vertical lanes, headed left to right by a calendar-and-app icon labeled \"Booking app\", a small server labeled \"Payment service\", a payment company building labeled \"Provider\", a bank building labeled \"Issuer\" and a person with a phone labeled \"Member\". A horizontal time axis runs down the left side with two markers labeled \"1 April\" and \"4 April\". At the top marker: a blue arrow named 'attempt 1' runs from the booking app through the payment service and the provider to the issuer, and an orange arrow labeled \"Declined\" returns along the same lanes. Just below it, a teal arrow labeled \"Notice\" runs from the booking app across to the member. At the bottom marker: a blue arrow named 'attempt 2' runs from the booking app to the issuer, and a green arrow labeled \"Approved\" returns. In the booking app lane, a tall orange bar labeled \"Debt open\" spans from the top marker to the bottom marker and ends in a small green cap labeled \"Paid\". The provider and issuer lanes are visibly empty between the two markers. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Sequence diagram with five lanes: a declined attempt on 1 April, a notice to the member, an approved attempt on 4 April, and a bar for the open debt spanning both dates in the booking app lane.",
-  "caption": "Two attempts of a few seconds each, on 1 April and 4 April, and one debt that stays open for the three days between them; only the billing side holds anything in that time."
-}
--->
+![Sequence diagram with five lanes: a declined attempt on 1 April, a notice to the member, an approved attempt on 4 April, and a bar for the open debt spanning both dates in the booking app lane.](assets/images/43-journey-failed-renewal/43-renewal-sequence.jpeg)
+**Figure 1:** *Two attempts of a few seconds each, on 1 April and 4 April, and one debt that stays open for the three days between them; only the billing side holds anything in that time.*
 
 ## From the Billing Clock to the Issuer: A Charge With Nobody Present
 
@@ -96,19 +85,8 @@ Because the refusal carries a code, the first decision can be made by rule. The 
 | Try again later | 2: 51 (not sufficient funds), 91 (issuer or switch inoperative) | “Reattempt permitted (up to 20 attempts in 30 days)” | Schedule a few attempts on chosen days |
 | Get a current credential | 3: 54 (expired card) | The same limit, once the data is corrected | Let an updater or a token repair it, or ask the member |
 
-<!-- illustration-placeholder
-{
-  "id": "43-three-doors-after-a-decline",
-  "status": "pending",
-  "asset": "assets/images/43-journey-failed-renewal/43-three-doors-after-a-decline.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of three kinds of decline",
-  "visual_goal": "Make memorable that a decline code is a signpost with three different exits, not a dead end.",
-  "prompt": "Create a conceptual illustration. On the left, a generic bank card lies on a path beside an orange tag labeled \"Declined\". The path leads to a signpost with three arms and then splits into three doors, left to right. The first door is closed with a bar across it and a sign labeled \"Never\"; a small envelope icon beside it has an arrow named 'ask member' pointing away toward a person with a phone. The second door is ajar with a wall clock above it and a sign labeled \"Later\"; a calendar page beside it shows three circled days. The third door has a key icon above it and a sign labeled \"New credential\"; a small arrow named 'update' comes from a hub of connected nodes toward the key. A generic engineer stands at the signpost reading a small code tag labeled \"51\" and facing the middle door. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A declined card in front of three doors labeled Never, Later and New credential, with an engineer reading code 51 and facing the middle door.",
-  "caption": "A decline code points to one of three doors: never try this card again, try later, or get a current credential; code 51 points to the second."
-}
--->
+![A declined card in front of three doors labeled Never, Later and New credential, with an engineer reading code 51 and facing the middle door.](assets/images/43-journey-failed-renewal/43-three-doors-after-a-decline.jpeg)
+**Figure 2:** *A decline code points to one of three doors: never try this card again, try later, or get a current credential; code 51 points to the second.*
 
 The third row, by contrast, is not cured by waiting. A card that has expired or been replaced needs a new credential, and that repair comes from the network or from the member. Adyen's Real Time Account Updater (documentation, n.d., accessed November 2026) does it inside the failing call: “When you submit a payment that is refused, our Real Time Account Updater instantly checks for updated card details. If there is an update, we immediately retry the payment with the updated card details.” Stripe's documentation (n.d., accessed November 2026) says Stripe “automatically attempts to update saved card details whenever a customer receives a new card”, and adds: “It isn’t possible to identify cards that support automatic updates.” A network token stays valid through a reissue. None of the three can be counted on for a given card, so the fallback is always a request to the member.
 
@@ -165,19 +143,8 @@ Now replay April with every attempt refused for the same reason. Under Larkfield
 | 15 April | 14 | Window closes; no further attempts on this card | `open` | Paused; access ends |
 | 1 May | 30 | Debt given up | `uncollectible` | Ended |
 
-<!-- illustration-placeholder
-{
-  "id": "43-clock-on-the-debt",
-  "status": "pending",
-  "asset": "assets/images/43-journey-failed-renewal/43-clock-on-the-debt.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the timeline table of the lapse branch",
-  "visual_goal": "Show the debt as a bar with a clock on it: four failed attempts, then a pause on day 14 and an end on day 30, with access ending at the pause.",
-  "prompt": "Create a horizontal timeline illustration. A long horizontal bar runs left to right, with tick marks labeled \"Day 0\", \"Day 3\", \"Day 7\", \"Day 12\", \"Day 14\" and \"Day 30\". The bar is tinted orange from Day 0 to Day 14 and labeled \"Past due\", tinted grey from Day 14 to Day 30 and labeled \"Paused\", and ends at Day 30 in a dark cap labeled \"Ended\". Below the bar, at Day 0, Day 3, Day 7 and Day 12, four identical generic bank cards hang on thin vertical lines, each with a red cross. Above the bar, a studio door with a green open sign spans Day 0 to Day 14, and from Day 14 onward the same door is shown closed. A wall clock sits at the far left above the bar with an arrow named 'window' pointing along the bar to Day 14. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Timeline of a debt from day 0 to day 30 with four failed card attempts on days 0, 3, 7 and 12, a pause at day 14 when the studio door closes, and an end at day 30.",
-  "caption": "The clock on an unpaid period under Larkfield's illustrative policy: four attempts by day 12, a pause on day 14 and an end on day 30, with access kept only to day 14."
-}
--->
+![Timeline of a debt from day 0 to day 30 with four failed card attempts on days 0, 3, 7 and 12, a pause at day 14 when the studio door closes, and an end at day 30.](assets/images/43-journey-failed-renewal/43-clock-on-the-debt.jpeg)
+**Figure 3:** *The clock on an unpaid period under Larkfield's illustrative policy: four attempts by day 12, a pause on day 14 and an end on day 30, with access kept only to day 14.*
 
 Consequently, the end of the window forces three decisions. What does the membership become? Does the €49.00 stay owed? From which day does Mila lose access? On an Adyen integration all three are the platform's own rules in its own records, because I found no invoice and no subscription object in Adyen's documentation (accessed November 2026). Orb, the billing company Adyen bought on 1 July 2026 (press release of that date), has its own documentation, which lists Adyen as a payment gateway; Adyen's documentation has no page on Orb (sitemap searched, November 2026) ([[subscriptions-and-billing-engines]]). Larkfield's answers are in the table: paused on day 14, written off and ended on day 30, access for fourteen days. Meanwhile the payment record store holds four attempt rows, each closed as declined. A payment record can say that an attempt failed. It cannot say that a customer has left or that a debt has been given up.
 

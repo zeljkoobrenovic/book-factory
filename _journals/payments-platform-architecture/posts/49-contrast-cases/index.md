@@ -44,19 +44,8 @@ All five companies in this chapter publish a volume figure, and no two define it
 | Checkout.com | "over $300B" total processed volume | Not defined | Private company's release |
 | Block | $250 billion Square gross payment volume (GPV) | "all card and bank payments processed by sellers using Square, net of refunds" | Audited filing |
 
-<!-- illustration-placeholder
-{
-  "id": "49-five-measuring-cups",
-  "status": "pending",
-  "asset": "assets/images/49-contrast-cases/49-five-measuring-cups.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of the five volume figures",
-  "visual_goal": "Show that five companies measure payment volume with five differently shaped measures, so the amounts cannot be ranked.",
-  "prompt": "Conceptual illustration of a long kitchen counter seen from the front with five measuring vessels in a row, each a clearly different shape and each partly filled with coins: a tall narrow cylinder, a wide shallow bowl, a conical flask, a square jug with a handle, and a small rounded cup. Each vessel has its own different scale markings on the side, none of them aligned with the next. Under the vessels, small tags read \"Total volume\", \"Processed\", \"TPV\", \"Processed\" and \"GPV\". On the right, a person in office clothes holds a ruler horizontally across the tops of the vessels and looks puzzled, with a small orange question mark above the ruler. Below the first and fourth vessels a small gray tag reads \"undefined\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Five differently shaped measuring vessels partly filled with coins, each with its own scale; a person tries to compare them with one ruler.",
-  "caption": "Five companies report five volume figures under five definitions, two of them undefined, so the figures cannot be ranked."
-}
--->
+![Five differently shaped measuring vessels partly filled with coins, each with its own scale; a person tries to compare them with one ruler.](assets/images/49-contrast-cases/49-five-measuring-cups.jpeg)
+**Figure 1:** *Five companies report five volume figures under five definitions, two of them undefined, so the figures cannot be ranked.*
 
 ## PayPal and Braintree: The Wallet Is the Asset
 
@@ -70,19 +59,8 @@ So a company that owns a consumer network and a processor reports that the proce
 
 > **INFERENCE, NOT DOCUMENTED:** Stripe has not said why it promotes Link. I read it as a processor building the consumer side that PayPal started with, because a provider that knows the shopper can recognize them at any merchant's checkout, and a processor alone cannot. PayPal's filing supports the premise and says nothing about Stripe. It does not state Braintree's margin; "higher expense rates" is as far as it goes.
 
-<!-- illustration-placeholder
-{
-  "id": "49-branded-and-unbranded",
-  "status": "pending",
-  "asset": "assets/images/49-contrast-cases/49-branded-and-unbranded.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the inference block of the PayPal section",
-  "visual_goal": "Show the difference between branded checkout, where the shopper has an account with the provider, and unbranded processing, where the provider is invisible behind the merchant's card form.",
-  "prompt": "Two-panel structural diagram with a thin vertical divider, panels tagged \"Branded\" on the left and \"Unbranded\" on the right. In both panels a shopper with a phone stands on the left and a small shop building labeled \"Merchant\" on the right. Left panel: on the phone screen a large teal button labeled \"Wallet\" is visible; a solid teal line labeled \"account\" runs from the shopper directly to a generic provider building at the top center; a green arrow labeled \"pays\" runs from the provider building down to the merchant. Right panel: on the phone screen a plain card form with four empty fields is visible; a green arrow labeled \"pays\" runs from the shopper to the merchant; behind the merchant, drawn in pale gray, stands the same generic provider building connected to the merchant by a thin gray pipe labeled \"processing\"; there is no line between the shopper and the provider. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two panels. In branded checkout the shopper has an account with the provider and pays through a wallet button; in unbranded processing the shopper fills in the merchant's card form and the provider stays behind the merchant.",
-  "caption": "In branded checkout the shopper holds an account with the provider; in unbranded processing the provider stays out of sight behind the merchant's own card form."
-}
--->
+![Two panels. In branded checkout the shopper has an account with the provider and pays through a wallet button; in unbranded processing the shopper fills in the merchant's card form and the provider stays behind the merchant.](assets/images/49-contrast-cases/49-branded-and-unbranded.jpeg)
+**Figure 2:** *In branded checkout the shopper holds an account with the provider; in unbranded processing the provider stays out of sight behind the merchant's own card form.*
 
 ## Checkout.com: An Enterprise Acquirer Assembled Later
 
@@ -120,19 +98,8 @@ The last row needs stating with care. Line the five companies up by the customer
 
 Fill that row in for Larkfield, beside the rows of the previous chapter. Larkfield owns both. The studio is its customer through the scheduling software, and the member is known to it through the booking app. Stripe and Adyen, which carried 44% and 56% of its 2026 volume, own neither. That is the position of a software-first company such as Square, without the bank: Larkfield holds no license ([[licences-and-safeguarding]]). Owning both relationships is what made decision K8 possible, under which the payment service can move a studio's online card payments to the other provider. What Larkfield does not hold is the stored cards, which stay with the provider that stored them ([[payment-routing-and-orchestration]]).
 
-<!-- illustration-placeholder
-{
-  "id": "49-first-customer-what-is-held",
-  "status": "pending",
-  "asset": "assets/images/49-contrast-cases/49-first-customer-what-is-held.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the Larkfield paragraph of the cross-case section",
-  "visual_goal": "Show four starting customers side by side and, above each, what a provider that started there came to hold.",
-  "prompt": "Structural diagram with four equal columns separated by thin dividers. At the bottom of each column stands one figure on a small platform with a tag: a shopper with a phone tagged \"Shopper\", a tall office tower with a person in a suit tagged \"Enterprise\", a person at a laptop tagged \"Developer\", and a shopkeeper in an apron behind a counter tagged \"Shopkeeper\". From each figure a green upward arrow rises to an object in the upper half of the column: above the shopper a large teal wallet icon tagged \"Wallet\"; above the enterprise a stack of blue certificate documents with seals tagged \"Licenses\"; above the developer a code window with curly brackets tagged \"API\"; above the shopkeeper a countertop card reader beside a small bank building tagged \"Till + bank\". A thin horizontal orange dashed line runs across the top of all four columns with no endpoints marked, suggesting they are not points on one line. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Four columns: a shopper below a wallet, an enterprise below a stack of licenses, a developer below an API window, a shopkeeper below a card reader and a small bank.",
-  "caption": "Four first customers and what a provider that started with each came to hold: a wallet, acquiring licenses, an API, a till and a bank. The pairing is the author's inference."
-}
--->
+![Four columns: a shopper below a wallet, an enterprise below a stack of licenses, a developer below an API window, a shopkeeper below a card reader and a small bank.](assets/images/49-contrast-cases/49-first-customer-what-is-held.jpeg)
+**Figure 3:** *Four first customers and what a provider that started with each came to hold: a wallet, acquiring licenses, an API, a till and a bank. The pairing is the author's inference.*
 
 ## Where the Evidence Stops
 

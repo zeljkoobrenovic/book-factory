@@ -56,19 +56,8 @@ The names come next. Every payment has two identifiers, the provider's and yours
 
 By contrast with the names, what a name lets you read is where the two models part. On Stripe the current state is a `status` field on the object, "one of `requires_payment_method`, `requires_confirmation`, `requires_action`, `processing`, `requires_capture`, `canceled`, or `succeeded`", and a GET returns it at any time. On Adyen's Checkout API the state is a result code on each response, a word such as `Authorised` or `Refused`, followed by webhooks. Of the 31 operations in the v72 specification three are GETs (a payment link, a session, stored payment methods), and none returns a payment. The state machines themselves belong to [[payment-state-machines]].
 
-<!-- illustration-placeholder
-{
-  "id": "17-object-you-fetch-or-reference-you-keep",
-  "status": "pending",
-  "asset": "assets/images/17-api-design-and-object-models/17-object-you-fetch-or-reference-you-keep.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on where the current state lives",
-  "visual_goal": "Contrast a provider that keeps a fetchable payment object with a provider that returns a reference and a result and then sends events to the integrator's own record.",
-  "prompt": "Create a structural explainer diagram split into a left half and a right half by a thin vertical line. Left half, headed by a small tag labeled \"Provider A\": at the top a server box holding a document card labeled \"Object\" with a small status badge; at the bottom a laptop labeled \"Your system\". A blue arrow labeled \"Create\" goes up from the laptop to the server, and a teal looping arrow labeled \"Read again\" goes from the laptop up to the object card and back down. Right half, headed by a small tag labeled \"Provider B\": at the top a server box with no document inside; at the bottom a laptop labeled \"Your system\" with a database cylinder beside it labeled \"Own record\". A blue arrow labeled \"Send\" goes up from the laptop to the server, a short green arrow labeled \"Result\" comes back down with a small ticket stub, and three orange envelopes on a dashed arrow labeled \"Events\" travel from the server down into the database cylinder. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two-panel diagram: on the left a system creates a payment object at a provider and reads it again; on the right a system sends a request, gets a result back and stores later events in its own record.",
-  "caption": "Provider A is Stripe, where a payment is an object you can read again; Provider B is Adyen's Checkout API, where a request returns a reference and a result, and later states reach your own record as events."
-}
--->
+![Two-panel diagram: on the left a system creates a payment object at a provider and reads it again; on the right a system sends a request, gets a result back and stores later events in its own record.](assets/images/17-api-design-and-object-models/17-object-you-fetch-or-reference-you-keep.jpeg)
+**Figure 1:** *Provider A is Stripe, where a payment is an object you can read again; Provider B is Adyen's Checkout API, where a request returns a reference and a result, and later states reach your own record as events.*
 
 A payment also points at other things, such as a customer. An **expandable object** is a related object that the API returns as an identifier by default and as the full object on request. Stripe's reference page on expanding responses says: "Many objects allow you to request additional information as an expanded response by using the `expand` request parameter". Expansions nest "up to a maximum depth of four levels", and the cost is stated: "Performing deep expansions on numerous list requests might result in slower processing times". The newer part of Stripe's API, the `/v2` paths described below, dropped the convention: "The `expand` parameter isn't supported", and some endpoints take an `include` parameter instead (both n.d., accessed November 2026).
 
@@ -93,19 +82,8 @@ Adyen does the opposite and sends the same refused card as a successful request.
 | The reason | `decline_code`, for example `insufficient_funds` | `refusalReasonCode` and `refusalReason`, for example `12`, "Not enough balance" |
 | A rejected request | `400`, `401`, `403`, `429` with another error type | 4xx or 5xx; not accepted or stored |
 
-<!-- illustration-placeholder
-{
-  "id": "17-one-refusal-two-envelopes",
-  "status": "pending",
-  "asset": "assets/images/17-api-design-and-object-models/17-one-refusal-two-envelopes.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table that sets one declined card side by side",
-  "visual_goal": "Make memorable that one bank refusal arrives in two differently marked envelopes and must be sorted into one tray, separate from a rejected request and from no answer.",
-  "prompt": "Create a conceptual explainer illustration. On the far left, a bank building with a raised hand icon and a small speech bubble labeled \"No\". Two arrows leave the bank to the right and each passes through a generic provider box. The upper arrow ends in an orange envelope stamped \"402\"; the lower arrow ends in a green envelope stamped \"200\". Both envelopes then point with converging arrows to a sorting desk in the center right with three trays in a row. The first tray is labeled \"Refused\" and both envelopes land in it. The second tray is labeled \"Rejected\" and holds a single crumpled form. The third tray is labeled \"No answer\" and is empty, with a small clock above it. A studio staff member stands behind the desk. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A bank's refusal travels through two providers and arrives as one envelope marked 402 and one marked 200; both are sorted into a tray labeled Refused, beside trays labeled Rejected and No answer.",
-  "caption": "One refusal by the customer's bank arrives as an HTTP 402 from one provider and an HTTP 200 from the other; both belong in the same tray, apart from a rejected request and from no answer."
-}
--->
+![A bank's refusal travels through two providers and arrives as one envelope marked 402 and one marked 200; both are sorted into a tray labeled Refused, beside trays labeled Rejected and No answer.](assets/images/17-api-design-and-object-models/17-one-refusal-two-envelopes.jpeg)
+**Figure 2:** *One refusal by the customer's bank arrives as an HTTP 402 from one provider and an HTTP 200 from the other; both belong in the same tray, apart from a rejected request and from no answer.*
 
 Inside either envelope, the reason comes from a **normalized vocabulary**. An issuer answers with its own short response code; each provider maps those codes, and its own risk decisions, into a list it maintains. Stripe's list of decline codes includes `insufficient_funds` and `generic_decline`, which covers an unknown reason "or Stripe Radar or Adaptive Acceptance blocked the payment"; Radar is Stripe's fraud product, and Adaptive Acceptance a Stripe feature that, by its page on declines, can block payments with a low likelihood of authorization. Adyen's refusal reasons are numbered: 12 is "Not enough balance", 20 "FRAUD". Adyen tells you to keep all of the detail from the customer: "To prevent malicious use, do not expose the details of the refusal reason to shoppers". Stripe says so for particular codes, such as `fraudulent` and `stolen_card`: "Don't report more detailed information to your customer" (all n.d., accessed November 2026). The list is what your retry logic keys on ([[authorization-optimization]]).
 
@@ -196,19 +174,8 @@ The refusal case, by contrast, is Mila's €49.00 membership renewal of 1 April 
 
 The confirm call, unlike the rest, is where the providers are allowed to differ. It returns the state and a `source`. On Stripe the adapter retrieves the PaymentIntent, and the source is `provider_object`. On Adyen it returns the record store's state with the source `own_events`, which changes to `report` once the reconciliation job has matched the payment's line in the settlement report, Adyen's itemized file of what it paid out ([[payment-reconciliation-and-reporting]]). Had it existed on 14 September 2026, the check-in screen could have asked Stripe about each of the 3,200 memberships. For an Adyen studio it could not have asked, and the caller would have known that from the answer.
 
-<!-- illustration-placeholder
-{
-  "id": "17-adapter-hides-words-shows-source",
-  "status": "pending",
-  "asset": "assets/images/17-api-design-and-object-models/17-adapter-hides-words-shows-source.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on the confirm call",
-  "visual_goal": "Show an adapter layer that turns two providers' different words into one outcome for callers, while the confirm answer carries a visible tag saying where the state was read.",
-  "prompt": "Create a structural explainer diagram in three columns. Left column: a tablet showing a booking screen, labeled \"Booking app\". Middle column: a tall rounded box labeled \"Payment service\" containing two smaller boxes stacked vertically, the upper labeled \"Adapter A\" and the lower labeled \"Adapter B\". Right column: two server boxes stacked vertically, the upper tagged \"Provider A\" and the lower tagged \"Provider B\". A blue arrow labeled \"Take payment\" goes from the tablet into the payment service. From Adapter A a teal arrow goes to Provider A and a teal return arrow labeled \"Object\" comes back. From Adapter B a teal arrow goes to Provider B, and an orange dashed arrow labeled \"Events\" comes back into a small database cylinder inside the payment service labeled \"Own record\". Two green arrows labeled \"One outcome\" merge from both adapters and return to the tablet. Below the tablet, a small reply slip shows a checkmark and a luggage-style tag labeled \"Source\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Diagram of a booking app calling a payment service with two adapters; one adapter reads an object from its provider, the other receives events into its own record; both return one outcome, and the reply carries a tag naming its source.",
-  "caption": "Larkfield's payment service returns one outcome for both providers and tags each confirmed state with its source: the provider's object on Provider A (Stripe), Larkfield's own record of events on Provider B (Adyen)."
-}
--->
+![Diagram of a booking app calling a payment service with two adapters; one adapter reads an object from its provider, the other receives events into its own record; both return one outcome, and the reply carries a tag naming its source.](assets/images/17-api-design-and-object-models/17-adapter-hides-words-shows-source.jpeg)
+**Figure 3:** *Larkfield's payment service returns one outcome for both providers and tags each confirmed state with its source: the provider's object on Provider A (Stripe), Larkfield's own record of events on Provider B (Adyen).*
 
 ## When It Goes Wrong: Lost Responses, Unknown Codes and Models That Leak
 

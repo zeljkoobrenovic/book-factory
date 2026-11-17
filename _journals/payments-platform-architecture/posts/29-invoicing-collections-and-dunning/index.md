@@ -54,19 +54,8 @@ Stripe documents five invoice states and the transitions between them, each with
 | `uncollectible` | Pay, and the payment succeeds | `invoice.paid` | `paid` |
 | `uncollectible` | Void | `invoice.voided` | `void` |
 
-<!-- illustration-placeholder
-{
-  "id": "29-invoice-state-machine",
-  "status": "pending",
-  "asset": "assets/images/29-invoicing-collections-and-dunning/29-invoice-state-machine.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of invoice states and transitions",
-  "visual_goal": "Show the five invoice states, that finalization is the point after which the invoice is frozen, and that a failed payment leaves the invoice open.",
-  "prompt": "Create a state diagram with five rounded boxes. On the far left a box labeled \"Draft\" drawn with a dashed outline and a small pencil icon. In the center a large box labeled \"Open\". On the right, stacked top to bottom, three boxes labeled \"Paid\" (green), \"Void\" (grey) and \"Uncollectible\" (orange). An arrow named 'finalize' runs from Draft to Open and passes through a vertical teal line with a small padlock icon, labeled \"Frozen\". An arrow named 'payment succeeds' runs from Open to Paid. A curved arrow named 'payment fails' leaves Open and returns to Open as a loop. An arrow named 'void' runs from Open to Void. An arrow named 'write off' runs from Open to Uncollectible. A thin arrow named 'paid later' runs from Uncollectible up to Paid. Everything to the right of the padlock line sits on a slightly tinted background to show it can no longer be edited. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "State diagram of an invoice: draft, then a freeze line at finalization, then open with a loop for failed payments, ending in paid, void or uncollectible.",
-  "caption": "An invoice can be edited only as a draft; after finalization it is frozen, and a failed payment returns it to open."
-}
--->
+![State diagram of an invoice: draft, then a freeze line at finalization, then open with a loop for failed payments, ending in paid, void or uncollectible.](assets/images/29-invoicing-collections-and-dunning/29-invoice-state-machine.jpeg)
+**Figure 1:** *An invoice can be edited only as a draft; after finalization it is frozen, and a failed payment returns it to open.*
 
 Finalization is the freeze point. A draft can be edited, and Stripe's list of what finalizing does includes: “It allows the invoice to be paid. It ensures that an invoice number is present. It makes certain properties immutable on the invoice. It creates an incomplete payment intent for the invoice.” (The payment intent is Stripe's object for one payment; see [[payment-state-machines]].) After that, “you can’t change most of its details, including fields related to the amount or customer”, and Stripe gives the reason: “This is to satisfy the common tax-compliance requirement that finalized invoices be retained—as they were finalized—for a legally required minimum time period.” The customer's name, address and tax identifiers are copied onto the invoice at that moment and frozen with it.
 
@@ -80,19 +69,8 @@ The document itself is becoming regulated data. The EU's VAT in the Digital Age 
 
 Femke's second question is about attempts. Each payment attempt is a record of its own, with its own identifier and outcome, attached to the invoice. When one fails, the attempt is marked failed, a counter goes up, and the invoice stays open: Stripe's `invoice.payment_failed` event carries an `attempt_count` that, in the words of Stripe's Smart Retries documentation (n.d., accessed November 2026), “indicates how many attempts have been made so far”. The attempts need not look alike: a card, the same card three days later, then a new card the customer typed in after an email. The debt is the only constant.
 
-<!-- illustration-placeholder
-{
-  "id": "29-one-debt-many-attempts",
-  "status": "pending",
-  "asset": "assets/images/29-invoicing-collections-and-dunning/29-one-debt-many-attempts.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that says each payment attempt is a record of its own attached to the invoice",
-  "visual_goal": "Show that one invoice stays the same while several different payment attempts are made against it, and that only the last one changes its state.",
-  "prompt": "Create a horizontal timeline illustration. Along the top runs one long document-shaped bar, a generic invoice with a padlock icon, labeled \"Invoice €49\". Its left three quarters are tinted orange and labeled \"Open\"; its right quarter is tinted green and labeled \"Paid\". Below the bar, three small payment cards hang from it on thin vertical lines at three points in time, left to right. The first is a generic bank card with a red cross, labeled \"Attempt 1\". The second is the same generic bank card with a red cross, labeled \"Attempt 2\". The third is a different-colored generic bank card with a green check mark, labeled \"Attempt 3\", and its vertical line meets the bar exactly where orange turns to green. A small envelope icon sits between the second and third attempts with an arrow named 'new card' pointing to the third card. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "One invoice bar that stays open across two failed payment attempts and turns to paid at a third attempt made with a new card.",
-  "caption": "The attempts fail one by one and may use different cards; the invoice stays open until one of them pays it."
-}
--->
+![One invoice bar that stays open across two failed payment attempts and turns to paid at a third attempt made with a new card.](assets/images/29-invoicing-collections-and-dunning/29-one-debt-many-attempts.jpeg)
+**Figure 2:** *The attempts fail one by one and may use different cards; the invoice stays open until one of them pays it.*
 
 The process that works through those attempts has an old name. **Dunning** is the collection of an invoice whose payment failed or is overdue: retries, messages to the customer, and a defined end. When it fails, the business loses a customer who never decided to leave. Billing vendors call that loss involuntary churn. Recurly, one of them, defines it in its documentation (updated July 2026): “Involuntary churn refers to customer loss caused by factors outside their direct intent — expired credit cards, bank account changes, or failed payment attempts”.
 
@@ -122,19 +100,8 @@ A direct debit breaks the card pattern. A **direct debit** pulls money from a ba
 
 The last instrument is the customer. A message works on every branch, and after a hard decline it is the only thing that works. Stripe's customer email documentation (n.d., accessed November 2026) describes emails for failed payments and expiring cards that “include a link to a page where the customer can update their payment method”. Adyen documents an optional payment link, “Valid for 5 days”, that the merchant receives by webhook when Auto Rescue ends without success and can send to the customer. Two rules of mine follow. The message must say what the customer can do: “add a new card” after a stolen-card decline, “we will try again on Friday” after insufficient funds. And it must be triggered by a failed attempt, never by the absence of a payment, which was the fault in Larkfield's October emails.
 
-<!-- illustration-placeholder
-{
-  "id": "29-next-step-after-a-failed-attempt",
-  "status": "pending",
-  "asset": "assets/images/29-invoicing-collections-and-dunning/29-next-step-after-a-failed-attempt.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on the message to the customer, at the end of the section on decline type and payment method",
-  "visual_goal": "Show that the next step after a failed attempt branches by the reason for the failure and the payment method, and that every branch ends either in payment or in a named end state.",
-  "prompt": "Create a left-to-right decision tree. On the far left a generic invoice icon with a red cross beside it, labeled \"Attempt failed\". From it three branches fan out to the right. Top branch: a generic bank card with a broken-chain icon, labeled \"Hard decline\", followed by an arrow named 'ask customer' to an envelope icon labeled \"New card\". Middle branch: a generic bank card with a small clock icon, labeled \"Soft decline\", followed by an arrow named 'wait' to a calendar icon labeled \"Retry later\". Bottom branch: a generic bank building icon with a slow snail-shaped clock, labeled \"Direct debit\", followed by an arrow named 'wait longer' to a calendar icon labeled \"Two tries\". On the far right all three branches converge on two stacked boxes: a green box labeled \"Paid\" reached by an arrow named 'success', and an orange box labeled \"Paused\" reached by an arrow named 'window ends'. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Decision tree from a failed attempt to three branches, hard decline, soft decline and direct debit, each leading to paid or paused.",
-  "caption": "A hard decline needs a new card, a soft decline needs time, and a direct debit needs more time and allows two more tries; every branch ends paid or in a named state."
-}
--->
+![Decision tree from a failed attempt to three branches, hard decline, soft decline and direct debit, each leading to paid or paused.](assets/images/29-invoicing-collections-and-dunning/29-next-step-after-a-failed-attempt.jpeg)
+**Figure 3:** *A hard decline needs a new card, a soft decline needs time, and a direct debit needs more time and allows two more tries; every branch ends paid or in a named state.*
 
 ## Money That Arrives on Its Own: Bank Transfers, Partial Payments and Cash Application
 
@@ -164,19 +131,8 @@ One limit applies to both provider designs: the public record of the retry logic
 
 > **INFERENCE, NOT DOCUMENTED:** Both posts describe a model that predicts when a retry of a failed payment is most likely to be approved, trained on the provider's own payment history. That the models running in November 2026 still work this way is my assumption, and nothing public allows the two to be compared. A merchant choosing between them on recovery has to measure on its own renewals; [[authorization-optimization]] shows how.
 
-<!-- illustration-placeholder
-{
-  "id": "29-who-holds-the-invoice",
-  "status": "pending",
-  "asset": "assets/images/29-invoicing-collections-and-dunning/29-who-holds-the-invoice.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the inference block that closes the section on the three designs",
-  "visual_goal": "Contrast a provider that holds the invoice and retries it with a provider that sees only payments and retries a payment the merchant links to its own invoice by a reference.",
-  "prompt": "Create a side-by-side comparison in two panels separated by a thin vertical line. Left panel, headed by a generic payment-company building labeled \"Provider A\": inside the building sits a generic invoice icon with a padlock, and a circular arrow named 'retry' loops from the invoice to a generic bank card and back; a small merchant shop stands outside to the left, connected to the building by a single arrow named 'mirror'. Right panel, headed by a generic payment-company building labeled \"Provider B\": inside the building sits only a generic bank card with a circular arrow named 'retry' around it; the generic invoice icon with a padlock sits outside, inside a small merchant shop to the left; a dashed line with a tag icon labeled \"Reference\" connects the merchant's invoice to the provider's card. Under the left panel a short label \"Retries the invoice\"; under the right panel a short label \"Retries the payment\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two panels: in the first the invoice sits inside the provider, which retries it; in the second the invoice sits with the merchant and is linked by a reference to a payment the provider retries.",
-  "caption": "Provider A (Stripe) retries an invoice it holds; Provider B (Adyen) retries a payment that the merchant ties to its own invoice by a reference."
-}
--->
+![Two panels: in the first the invoice sits inside the provider, which retries it; in the second the invoice sits with the merchant and is linked by a reference to a payment the provider retries.](assets/images/29-invoicing-collections-and-dunning/29-who-holds-the-invoice.jpeg)
+**Figure 4:** *Provider A (Stripe) retries an invoice it holds; Provider B (Adyen) retries a payment that the merchant ties to its own invoice by a reference.*
 
 ## Stripe and Adyen: Where They Differ
 

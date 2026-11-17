@@ -62,19 +62,8 @@ Adyen's figures are of a similar spread but different kinds. I found no publishe
 | Achieved, rolling window | 99.999%, last 90 days, Stripe API (17 November 2026) | 99.999%, last 30 days (17 November 2026) | Adyen: share of successful requests to the Payments API. Stripe: none on the page |
 | Contractual commitment | No public percentage found | 99.9% per quarter, by “commercially reasonable efforts” (terms of November 2023) | Uptime of the Payment Interface “as measured by its ability to receive Transaction messages”, with exclusions |
 
-<!-- illustration-placeholder
-{
-  "id": "37-five-figures-one-word",
-  "status": "pending",
-  "asset": "assets/images/37-payment-reliability/37-five-figures-one-word.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of the five kinds of figure",
-  "visual_goal": "Show that five different measuring instruments hang under one sign, and that only one of them is a signed promise.",
-  "prompt": "Create a conceptual explainer illustration. At the top center, one wide signboard labeled \"Uptime\". Hanging from it on five strings, left to right, five different objects. First, an archery target labeled \"Target\". Second, a wall calendar showing a full year labeled \"Last year\". Third, a small shopping bag with a stopwatch labeled \"Peak weekend\". Fourth, a round gauge with a needle labeled \"Rolling\". Fifth, a paper document with a signature line and a seal labeled \"Contract\", drawn slightly larger and outlined in green. A person with a clipboard stands at the lower right looking up, and a green arrow labeled \"Plan here\" points from the person to the contract document. The first four objects have thin grey outlines; none of the five objects touches another. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Five different objects hang under one sign reading Uptime: a target, a yearly calendar, a peak-weekend stopwatch, a rolling-window gauge and a signed contract, with an arrow telling a planner to plan against the contract.",
-  "caption": "Five different figures are published under the word uptime; only the contractual commitment is a promise, and it is the one to plan against."
-}
--->
+![Five different objects hang under one sign reading Uptime: a target, a yearly calendar, a peak-weekend stopwatch, a rolling-window gauge and a signed contract, with an arrow telling a planner to plan against the contract.](assets/images/37-payment-reliability/37-five-figures-one-word.jpeg)
+**Figure 1:** *Five different figures are published under the word uptime; only the contractual commitment is a promise, and it is the one to plan against.*
 
 Adyen's public terms and conditions (last updated 1 November 2023, for agreements made from that date; still published in November 2026) say that Adyen “will use commercially reasonable efforts to achieve a quarterly-average minimum uptime of 99.9% of the Payment Interface, as measured by its ability to receive Transaction messages”; the Payment Interface is the contract's name for the connection through which a merchant submits payments. **(Evidence age: 3 years.)** The calculation excludes downtime caused by “acts or omissions of Merchant, Issuing Banks, Acquirers or Scheme Owners”, by “general internet failures”, by “failures of individual Payment Methods” and by force majeure. An issuing bank is the bank that issued the customer's card, an acquirer is the institution that processes card payments for a merchant, and scheme owners are the card networks such as Visa and Mastercard. The consequence the terms name is a right to leave: the merchant may terminate at once if the commitment is “not met during two consecutive quarters”. The older terms (March 2023), still published for earlier agreements, carry the same 99.9%. Adyen's status page draws the line itself: it “does not represent the service level commitments in your agreement with Adyen”. The two numbers are 131 minutes a quarter and 26 seconds a month apart.
 
@@ -90,19 +79,8 @@ Adyen's 2021 architecture posts show isolation at the edge. **(Evidence age: 5 y
 
 An edge without state has to put the state somewhere, and the second post (August 2021) says where and with what priority. It contrasts the edge with the accounting systems, the databases that hold the books: “Whereas for the latter the priority was uptime, for the accounting systems we don't mind if they are down for a little bit as long as we can guarantee their reliability and consistency.” Between the two sits a buffer. The PAL “saves the payment in a local database and a separate process picks it up when possible. This process will run behind if we have doubt about whether we can guarantee consistency in the accounting or if an accounting database is not available but that will not impact the availability of the PAL itself.” **What gives way is the freshness of the books.** The payment is answered now and booked later, from a durable queue.
 
-<!-- illustration-placeholder
-{
-  "id": "37-path-and-record",
-  "status": "pending",
-  "asset": "assets/images/37-payment-reliability/37-path-and-record.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on the local database queue between the edge and the accounting systems",
-  "visual_goal": "Show an answering path that keeps replying while the books run behind through a local queue.",
-  "prompt": "Create a structural component diagram that reads left to right in two rows. Top row, the fast path: a customer with a phone at the far left sends a blue arrow labeled \"Pay\" to a row of three identical small server boxes grouped under the label \"Edge\"; one of the three boxes is greyed out with a small cross, and the other two still pass the arrow on. From the edge a blue arrow labeled \"Ask bank\" goes right to a generic bank building, and a green return arrow labeled \"Answer\" comes back through the edge to the customer. Bottom row, the slow path: from the edge a teal arrow labeled \"Save\" drops down into a small database cylinder labeled \"Local queue\" holding a stack of four paper slips. From the queue an orange dashed arrow labeled \"Later\" goes right to a large ledger book labeled \"Books\", with a small clock beside the arrow. A horizontal dashed line separates the two rows; at its left end a tag labeled \"Must answer\" above the line and a tag labeled \"Must be right\" below it. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two rows: on top a customer's payment passes through interchangeable edge servers to a bank and gets an answer; below, the edge saves the payment to a local queue from which it reaches the books later.",
-  "caption": "The split Adyen described in 2021: the edge must answer, the books must be right, and a local queue lets the books run behind without stopping the edge."
-}
--->
+![Two rows: on top a customer's payment passes through interchangeable edge servers to a bank and gets an answer; below, the edge saves the payment to a local queue from which it reaches the books later.](assets/images/37-payment-reliability/37-path-and-record.jpeg)
+**Figure 2:** *The split Adyen described in 2021: the edge must answer, the books must be right, and a local queue lets the books run behind without stopping the edge.*
 
 Stripe described a different lever. Where Adyen lets the books lag, Stripe's engineering post of March 2017 on rate limiters refuses the less important request: “We divide up our traffic into two types: critical API methods (e.g. creating charges) and non-critical methods (e.g. listing charges.)” and “We always reserve a fraction of our infrastructure for critical requests.” **(Evidence age: 9 years; the current system may differ.)** Under overload a call that lists charges is turned away so that a call that creates one gets through ([[payment-developer-platform]] covers the limiters). No current source confirms those shedders in that form. The August 2026 post says only that Stripe's in-house proxy “supports retries, hedging, rate limiting, and dynamic priority-based request routing”. That hints that request priorities still exist; it does not confirm the 2017 design.
 
@@ -193,19 +171,8 @@ The third failure adds a second provider to the first two. A payment with an unk
 
 The last failure hides the other three: **declaring the outage over when the status page turns green**. The unknown payments are then nobody's, and they keep changing. Stripe's guide tells you to expect this: “Prepare your webhook handlers to process objects your integration hasn’t received in an API response.” An outage therefore has two ends, as the figure below shows. The first is the provider's: service restored. The second is yours: the count of payments that have been in an unknown state for longer than a set age is zero. That count needs an owner and an alert, or the second end never comes.
 
-<!-- illustration-placeholder
-{
-  "id": "37-two-ends-of-an-outage",
-  "status": "pending",
-  "asset": "assets/images/37-payment-reliability/37-two-ends-of-an-outage.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on declaring the outage over when the status page turns green",
-  "visual_goal": "Show that an outage has two ends: the provider's recovery, and the later moment when the merchant has no payment left with an unknown outcome.",
-  "prompt": "Create a structural timeline illustration that reads left to right. A long horizontal time axis runs across the middle. On the left part of the axis, an orange shaded band labeled \"Outage\" covers a short stretch. At the right edge of the band, a vertical green flag on the axis labeled \"Service restored\", with a small status screen above it showing a green dot. Far to the right on the axis, a second, taller teal flag labeled \"Every outcome known\". Above the axis, between the two flags, a descending staircase of stacked paper slips, each slip marked with a question mark: a tall stack next to the first flag labeled \"760\", shrinking step by step to an empty tray next to the second flag labeled \"0\". Below the axis, between the two flags, a person at a desk with a magnifying glass over a record book, and a curved blue arrow labeled \"Sweep\" pointing from the person up to the shrinking stacks. A bracket under the stretch between the two flags is labeled \"Your part\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A timeline with a short outage band, a flag where service is restored, and a later flag where every outcome is known; between them a stack of 760 unknown payments shrinks to zero as a person sweeps them against a record book.",
-  "caption": "An outage has two ends: the provider's, when service is restored, and yours, when the 760 payments with unknown outcomes have fallen to 0."
-}
--->
+![A timeline with a short outage band, a flag where service is restored, and a later flag where every outcome is known; between them a stack of 760 unknown payments shrinks to zero as a person sweeps them against a record book.](assets/images/37-payment-reliability/37-two-ends-of-an-outage.jpeg)
+**Figure 3:** *An outage has two ends: the provider's, when service is restored, and yours, when the 760 payments with unknown outcomes have fallen to 0.*
 
 ## What to Take Away
 

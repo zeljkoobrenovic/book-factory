@@ -42,19 +42,8 @@ Decision K1 of Keel, Larkfield's 2027 program for its payments estate, is the re
 
 Those questions rest on a simpler one: what does a missing answer tell the client? Stripe's engineering post of February 2017 lists three places where a call between two machines can fail: “The initial connection could fail as the client tries to connect to a server. The call could fail midway while the server is fulfilling the operation, leaving the work in limbo. The call could succeed, but the connection break before the server can tell its client about it.” **(Evidence age: 9 years; the current system may differ.)** On this point the current error guide agrees: “When a connection fails, you might not know whether Stripe received or executed the request.” From the client, the three cases look the same.
 
-<!-- illustration-placeholder
-{
-  "id": "18-three-silences",
-  "status": "pending",
-  "asset": "assets/images/18-idempotency-and-retries/18-three-silences.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that quotes the three failure cases",
-  "visual_goal": "Show that a request lost before, during or after the provider's work looks identical to the client.",
-  "prompt": "Create a structural explainer diagram with three horizontal lanes stacked top to bottom. Each lane has a laptop on the left labeled \"Client\" and a server box on the right labeled \"Provider\". Lane 1: a blue arrow labeled \"Request\" leaves the client and breaks with an orange X before reaching the provider; the lane is tagged \"Lost before\". Lane 2: the blue arrow labeled \"Request\" reaches the provider, where a gear icon is half complete with an orange X on it; the lane is tagged \"Lost during\". Lane 3: the blue arrow reaches the provider, a green checkmark sits on the provider, and a teal return arrow labeled \"Response\" breaks with an orange X on the way back; the lane is tagged \"Lost after\". Beside every client, the same large grey question mark. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Three lanes between a client and a provider: the request is lost before arrival, during the work, or the response is lost after the work; the client shows the same question mark in each.",
-  "caption": "A request can be lost before the provider sees it, during the work or after it, and the client sees the same silence in all three."
-}
--->
+![Three lanes between a client and a provider: the request is lost before arrival, during the work, or the response is lost after the work; the client shows the same question mark in each.](assets/images/18-idempotency-and-retries/18-three-silences.jpeg)
+**Figure 1:** *A request can be lost before the provider sees it, during the work or after it, and the client sees the same silence in all three.*
 
 The state this leaves has a name. An **unknown outcome** is the state in which the client cannot tell whether money moved. It is wider than a timeout. Stripe's guide says: “Treat the outcome of a request that returns `500` as indeterminate: the operation might have produced side effects even though you received an error.” It is also different in kind from a decline, where the issuer (the bank that gave the customer the card) answered, and the answer was no. A decline is information. A timeout or a server error is the absence of it.
 
@@ -73,19 +62,8 @@ To honor that key the server has to remember things. This section describes them
 | Key known, request still running | Nothing new | A “conflict” answer; send the same key again later |
 | Key known, request differs | Nothing | An error that points to a client bug |
 
-<!-- illustration-placeholder
-{
-  "id": "18-key-lookup",
-  "status": "pending",
-  "asset": "assets/images/18-idempotency-and-retries/18-key-lookup.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of four cases",
-  "visual_goal": "Show the server's decision on a keyed request as one lookup with four exits.",
-  "prompt": "Create a structural flow diagram. On the left, an envelope with a small key tag attached, labeled \"Request + key\". A blue arrow labeled \"Look up\" runs right into a central cabinet of index cards labeled \"Key store\". From the cabinet four arrows fan out to the right, each to its own box. Top arrow, green, labeled \"New\", to a gear box labeled \"Execute\". Second arrow, teal, labeled \"Finished\", to a document box labeled \"Replay\". Third arrow, orange, labeled \"Running\", to an hourglass box labeled \"Wait\". Bottom arrow, orange, labeled \"Different\", to a box with a stop sign labeled \"Refuse\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A request with a key enters a key store lookup that branches four ways: a new key is executed, a finished one is replayed, a running one must wait, and one with a different request is refused.",
-  "caption": "With a key, the server sorts every request into four cases: execute, replay, wait or refuse."
-}
--->
+![A request with a key enters a key store lookup that branches four ways: a new key is executed, a finished one is replayed, a running one must wait, and one with a different request is refused.](assets/images/18-idempotency-and-retries/18-key-lookup.jpeg)
+**Figure 2:** *With a key, the server sorts every request into four cases: execute, replay, wait or refuse.*
 
 The fourth case needs more than the key. A **request fingerprint** is the server's stored record of what the first request asked for: its parameters, or a hash of them. Without it, a client bug that reuses a key for a different charge would get the old result back as the answer to a new question. Stripe documents the check and its purpose: “The idempotency layer compares incoming parameters to those of the original request and errors if they’re not the same to prevent accidental misuse.”
 
@@ -149,19 +127,8 @@ Finally, the window turns into a check on the whole system: **any path whose lon
 | The next scheduled batch | A day or more | No | Yes |
 | A person pressing “retry” | Days | No | Not reliably |
 
-<!-- illustration-placeholder
-{
-  "id": "18-window-timeline",
-  "status": "pending",
-  "asset": "assets/images/18-idempotency-and-retries/18-window-timeline.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of retry paths",
-  "visual_goal": "Show which retry paths fall inside and outside each provider's key retention window.",
-  "prompt": "Create a conceptual timeline illustration. A horizontal time axis runs left to right with a small clock at the left end labeled \"First send\". Above the axis, three horizontal bands start at the left end and extend to different lengths: a short blue band labeled \"24 hours\", a longer teal band labeled \"7 to 14 days\", and the longest green band labeled \"30 days\". Below the axis, five small icons are placed at increasing distance from the left: a looping arrow labeled \"SDK retry\" very close to the start, a gear labeled \"Job loop\" a little further, a stack of envelopes labeled \"Queue\" just past the end of the blue band, a calendar page labeled \"Next batch\" further right, and a hand pressing a button labeled \"Person\" furthest right. A thin vertical dashed orange line drops from the end of the blue band, and another from the start of the teal band's faded right end. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A timeline from the first send with three retention bands of 24 hours, 7 to 14 days and 30 days, and five retry paths placed along it, from an SDK retry near the start to a person pressing a button far to the right.",
-  "caption": "A retry path is safe only while it fires inside the provider's window: 24 hours on Stripe's API v1, 7 to 14 days on Adyen, 30 days on Stripe's API v2."
-}
--->
+![A timeline from the first send with three retention bands of 24 hours, 7 to 14 days and 30 days, and five retry paths placed along it, from an SDK retry near the start to a person pressing a button far to the right.](assets/images/18-idempotency-and-retries/18-window-timeline.jpeg)
+**Figure 3:** *A retry path is safe only while it fires inside the provider's window: 24 hours on Stripe's API v1, 7 to 14 days on Adyen, 30 days on Stripe's API v2.*
 
 ## Retry Policy: Backoff, Jitter and a Deadline
 

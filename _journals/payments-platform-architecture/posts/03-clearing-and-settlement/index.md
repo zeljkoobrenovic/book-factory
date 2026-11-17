@@ -36,19 +36,8 @@ Ines's question reaches Aylin Demir's support team on Wednesday morning, and the
 
 Yet each answer is true of the step it reports. Larkfield's `paid` records that Mila's bank approved and that the studio claimed the money. The provider's balance records the provider's own schedule for releasing it. The bank records only a transfer that has arrived, and none has. The three are not copies of one fact that have drifted apart. They are three facts.
 
-<!-- illustration-placeholder
-{
-  "id": "03-three-screens-one-payment",
-  "status": "pending",
-  "asset": "assets/images/03-clearing-and-settlement/03-three-screens-one-payment.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that says each of the three answers is true of a different step",
-  "visual_goal": "Make memorable that three systems showing three statuses for one payment are three layers, not three copies.",
-  "prompt": "Create an explainer illustration with three device screens side by side, left to right. Left: a tablet showing a booking app with a green check and the label \"Paid\". Middle: a laptop showing a balance dashboard with an hourglass and the label \"Not paid out\". Right: a phone showing a bank statement with an empty list and the label \"€0\". Above the three screens, one single receipt slip showing \"€120\" with three thin arrows pointing down, one to each screen. Below the screens, a calendar strip with three day cells labeled \"Tue\", \"Wed\", \"Thu\", and a marker on \"Wed\". A studio owner stands at the right, looking at the three screens with a question mark above her head. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Three screens show three different statuses for the same 120 euro payment on Wednesday: paid, not paid out, and zero.",
-  "caption": "On Wednesday three systems give three answers about one €120 payment, and each is correct about the step it reports."
-}
--->
+![Three screens show three different statuses for the same 120 euro payment on Wednesday: paid, not paid out, and zero.](assets/images/03-clearing-and-settlement/03-three-screens-one-payment.jpeg)
+**Figure 1:** *On Wednesday three systems give three answers about one €120 payment, and each is correct about the step it reports.*
 
 So Femke de Graaf, Larkfield's head of payments engineering, turns the support ticket into a question her team can work on, and it is this chapter's question: **what happens to the €120 between Tuesday 19:42 and Thursday, who does each step, and which record shows it?**
 
@@ -94,19 +83,8 @@ What the acquirer does with an accepted claim depends on how the network carries
 
 In the two-message case the second message is a record, and Visa's glossary names its parts. **Clearing** is "A processing service for the validation and valuation of financial and non-financial records exchanged between Visa and Members", members being the banks and licensed institutions that belong to the network. A **presentment** is "A Clearing Record that an Acquirer presents to an Issuer through Interchange", and interchange, in the rulebook's first sense, is "The exchange of Clearing Records between Members". So the merchant's claim becomes a record that the acquirer presents to the issuer, and the network checks and values those records in batches. The figure below shows which of the arrows is an instruction, which a record and which money.
 
-<!-- illustration-placeholder
-{
-  "id": "03-claim-record-money-flow",
-  "status": "pending",
-  "asset": "assets/images/03-clearing-and-settlement/03-claim-record-money-flow.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that defines clearing and presentment",
-  "visual_goal": "Show the four steps after the approval as four different kinds of arrow between five parties: an instruction, a record, net money between banks, and a payout.",
-  "prompt": "Create a structural explainer diagram with five generic parties in a row from left to right: a small studio building labeled \"Merchant\", an office block labeled \"Provider\", a hub with radiating lines labeled \"Network\", a bank building labeled \"Issuer\", and a person holding a phone labeled \"Cardholder\". Draw four numbered arrows stacked from top to bottom. Arrow 1, a thin dashed arrow from Merchant to Provider, labeled \"Capture\". Arrow 2, a document icon travelling on an arrow from Provider through Network to Issuer, labeled \"Presentment\". Arrow 3, a thick solid arrow with a euro coin from Issuer through Network back to Provider, labeled \"Net settlement\". Arrow 4, a solid arrow with a euro coin from Provider to Merchant, labeled \"Payout\". Arrows 1 and 2 are blue to show information; arrows 3 and 4 are green to show money. A small clock icon sits beside each arrow to suggest different times. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Diagram of five parties with four arrows: capture as an instruction, presentment as a record, net settlement and payout as money.",
-  "caption": "After the approval, capture is an instruction and presentment is a record; money moves only at net settlement and again at payout."
-}
--->
+![Diagram of five parties with four arrows: capture as an instruction, presentment as a record, net settlement and payout as money.](assets/images/03-clearing-and-settlement/03-claim-record-money-flow.jpeg)
+**Figure 2:** *After the approval, capture is an instruction and presentment is a record; money moves only at net settlement and again at payout.*
 
 One of the values fixed at clearing is the fee the issuer receives. Visa's glossary calls it the Interchange Reimbursement Fee, "A fee between Acquirers and Issuers in the Clearing and Settlement of an Interchange Transaction", and Mastercard's annual report says "We administer the collection and remittance of interchange fees through the settlement process." Both place the fee at clearing and settlement, not at the approval. Which rate a record earns is published only in part: Visa's public "Visa USA Interchange Reimbursement Fees" (24 October 2026) lists the US rates by program, but the "US Interchange Reimbursement Fee Rate Qualification Guide" that its rulebook names among its documents is not reproduced there or on Visa's site. It is industry practice, not a rule I can cite, that the rate depends on the data in the record and on how promptly it is presented; Adyen's warning of "Increased interchange fees" after a late capture is the documented instance. [[payment-economics]] covers the fee itself.
 
@@ -114,19 +92,8 @@ One of the values fixed at clearing is the fee the issuer receives. Visa's gloss
 
 Cleared records give rise to money, and the money does not move payment by payment. Visa's glossary defines **settlement** as "The reporting and funds transfer of Settlement Amounts owed by one Member to another, or to Visa, as a result of Clearing", and a settlement amount as "The daily net amounts expressed in a Member’s Settlement Currency resulting from Clearing. These amounts include Transaction and Fee Collection Transaction totals". Assume, for illustration, that an acquirer presents €10,000,000 of purchases on one day, has €300,000 of refunds and disputes going the other way and owes €40,000 in interchange and fees. It receives one transfer of €9,660,000. Mila's €120 is in there, and nobody downstream can point to it.
 
-<!-- illustration-placeholder
-{
-  "id": "03-netting-one-amount",
-  "status": "pending",
-  "asset": "assets/images/03-clearing-and-settlement/03-netting-one-amount.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph with the netting example",
-  "visual_goal": "Show that many individual payments are netted into one transfer per bank per day, and that the network's guarantee covers only the bank-to-bank link.",
-  "prompt": "Create a conceptual explainer illustration. On the left, a bank building labeled \"Acquirer\"; on the right, a bank building labeled \"Issuer\". Above each bank, a wide funnel collects many small paper slips, each with a tiny euro sign; a few slips on the left funnel are orange to suggest refunds going the other way. Between the two banks, in the center, a single thick green arrow carries one large euro coin from right to left, labeled \"One net amount\". A calendar page above the arrow is labeled \"Per day\". A translucent shield icon covers only the arrow between the two banks, labeled \"Guaranteed\". Below the left bank, a thin dotted arrow leads down to a small shop labeled \"Merchant\", with no shield over it. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Many payment slips are funneled into one net transfer between two banks; a shield covers the bank-to-bank transfer but not the link to the merchant.",
-  "caption": "Settlement moves one net amount per member per day, and the network's guarantee covers the transfer between members, not the payment to the merchant."
-}
--->
+![Many payment slips are funneled into one net transfer between two banks; a shield covers the bank-to-bank transfer but not the link to the merchant.](assets/images/03-clearing-and-settlement/03-netting-one-amount.jpeg)
+**Figure 3:** *Settlement moves one net amount per member per day, and the network's guarantee covers the transfer between members, not the payment to the merchant.*
 
 What makes a system of daily net transfers safe is a guarantee, and the guarantee has an edge. Visa's annual report says: "We indemnify issuers and acquirers for settlement losses they may suffer due to the failure of another issuer or acquirer to honor its settlement obligations". Mastercard's says: "We guarantee the settlement of many of the transactions from issuers to acquirers", and then: "We do not, however, guarantee payments to merchants by their acquirers". The merchant is outside the guarantee. Once the acquirer has been paid, the merchant's claim is on its provider alone.
 
@@ -196,19 +163,8 @@ Here is Mila's payment on Adyen, step by step. Only the first and last rows were
 | Wed 10 March | Ines asks whether she has been paid | Scene | `paid` | Not paid out | Nothing |
 | Thu 11 March | Payout delay passed; Tuesday's batch is paid: €117.47 after Larkfield's €2.53 fee | Ledger; documented model | `paid` | Paid out | €117.47 |
 
-<!-- illustration-placeholder
-{
-  "id": "03-mila-timeline-three-lanes",
-  "status": "pending",
-  "asset": "assets/images/03-clearing-and-settlement/03-mila-timeline-three-lanes.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the timeline table in the Larkfield worked example",
-  "visual_goal": "Show the three records of one payment on a Tuesday-to-Thursday timeline, disagreeing for two days and agreeing only at the end.",
-  "prompt": "Create a structural timeline diagram. A horizontal time axis runs left to right with three day markers labeled \"Tue 19:42\", \"Wed\" and \"Thu\". Three horizontal lanes are stacked above the axis, labeled at the left \"Larkfield record\", \"Provider balance\" and \"Studio bank\". The top lane is a solid green bar from Tue to Thu labeled \"Paid\". The middle lane is an orange bar from Tue to Thu labeled \"Not paid out\" that turns green at Thu. The bottom lane is an empty grey outline from Tue to Thu that turns green at Thu with a euro coin labeled \"€117.47\". At the Tue marker, a phone with a receipt showing \"€120\". Between Tue and Wed, below the axis, two small icons: a document labeled \"Clearing\" and two bank buildings joined by an arrow labeled \"Settlement\". At the Wed marker, a studio owner with a question mark. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Timeline from Tuesday 19:42 to Thursday with three lanes: Larkfield's record says paid throughout, the provider balance and the studio's bank change only on Thursday.",
-  "caption": "Mila's €120 is recorded as paid on Tuesday at 19:42, but the studio's bank shows €117.47 only on Thursday; in between, the records disagree and all are right."
-}
--->
+![Timeline from Tuesday 19:42 to Thursday with three lanes: Larkfield's record says paid throughout, the provider balance and the studio's bank change only on Thursday.](assets/images/03-clearing-and-settlement/03-mila-timeline-three-lanes.jpeg)
+**Figure 4:** *Mila's €120 is recorded as paid on Tuesday at 19:42, but the studio's bank shows €117.47 only on Thursday; in between, the records disagree and all are right.*
 
 So the answer to Ines on Wednesday is: your payment is claimed and scheduled, not received, and it arrives tomorrow. To let support say that, Larkfield stores three facts where it had one status, each with its own source. This follows two decisions of its 2027 Keel program ([[meet-larkfield]]): the provider's record is the truth, and every movement gets a ledger entry ([[payment-ledgers]]). The five-state vocabulary stays ([[payment-state-machines]]); the three facts sit beside it.
 

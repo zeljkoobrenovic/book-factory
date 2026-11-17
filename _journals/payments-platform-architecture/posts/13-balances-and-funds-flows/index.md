@@ -55,19 +55,8 @@ Between payment and payout, four parties each hold something different, and only
 | Acquirer or provider | Stripe or Adyen, taking the payment in for the merchant | Pooled cash once the network pays, and a debt to the merchant | Paying the merchant and not being paid; a merchant who cannot cover later refunds |
 | Merchant | Studio Noord | A claim on the provider: the balance | A claim that is reduced later |
 
-<!-- illustration-placeholder
-{
-  "id": "13-claim-not-cash",
-  "status": "pending",
-  "asset": "assets/images/13-balances-and-funds-flows/13-claim-not-cash.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of four parties",
-  "visual_goal": "Show that the cash and the merchant's balance travel on two separate paths: the cash moves between banks and stops in the provider's pooled account, while the merchant holds only a line in the provider's book.",
-  "prompt": "Create a two-lane funds-flow diagram. Lower lane, left to right: a generic bank building labeled 'Cardholder's bank', a network hub of connected nodes labeled 'Card network', a large vault holding many mixed coins labeled 'Pooled account', and on the far right a small bank building labeled 'Merchant's bank' drawn faded with an empty tray. Solid arrows named 'settles' run from the cardholder's bank to the card network and from the card network to the pooled account; a dashed arrow named 'payout, later' runs from the pooled account to the merchant's bank. Upper lane: an open ledger book above the pooled account with one highlighted row labeled 'Owed to studio', and a thin line named 'claim' from that row to a small studio storefront on the right holding a paper slip. A euro sign appears on the coins. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two-lane diagram: cash moves from the cardholder's bank through the card network into the provider's pooled account, while the studio holds only a line in the provider's ledger.",
-  "caption": "The cash stops in the provider's pooled account; what the merchant holds until the payout is a line in the provider's book."
-}
--->
+![Two-lane diagram: cash moves from the cardholder's bank through the card network into the provider's pooled account, while the studio holds only a line in the provider's ledger.](assets/images/13-balances-and-funds-flows/13-claim-not-cash.jpeg)
+**Figure 1:** *The cash stops in the provider's pooled account; what the merchant holds until the payout is a line in the provider's book.*
 
 Five terms describe the state of that claim. Each is a statement about the debt, and none says where cash is.
 
@@ -109,19 +98,8 @@ At Adyen it does not, and Adyen says so twice. Its Sales Day Payout Terms of Ser
 
 The advance has a limit and a way back. "Prefinancing is capped at 30 days. If the card scheme, payment method, or acquirer does not settle the funds within 30 days, Adyen reverses the prefinanced amount from your payable batch. These reversals appear as SettledReversed and RefundNotCleared entries." If the money turns up later, it is booked again. The platform model has the same rule: "If Adyen does not receive the funds within 30 days after a payment's capture, we subtract those funds from the current settlement batch." The reversal is also quiet: the `SETTLED_REVERSED` and `REFUND_NOT_CLEARED` webhook event types "apply to all payment methods and are disabled by default".
 
-<!-- illustration-placeholder
-{
-  "id": "13-paid-before-being-paid",
-  "status": "pending",
-  "asset": "assets/images/13-balances-and-funds-flows/13-paid-before-being-paid.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on the 30-day cap",
-  "visual_goal": "Show two clocks on one timeline: the merchant is paid on a fixed day, the network pays the provider on a later and variable day, and the provider is out of pocket in between, for at most 30 days.",
-  "prompt": "Create a horizontal timeline diagram with two parallel tracks. Upper track labeled 'Merchant': a marker at the left labeled 'Sale', then a marker shortly after labeled 'Paid, day 2' with a euro coin dropping into a small studio storefront. Lower track labeled 'Provider': the same 'Sale' marker, then a wide shaded band that starts under 'Paid, day 2' and ends at a wavy, uncertain marker labeled 'Network pays'; the band is labeled 'Advance'. At the far right of the lower track a firm vertical line labeled '30-day cap' with a curved return arrow named 'taken back' pointing from the cap up to the merchant track. A generic network hub icon sits under the 'Network pays' marker with an arrow named 'settles' into a vault. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Timeline with two tracks: the merchant is paid on day 2, the provider is paid by the network later, and an advance outstanding at the 30-day cap is taken back.",
-  "caption": "Under Adyen's documented default the merchant is paid on a fixed day, the network pays the provider later, and an advance still unsettled after 30 days is taken back."
-}
--->
+![Timeline with two tracks: the merchant is paid on day 2, the provider is paid by the network later, and an advance outstanding at the 30-day cap is taken back.](assets/images/13-balances-and-funds-flows/13-paid-before-being-paid.jpeg)
+**Figure 2:** *Under Adyen's Sales day payout as its documentation describes it, the merchant is paid on a fixed day, the network pays the provider later, and an advance still unsettled after 30 days is taken back.*
 
 Adyen bounds the risk it takes by advancing. Under the terms, payment methods that settle late or unpredictably are excluded and paid only on receipt, and "If more than 25% of the Captured Volume on a sub-account consists of Payment Methods that structurally settle to Adyen later than the Payout Day, Adyen will have the right to accordingly delay the Payout Day by one or more business days." Activation is subject to Adyen's review of the merchant. Its other model, Pass-through payout, pays on receipt, and Adyen's documentation calls it "the only available payout model in Africa, Brazil, and India". Pre-funding is a credit decision about the merchant and its mix.
 
@@ -201,19 +179,8 @@ On the evening of Tuesday 9 March, Mila's €120.00 becomes three figures in Ady
 | The processing cost | Nobody's claim; the provider keeps it and passes part on to the issuer and the network ([[payment-economics]]) | €0.61 *(assumption)* |
 | Total | | €120.00 |
 
-<!-- illustration-placeholder
-{
-  "id": "13-three-balances",
-  "status": "pending",
-  "asset": "assets/images/13-balances-and-funds-flows/13-three-balances.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of three figures in the Larkfield section",
-  "visual_goal": "Show one €120 payment dividing into three figures in the provider's book: €117.47 for the studio, €1.92 for the platform and €0.61 of processing cost.",
-  "prompt": "Create a funds-split diagram. On the left a phone showing a paid class pass with a large label '€120.00'. An arrow named 'captured' leads to an open ledger book in the center. From the book three arrows fan out to the right into three labeled trays of different sizes: a large tray with a small yoga studio storefront above it labeled '€117.47', with the arrow named 'studio'; a small tray with a generic software platform window above it labeled '€1.92', with the arrow named 'platform'; and a smaller tray with a generic bank and network hub above it labeled '€0.61', with the arrow named 'cost'. All three trays sit inside a dotted outline that also contains the ledger book, to show they are entries in one book. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A €120.00 payment divided in a ledger book into €117.47 for the studio, €1.92 for the platform and €0.61 of processing cost.",
-  "caption": "Mila's €120.00 becomes three figures in the provider's book: €117.47 owed to the studio, €1.92 owed to Larkfield and €0.61 of processing cost."
-}
--->
+![A €120.00 payment divided in a ledger book into €117.47 for the studio, €1.92 for the platform and €0.61 of processing cost.](assets/images/13-balances-and-funds-flows/13-three-balances.jpeg)
+**Figure 3:** *Mila's €120.00 becomes three figures in the provider's book: €117.47 owed to the studio, €1.92 owed to Larkfield and €0.61 of processing cost.*
 
 The studio's €117.47 is booked on Tuesday and changes state on Thursday 11 March. Studio Noord's settlement delay is two business days (a Larkfield contract detail, illustrative), which matches the example in Adyen's platform documentation: sales captured on a Monday "are settled two business days later, on Wednesday, regardless of when the schemes pay out the funds." The payout that includes the pass reaches Ines's bank the same Thursday. Whether Visa had paid Adyen by then, Ines cannot know, and it changes nothing for her unless the funds have still not arrived after 30 days.
 

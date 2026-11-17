@@ -22,19 +22,8 @@ Between the coin and the tap lie seven other ways of paying, and this page walks
 
 The walk has nine steps: cash; a village shop that sells on a promise; the check; the card; the card network; paying at a distance; the stored card; the platform; and today's payment, where Mila's pass returns. Each step says what stopped working, what was added and what the book calls it, what it made possible for buyer and seller, and what it cost. The figure below draws the result as a stack. Each then answers one question: **when is it really paid, and who is on the hook until then?**
 
-<!-- illustration-placeholder
-{
-  "id": "evolution-nine-steps",
-  "status": "pending",
-  "asset": "assets/images/how-payments-got-complicated/evolution-nine-steps.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the roadmap paragraph that lists the nine steps",
-  "visual_goal": "Show that the ways of paying accumulated as a stack: the same simple exchange of a coin for bread at the bottom, and one layer stacked on it for each later step, none removed.",
-  "prompt": "Create a structural layered diagram, read from bottom to top, like a cross-section of nine stacked horizontal bands of equal width. At the very bottom, below the stack, two hands exchange a coin with a euro sign and a loaf of bread. Each band has one small icon at its left end and one short label. From bottom to top the labels are: \"Cash\" with a coin icon; \"Shop credit\" with a small notebook icon; \"Check\" with a paper slip icon; \"Card\" with a plain unbranded card icon; \"Card network\" with two small bank buildings joined by a line; \"At a distance\" with a laptop icon; \"Stored card\" with a key icon; \"Platform\" with three small shopfronts under one roof; \"Today\" with a phone showing a green checkmark. The bottom band is green, the middle bands shade from teal to blue, and the top band is orange. On the right side of the stack one tall upward arrow runs from the bottom band to the top band, labeled \"added\", and next to it a crossed-out downward arrow labeled \"removed\". At the very top, above the stack, a generic customer taps a phone. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Nine stacked bands labeled from Cash at the bottom to Today at the top, with a coin-for-bread exchange below the stack and a customer tapping a phone above it; an arrow shows layers being added and none removed.",
-  "caption": "Nine steps, one stack: each way of paying was added on top of the one before, and none was removed, so a tap in an app today rests on all of them."
-}
--->
+![Nine stacked bands labeled from Cash at the bottom to Today at the top, with a coin-for-bread exchange below the stack and a customer tapping a phone above it; one upward arrow shows the layers being added.](assets/images/how-payments-got-complicated/evolution-nine-steps.jpeg)
+**Figure 1:** *Nine steps, one stack: each way of paying was added on top of the one before, and none was removed, so a tap in an app today rests on all of them.*
 
 ## Cash: Paid on the Spot
 
@@ -96,19 +85,8 @@ The gain is reach. The customer carries one card that works in any shop of any m
 
 The price is that this step separates the answer from the money. They now travel days apart, between parties that cannot see each other. A shop can take the approval for the money. An answer can be lost on the way, and then the shop does not know whether the issuer said yes. And the banks settle in daily totals, in which a single payment cannot be seen.
 
-<!-- illustration-placeholder
-{
-  "id": "evolution-answer-before-money",
-  "status": "pending",
-  "asset": "assets/images/how-payments-got-complicated/evolution-answer-before-money.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that says the network step separates the answer from the money",
-  "visual_goal": "Show that in a card network the approval travels in seconds as a message while the money follows days later on a separate, slower path between the same parties.",
-  "prompt": "Create a conceptual diagram with four generic parties in a row from left to right: a shop counter with a card reader, a bank building, a round hub, and a second bank building. Labels under them, in order: \"Shop\", \"Acquirer\", \"Network\", \"Issuer\". Two paths connect the four parties. The upper path is a thin, fast blue line with small envelope icons flying along it in both directions: one arrow from the shop to the issuer labeled \"asks\" and one arrow from the issuer back to the shop labeled \"approved\"; a small stopwatch next to this path is labeled \"seconds\". The lower path is a thick, slow orange line with euro coins rolling from the issuer through the hub and the acquirer to the shop, one arrow labeled \"money\"; a small calendar next to this path is labeled \"days\". Between the two paths, a wide empty gap is marked with a dashed double-headed vertical arrow labeled \"the gap\". At the shop, a clerk holds a green checkmark in one hand and an empty open palm in the other. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A shop, an acquirer, a network and an issuer in a row; a fast upper path carries the question and the approval in seconds, a slow lower path carries the money in days, and the clerk holds an approval but no money yet.",
-  "caption": "The card network separated the answer from the money: the approval arrives in seconds as a message, and the money follows a day or more later by clearing and settlement."
-}
--->
+![A shop, an acquirer, a network and an issuer in a row; a fast upper path carries the question and the approval in seconds, a slow lower path carries the money in days, and the clerk holds an approval but no money yet.](assets/images/how-payments-got-complicated/evolution-answer-before-money.jpeg)
+**Figure 2:** *The card network separated the answer from the money: the approval arrives in seconds as a message, and the money follows a day or more later by clearing and settlement.*
 
 **When is it really paid?** Promised in seconds, moved between the banks a day or more later, and paid to the shop after that. **Who is on the hook until then?** The issuer owes the acquirer and the acquirer owes the shop, which holds a promise in the meantime.
 

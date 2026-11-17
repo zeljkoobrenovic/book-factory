@@ -18,19 +18,8 @@ timetoread: 28 min read
 <br>
 A customer is charged twice for one month of a membership. Another has paid and is turned away at the door, because the system says she has not. In both cases the provider was up and answered every call the way its documentation says it does. The [[introduction]] argued that the answer a payment API returns is the first of several promises, kept over days by parties that cannot see each other. Both failures have that shape: **a system recorded a promise, or a silence, as the truth**.
 
-<!-- illustration-placeholder
-{
-  "id": "patterns-first-day-shortcut",
-  "status": "pending",
-  "asset": "assets/images/where-payment-systems-go-wrong/patterns-first-day-shortcut.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the opening paragraph of the page",
-  "visual_goal": "Show that a shortcut which matches the provider's API on the first day is contradicted later by the slow parts of a payment.",
-  "prompt": "Create a conceptual before-and-after illustration in two panels side by side. The left panel has a small calendar page labeled \"First day\": a developer at a laptop sends one blue arrow to a generic server box and receives one green arrow back with a checkmark; a short straight path labeled \"Shortcut\" runs under the two arrows. The right panel has a calendar page labeled \"Later\": the same developer and server, but now three things arrive at the developer's side: a clock icon with a broken arrow labeled \"Timeout\", two identical envelopes labeled \"Twice\", and an orange euro coin with a curved arrow going back toward the server labeled \"Taken back\". The straight path from the left panel continues into the right panel and ends in a crack. A thin dashed vertical line separates the panels. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two panels: on the first day a developer's call to a provider returns one clean success; later the same integration meets a timeout, a duplicated message and money taken back, and the shortcut path cracks.",
-  "caption": "Every pattern began as a shortcut that matched the provider's API on the first day and was contradicted only later, by a timeout, a repeated event or money taken back."
-}
--->
+![Two panels: on the first day a developer's call to a provider returns one clean success; later the same integration meets a timeout, a duplicated message and money taken back, and the shortcut path cracks.](assets/images/where-payment-systems-go-wrong/patterns-first-day-shortcut.jpeg)
+**Figure 1:** *Every pattern began as a shortcut that matched the provider's API on the first day and was contradicted only later, by a timeout, a repeated event or money taken back.*
 
 Failures of this kind recur often enough to be named, and they share an origin. **Each began as a shortcut that matched how the provider's API behaved on the first day**: a call returns success, a webhook arrives once and in order, a card behaves like every other method, verification is a form filled in at sign-up. The slow parts of a payment contradict each shortcut only later and only sometimes, so it survives testing and fails under a timeout, a peak or a rule change. Each decision behind a pattern was reasonable when it was made, so finding a pattern is not finding someone to blame. The patterns also chain: the money error that a customer or an accountant notices is usually the last link, and the repair that holds is at the first.
 
@@ -59,19 +48,8 @@ The four families say where to look. **Money truth** is a record of money that n
 | **The Borrowed Blueprint** | An architecture is copied from a provider a thousand times larger without its reasons. | Platform and scale |
 | **The Accidental Bank** | A platform holds, moves or lends other people's money without knowing which license and liability that takes. | Platform and scale |
 
-<!-- illustration-placeholder
-{
-  "id": "patterns-four-families",
-  "status": "pending",
-  "asset": "assets/images/where-payment-systems-go-wrong/patterns-four-families.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of sixteen patterns",
-  "visual_goal": "Show the sixteen patterns as four groups, with money truth as the place where failures surface and the other three as places where they start.",
-  "prompt": "Create a structural diagram with four rounded panels. One wide panel across the top is labeled \"Money truth\" and contains five euro-coin icons in a row, each with a small warning triangle. Below it, three equal panels side by side are labeled \"Integration\", \"Trust\" and \"Platform and scale\". The \"Integration\" panel contains three icons: a doorbell, a calendar page and a bank card. The \"Trust\" panel contains four icons: a vault door, a document with a magnifying glass, an open cash drawer and a snowflake. The \"Platform and scale\" panel contains four icons: a single rail track, a calendar page showing the number 1, a rolled blueprint and a small bank building. From each of the three lower panels one orange arrow labeled \"starts here\" rises to the top panel. Next to the top panel a small eye icon is labeled \"noticed here\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Four panels: money truth across the top with five coin icons, and integration, trust, and platform and scale below with three, four and four icons, each sending an arrow up to money truth.",
-  "caption": "The sixteen patterns fall into four families: failures are usually noticed in money truth and started in integration, trust, or platform and scale."
-}
--->
+![Four panels: money truth across the top with five coin icons, and integration, trust, and platform and scale below with three, four and four icons, each sending an arrow up to money truth.](assets/images/where-payment-systems-go-wrong/patterns-four-families.jpeg)
+**Figure 2:** *The sixteen patterns fall into four families: failures are usually noticed in money truth and started in integration, trust, or platform and scale.*
 
 A warning sign is a prompt to look, not a verdict: **ask for the number or the record that would confirm it**. For a Black-Box Balance, that is the provider balance on one date, broken down into payments, fees, refunds, disputes and reserves (amounts a provider holds back against losses), set against your own ledger for the same date, with the size and age of the difference nobody can explain.
 
@@ -335,19 +313,8 @@ A warning sign is a prompt to look, not a verdict: **ask for the number or the r
 
 The catalog treats each pattern alone. In practice one sets up the next, and the chain has a direction: **it is usually noticed at a money-truth pattern, where a customer or an accountant sees that the money is wrong, and it usually started at one of the other eleven**. There are three chains, one for each family a failure can start in, and the figure below draws them.
 
-<!-- illustration-placeholder
-{
-  "id": "patterns-chains",
-  "status": "pending",
-  "asset": "assets/images/where-payment-systems-go-wrong/patterns-chains.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the first paragraph of the section on chains",
-  "visual_goal": "Show that chains start in the integration, trust, and platform-and-scale families and end in the money-truth patterns.",
-  "prompt": "Create a structural flow diagram that reads left to right. On the left, three stacked rounded boxes: a blue box labeled \"Integration\" with a doorbell icon, a teal box labeled \"Trust\" with a snowflake icon, and a green box labeled \"Platform and scale\" with a calendar page showing the number 1. On the right, one tall orange-outlined box labeled \"Money truth\" containing five small stacked tags labeled \"Double Charge\", \"Phantom Payment\", \"Orphaned Refund\", \"Black-Box Balance\" and \"Stranded Payout\". Draw a blue arrow from the Integration box to the \"Phantom Payment\" tag, a teal arrow from the Trust box to the \"Black-Box Balance\" tag, and a green arrow from the Platform and scale box to the \"Double Charge\" tag. Above the left side a small flag icon labeled \"Starts here\"; above the right side a small eye icon labeled \"Noticed here\". A wrench icon labeled \"Repair\" sits next to the left boxes, not the right one. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Flow diagram: three boxes for the integration, trust, and platform-and-scale families on the left send arrows to a money-truth box on the right that lists the five money-truth patterns; the repair wrench sits on the left.",
-  "caption": "The chains run one way: they start in the integration, trust, or platform-and-scale families and are noticed in money truth, so the repair belongs at the start."
-}
--->
+![Flow diagram: three boxes for the integration, trust, and platform-and-scale families on the left send arrows to a money-truth box on the right that lists the five money-truth patterns; the repair wrench sits on the left.](assets/images/where-payment-systems-go-wrong/patterns-chains.jpeg)
+**Figure 3:** *The chains run one way: they start in the integration, trust, or platform-and-scale families and are noticed in money truth, so the repair belongs at the start.*
 
 **The integration chain** starts at an assumption about the interface. A Trusted Doorbell reads silence as a fact and produces Phantom Payments: memberships shown as unpaid for nine hours. A Card by Any Other Name marks a direct debit paid on the day it is submitted, which is a Phantom Payment, and when the debit comes back weeks later there is nothing to tie it to, which is an Orphaned Refund. A Version Cliff changes a field under a report and leaves finance with a figure nobody can explain.
 
@@ -357,19 +324,8 @@ The catalog treats each pattern alone. In practice one sets up the next, and the
 
 Larkfield's 1 November 2026 shows one chain end to end. The renewal wave came, as on every 1st; a month earlier it had already delayed 7,900 renewals. During it a provider call timed out. The renewal job sent the request again under a new key. 1,840 members paid twice, and the refunds that followed did not stop 212 disputes. Refunding repaired that month only: nothing had changed that would stop the next wave from doing the same. So Keel works at the start of the chain. K5 paces the wave, K1 fixes the key, K2 makes the provider's record the one that counts, and Larkfield keeps both providers and adds no orchestration product.
 
-<!-- illustration-placeholder
-{
-  "id": "patterns-one-chain-at-larkfield",
-  "status": "pending",
-  "asset": "assets/images/where-payment-systems-go-wrong/patterns-one-chain-at-larkfield.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on Larkfield's 1 November 2026",
-  "visual_goal": "Show one chain end to end: a predictable peak, a timeout, a retry under a new key and a double charge, with the refund acting on the last link and the lasting repairs on the earlier ones.",
-  "prompt": "Create a structural diagram of a chain with four large links drawn left to right. The first link holds a calendar page showing the number 1 and is labeled \"Renewal wave\". The second link holds a clock with a broken arrow and is labeled \"Timeout\". The third link holds two different key icons and is labeled \"New key\". The fourth link, in orange, holds two identical euro coins and is labeled \"Paid twice\". Under the fourth link, a small bandage icon labeled \"Refund\". Under the first link a wrench icon labeled \"Pace it\"; under the third link a wrench icon labeled \"One key\". A thin gray arrow runs along the top from the first link to the fourth. Two small figures stand at the right end looking at the orange link: a customer holding a phone and a studio owner. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A chain of four links from left to right: a renewal wave, a timeout, a new key and a double payment; a bandage marks the refund under the last link and wrenches mark the repairs under the first and third.",
-  "caption": "On 1 November 2026 the chain ran from the renewal wave through a timeout and a new key to 1,840 double charges; the refund touched the last link, and Keel repairs the earlier ones."
-}
--->
+![A chain of four links from left to right: a renewal wave, a timeout, a new key and a double payment; a bandage marks the refund under the last link and wrenches mark the repairs under the first and third.](assets/images/where-payment-systems-go-wrong/patterns-one-chain-at-larkfield.jpeg)
+**Figure 4:** *On 1 November 2026 the chain ran from the renewal wave through a timeout and a new key to 1,840 double charges; the refund touched the last link, and Keel repairs the earlier ones.*
 
 ## Using the Patterns
 

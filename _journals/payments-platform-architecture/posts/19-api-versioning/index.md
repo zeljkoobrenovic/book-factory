@@ -66,19 +66,8 @@ All three designs share one property, and it is the one that hurt Larkfield. The
 | Small versions pinned per integration, no stated end | The provider, for as long as it serves each version; the integrator later, by choice or by accident | Know where the pin is set and choose its own upgrade dates | Integrators are too many to coordinate |
 | Additive changes on every version, numbered versions for breaks, a published lifecycle | Both, on a schedule | Parse leniently and upgrade inside the notice period | Old versions must end, for security or regulatory reasons |
 
-<!-- illustration-placeholder
-{
-  "id": "19-pin-is-a-loan",
-  "status": "pending",
-  "asset": "assets/images/19-api-versioning/19-pin-is-a-loan.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table that compares the three versioning designs",
-  "visual_goal": "Show that a pinned integration falls further behind with every release, and that the gap can be crossed in small scheduled steps or in one forced jump.",
-  "prompt": "Create a conceptual illustration. A staircase of seven steps rises from lower left to upper right; each step has a small calendar icon on its front face. On the lowest step stands a small server box with a pin stuck in it, labeled \"Pinned\". At the top step a flag is labeled \"Current\". Two paths lead from the server box to the flag. Path one, in green, climbs the stairs one step at a time with small footprints, labeled \"Calendar\". Path two, in orange, is a single tall vertical cliff face rising straight from the lowest step to the top, with a dashed arrow and a small warning triangle, labeled \"Forced\". A bracket along the right side spanning the full height is labeled \"Gap\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A staircase of releases with a pinned system on the lowest step; a green path climbs step by step and an orange path is one tall cliff to the top.",
-  "caption": "A pin is a loan: each release adds a step to the gap, which is crossed either one step at a time on a calendar or all at once when something forces it."
-}
--->
+![A staircase of releases with a pinned system on the lowest step; a green path climbs step by step and an orange path is one tall cliff to the top.](assets/images/19-api-versioning/19-pin-is-a-loan.jpeg)
+**Figure 1:** *A pin is a loan: each release adds a step to the gap, which is crossed either one step at a time on a calendar or all at once when something forces it.*
 
 ## How Stripe Described Its Mechanism in 2017: Version-Change Modules
 
@@ -86,19 +75,8 @@ Of the two providers, only Stripe has published how it pays for pinning. Everyth
 
 The post then explains how one code base answers in every version. The server builds each response in the shape of the current version. For each incompatible change there is a **version-change module**: “we encapsulate it in a version change module which defines documentation about the change, a transformation, and the set of API resource types that are eligible to be modified.” Having found the caller's version, from the header, an authorized application or the account's pin, the server “walks back through time and applies each version change module that finds along the way until that target version is reached.” Old versions are therefore produced by a chain of small transformations, not by old code paths, and the core code handles one shape only.
 
-<!-- illustration-placeholder
-{
-  "id": "19-walking-back-through-versions",
-  "status": "pending",
-  "asset": "assets/images/19-api-versioning/19-walking-back-through-versions.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that describes responses transformed backward through version-change modules",
-  "visual_goal": "Show a response built once in the current shape and transformed backward, module by module, to the shape the caller is pinned to.",
-  "prompt": "Create a structural explainer diagram reading right to left. On the far right, a server box labeled \"Core code\" emits a document icon labeled \"Current\". The document travels left along a conveyor through three identical small machine boxes in a row, each labeled \"Module\", and each box changes the document slightly: the document icon gains or loses one colored line after each box. Arrows between the boxes point left and are labeled \"walk back\". On the far left the final document is labeled \"Pinned version\" and an arrow labeled \"response\" delivers it to a laptop icon labeled \"Integration\". Above the conveyor, a thin arrow from the laptop to the server box, pointing right, is labeled \"request\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A response document leaves the core code in its current shape and passes leftward through three module boxes, arriving at the integration in the shape of its pinned version.",
-  "caption": "As Stripe described it in 2017, a response is built once in the current shape and walked back through version-change modules until it matches the version the caller is pinned to."
-}
--->
+![A response document leaves the core code in its current shape and passes leftward through three module boxes, arriving at the integration in the shape of its pinned version.](assets/images/19-api-versioning/19-walking-back-through-versions.jpeg)
+**Figure 2:** *As Stripe described it in 2017, a response is built once in the current shape and walked back through version-change modules until it matches the version the caller is pinned to.*
 
 Not every change fits inside such a transformation. A change in behavior, as opposed to a change in the shape of a response, cannot be undone by rewriting the response afterwards. The 2017 post describes modules marked as having side effects, whose presence the core code has to check for directly, and it is frank about them: “This reduced encapsulation makes changes with side effects more complex to maintain, so we try to avoid them.”
 
@@ -169,19 +147,8 @@ The inventory worth keeping is one table of every place a version is set, with o
 | Client-side checkout library | Stripe.js has named versions, released twice a year, chosen in the script URL or the npm package | Drop-in/Components requires a minimum Checkout API version | Yes; at Adyen it can force the server's |
 | Webhook endpoint or configuration | Set at endpoint creation, else the account default; thin events are unversioned | A “Version” setting per configuration | No |
 
-<!-- illustration-placeholder
-{
-  "id": "19-where-the-version-is-set",
-  "status": "pending",
-  "asset": "assets/images/19-api-versioning/19-where-the-version-is-set.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table that lists every place a version is set",
-  "visual_goal": "Show that one integration holds its version in four places and that a library upgrade moves some of them and not others.",
-  "prompt": "Create a structural explainer diagram. In the center, a large rounded box labeled \"Integration\". Attached around it are four round dials, each with a pointer: top left dial labeled \"Account default\", top right dial labeled \"Request\", bottom right dial labeled \"Library\", bottom left dial labeled \"Webhook endpoint\". From the left edge of the image a package box with an upward arrow, labeled \"Library upgrade\", sends one bold orange arrow to the \"Library\" dial, whose pointer is drawn turned to a new position in orange, and a second orange arrow labeled \"moves\" continues from the \"Library\" dial to the \"Request\" dial, whose pointer is also turned. The \"Account default\" and \"Webhook endpoint\" dials are drawn in calm blue with pointers unchanged and a small padlock icon beside each, with the label \"stays\" between them. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "An integration with four version dials; a library upgrade turns the library and request dials while the account default and webhook endpoint dials stay where they were.",
-  "caption": "One integration holds its version in several places; a library upgrade moves the requests and leaves the account default and the webhook endpoint where they were."
-}
--->
+![An integration with four version dials; a library upgrade turns the library and request dials while the account default and webhook endpoint dials stay where they were.](assets/images/19-api-versioning/19-where-the-version-is-set.jpeg)
+**Figure 3:** *One integration holds its version in several places; a library upgrade moves the requests and leaves the account default and the webhook endpoint where they were.*
 
 ## Stripe and Adyen: Where They Differ
 

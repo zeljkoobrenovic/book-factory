@@ -16,37 +16,15 @@ timetoread: 5 min read
 <br>
 At the end of 2025, every payment in the records of **Larkfield, the fictional studio-software platform this book follows**, had the right status. Yet its books said it owed its studios €412,000 more than the balances at its two providers, Stripe and Adyen, showed. The difference was found in January 2026 and took three weeks to trace: to refunds made after a studio had been paid, fees on chargebacks (card payments taken back by the customer's bank) and a rounding rule for currency conversion ([[payment-ledgers]] gives the amounts). **None of the three was a payment that had failed.**
 
-<!-- illustration-placeholder
-{
-  "id": "part-9-all-paid-books-apart",
-  "status": "pending",
-  "asset": "assets/images/part-9-intro/part-9-all-paid-books-apart.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the opening paragraph",
-  "visual_goal": "Show that every payment record is correct while the platform's books and the providers' balances stand apart, with three later movements in the gap.",
-  "prompt": "Create a wide explainer illustration. On the left, a neat grid of small payment record cards, every one carrying a green check mark, under a small tag labeled \"All paid\". On the right, two tall stacks of euro coins standing side by side on a table: the left stack, beside an open ledger book, is labeled \"Books\"; the right stack, beside a generic office building, is labeled \"Providers\" and is visibly shorter. A horizontal bracket marks the difference in height between the two stacks, with an orange tag labeled \"€412,000\". Inside the gap above the shorter stack float three small items with no text: a receipt slip with a backward arrow, a price tag with a euro sign, and a small coin cut by a rounding symbol. A generic finance professional stands between the grid and the stacks, looking from one to the other. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A grid of payment records all marked with a check, beside two coin stacks labeled Books and Providers whose heights differ by a gap tagged €412,000, with a refund slip, a fee tag and a rounded coin in the gap.",
-  "caption": "At year-end 2025 every payment at Larkfield had the right status, and its books and its providers' balances were €412,000 apart."
-}
--->
+![A grid of payment records all marked with a check, beside two coin stacks labeled Books and Providers whose heights differ by a gap tagged €412,000, with a refund slip, a fee tag and a rounded coin in the gap.](assets/images/part-9-intro/part-9-all-paid-books-apart.jpeg)
+**Figure 1:** *At year-end 2025 every payment at Larkfield had the right status, and its books and its providers' balances were €412,000 apart.*
 
 The chapters so far could not have shown that difference. Parts I to VIII explained one mechanism per chapter, ending in [[part-8]] with the rule that a money path must be correct before it is available. Part IX teaches no new mechanism. It takes **four payments at Larkfield and follows each through every party and system, in the order the payment meets them** to show what passes from each step to the next.
 
 The four make one claim: **every failure they show appears at a hand-off**, the point where one mechanism's answer (an approval, a decline, a payout, a payment marked complete) is taken by the next system as final. The mechanisms belong to different parties and run on different clocks, from seconds for an approval to about four months for a chargeback. So each step can tell the next only what it knows when it finishes, which is a promise. Whether the promise was kept is reported later, by another record, usually on another channel.
 
-<!-- illustration-placeholder
-{
-  "id": "part-9-four-chains-marked-joints",
-  "status": "pending",
-  "asset": "assets/images/part-9-intro/part-9-four-chains-marked-joints.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that states the part's claim",
-  "visual_goal": "Show the part's shape: four payments, each a chain of working mechanisms, with attention on the joints between them and not on the links.",
-  "prompt": "Create a wide conceptual diagram. Four horizontal chains run from left to right, stacked one above the other with even spacing. Each chain is made of five solid rounded links drawn in blue or teal, and every link carries a small green check mark. Between each pair of neighboring links, the joint is drawn as a small orange ring, clearly brighter than the links. At the left end of each chain sits one small icon and a short label: a phone with a check mark labeled \"Pass\"; a calendar page with a circular arrow labeled \"Renewal\"; a euro coin split in three with a backward arrow labeled \"Refund\"; a bank building with a backward arrow labeled \"Dispute\". A generic engineer stands at the right holding a magnifying glass over one orange joint of the first chain, and a single callout from that joint is labeled \"Hand-off\". The fourth chain is visibly the longest and the first the shortest. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Four chains labeled Pass, Renewal, Refund and Dispute, each made of links with check marks, with the joints between links marked in orange and one joint under a magnifying glass labeled Hand-off.",
-  "caption": "The shape of Part IX: four payments, each a chain of mechanisms that work, read at the joints where one hands to the next."
-}
--->
+![Four chains labeled Pass, Renewal, Refund and Dispute, each made of links with check marks, with the joints between links marked in orange and one joint under a magnifying glass labeled Hand-off.](assets/images/part-9-intro/part-9-four-chains-marked-joints.jpeg)
+**Figure 2:** *The shape of Part IX: four payments, each a chain of mechanisms that work, read at the joints where one hands to the next.*
 
 Every journey has the same form: a narrative, one sequence figure and a **step table**, which the first journey sets up. Each row names the party or system that acts, the record it leaves, the promise that record makes and what can fail there, with the chapter that owns the mechanism. Read a row by asking **which later record confirms or corrects it**. The failures to look for are between rows, not inside one. Each journey is told on Adyen, the provider of Studio Noord, the yoga studio where all four payments are made, with the Stripe record beside it. The two report the same step through different records at different moments: Stripe as objects whose status can be read again, Adyen as events and report lines keyed by a reference. An integration that waits for the right record on one waits for the wrong one on the other.
 

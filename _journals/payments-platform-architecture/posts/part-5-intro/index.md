@@ -16,37 +16,15 @@ timetoread: 5 min read
 <br>
 On the weekend of 8–9 August 2026, bots tested 61,000 stolen card numbers with €1 drop-in payments through the public booking widget of one studio on **Larkfield, the fictional studio-software platform this book follows**. Larkfield stored none of those numbers, and nothing was stolen from it. It still paid €4,100 in provider fees and refunds, and the studio could not sell online for 31 hours.
 
-<!-- illustration-placeholder
-{
-  "id": "part-5-no-cards-held-still-a-bill",
-  "status": "pending",
-  "asset": "assets/images/part-5-intro/part-5-no-cards-held-still-a-bill.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the opening paragraph",
-  "visual_goal": "Show that the stolen card numbers went past the platform to the provider, and that the platform, holding no card data, was still left with a bill and a studio that could not sell online.",
-  "prompt": "Create a wide left-to-right explainer illustration with five elements. Far left: a cluster of three small robot figures labeled \"Bots\", with a stream of many small orange payment cards leaving them. Center left: a browser window labeled \"Booking page\" that the stream of cards enters. Top right: a blue building labeled \"Provider\". Bottom center: a server rack icon labeled \"Platform\" with a small empty box beside it labeled \"No card numbers\". Bottom right: a small studio shopfront with its door open and, beside it, a laptop showing a crossed-out shopping cart labeled \"Online off: 31 hours\", and next to the server a paper invoice labeled \"€4,100\". Arrows: a thick orange arrow named \"card numbers\" runs from the booking page along the top directly to the provider, passing above the platform server without touching it. A thin grey dashed arrow named \"page\" runs from the platform server up to the booking page. A thin orange arrow named \"bill\" runs from the provider down to the invoice. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Bots send a stream of cards into a booking page; the card numbers go to the provider and none reach the platform's server, which is left with an invoice of €4,100 and a studio whose online sales were off for 31 hours.",
-  "caption": "The Card-Testing Weekend: the 61,000 card numbers went to the provider and none reached Larkfield, which still paid €4,100 while one studio could not sell online for 31 hours."
-}
--->
+![Bots send a stream of cards into a booking page; the card numbers go to the provider and none reach the platform's server, which is left with an invoice of €4,100 and a studio whose online sales were off for 31 hours.](assets/images/part-5-intro/part-5-no-cards-held-still-a-bill.jpeg)
+**Figure 1:** *The Card-Testing Weekend: the 61,000 card numbers went to the provider and none reached Larkfield, which still paid €4,100 while one studio could not sell online for 31 hours.*
 
 That weekend contradicts a habit most engineers bring to payments: security is something you add and then have. Encrypt the data, put it behind a provider, pass the audit. Payments works differently. **Every control names who holds the data and who pays when it fails**, and that assignment is what [[part-4]] said an API cannot hide.
 
 Part V's claim is that **each of five controls relocates something and leaves something behind**. Tokenization moves card numbers to the provider's vault and leaves you the page around the card fields. A network token moves the stored card to the card network and leaves you a provider token behind which the card can change. A risk score moves the allow-or-block decision to the provider's model and leaves you the loss on what you accept. 3-D Secure moves a fraud loss to the issuer, the cardholder's bank, only when the payer is authenticated. Verification moves the duty to know a seller to the regulated provider and leaves the platform the deadlines.
 
-<!-- illustration-placeholder
-{
-  "id": "part-5-five-moves-five-remainders",
-  "status": "pending",
-  "asset": "assets/images/part-5-intro/part-5-five-moves-five-remainders.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that states the part's claim",
-  "visual_goal": "Show the part's shape: five things leave the business for five different holders, and five remainders stay behind with the business.",
-  "prompt": "Create a wide conceptual diagram. On the left, one large rounded box with a shop icon labeled \"Your business\". On the right, a vertical column of five holders, from top to bottom: an orange safe labeled \"Vault\", a hub of connected nodes labeled \"Card network\", a gauge dial labeled \"Risk model\", a bank building labeled \"Issuer\", and a blue office building labeled \"Provider\". Five solid blue arrows run from the business box to the five holders, one each; the top arrow carries the single arrow name \"moves\". Inside the business box, aligned with the five arrows, sit five small orange tiles from top to bottom labeled \"Page\", \"Token\", \"Threshold\", \"Exemptions\", \"Deadlines\". A single orange bracket groups the five tiles and carries the name \"stays\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Five arrows run from a business to a vault, a card network, a risk model, an issuer and a provider, while five tiles labeled Page, Token, Threshold, Exemptions and Deadlines stay inside the business.",
-  "caption": "The shape of Part V: each of the five controls moves something to another party, and each leaves a remainder with the business."
-}
--->
+![Five arrows run from a business to a vault, a card network, a risk model, an issuer and a provider, while five tiles labeled Page, Token, Threshold, Loss and Deadlines stay inside the business.](assets/images/part-5-intro/part-5-five-moves-five-remainders.jpeg)
+**Figure 2:** *The shape of Part V: each of the five controls moves something to another party, and each leaves a remainder with the business.*
 
 The controls have this shape because each is defined by **a rule that assigns responsibility**, not by a technology that destroys risk. The card industry's security standard binds every system a card number passes through or can affect. Stripe's documentation calls the merchant "ultimately responsible for payments you choose to accept". European law puts the loss on the side that avoids strong authentication. The rules are also linked: Stripe's PCI guide says its fraud tool is available only when its own client-side code collects the card. So I would stop asking "are we compliant?" and ask, for each control, what moved, to whom, what came back, and who owns it.
 

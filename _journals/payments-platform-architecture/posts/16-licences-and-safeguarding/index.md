@@ -37,19 +37,8 @@ The size of the buffer follows from Larkfield's 2026 figures: €1.12 billion pr
 
 Jonas Weber, Larkfield's risk and compliance lead, stopped the proposal in review: "That account would contain forty-three million euros that are not ours, and holding money that is not ours is a regulated activity." His objection was about **possession**: who holds the money while it is owed. Two questions follow: what would holding it require, and can Larkfield get the buffer without holding it? The figure below shows the two flows.
 
-<!-- illustration-placeholder
-{
-  "id": "16-one-arrow-two-flows",
-  "status": "pending",
-  "asset": "assets/images/16-licences-and-safeguarding/16-one-arrow-two-flows.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph in which Jonas Weber objects",
-  "visual_goal": "Show that only a flow through the platform's own bank account puts other people's money in its possession.",
-  "prompt": "Two-panel before/after illustration with a thin divider. Left panel: a customer with a phone, a bank vault tagged with a small software-window icon and labeled \"Platform's account\", and a studio storefront labeled \"Seller\"; an orange arrow labeled \"pays\" runs from the customer into the vault, which is full of coins, and an orange arrow labeled \"pays out\" runs from the vault to the seller. Right panel: the same customer and seller with a building bearing a shield, labeled \"Licensed provider\", between them; a blue arrow labeled \"pays\" runs from customer to provider and a blue arrow labeled \"pays out\" from provider to seller; below, a small software-window icon sends only a thin dashed teal arrow labeled \"instructs\" up to the provider, and no coins touch it. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Left: a payment passes through the platform's own bank account before reaching the seller. Right: it passes through a licensed provider that the platform only instructs.",
-  "caption": "Money that passes through the platform's own account is in the platform's possession; money held by a licensed provider that the platform only instructs is not."
-}
--->
+![Left: a payment passes through the platform's own bank account before reaching the seller. Right: it passes through a licensed provider that the platform only instructs.](assets/images/16-licences-and-safeguarding/16-one-arrow-two-flows.jpeg)
+**Figure 1:** *Money that passes through the platform's own account is in the platform's possession; money held by a licensed provider that the platform only instructs is not.*
 
 ## Why Holding Other People's Money Needs a License
 
@@ -78,19 +67,8 @@ Side by side, the four differ on one line that matters to an architect. Reading 
 
 Read as a system requirement, the first method needs three things: a ledger that says, per user, how much is owed; a bank account, the safeguarding account, that holds users' money and nothing else; and the total of the first covered by the balance of the second. The bank that holds the account does not know the users. Where that account is pooled, **the institution's own ledger is the only thing that divides the cash between customers**, so a bug in that ledger is a bug in who owns what. The figure below shows the structure.
 
-<!-- illustration-placeholder
-{
-  "id": "16-safeguarding-ledger-and-account",
-  "status": "pending",
-  "asset": "assets/images/16-licences-and-safeguarding/16-safeguarding-ledger-and-account.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that reads safeguarding as a ledger, an account and a comparison",
-  "visual_goal": "Show a ledger of what is owed to each user, one pooled bank account, and a scheduled comparison between the two totals.",
-  "prompt": "Structural diagram in three zones. Left: a ledger card labeled \"Owed to users\" with four short unlabeled rows of bars and a bold total bar. Right: a bank building with one large vault labeled \"Safeguarding account\" holding a single undivided pile of euro coins. Center: a balance scale with a small calendar above it, labeled \"Daily comparison\"; a teal arrow labeled \"total owed\" comes from the ledger and a teal arrow labeled \"account balance\" from the vault. Bottom right, behind a thick wall, a smaller vault labeled \"Own funds\"; a dashed orange arrow labeled \"covers shortfall\" runs from it into the safeguarding vault. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A ledger of amounts owed to users, one pooled safeguarding account at a bank, a daily comparison between their totals, and a separate own-funds vault that covers any shortfall.",
-  "caption": "Safeguarding as a system: a ledger of what is owed to each user, one pooled account at a bank that sees only the total, a comparison between the two, and the firm's own funds kept apart to cover a shortfall."
-}
--->
+![A ledger of amounts owed to users, one pooled safeguarding account at a bank, a scheduled comparison between their totals, and a separate own-funds vault that covers any shortfall.](assets/images/16-licences-and-safeguarding/16-safeguarding-ledger-and-account.jpeg)
+**Figure 2:** *Safeguarding as a system: a ledger of what is owed to each user, one pooled account at a bank that sees only the total, a comparison between the two, and the firm's own funds kept apart to cover a shortfall.*
 
 The rule also carries a clock: funds still held at the end of the business day after receipt must already be in the separate account. So the system has to know, every business day, how much it holds for users and where. As requirements:
 
@@ -168,19 +146,8 @@ The Stripe and Adyen columns restate facts cited above; the last column is my in
 
 On Stripe, ask which entity and which safeguarding or partner-bank arrangement applies to each account country, because the protection differs by region. On Adyen, ask how balances are treated in each region, because the public pages state the license and, beyond the business-account product, stop. [[stripe-and-adyen-bets-compared]] weighs the two bets; [[case-stripe]] and [[case-adyen]] give each company's account. The figure below sets the two structures side by side.
 
-<!-- illustration-placeholder
-{
-  "id": "16-non-bank-and-bank-custody",
-  "status": "pending",
-  "asset": "assets/images/16-licences-and-safeguarding/16-non-bank-and-bank-custody.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the reading of the comparison table",
-  "visual_goal": "Contrast a non-bank provider that places users' money at other banks with a provider that is itself a bank.",
-  "prompt": "Two-column comparison diagram with a thin divider. Left column, tagged \"Provider A\": an office building with a shield labeled \"Non-bank\"; a blue arrow labeled \"users' funds\" runs from it to two separate bank buildings, each with a vault labeled \"Safeguarding\"; under the office building, behind a thick wall, a small vault labeled \"Own funds\". Right column, tagged \"Provider B\": one large bank building labeled \"Bank\" containing a card with two stacked bars labeled \"Balances owed\" and \"Own capital\"; a teal arrow labeled \"direct access\" runs from the bank to a generic hub of connected nodes. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Left: a non-bank provider sends users' funds to safeguarding vaults at two banks and keeps its own funds apart. Right: a provider that is a bank holds balances itself and connects directly to a payment network.",
-  "caption": "Provider A is Stripe as it documents itself in the EEA and the UK: a non-bank with users' funds in safeguarding accounts at banks. Provider B is Adyen, a bank; that balances sit on its own balance sheet is the author's inference."
-}
--->
+![Left: a non-bank provider sends users' funds to safeguarding vaults at two banks and keeps its own funds apart. Right: a provider that is a bank holds balances itself and connects directly to a payment network.](assets/images/16-licences-and-safeguarding/16-non-bank-and-bank-custody.jpeg)
+**Figure 3:** *Provider A is Stripe as it documents itself in the EEA and the UK: a non-bank with users' funds in safeguarding accounts at banks. Provider B is Adyen, a bank; that balances sit on its own balance sheet is the author's inference.*
 
 ## In Practice at Larkfield: Mila's €120 by License Holder
 

@@ -18,37 +18,15 @@ On 2 February 2027 a ten-class pass for €120.00 is bought with Bram de Wit's c
 
 Nothing had failed, yet the money came back. To an engineer, a payment is a request that returned success. Behind the API, that success was one bank's promise: **a card payment is a chain of separate promises made by different parties on different clocks**. The cardholder's bank, called the **issuer**, approves in seconds and moves no money. The merchant claims the amount, the banks settle through the card network a day or more later, and the provider pays the merchant on its own schedule. None of these makes the payment final: Visa's public rules (edition of 24 October 2026) give the issuer 120 calendar days for most kinds of dispute ([[journey-of-a-payment]]), and that right outlasts all four.
 
-<!-- illustration-placeholder
-{
-  "id": "part-1-chain-of-promises",
-  "status": "pending",
-  "asset": "assets/images/part-1-intro/part-1-chain-of-promises.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the lead paragraph that states the part's claim, a card payment is a chain of separate promises",
-  "visual_goal": "Show one payment as a chain of four links, each held by a different party with its own clock, followed by a long open stretch from which the payment can still be pulled back.",
-  "prompt": "Create a conceptual explainer illustration of a chain drawn left to right across the middle of the image. The chain has four large links, each a different color and each held up by a different generic figure standing behind it. The first link is labeled \"Approved\" and is held by a bank building; the second is labeled \"Claimed\" and is held by a small yoga studio shopfront; the third is labeled \"Settled\" and is held by a hub of connected nodes between two small bank buildings; the fourth is labeled \"Paid out\" and is held by an office block with a payout chute. A small clock sits above each link, and the four clocks show visibly different times. To the left of the first link, a smartphone shows one green check mark. To the right of the fourth link the chain does not close: a long dotted line runs on to a calendar page labeled \"120 days\". From the calendar page a curved orange arrow labeled \"Dispute\" runs back over the top of the chain to the first link, carrying a euro coin labeled \"€120\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A chain of four links labeled Approved, Claimed, Settled and Paid out, each held by a different party with its own clock, and a dispute arrow running back from a calendar page labeled 120 days.",
-  "caption": "One payment is four promises held by four parties on four clocks, and for about 120 days a dispute can still pull the €120 back."
-}
--->
+![A chain of four links labeled Approved, Claimed, Settled and Paid out, each held by a different party with its own clock, and a dispute arrow running back from a calendar page labeled 120 days.](assets/images/part-1-intro/part-1-chain-of-promises.jpeg)
+**Figure 1:** *One payment is four promises held by four parties on four clocks, and for about 120 days a dispute can still pull the €120 back.*
 
 The promises cannot be folded into one status, because none of them is the provider's own. Each belongs to another party, which keeps its own record on its own clock, and the provider that answers your API call can only report them as they arrive. So “approved”, “captured”, “settled” and “paid out” are four facts held by four parties, and **a system that stores one status word for them is wrong for days at a time**.
 
 Part I follows the payment in the order it happens. The first chapter lays out the whole journey. The next three take its stretches in turn: the authorization, which is the first promise; capture, clearing and settlement, where money actually moves; and refunds, reversals and disputes, where it moves back. The last says who earns what at each step. On the way, three beliefs an integrator arrives with are overturned: that approved means paid, that paid out means final, and that the fee is one charge.
 
-<!-- illustration-placeholder
-{
-  "id": "part-1-five-chapters-on-the-timeline",
-  "status": "pending",
-  "asset": "assets/images/part-1-intro/part-1-five-chapters-on-the-timeline.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the roadmap paragraph that names the five chapters in the order a payment happens",
-  "visual_goal": "Show the shape of Part I: five chapters laid along one payment's timeline, the first spanning the whole line, three covering its stretches in order, and the fifth running underneath as the fee paid at each step.",
-  "prompt": "Create a structural timeline diagram. One horizontal line runs left to right across the middle with four round stations labeled \"Approval\", \"Settlement\", \"Payout\" and, after a long dotted stretch, \"Dispute window\". Above the line, a wide blue bracket spans the whole line from the first station to the last and carries a round badge labeled \"1\" and the label \"Journey\". Directly on the line, three shorter colored bands mark its stretches: a teal band around the first station with a badge labeled \"2\" and the label \"Promise\"; a green band from just after the first station to the third station with a badge labeled \"3\" and the label \"Money moves\"; and an orange band over the dotted stretch and the last station with a badge labeled \"4\" and the label \"Money back\", with a curved orange arrow pointing from right to left above it. Below the line, a thin grey strip runs under the first three stations with a small euro coin under each station, a badge labeled \"5\" and the label \"Who earns\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A payment timeline from approval to the dispute window with five numbered chapter markers: one spanning the whole line, three covering its stretches in order, and one underneath showing a fee at each step.",
-  "caption": "The five chapters of Part I on one payment's timeline: the whole journey, the first promise, the money moving forward, the money moving back, and who earns what at each step."
-}
--->
+![A payment timeline from approval to the dispute window with five numbered chapter markers: one spanning the whole line, three covering its stretches in order, and one underneath showing a fee at each step.](assets/images/part-1-intro/part-1-five-chapters-on-the-timeline.jpeg)
+**Figure 2:** *The five chapters of Part I on one payment's timeline: the whole journey, the first promise, the money moving forward, the money moving back, and who earns what at each step.*
 
 ## Chapters in this part
 

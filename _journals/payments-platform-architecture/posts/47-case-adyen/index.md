@@ -62,19 +62,8 @@ The run of additions has one visible stumble, in 2023. EBITDA is earnings before
 
 > **INFERENCE, NOT DOCUMENTED:** I read the dates as an order of construction: the acquiring license, then breadth on one platform, then the bank, then products that only a bank can offer without a partner. In each case the permission precedes the product that needs it. Adyen does not describe its history in these terms.
 
-<!-- illustration-placeholder
-{
-  "id": "47-order-of-construction",
-  "status": "pending",
-  "asset": "assets/images/47-case-adyen/47-order-of-construction.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the inference block that closes the history section",
-  "visual_goal": "Show Adyen's history as layers added in order on one base: acquiring license, bank in three jurisdictions, financial products, and bought software placed beside the stack in 2026.",
-  "prompt": "Structural timeline diagram on a light background. A horizontal time axis runs along the bottom with five tick labels: \"2006–2012\", \"2017\", \"2021\", \"2023\", \"2026\". Above the axis, a stack of flat building blocks grows from left to right like a staircase. Block one, widest and lowest, in blue, labeled \"Acquiring\", starts above \"2006–2012\". Block two, in teal, labeled \"Bank EU\", sits on top starting above \"2017\". Block three, in teal, labeled \"Bank US\", starts above \"2021\". Block four, in teal, labeled \"Bank UK\", starts above \"2023\". A green block labeled \"Accounts, cards\" rests on the teal blocks between \"2021\" and \"2023\". To the right of the whole stack, above \"2026\", two separate orange blocks stand beside it and do not touch it, labeled \"Loyalty\" and \"Billing\"; a thin dashed orange arrow labeled \"bought\" points from each orange block toward the stack. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A staircase of blocks on a time axis: acquiring from the 2006 to 2012 period, a bank in the EU from 2017, in the US from 2021 and in the UK from 2023, accounts and cards on top, and two separate blocks for loyalty and billing placed beside the stack in 2026.",
-  "caption": "Adyen's order of construction: the acquiring license from the 2006 to 2012 period, banking permissions in 2017, 2021 and 2023, financial products on top, and loyalty and billing bought in 2026 and standing beside the platform."
-}
--->
+![A stack of dated blocks, bottom to top: acquiring from the 2006 to 2012 period, a bank in the EU in 2017, in the US in 2021 and in the UK in 2023, accounts and cards on top; two separate blocks for loyalty and billing, dated 2026 and marked bought, stand beside the stack.](assets/images/47-case-adyen/47-order-of-construction.jpeg)
+**Figure 1:** *Adyen's order of construction: the acquiring license from the 2006 to 2012 period, banking permissions in 2017, 2021 and 2023, financial products on top, and loyalty and billing bought in 2026 and standing beside the platform.*
 
 ## The Single-Platform Bet in Adyen's Own Words
 
@@ -137,19 +126,8 @@ What do the acquisitions change about the phrase? For payments, acquiring, termi
 
 > **INFERENCE, NOT DOCUMENTED:** The sentence I would use is this: Adyen built its payments and banking platform and, since July 2026, buys adjacent software. Its 2021 engineering post, writing about vendor software, already allowed buying "if the use case is peripheral" **(Evidence age: 5 years.)** Billing and loyalty are now called part of the platform, so the rule has moved. Whether the two products will be rebuilt on the platform or connected to it is not known.
 
-<!-- illustration-placeholder
-{
-  "id": "47-platform-and-bought-products",
-  "status": "pending",
-  "asset": "assets/images/47-case-adyen/47-platform-and-bought-products.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the inference block that closes the acquisitions section",
-  "visual_goal": "Show that payments, acquiring, terminals and banking products sit inside one platform, while the two products bought in 2026 sit outside it, one being connected and one still serving other providers.",
-  "prompt": "Component layout diagram on a light background. In the center-left, one large rounded rectangle in blue labeled \"One platform\" contains four smaller teal tiles in a two-by-two grid labeled \"Payments\", \"Acquiring\", \"Terminals\" and \"Accounts, cards\"; under the grid, inside the same rectangle, a long thin green bar labeled \"One ledger\". To the right of the large rectangle, outside it, two separate orange rounded boxes are stacked vertically with a clear gap from the platform: the upper one labeled \"Loyalty\", the lower one labeled \"Billing\". A solid orange arrow labeled \"being integrated\" runs from the \"Loyalty\" box to the edge of the large rectangle. A dashed orange arrow labeled \"intent\" runs from the \"Billing\" box to the edge of the large rectangle. From the \"Billing\" box a second thin gray arrow labeled \"other providers\" runs to the far right toward two small generic gray provider icons. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A large box labeled one platform holds payments, acquiring, terminals, accounts and cards over one ledger. Outside it stand two boxes, loyalty and billing; loyalty has an arrow marked being integrated, billing an arrow marked intent and another arrow to other providers.",
-  "caption": "Since 1 July 2026 the single platform is the core, not the company: loyalty is being integrated, and usage billing, as Adyen described it in June 2026, runs under an incubator model and still serves other payment providers."
-}
--->
+![A large box labeled one platform holds payments, acquiring, terminals, accounts and cards. Outside it stand two boxes, loyalty and billing; loyalty has an arrow marked being integrated, billing an arrow marked intent and another arrow to other providers.](assets/images/47-case-adyen/47-platform-and-bought-products.jpeg)
+**Figure 2:** *Since 1 July 2026 the single platform is the core, not the company: loyalty is being integrated, and usage billing, as Adyen described it in June 2026, runs under an incubator model and still serves other payment providers.*
 
 ## The Figures, With Their Definitions
 
@@ -171,19 +149,8 @@ What is left is the margin, and here Adyen makes a causal claim. The letter for 
 
 > **INFERENCE, NOT DOCUMENTED:** A 53% margin does not show that the architecture causes it: that link is Adyen's attribution, and 2023 and 2026 both show the margin moving with hiring while the platform stayed the same. Volume is not revenue either. By my arithmetic, Adyen kept about one euro of net revenue for every €590 it processed in 2025.
 
-<!-- illustration-placeholder
-{
-  "id": "47-volume-is-not-revenue",
-  "status": "pending",
-  "asset": "assets/images/47-case-adyen/47-volume-is-not-revenue.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the inference block that closes the figures section",
-  "visual_goal": "Make memorable how small net revenue is next to processed volume, and that EBITDA is about half of net revenue.",
-  "prompt": "Conceptual scale illustration on a light background, read left to right in three steps connected by two arrows. Step one on the left: a very large pale-blue circle filling most of the height, labeled \"Volume\" with the caption \"€1,394.3 bn\" beneath it; inside the circle, faint generic payment cards and coins drift. A teal arrow labeled \"17 bps\" runs from the large circle to step two. Step two in the middle: a tiny solid teal dot, drawn clearly but very small compared with the circle, placed under a magnifying glass so it can be seen; label \"Net revenue\" with the caption \"€2,364.2 m\". A green arrow labeled \"53%\" runs from the magnified dot to step three. Step three on the right: inside a second magnifying glass, the same teal dot shown enlarged and split in two halves, the left half green and labeled \"EBITDA\" with the caption \"€1,245.7 m\", the right half pale gray. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A very large circle for processed volume, a tiny dot under a magnifying glass for net revenue, and the dot enlarged and half shaded for EBITDA.",
-  "caption": "Volume is not revenue: of €1,394.3 billion processed in 2025, Adyen kept €2,364.2 million as net revenue, a take rate of 17.0 basis points, and 53% of that was EBITDA."
-}
--->
+![A very large circle for processed volume, a tiny dot under a magnifying glass for net revenue, and the dot enlarged and half shaded for EBITDA.](assets/images/47-case-adyen/47-volume-is-not-revenue.jpeg)
+**Figure 3:** *Volume is not revenue: of €1,394.3 billion processed in 2025, Adyen kept €2,364.2 million as net revenue, a take rate of 17.0 basis points, and 53% of that was EBITDA.*
 
 ## The Engineering Record, and How Old It Is
 

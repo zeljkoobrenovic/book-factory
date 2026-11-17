@@ -59,19 +59,8 @@ The law puts a duty on the issuer, but an online payment starts in a merchant's 
 
 Between those components the exchange has up to four steps. The checkout collects data about the customer's device. The 3DS server sends an authentication request through the directory server to the access control server. If the issuer wants more, a challenge runs between the cardholder and the issuer. Finally the result travels inside the authorization request. Stripe's standalone 3-D Secure API (n.d., accessed November 2026) shows the same sequence, ending with "On success, extract the cryptogram, ECI, and DS Transaction ID". The cryptogram is a one-time value that proves the authentication took place; the ECI (Electronic Commerce Indicator) is a code that says how it ended. One limit: the EMVCo specification sits behind a license and was not read, so the sequence follows the providers' documentation and omits the protocol's message names. The figure below shows the path.
 
-<!-- illustration-placeholder
-{
-  "id": "25-3ds-message-flow",
-  "status": "pending",
-  "asset": "assets/images/25-3ds-and-sca/25-3ds-message-flow.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on the four steps of the exchange",
-  "visual_goal": "Show that the question travels from the checkout through the network to the issuer, which answers silently or challenges the cardholder directly.",
-  "prompt": "A left-to-right message-flow diagram with four elements in one row. Far left: a person holding a phone that shows a checkout screen, labeled \"Customer\". Next: a rounded box with a small server icon, labeled \"3DS server\". Center: a ring of small nodes, labeled \"Directory server\". Far right: a bank building with a small shield, labeled \"Issuer\". A solid blue arrow labeled \"request\" runs from the 3DS server through the directory server to the issuer. A solid green arrow labeled \"answer\" runs back underneath from the issuer to the 3DS server. A dashed orange arrow labeled \"challenge\" arcs over the top, directly between the issuer and the customer's phone, with a small fingerprint icon at the phone. A short teal arrow labeled \"result\" leaves the 3DS server downward toward a small card-payment icon. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A request traveling from a 3DS server through a directory server to the issuer, an answer returning, and an optional challenge running directly between the issuer and the customer.",
-  "caption": "The merchant's side sends the request and receives the answer; the optional challenge runs between the issuer and the cardholder, and the issuer decides whether there is one."
-}
--->
+![A request traveling from a 3DS server through a directory server to the issuer, an answer returning, and an optional challenge running directly between the issuer and the customer.](assets/images/25-3ds-and-sca/25-3ds-message-flow.jpeg)
+**Figure 1:** *The merchant's side sends the request and receives the answer; the optional challenge runs between the issuer and the cardholder, and the issuer decides whether there is one.*
 
 Once the request reaches the access control server, the issuer answers in one of two ways. Adyen's documentation (n.d., accessed November 2026) defines both. "In a **frictionless** flow, the acquirer, issuer, and card scheme exchange all necessary information in the background through passive authentication using the shopper's device fingerprint. The transaction is completed without further shopper interaction." "In a **challenge** flow, the issuer requires additional shopper interaction, either through biometrics, two-factor authentication, or similar methods". ("Card scheme" is Adyen's word for card network; the acquirer is the institution on the merchant's side.) The merchant's side can state a preference and cannot choose. Stripe: "Stripe can't guarantee your preference because the issuer determines the ultimate authentication flow."
 
@@ -99,19 +88,8 @@ Sorted by what happened before authorization, the cases divide cleanly. One term
 | Data-only | The merchant | Adyen: "there is no liability shift for the data-only flow" |
 | A phone wallet authenticated the customer on the device | Usually the issuer | Adyen: "Apple Pay supports liability shift for American Express, Discover, JCB, Mastercard, and Visa cards" |
 
-<!-- illustration-placeholder
-{
-  "id": "25-ask-or-skip-fork",
-  "status": "pending",
-  "asset": "assets/images/25-3ds-and-sca/25-ask-or-skip-fork.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of liability cases",
-  "visual_goal": "Make the central rule memorable: asking the bank sends a later fraud loss to the bank, skipping keeps it with the merchant.",
-  "prompt": "A road that forks into two paths, seen from above at a slight angle. At the bottom center, before the fork: a small shopping-cart icon with a payment card, labeled \"Checkout\". The left path is blue and passes a small gate with a fingerprint icon, labeled \"Ask the bank\"; it ends at a bank building. The right path is orange, smooth and without a gate, labeled \"Skip\"; it ends at a small shop with an awning. Above the bank building floats a red warning coin with a crack in it, labeled \"Fraud loss\", with a thin arrow pointing down to the bank. Above the shop floats an identical cracked coin, also labeled \"Fraud loss\", with a thin arrow pointing down to the shop. On the left path a few small person figures have stepped off the road at the gate; on the right path all figures continue. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A road forking after a checkout: one path through a gate ends at a bank that carries the fraud loss, the other path without a gate ends at a shop that carries it.",
-  "caption": "Asking the bank costs some customers at the gate and sends a later fraud loss to the bank; skipping keeps every customer and leaves the loss with the merchant."
-}
--->
+![A road forking after a checkout: one path through a gate ends at a bank that carries the fraud loss, the other path without a gate ends at a shop that carries it.](assets/images/25-3ds-and-sca/25-ask-or-skip-fork.jpeg)
+**Figure 2:** *Asking the bank costs some customers at the gate and sends a later fraud loss to the bank; skipping keeps every customer and leaves the loss with the merchant.*
 
 One case turns on who asked. An issuer may apply the low-risk exemption itself, with no request from the merchant's side. Adyen's documentation says that then "The chargeback liability shifts to the issuer", and its table of Mastercard rules gives "Yes" where the "issuing bank applies a PSD2 exemption without the merchant or acquirer requesting for it". That fits Article 74(2): the issuer chose not to ask, so the issuer pays. Stripe's SCA readiness page reads more bluntly: "If the card issuer applies exemptions, the payment isn't authenticated through 3D Secure, and liability shift doesn't apply." I read the two as describing different payments, one sent through 3-D Secure and waved through by the issuer, the other never sent through it. That reading is mine; check the rule per network with your provider.
 
@@ -121,19 +99,8 @@ Even for an authenticated payment the shift is an expectation and not a guarante
 
 A membership is built from those two rules. The set-up is the one moment the cardholder is present, so it **must be authenticated**, and it must record the customer's agreement to later charges. Both providers give it a distinct shape in the API (documentation n.d., accessed November 2026). On Stripe, "you authenticate the card when it's being saved" and "must also secure agreement from the customer"; the card is saved with `setup_future_usage` set to `off_session` during a first payment, or with a SetupIntent when there is none. On Adyen the first payment carries `shopperInteraction` **Ecommerce** and a `recurringProcessingModel` such as **Subscription**, and "Zero-value authorizations to set up merchant-initiated transactions, for example subscriptions, do require SCA." [[subscriptions-and-billing-engines]] covers the billing objects built on top.
 
-<!-- illustration-placeholder
-{
-  "id": "25-membership-timeline",
-  "status": "pending",
-  "asset": "assets/images/25-3ds-and-sca/25-membership-timeline.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on the authenticated set-up",
-  "visual_goal": "Show one membership over time: a single authenticated first payment, then renewals that the merchant initiates without the customer and without a shift of the loss.",
-  "prompt": "A horizontal timeline with five evenly spaced markers. The first marker, larger and blue, shows a person holding a phone with a fingerprint icon, labeled \"12 January\" above and \"Set-up\" below. The next four markers are smaller and orange, each showing a small calendar page with a circular-arrow icon and no person, labeled \"1 February\", \"1 March\", \"1 April\" and \"1 May\". A bracket under the four orange markers is labeled \"Renewals\". Below the first marker sits a small bank building connected to it by a thin line. Below the bracket sits a small shop with an awning connected by a thin line. Each marker shows the amount \"€49\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A timeline with one authenticated set-up payment on 12 January tied to a bank, followed by monthly renewals with no customer present tied to a shop.",
-  "caption": "A €49 membership has one authenticated payment, the set-up on 12 January, whose fraud loss would be the bank's; every renewal after it is initiated by the merchant, and a fraud dispute on it is the merchant's."
-}
--->
+![A timeline with one authenticated set-up payment on 12 January tied to a bank, followed by monthly renewals with no customer present tied to a shop.](assets/images/25-3ds-and-sca/25-membership-timeline.jpeg)
+**Figure 3:** *A €49 membership has one authenticated payment, the set-up on 12 January, whose fraud loss would be the bank's; every renewal after it is initiated by the merchant, and a fraud dispute on it is the merchant's.*
 
 Every later charge is then flagged as merchant-initiated. Stripe's instruction is "Set off_session to `true` when creating an off-session payment". Adyen's is `shopperInteraction` **ContAuth** with the same processing model. The flag spares the customer a challenge nobody is present to answer, at a price. Stripe: "marking a payment as MIT is similar to requesting an exemption; neither a customer challenge nor a liability shift occurs". Adyen's Mastercard table lists "PSD2 SCA out-of-scope transactions that were not authenticated with 3D Secure 2" with liability shift "No". The merchant carries any fraud dispute on a renewal.
 
@@ -152,19 +119,8 @@ A worked example on the chapter's €120 pass shows the shape of the trade. Assu
 | Exempt; 5% are fraud *(assumption)* | 50 disputes | €6,750 |
 
 
-<!-- illustration-placeholder
-{
-  "id": "25-challenge-or-loss-balance",
-  "status": "pending",
-  "asset": "assets/images/25-3ds-and-sca/25-challenge-or-loss-balance.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the worked break-even example",
-  "visual_goal": "Show the decision as a balance between customers lost to a challenge and fraud loss kept, tipped by a risk score.",
-  "prompt": "A classic two-pan balance scale in the center. On the left pan: three small person figures walking away from a phone that shows a lock icon, labeled \"Lost customers\". On the right pan: a stack of cracked red coins with euro signs, labeled \"Fraud loss\". Above the balance, a semicircular gauge with a needle, colored green on the left, orange in the middle and red on the right, labeled \"Risk score\". A thin dashed line connects the gauge needle to the right pan, showing that a higher score makes the right pan heavier. Below the balance, a small tag reads \"2.7%\" at the pivot point. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A balance scale with lost customers on one pan and fraud loss on the other, a risk-score gauge above it and 2.7% marked at the pivot.",
-  "caption": "With the chapter's assumed figures, challenging and exempting a €120 payment cost the same at a fraud probability of about 2.7%; below it the challenge loses more than it saves."
-}
--->
+![A balance scale with lost customers on one pan and fraud loss on the other, a risk-score gauge above it and 2.7% marked at the pivot.](assets/images/25-3ds-and-sca/25-challenge-or-loss-balance.jpeg)
+**Figure 4:** *With the chapter's assumed figures, challenging and exempting a €120 payment cost the same at a fraud probability of about 2.7%; below it the challenge loses more than it saves.*
 
 Because the break-even depends on the single payment, three policies are realistic, and only the third follows it. The third is what both providers document: Adyen's table sends low-risk payments to an exemption, a frictionless flow or data-only, high-risk ones to a challenge, and declines the highest; Stripe's adaptive 3DS "runs machine learning in the background to authenticate medium-risk payments". The last column is my judgement.
 

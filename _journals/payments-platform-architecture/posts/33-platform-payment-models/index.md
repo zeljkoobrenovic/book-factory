@@ -66,19 +66,8 @@ Set side by side, the three questions are decided by three different things, and
 | Whose balance holds the money? | The booking of the payment | The platform, per payment | Stripe: charge type. Adyen: split instructions |
 | Who covers a negative balance? | An assignment | The platform, when it configures | Stripe: the account's responsibilities. Adyen: the liable balance account |
 
-<!-- illustration-placeholder
-{
-  "id": "33-three-questions",
-  "status": "pending",
-  "asset": "assets/images/33-platform-payment-models/33-three-questions.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of the three questions",
-  "visual_goal": "Show that the three questions of a platform payment attach to three different things: the sale the customer sees, the booking of the payment in the provider's book, and the party standing behind the seller's balance.",
-  "prompt": "Create a structural explainer diagram. On the left, a customer holding a phone, labeled 'Payer'. On the right, a small studio storefront labeled 'Seller'. Between them, slightly above, a software window labeled 'Platform'. In the center below the platform, a large open ledger book labeled 'Provider' with two rows: a wide row labeled 'Seller balance' and a narrow row labeled 'Platform balance'. A solid arrow named 'buys from' runs from the payer to the seller. A solid arrow named 'booked to' runs from the payer's phone down into the 'Seller balance' row. A dashed arrow named 'stands behind' runs from the 'Platform balance' row up to the underside of the 'Seller balance' row. Three round numbered badges: badge '1' on the 'buys from' arrow, badge '2' on the 'booked to' arrow, badge '3' on the 'stands behind' arrow. Euro coins sit inside the ledger rows only, none at the platform window. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Diagram of a payer, a platform and a seller around a provider's ledger, with three numbered marks: on the sale, on the booking to the seller's balance, and on the platform balance standing behind it.",
-  "caption": "Three questions attach to three different things: the sale the customer sees, the booking of the payment, and the party behind the seller's balance."
-}
--->
+![Diagram of a payer, a platform and a seller around a provider's ledger, with three numbered marks: on the sale, on the booking to the seller's balance, and on the platform balance standing behind it.](assets/images/33-platform-payment-models/33-three-questions.jpeg)
+**Figure 1:** *Three questions attach to three different things: the sale the customer sees, the booking of the payment, and the party behind the seller's balance.*
 
 ## Stripe Connect: The Charge Type Books the Payment, the Account's Responsibilities Assign the Loss
 
@@ -92,23 +81,12 @@ A **charge type** is the choice of which of those two accounts a payment is crea
 | Destination | "the payment appears in your platform's balance. A portion of the funds immediately transfers to the connected account's balance" | "your platform's balance" | "your platform's balance" |
 | Separate charges and transfers | "on your platform's account first. Create a separate transfer to move funds" | The platform's balance | The platform's balance |
 
-<!-- illustration-placeholder
-{
-  "id": "33-charge-booking",
-  "status": "pending",
-  "asset": "assets/images/33-platform-payment-models/33-charge-booking.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of charge types",
-  "visual_goal": "Show that a reversal lands on whichever balance the payment was booked to: the seller's balance for a direct charge, the platform's balance for an indirect charge.",
-  "prompt": "Create a two-panel funds-flow diagram, panels side by side with a thin divider. Left panel headed by a small tag 'Direct': a customer card at the top, a solid arrow named 'payment' going down into a box labeled 'Seller balance'; a thin arrow named 'fee' going from the seller balance sideways to a smaller box labeled 'Platform balance'; an orange curved arrow named 'chargeback' coming from the top and landing on the 'Seller balance' box. Right panel headed by a small tag 'Indirect': a customer card at the top, a solid arrow named 'payment' going down into a box labeled 'Platform balance'; a solid arrow named 'transfer' going from the platform balance sideways to a box labeled 'Seller balance'; an orange curved arrow named 'chargeback' coming from the top and landing on the 'Platform balance' box. In each panel the box that the orange arrow hits has an orange outline. Euro signs on small coins inside the boxes. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two panels: in a direct charge the payment and a later chargeback both land on the seller's balance; in an indirect charge both land on the platform's balance, which transfers the seller's share onward.",
-  "caption": "A reversal follows the booking: a direct charge puts it on the seller's balance, an indirect charge on the platform's."
-}
--->
+![Two panels: in a direct charge the payment and a later chargeback both land on the seller's balance; in an indirect charge both land on the platform's balance, which transfers the seller's share onward.](assets/images/33-platform-payment-models/33-charge-booking.jpeg)
+**Figure 2:** *A reversal follows the booking: a direct charge puts it on the seller's balance, an indirect charge on the platform's.*
 
 The charge type is not a free choice, however, because it has to match the merchant. Stripe calls the merchant the **merchant of record** ([[merchant-of-record]]) and tells platforms: "The MoR is the entity that the customer understands they're buying from", and "Don't base it on the charge type or payment configuration." If the platform is the merchant, only indirect charges without `on_behalf_of` are allowed. If the connected account is, the options are a direct charge or an indirect charge with the `on_behalf_of` parameter, which makes "the connected account the business of record for the payment" and puts its name in the statement descriptor, the text on the cardholder's statement. That parameter changes the name and not the booking: for indirect charges a dispute debits the "Platform's balance, with or without `on_behalf_of`".
 
-Who covers a connected account's negative balance is a property of the account. In the current Accounts v2 interface it is `losses_collector`, one of two responsibilities: "You must define `defaults.responsibilities` properties when you add the Merchant configuration to an account. You can't update their values later." The value `application` makes the platform responsible. The value `stripe` means "Stripe is liable for the connected account's negative balances. Your platform is still liable for negative balances on your platform account." The cover therefore reaches only payments booked on the seller's balance, and Stripe says so: "If you use indirect charges, assign negative balance responsibility to your platform, not to Stripe." The other responsibility, `fees_collector`, says whether Stripe takes its fees from the seller or from the platform; a platform that bears the losses must also collect the fees.
+Who covers a connected account's negative balance is a property of the account. In Accounts v2 it is `losses_collector` (`controller.losses.payments` in v1), one of two responsibilities: "You must define `defaults.responsibilities` properties when you add the Merchant configuration to an account. You can't update their values later." The value `application` makes the platform responsible. The value `stripe` means "Stripe is liable for the connected account's negative balances. Your platform is still liable for negative balances on your platform account." The cover reaches only payments booked on the seller's balance, and Stripe says so: "If you use indirect charges, assign negative balance responsibility to your platform, not to Stripe." The other responsibility, `fees_collector`, says whether Stripe takes its fees from the seller or from the platform; a platform that bears the losses must also collect the fees.
 
 Stripe then documents how a negative connected balance is collected, in order. It offsets the amount against the account's later payments. It tries the seller's bank account: "Stripe first attempts to offset the negative amount by collecting funds from the account's external account." Payouts to the seller stop while the balance is negative. If the platform is responsible, Stripe "holds funds in your platform account in reserve", shown as the platform's `connect_reserved` balance, and "if a connected account's balance remains negative for 180 days, we transfer funds from the platform reserve to cover the negative amount." If Stripe is responsible, Stripe covers the loss. A refund may not get that far: one the booked balance cannot fund waits as `pending` and fails after 45 days. The second step of the loss rule thus has a published timeline.
 
@@ -142,19 +120,8 @@ A seller on the balance platform is not one object. It is several resources, eac
 | Transfer instrument | "your user's verified bank account where they can receive payouts" | Where is it paid? |
 | Store | "ensures that the transactions you process for your users correspond to an accurate payer statement" | Whose name does the payer see? |
 
-<!-- illustration-placeholder
-{
-  "id": "33-seller-resources",
-  "status": "pending",
-  "asset": "assets/images/33-platform-payment-models/33-seller-resources.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of Adyen resources",
-  "visual_goal": "Contrast the two shapes of a seller: one account object holding everything at Provider A, and several linked resources with the platform's liable account beneath them at Provider B.",
-  "prompt": "Create a side-by-side structural diagram with two columns. Left column under a tag 'Provider A': one large rounded card labeled 'Account' containing three small inner tiles stacked vertically, an ID badge icon, a toggle switch icon and a stack of euro coins; a small padlock sits on the toggle tile. Right column under a tag 'Provider B': four separate small cards arranged in a row and linked by thin lines, labeled 'Legal entity' with an ID badge icon, 'Account holder' with a toggle icon, 'Balance account' with a stack of euro coins, 'Bank account' with a bank building icon. Beneath the 'Balance account' card, a wider card labeled 'Liable account' with a larger stack of euro coins, and a dashed upward arrow named 'covers' from it to the 'Balance account' card. Both columns show the same small studio storefront icon above them to indicate the same seller. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two columns for the same seller: at Provider A one account card holding identity, a locked setting and money; at Provider B four linked cards for legal entity, account holder, balance account and bank account, with the platform's liable account beneath covering the balance account.",
-  "caption": "The same seller in two shapes: Provider A (Stripe) keeps identity, settings and balance in one account; Provider B (Adyen) keeps them as separate resources, with the platform's liable balance account behind the seller's."
-}
--->
+![Two columns for the same seller: at Provider A one account card holding identity, a locked setting and money; at Provider B four linked cards for legal entity, account holder, balance account and bank account, with the platform's liable account beneath covering the balance account.](assets/images/33-platform-payment-models/33-seller-resources.jpeg)
+**Figure 3:** *The same seller in two shapes: Provider A (Stripe) keeps identity, settings and balance in one account; Provider B (Adyen) keeps them as separate resources, with the platform's liable balance account behind the seller's.*
 
 The platform has resources of the same kinds for itself, with a role the seller's do not have. Adyen's account structure page reads: "Liable account holder: represents your business in the balance platform. Liable balance account: the account where your business' funds are held. Funds can be deducted from this account if your users' balance accounts incur negative balances due to refunds and chargebacks. These resources are created by Adyen." The default party behind every seller is therefore part of the account structure itself; the platform does not create it.
 
@@ -235,19 +202,8 @@ The two configurations treat the ledger's two reversals differently at the first
 | What do the €120.00 chargeback and its €15.00 fee debit first? | The studio's balance account, by the chargeback instruction | Larkfield's platform balance; Larkfield then tries to reverse the transfer |
 | What if the studio cannot cover it? | The studio's balance account goes negative; after more than 30 days Larkfield's reserved compensation account is debited | Larkfield's balance has already paid; what it cannot pull back stays its loss |
 
-<!-- illustration-placeholder
-{
-  "id": "33-loss-steps",
-  "status": "pending",
-  "asset": "assets/images/33-platform-payment-models/33-loss-steps.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table that follows the refund and the chargeback on both providers",
-  "visual_goal": "Make the two-step loss rule memorable: a reversal steps down from the booked balance to the seller's bank account and finally to the party standing behind the seller, a platform that never held the money.",
-  "prompt": "Create a conceptual staircase illustration descending from top left to bottom right with three wide steps. An orange ball marked with a euro sign and a small label 'Refund' is drawn bouncing down the steps along a dotted path. Top step: an open ledger row with a few coins, labeled 'Booked balance'. Middle step: a small bank building with an empty tray, labeled 'Seller's bank'. Bottom step: a software window with a figure of a professional standing beside it holding out a tray of coins, labeled 'Party behind'. Arrows along the dotted path between steps are named 'if empty' (top to middle) and 'if unpaid' (middle to bottom). In the background above the staircase, a faint outline of a vault with a sign reading 'Never held' connected by a thin line to the software window. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A staircase of three steps: a refund lands on the booked balance, moves to the seller's bank account if the balance is empty, and ends with the party standing behind the seller, a platform that never held the money.",
-  "caption": "A loss steps down: first the balance the payment was booked to, then the seller's bank account, then the party assigned to stand behind the seller."
-}
--->
+![A staircase of three steps: a refund lands on the booked balance, moves to the seller's bank account if the balance is empty, and ends with the party standing behind the seller, a platform that never held the money.](assets/images/33-platform-payment-models/33-loss-steps.jpeg)
+**Figure 4:** *A loss steps down: first the balance the payment was booked to, then the seller's bank account, then the party assigned to stand behind the seller.*
 
 So the answer to Aylin's question is the same name on both providers, reached by two routes. Under Keel, the 2027 program that puts Larkfield's payments on an even keel, the payment service now stores for each studio and provider the merchant, the booking rule, the loss bearer and whether the assignment can still change. Finance reports one exposure figure next to it: about **€156 million** of paid-out online card volume sits inside the 120-day dispute window at any time. That is what can be disputed, not what will be lost. The figure exists because "we never hold the funds" had been read for years as "we never carry the loss".
 

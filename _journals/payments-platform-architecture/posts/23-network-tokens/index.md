@@ -54,37 +54,15 @@ Taken together, one stored card now exists in three forms, each issued by a diff
 | Provider token | The payment provider | One merchant, at that provider | No | Unchanged; what it points to in the vault may be stale |
 | Network token | The card network, as token service provider | The requestor only | Yes, in place of the card number | Unchanged; the network points it at the new card |
 
-<!-- illustration-placeholder
-{
-  "id": "23-one-card-three-forms",
-  "status": "pending",
-  "asset": "assets/images/23-network-tokens/23-one-card-three-forms.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of the three representations of one stored card",
-  "visual_goal": "Make memorable that one stored card exists in three forms held by three different parties.",
-  "prompt": "Create a conceptual illustration with one generic payment card at the top center labeled \"One card\". Three thin lines descend from it to three separate holders arranged left to right. On the left, a shop building holds a small key-shaped tag labeled \"Provider token\". In the middle, a payment company building with a safe holds a card-shaped tile labeled \"Card number\". On the right, a hub of connected nodes holds a card-shaped tile with a small lock, labeled \"Network token\". Under the shop is the label \"Merchant\", under the building with the safe \"Provider vault\", under the hub \"Card network\". A dashed arrow labeled \"Stays current\" circles the right-hand tile. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "One card connected to three holders: a merchant with a provider token, a provider vault with the card number, and a card network with a network token.",
-  "caption": "One stored card exists in three forms: the merchant holds a provider token, the provider's vault holds the card number, and the card network holds the network token and keeps it current."
-}
--->
+![One card connected to three holders: a merchant with a provider token, a provider vault with the card number, and a card network with a network token.](assets/images/23-network-tokens/23-one-card-three-forms.jpeg)
+**Figure 1:** *One stored card exists in three forms: the merchant holds a provider token, the provider's vault holds the card number, and the card network holds the network token and keeps it current.*
 
 ## From Request to Reissue: Provisioning, Cryptograms and the Choice per Attempt
 
 A token starts with a request, called **provisioning**. Adyen's explainer describes it: "The requestor sends a PAN to the card scheme, which forwards the request to the issuer. The issuer approves the request, and the network issues the token." It is a three-party step in which the issuer can say no, so a token exists only for cards whose issuers take part. Visa's press release of 4 June 2024 counted "over 8,000 issuers" enabled, and Stripe's documentation index (n.d., accessed November 2026), in its guidance for AI agents, warns them not to "assume every card or payment is eligible for network tokenization". Partial coverage is one reason a provider keeps the card number as well.
 
-<!-- illustration-placeholder
-{
-  "id": "23-provision-then-pay",
-  "status": "pending",
-  "asset": "assets/images/23-network-tokens/23-provision-then-pay.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that describes provisioning",
-  "visual_goal": "Show who talks to whom when a token is provisioned and when a payment is made with it.",
-  "prompt": "Create a two-row flow diagram with three generic elements repeated in each row from left to right: a payment company building labeled \"Requestor\", a hub of connected nodes labeled \"Card network\", and a bank building labeled \"Issuer\". Top row, headed by a small tag \"Once\": a blue arrow labeled \"Card number\" runs from the requestor to the network, a blue arrow labeled \"Approve?\" runs from the network to the issuer, a green arrow labeled \"Yes\" returns to the network, and a teal arrow labeled \"Token\" returns from the network to the requestor. Bottom row, headed by a small tag \"Each payment\": a teal arrow labeled \"Token + cryptogram\" runs from the requestor to the network, inside the network a small table icon is labeled \"Mapping\", an orange arrow labeled \"Card number\" runs from the network to the issuer, and a green arrow labeled \"Approved\" returns from the issuer through the network to the requestor. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two rows: a requestor obtains a token from the card network with the issuer's approval, then pays with the token and a cryptogram that the network maps to the card number.",
-  "caption": "A token is provisioned once, with the issuer's approval, and on each payment the card network maps the token back to the card for the issuer."
-}
--->
+![Two rows: a requestor obtains a token from the card network with the issuer's approval, then pays with the token, which the network maps to the card number.](assets/images/23-network-tokens/23-provision-then-pay.jpeg)
+**Figure 2:** *A token is provisioned once, with the issuer's approval, and on each payment the card network maps the token back to the card for the issuer.*
 
 Once issued, the token is bound to the party that requested it. Adyen puts it this way: "Tokens are domain-locked, meaning the same token can only be used by the party that requested it." Stripe's analytics documentation (n.d., accessed November 2026) calls network tokens "payment credentials that you can dynamically restrict to specific businesses and channels". This restriction, which the standard calls a domain control, is the security property: a token stolen from one merchant or provider is useless at another. It is also why a token belongs to its requestor.
 
@@ -94,19 +72,8 @@ The token does not replace the card number in the provider's vault; it sits besi
 
 Months later the bank replaces the card, and this is where the mapping earns its keep: the network re-points the token at the new card, and the requestor keeps sending the same token. Stripe's guide: "if a customer lost their card, Stripe would get notified by the network and would update the token directly so it would continue to work without the customer having to update their payment information." Adyen's documentation: "if the shopper receives a new card because the old one expired or was lost, the network token remains the same." This is the **credential lifecycle** managed by the network, and it explains Lotte's renewal. The older remedy, an account updater, is a network service that delivers the new card number to the provider's vault; the token makes the new number unnecessary for the payment, though not for what the merchant displays.
 
-<!-- illustration-placeholder
-{
-  "id": "23-reissue-token-stays",
-  "status": "pending",
-  "asset": "assets/images/23-network-tokens/23-reissue-token-stays.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that explains what happens when the card is reissued",
-  "visual_goal": "Show that when a card is replaced the token and the merchant's key stay the same, the network's pointer moves, and the merchant's displayed digits go stale.",
-  "prompt": "Create a before-and-after diagram split into a left panel with a small tag \"Before\" and a right panel with a small tag \"After\". In each panel, three stacked elements from top to bottom: a phone screen showing a card line, a tile with a lock labeled \"Network token\", and a payment card. In the left panel the phone screen shows \"•••• 4417\", the token points with a teal arrow to a card labeled \"4417\". In the right panel the phone screen still shows \"•••• 4417\" with a small orange warning mark labeled \"Stale\", the same token tile points with a teal arrow to a new card labeled \"8052\", and the old card labeled \"4417\" lies crossed out to the side. Between the panels a bank building sends an arrow labeled \"New card\" to the right panel. A green check mark labeled \"Approved\" sits under the right panel. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Before and after a card is replaced: the network token is unchanged and now points to the card ending 8052, while the app still shows 4417.",
-  "caption": "When the bank replaces the card ending 4417 with one ending 8052, the token stays the same and the payment is approved; only the digits the merchant displays go stale."
-}
--->
+![Before and after a card is replaced: the network token is unchanged and now points to the card ending 8052, while the app still shows 4417.](assets/images/23-network-tokens/23-reissue-token-stays.jpeg)
+**Figure 3:** *When the bank replaces the card ending 4417 with one ending 8052, the token stays the same and the payment is approved; only the digits the merchant displays go stale.*
 
 Put together, these steps promise two things, continuity and restriction, and they leave four things unpromised that a design has to cover itself.
 

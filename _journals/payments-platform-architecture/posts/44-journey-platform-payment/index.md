@@ -40,19 +40,8 @@ When Ines approved the refund in Larkfield's back office, Aylin Demir, Head of S
 
 Femke de Graaf, Head of Payments Engineering, answered by walking this one payment through every system in order. The walk has **eleven steps on five dates**, and it starts before the sale. The figure below shows it as a sequence; the sections after it take the steps one by one.
 
-<!-- illustration-placeholder
-{
-  "id": "44-three-parties-sequence",
-  "status": "pending",
-  "asset": "assets/images/44-journey-platform-payment/44-three-parties-sequence.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that introduces the walk of eleven steps on five dates",
-  "visual_goal": "Show the journey as a sequence between four lanes: the payment and its split going forward on 9 March, the payout on 11 March, and the refund going backward on 18 March through the provider's books.",
-  "prompt": "A sequence-style diagram with four vertical lanes, each headed by an icon and a short label, left to right: a customer with a phone labeled \"Member\", a software window labeled \"Platform\", an open ledger book labeled \"Provider's books\", and a generic bank building labeled \"Studio's bank\". Time runs downward, marked on the far left by three small calendar tags reading \"9 March\", \"11 March\" and \"18 March\". Next to \"9 March\": a blue arrow named \"pays\" from Member to Platform labeled \"€120.00\"; a blue arrow named \"split\" from Platform to Provider's books; inside the Provider's books lane two small trays appear, one labeled \"€117.47\" with a yoga-studio icon and one labeled \"€2.53\" with an office icon. Next to \"11 March\": a green arrow named \"payout\" from the \"€117.47\" tray to Studio's bank, after which that tray is drawn empty. Next to \"18 March\": an orange arrow named \"asks\" from Member to Platform; an orange arrow named \"refund\" from Platform to Provider's books pointing at the empty tray; an orange arrow named \"€84.00\" from Provider's books back to Member. A thin dashed teal arrow named \"stands behind\" runs from the \"€2.53\" office tray to the empty tray. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Sequence diagram with four lanes: on 9 March a member pays €120.00 and the platform's split books €117.47 and €2.53 in the provider's books; on 11 March the €117.47 is paid out to the studio's bank; on 18 March a refund of €84.00 goes back to the member from the emptied balance, with the platform's balance standing behind it.",
-  "caption": "One payment in sequence: €120.00 is split into €117.47 and €2.53 on 9 March, the €117.47 is paid out on 11 March, and on 18 March €84.00 goes back through a balance the payout emptied."
-}
--->
+![Sequence diagram with four lanes: on 9 March a member pays €120.00 and the platform's split books €117.47 and €2.53 in the provider's books; on 11 March the €117.47 is paid out to the studio's bank; on 18 March a refund of €84.00 goes back to the member from the emptied balance, with the platform's balance standing behind it.](assets/images/44-journey-platform-payment/44-three-parties-sequence.jpeg)
+**Figure 1:** *One payment in sequence: €120.00 is split into €117.47 and €2.53 on 9 March, the €117.47 is paid out on 11 March, and on 18 March €84.00 goes back through a balance the payout emptied.*
 
 ## Before the Sale: Studio Noord May Take Payments and Be Paid
 
@@ -92,19 +81,8 @@ The hand-off from payment to cost is therefore a matter of time. Larkfield's led
 
 The payout closes nothing about the payment. **Money moves forward on the provider's schedule and backward on the customer's**, and the two meet in the same balance at different times. From 11 March Studio Noord's balance account no longer contains Mila's money. Yet the studio can agree to a refund on any later day, and Mila's bank can force the payment back until about 7 July. Whatever comes back will be asked of a balance that holds something else, or nothing.
 
-<!-- illustration-placeholder
-{
-  "id": "44-two-clocks-one-tray",
-  "status": "pending",
-  "asset": "assets/images/44-journey-platform-payment/44-two-clocks-one-tray.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that says money moves forward on the provider's schedule and backward on the customer's",
-  "visual_goal": "Make memorable that the forward flow empties the seller's balance on day 2 while a backward flow can arrive at the same balance on any later day.",
-  "prompt": "A conceptual illustration built around one shallow tray in the center, labeled \"Seller balance\". On the left, a conveyor belt moving right, with a small clock above it labeled \"Provider's clock\": euro coins ride the belt into the tray, and a green arrow named \"payout\" carries them out of the tray to a generic bank building at the upper right labeled \"Paid out\". The tray is drawn empty, with faint outlines where coins were. On the right, a second conveyor belt moving left toward the tray, with a second clock above it labeled \"Customer's clock\" showing a later time: on it travels a single orange slip labeled \"Refund\", about to arrive at the empty tray. Below the tray, a small question mark inside a dotted coin outline. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A seller's balance drawn as a tray: coins arrive and are paid out to a bank on the provider's clock, and a refund slip arrives later, on the customer's clock, at the empty tray.",
-  "caption": "Money goes forward on the provider's schedule and comes back on the customer's, so a refund arrives at a balance that the payout has already emptied."
-}
--->
+![A seller's balance drawn as a tray: coins arrive and are paid out to a bank on the provider's clock, and a refund slip arrives later, on the customer's clock, at the empty tray.](assets/images/44-journey-platform-payment/44-two-clocks-one-tray.jpeg)
+**Figure 2:** *Money goes forward on the provider's schedule and comes back on the customer's, so a refund arrives at a balance that the payout has already emptied.*
 
 ## 18 March: €84 Goes Back Through a Balance the Payout Emptied
 
@@ -138,19 +116,8 @@ On Stripe the charge type decides who is short ([[platform-payment-models]]). Wi
 | Stripe, destination charge | The platform's balance | The refund waits as `pending` for up to 45 days | Nobody: the platform has paid, and must reverse the transfer to recover |
 | Stripe, direct charge | The studio's connected account | The refund waits as `pending` for up to 45 days | For a balance that does go negative: Stripe or the platform, as set on the account |
 
-<!-- illustration-placeholder
-{
-  "id": "44-who-goes-short",
-  "status": "pending",
-  "asset": "assets/images/44-journey-platform-payment/44-who-goes-short.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of who is short and who stands behind",
-  "visual_goal": "Contrast the two routes by which the platform ends up paying a refund when the seller's balance is empty: behind the seller's negative balance at Provider A, first in line at Provider B.",
-  "prompt": "A two-panel diagram with a thin divider. Left panel under a small tag \"Provider A\": two trays side by side, the left one empty with a minus sign and a yoga-studio icon, labeled \"Seller balance\", the right one holding coins with an office icon, labeled \"Platform balance\". An orange arrow named \"refund\" leaves the seller tray toward a customer with a phone at the far left, labeled \"€84.00\". A blue dashed arrow named \"stands behind\" runs from the platform tray to the seller tray. Right panel under a small tag \"Provider B\": the same two trays and icons, but the orange arrow named \"refund\" labeled \"€84.00\" leaves the platform tray toward the customer, and a teal arrow named \"reversal\" runs from the empty seller tray toward the platform tray and ends in a small red cross to show it fails. In both panels a small bank building above the seller tray is connected to it by a faded green arrow named \"paid out\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two panels. At Provider A the €84.00 refund leaves the seller's empty balance, which goes negative with the platform's balance standing behind it. At Provider B the refund leaves the platform's balance and the reversal from the seller's empty balance fails.",
-  "caption": "When the seller's balance is empty, the platform pays the €84.00 by two routes: at Provider A (Adyen) it stands behind the seller's negative balance; at Provider B (Stripe, destination charge) its own balance is debited first and the reversal fails."
-}
--->
+![Two panels. At Provider A the €84.00 refund leaves the seller's empty balance, which goes negative with the platform's balance standing behind it. At Provider B the refund leaves the platform's balance and the reversal from the seller's empty balance fails.](assets/images/44-journey-platform-payment/44-who-goes-short.jpeg)
+**Figure 3:** *When the seller's balance is empty, the platform pays the €84.00 by two routes: at Provider A (Adyen) it stands behind the seller's negative balance; at Provider B (Stripe, destination charge) its own balance is debited first and the reversal fails.*
 
 Stripe thus publishes an order of collection and a number of days. **Adyen publishes a shorter period and names the account.** Its page on liable balance accounts says: "Adyen allows negative balances for up to 30 days. If a balance account has a negative balance for more than 30 days, Adyen compensates this by debiting your reserved compensation account on the first day of the following month." That account is one of the platform's own liable accounts, and the platform must refill it. Adyen also documents one arrangement in which it takes a seller's loss: Managed Risk, marked as in pilot with limited availability, under which Adyen says it will "assume the responsibility for negative balances" on users' accounts. What I did not find is a price list for platforms: Adyen's pricing page lists prices per payment method and says "Other Adyen products, besides payment methods, are priced separately." Whether the pilot is open to a given platform, and at what price, is a question to put to Adyen in writing.
 

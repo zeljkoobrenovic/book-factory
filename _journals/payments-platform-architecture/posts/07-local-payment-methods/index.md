@@ -66,19 +66,8 @@ The status word can now be read properly. Stripe's documentation (n.d., accessed
 
 Take bank redirects first. In a **redirect flow** the customer leaves the merchant's page to approve the payment at their bank, and may not come back. iDEAL and Bancontact (Belgium) work this way: pushes with an immediate answer, no hold and no dispute through the payer's bank. Stripe's iDEAL page (n.d., accessed November 2026) lists “immediate notification” and no manual capture, and says “Customers can’t dispute iDEAL | Wero payments with their bank”; its Bancontact page (n.d., accessed November 2026) says customers “can’t file a chargeback through their bank”. Adyen's iDEAL page (n.d., accessed November 2026) shows no separate captures and no chargebacks, and its catalog, which files Bancontact under cards and wallets and not under online banking, lists no chargebacks for it either. Both print the same properties because they belong to the scheme; the figure below sets this shape beside two others.
 
-<!-- illustration-placeholder
-{
-  "id": "07-three-shapes-of-yes",
-  "status": "pending",
-  "asset": "assets/images/07-local-payment-methods/07-three-shapes-of-yes.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on bank redirects",
-  "visual_goal": "Show three shapes over time: pull with a hold, push that is final, pull with no hold and a long take-back window.",
-  "prompt": "Three horizontal lanes stacked top to bottom, each running from a generic phone on the left, through a generic bank icon in the middle, to a small studio building on the right. Top lane labeled \"Card\": an arrow named 'ask' from studio to bank, a padlock on a coin stack labeled \"Hold\" at the bank, an arrow named 'capture' carrying coins to the studio, and a long dashed orange arrow named 'chargeback' back to the phone. Middle lane labeled \"Bank redirect\": one solid green arrow named 'push' from phone through bank to studio, ending in a check mark labeled \"Final\"; nothing returns. Bottom lane labeled \"Direct debit\": a signed paper labeled \"Mandate\" at the left, an arrow named 'pull' from studio to bank, coins to the studio with no padlock, then a dashed orange bracket labeled \"8 weeks\" with a dashed arrow named 'return' back to the phone. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Three timelines: a card with a hold, a bank redirect that is final, a direct debit with an eight-week return window.",
-  "caption": "A card is a pull with a hold, a bank redirect is a push that the payer cannot take back through the bank, and a direct debit is a pull with no hold and a return window of 8 weeks."
-}
--->
+![Three timelines: a card with a hold, a bank redirect that is final, a direct debit with an eight-week return window.](assets/images/07-local-payment-methods/07-three-shapes-of-yes.jpeg)
+**Figure 1:** *A card is a pull with a hold, a bank redirect is a push that the payer cannot take back through the bank, and a direct debit is a pull with no hold and a return window of 8 weeks.*
 
 A direct debit is the opposite case, and here the rule is law. For euro direct debits under SEPA (the Single Euro Payments Area), the EU's second Payment Services Directive (PSD2, Directive (EU) 2015/2366 of 2015) gives the payer two separate rights. Article 76(1) says “the payer has an unconditional right to a refund within the time limits laid down in Article 77”, and Article 77(1) sets that limit at “a period of 8 weeks from the date on which the funds were debited”. Article 71(1) lets a payer claim a transaction was unauthorized “no later than 13 months after the debit date”. These are two rules: a no-questions refund of a debit the payer agreed to, and a claim that there was no valid mandate. **(Evidence age: 11 years; still in force. Final compromise texts of its successors, a third directive (PSD3) and a Payment Services Regulation, were published in April 2026 and awaited formal adoption, according to a law-firm briefing, a secondary source.)**
 
@@ -110,19 +99,8 @@ On one question both are equally explicit: whether there is a hold to capture is
 
 So both abstractions leak, in the same four places: capture, refund, the name of a reversal, and the time at which success is known. Each is one of the seven questions showing through. A capture setting does nothing for a method with no hold. A refund can fail days later. A “dispute” arrives that nobody can contest. A status stays in processing for a week. Neither API is at fault: the door is shared and the rooms behind it are not, as the figure below shows.
 
-<!-- illustration-placeholder
-{
-  "id": "07-one-door-many-rooms",
-  "status": "pending",
-  "asset": "assets/images/07-local-payment-methods/07-one-door-many-rooms.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on where the abstraction leaks",
-  "visual_goal": "One shared front door, differently shaped rooms behind it.",
-  "prompt": "Cutaway of a building seen from the side. On the left, one wide front door labeled \"One API\" with a generic developer walking in. Behind it, four rooms of clearly different shapes side by side. Room one, labeled \"Card\": a safe with a padlock holding euro coins. Room two, labeled \"Redirect\": a short corridor ending in a green check mark. Room three, labeled \"Direct debit\": a long room with an hourglass and an open back door, a dashed orange arrow named 'return' leaving through it. Room four, labeled \"Voucher\": an empty counter with a paper slip and a wall clock. The same small green sign reading \"OK\" hangs over each room entrance. Solid blue arrows named 'start' lead from the front door into each room. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "One front door labeled One API and four differently shaped rooms behind it, each under the same OK sign.",
-  "caption": "The API is one door; the same sign of success hangs over rooms of different shapes, and the scheme, not the provider, built the rooms."
-}
--->
+![One front door labeled One API and four differently shaped rooms behind it, each under the same OK sign.](assets/images/07-local-payment-methods/07-one-door-many-rooms.jpeg)
+**Figure 2:** *The API is one door; the same sign of success hangs over rooms of different shapes, and the scheme, not the provider, built the rooms.*
 
 What stands behind the door is mostly not public. I found no page of either company that says how it adds a method or lists the methods it reaches through another payment company (documentation, legal pages, help centers and sites searched, November 2026). The nearest list is Stripe's sub-processor list (last updated 27 September 2026), which names three "Payment method integration service providers" (PPRO, Payla and NETSTARS) without saying for which methods. The method pages (accessed November 2026) leave traces. The French mandate text on Stripe's SEPA Direct Debit page authorizes “Stripe, notre prestataire de services de paiement et/ou PPRO, son prestataire de services local”, naming a second payment company as a local service provider. Stripe's Pix page says “Ebanx appears as the payment recipient” on the customer's bank statement and calls it “our Pix partner”. Adyen's ACH page mentions “The legacy BOA acquirer” that its own “AdyenACH” replaced. So this chapter describes the contract each documents, not what is behind it.
 
@@ -170,19 +148,8 @@ Larkfield runs on both. Under Keel, the payment record store keeps the **method 
 
 Take Daan Peters, a fictional member of Studio Noord, who pays his €49.00 membership by SEPA Direct Debit, collected on Thursday 1 April 2027. Larkfield's fee is €0.64 and the studio receives €48.36. The record is `pending` and Daan can book, a risk the studio accepts. By Friday 9 April, six business days later, the debit is past the point where Stripe says most failures occur. Until 27 May 2027 Daan's bank will refund it without a reason, and until 1 May 2028 he can contest it as unauthorized. Larkfield stores both dates with the payment and, per studio, compares the debits still inside their eight weeks with the studio's balance ([[splits-balances-and-platform-payouts]]). The Bacs row is “open-ended” because the scheme is: the UK's Direct Debit Guarantee (n.d., accessed November 2026) promises “a full and immediate refund” if an error is made and its text names no time limit, and Stripe's Bacs page says “There’s no set time limit for customers to file Bacs Direct Debit disputes”.
 
-<!-- illustration-placeholder
-{
-  "id": "07-direct-debit-long-tail",
-  "status": "pending",
-  "asset": "assets/images/07-local-payment-methods/07-direct-debit-long-tail.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the worked example of the 49 euro direct debit",
-  "visual_goal": "Show how long the reversal tail of one direct debit is next to the day it was requested.",
-  "prompt": "One horizontal timeline across the full width. At the far left, a small studio building and a coin stack labeled \"€49\". Four pins with flags on the line. First pin, blue, labeled \"1 April\", with an arrow named 'collect' from a generic bank icon to the studio. Second pin, teal, close by, labeled \"9 April\", with a check mark. Third pin, orange, labeled \"27 May\", closing a wide orange band from the first pin labeled \"Refund, no reason\". Fourth pin, orange, at the far right after a break mark in the line, labeled \"1 May 2028\", closing a paler dashed band labeled \"Unauthorized claim\". A dashed orange arrow named 'return' arcs from the orange band back to a generic phone at the top left. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A timeline of one 49 euro direct debit with pins at 1 April, 9 April, 27 May and 1 May 2028.",
-  "caption": "A €49 direct debit collected on 1 April 2027 can be refunded without a reason until 27 May 2027 and contested as unauthorized until 1 May 2028."
-}
--->
+![A timeline of one 49 euro direct debit with pins at 1 April, 9 April, 27 May and 1 May 2028.](assets/images/07-local-payment-methods/07-direct-debit-long-tail.jpeg)
+**Figure 3:** *A €49 direct debit collected on 1 April 2027 can be refunded without a reason until 27 May 2027 and contested as unauthorized until 1 May 2028.*
 
 When a return does come, the providers' names for it will not do: Stripe and Adyen report the same scheme event with different words, so Larkfield records every reversal under one of four terms of its own. The Stripe column follows its SEPA Direct Debit page, the Adyen column its SEPA chargebacks guide (n.d., accessed November 2026); matching reason codes to rows is my reading. Jonas's dispute report now counts only the last two rows.
 

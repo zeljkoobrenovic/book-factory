@@ -58,19 +58,8 @@ There is a fourth limit, and it is the one that hurt Larkfield. No sender retrie
 | | That an event is sent again after the window closes |
 | | That every change has an event ([[payment-reconciliation-and-reporting]]) |
 
-<!-- illustration-placeholder
-{
-  "id": "20-doorbell-and-record",
-  "status": "pending",
-  "asset": "assets/images/20-webhooks-and-events/20-doorbell-and-record.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of what a webhook promises and does not promise",
-  "visual_goal": "Contrast the notice (a doorbell that may ring twice, late or not at all) with the record (a book that says what is true).",
-  "prompt": "Create a conceptual explainer illustration in two halves. On the left, a front door with a large doorbell button labeled \"Notice\"; three small sound-wave marks around it, one drawn twice to suggest a repeated ring, and one faded to suggest a ring that never came. On the right, an open record book on a desk labeled \"Record\" with one row highlighted by a green checkmark. A person in the middle stands at the door, turning from the doorbell toward the book. A blue arrow labeled \"Go and read\" runs from the doorbell to the book. Below the doorbell a small orange tag labeled \"Maybe twice\"; below the book a small green tag labeled \"The truth\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A doorbell labeled as the notice on the left and a record book labeled as the record on the right, with an arrow telling the person at the door to go and read the book.",
-  "caption": "A webhook is the doorbell: it says something changed, possibly twice or late; what is true is read from the provider's record."
-}
--->
+![A doorbell labeled as the notice on the left and a record book labeled as the record on the right, with an arrow telling the person at the door to go and read the book.](assets/images/20-webhooks-and-events/20-doorbell-and-record.jpeg)
+**Figure 1:** *A webhook is the doorbell: it says something changed, possibly twice or late; what is true is read from the provider's record.*
 
 ## The Two Delivery Contracts, Term by Term
 
@@ -84,19 +73,8 @@ The other consequence of retries is the duplicate, and both providers say plainl
 
 The last term is what you can do once automatic retries are not enough, and it is where the two contracts part. Stripe pairs its short push window with a longer pull window. The API reference says “You can access events through the Retrieve Event API for 30 days”, and Stripe's guide to managing webhook endpoints (n.d., accessed November 2026) shows how to list the events whose delivery has not succeeded and process them yourself, with a warning: “Stripe still considers manually processed events as undelivered and continues its automatic retry schedule.” Adyen has a longer push window and, for online payments, no pull path: version 72 of its Checkout API specification (accessed November 2026) has three read operations (payment links, session results, stored payment methods) and none that returns a payment by its PSP reference ([[payment-api-design]]). Recovery there runs through the queue, the Retry and Ignore buttons of the Customer Area (Adyen's back-office site), alerts sent “after 5 retry attempts” and “after 7 days of a webhook failing”, and reports.
 
-<!-- illustration-placeholder
-{
-  "id": "20-delivery-loop",
-  "status": "pending",
-  "asset": "assets/images/20-webhooks-and-events/20-delivery-loop.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on reading events back",
-  "visual_goal": "Show the one loop both delivery contracts are versions of: send, wait for a 2xx, retry with growing gaps, stop when the window closes.",
-  "prompt": "Create a structural message-flow diagram with two vertical lifelines. The left lifeline is a server box labeled \"Provider\"; the right lifeline is a server box labeled \"Your endpoint\". From top to bottom draw four horizontal arrows from left to right, each labeled \"Event\". The first arrow ends in a red cross at the right lifeline, labeled \"No answer\". The second arrow, a little lower, also ends in a red cross. The gap between the second and third arrows is clearly larger than the gap between the first and second, with a small clock icon labeled \"Wait longer\" in the gap. The third arrow reaches the right lifeline and a green return arrow labeled \"2xx\" goes back to the left. At the bottom of the left lifeline draw an orange horizontal bar across it labeled \"Window closes\", with a fourth, faded arrow below it that stops before reaching the right side. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Sequence diagram of a provider sending the same event to an endpoint several times with growing waits, getting a 2xx on the third try, and a bar marking the point after which it would have stopped trying.",
-  "caption": "Every delivery contract is this loop: the event is sent again, with growing waits, until a 2xx comes back or the retry window closes."
-}
--->
+![Sequence diagram of a provider sending the same event to an endpoint several times with growing waits, getting a 2xx on the third try, and a bar marking the point after which it would have stopped trying.](assets/images/20-webhooks-and-events/20-delivery-loop.jpeg)
+**Figure 2:** *Every delivery contract is this loop: the event is sent again, with growing waits, until a 2xx comes back or the retry window closes.*
 
 ## Proving Who Sent It: Signatures and Replay Protection
 
@@ -153,19 +131,8 @@ Order is one case of a wider rule: **an event is confirmed against the provider'
 
 All of that handles the events that arrive. For the ones that do not, a **sweep** is needed: a job that takes every payment pending longer than a set time and resolves it from the provider's record. On Stripe it reads the object. On Adyen it waits for the report and raises whatever the report does not explain. Until the sweep has an answer, the payment is shown as *unknown*, to staff and to other systems, and never as failed. The receiver needs this because the one thing an event stream cannot tell you is that an event is missing.
 
-<!-- illustration-placeholder
-{
-  "id": "20-receiver-pipeline",
-  "status": "pending",
-  "asset": "assets/images/20-webhooks-and-events/20-receiver-pipeline.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on the sweep",
-  "visual_goal": "Show the receiver as a pipeline in which the acknowledgement comes before processing, with a sweep loop covering events that never arrive.",
-  "prompt": "Create a structural component diagram that reads left to right. At the far left, a cloud-like server labeled \"Provider\" sends a blue arrow labeled \"Event\" into a row of five connected boxes. Box one shows a key icon and is labeled \"Verify\". Box two shows a database cylinder and is labeled \"Store\". Box three shows a return arrow and is labeled \"Reply 2xx\"; from it a green arrow curves back up to the provider. A vertical dashed line after box three separates fast work from later work. Box four shows a gear and is labeled \"Process\". Box five shows a magnifying glass over a book and is labeled \"Confirm\"; from it a teal arrow labeled \"Read record\" goes up to the provider. Below the row, a circular orange arrow labeled \"Sweep\" loops from a small list icon labeled \"Pending\" up to the \"Confirm\" box. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Pipeline diagram of a webhook receiver: verify, store, reply with a 2xx, then process and confirm against the provider's record, with a sweep loop over pending payments feeding the confirm step.",
-  "caption": "The receiver verifies, stores and acknowledges before it processes; confirmation reads the provider's record, and a sweep covers the events that never arrive."
-}
--->
+![Pipeline diagram of a webhook receiver: verify, store, reply with a 2xx, then process and confirm against the provider's record, with a sweep loop over pending payments feeding the confirm step.](assets/images/20-webhooks-and-events/20-receiver-pipeline.jpeg)
+**Figure 3:** *The receiver verifies, stores and acknowledges before it processes; confirmation reads the provider's record, and a sweep covers the events that never arrive.*
 
 ## Stripe and Adyen: Where They Differ
 
@@ -201,19 +168,8 @@ Nine hours was inside both windows. The failure that loses events for good is an
 | 3 to 30 days | Early events are no longer retried; list them from the Events API, run them through the same handler, then read each pending object | Still in the queue; expect the burst; check against the settlement reports |
 | Longer than 30 days | Full event payloads are gone; read the objects and reconcile against reports | Not documented; assume the events are lost and rebuild from reports |
 
-<!-- illustration-placeholder
-{
-  "id": "20-outage-against-windows",
-  "status": "pending",
-  "asset": "assets/images/20-webhooks-and-events/20-outage-against-windows.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the outage recovery table",
-  "visual_goal": "Lay one outage against the two providers' windows so the reader sees which events are pushed again, which must be pulled and which arrive as a burst.",
-  "prompt": "Create a conceptual timeline comparison with two horizontal lanes sharing one time axis marked at day 0, day 3 and day 30. The top lane is labeled \"Provider A\": a short blue bar from day 0 to day 3 labeled \"Retries\", followed by a longer, lighter teal bar from day 0 to day 30 drawn beneath it labeled \"Read back\". The bottom lane is labeled \"Provider B\": one long orange bar from day 0 to day 30 labeled \"Queue\", ending in a cluster of small envelope icons bunched together labeled \"Burst\". Across both lanes, a gray shaded vertical band starts at day 0 and ends between day 3 and day 30, labeled \"Outage\". In the top lane, the part of the outage band beyond day 3 has a small hand-pulling icon labeled \"You pull\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two timelines against one outage: Provider A with a 3-day retry bar and a 30-day read-back bar, Provider B with a single 30-day queue bar ending in a burst of messages.",
-  "caption": "One outage, two contracts: Provider A (Stripe) retries for 3 days and lets you read events back for 30; Provider B (Adyen) queues for up to 30 days and delivers the backlog as a burst."
-}
--->
+![Two timelines against one outage: Provider A with a 3-day retry bar and a 30-day read-back bar, Provider B with a single 30-day queue bar and a burst of messages when the endpoint comes back.](assets/images/20-webhooks-and-events/20-outage-against-windows.jpeg)
+**Figure 4:** *One outage, two contracts: Provider A (Stripe) retries for 3 days and lets you read events back for 30; Provider B (Adyen) queues for up to 30 days and delivers the backlog as a burst.*
 
 Once the endpoint is back, recovery itself can fail in two ways. The first is the burst. Adyen's troubleshooting page lists the status 429 with the note that it “can happen after you fix a failing endpoint, as the queued webhooks are sent in a short timeframe”. Stripe gives the same warning for ordinary peaks: “Any large spike in webhook deliveries (for example, during the beginning of the month when all subscriptions renew) might overwhelm your endpoint hosts.” The second is the poison message: one payload that makes your handler return an error every time, while at Adyen the endpoint's other events wait in its queue. For a 422 the page gives the cure: “We recommend acknowledging receipt with `[200 OK]` first, and performing business logic separately.”
 

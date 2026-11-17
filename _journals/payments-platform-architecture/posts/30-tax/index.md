@@ -65,35 +65,13 @@ For a platform, though, the law itself can change who the seller is. A **deemed 
 
 Stripe Tax calculates wherever Stripe already fixes an amount: in Checkout (Stripe's hosted payment page), on a subscription's invoice at finalization, and through an API for custom flows, including "when processing payments off-Stripe" (Stripe's page on its standalone Tax APIs, n.d., accessed November 2026). A calculation is a quote; a tax transaction records that the sale happened, and reports and filing read transactions. When an input is unusable, Stripe stops and does not guess. If a customer's address cannot be resolved, the invoice's tax status becomes `requires_location_inputs`, and then "Stripe can't calculate the taxes, can't finalize the invoice, and can't collect the payment" (Stripe's page on collecting taxes for recurring payments, n.d., accessed November 2026). A missing tax input is thus a billing failure: the renewal is not charged. The figure below places the calculation among the four steps.
 
-<!-- illustration-placeholder
-{
-  "id": "30-four-step-cycle",
-  "status": "pending",
-  "asset": "assets/images/30-tax/30-four-step-cycle.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that says where Stripe Tax calculates",
-  "visual_goal": "Show tax compliance as a cycle of four steps in which the provider performs the calculation and the seller holds the other three.",
-  "prompt": "Structural cycle diagram with four round stations arranged clockwise on a ring. Top station: a map with a magnifying glass, labeled \"Know where\". Right station: a form with a stamp, labeled \"Register\". Bottom station: a calculator next to an invoice, labeled \"Calculate\". Left station: an envelope going to a government building, labeled \"File and pay\". Blue arrows run clockwise between the stations, each named: \"thresholds\" from Know where to Register, \"registrations\" from Register to Calculate, \"tax collected\" from Calculate to File and pay, \"sales totals\" from File and pay back to Know where. A person at a desk tagged \"Seller\" stands outside the ring with thin teal lines to the top, right and left stations. A generic office building tagged \"Provider\" stands below the ring with one thick orange line to the bottom station only. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A ring of four steps: know where, register, calculate, file and pay. A seller is linked to three of them and a provider to the calculation only.",
-  "caption": "Calculating and collecting is one of four steps; the provider performs it, and knowing where tax is due, registering and filing stay in the seller's hands."
-}
--->
+![A ring of four steps: know where, register, calculate, file and pay. A seller is linked to three of them and a provider to the calculation only.](assets/images/30-tax/30-four-step-cycle.jpeg)
+**Figure 1:** *Calculating and collecting is one of four steps; the provider performs it, and knowing where tax is due, registering and filing stay in the seller's hands.*
 
 A missing registration, by contrast, stops nothing. "Stripe only calculates tax in jurisdictions where you have an active tax registration. Without a registration in the customer's location, the calculation returns zero tax" (standalone Tax APIs page). That is the Leipzig invoice. The reason travels in a separate field: "The API returns the reason for a tax result in the taxability_reason field", with values such as `reverse_charge`, `customer_exempt`, `zero_rated` and `not_collecting` (Stripe's page on zero tax amounts and reverse charges, n.d., accessed November 2026). Even the reason needs reading: the page calls `not_collecting` "ambiguous", because it covers both a missing registration and a product the seller marked non-taxable. So the three zeros of the opening differ in a field that an export of amounts drops, and two of them share a value.
 
-<!-- illustration-placeholder
-{
-  "id": "30-three-zeros",
-  "status": "pending",
-  "asset": "assets/images/30-tax/30-three-zeros.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on the zero result and its reason field",
-  "visual_goal": "Show three invoices that look the same, each with a zero tax line, and a different cause standing behind each one.",
-  "prompt": "Conceptual illustration with three identical paper invoices side by side in the foreground, each showing a few unlabeled gray lines and one highlighted line labeled \"Tax €0.00\". Behind each invoice a translucent tag rises like a shadow, connected to it by a thin dashed line. Behind the left invoice: a tag with two office buildings and an arrow between them, labeled \"Buyer accounts\", with a small green check mark. Behind the middle invoice: a tag with an empty form and a missing stamp, labeled \"Not registered\", with a small orange warning triangle. Behind the right invoice: a tag with a product box and a crossed-out percent sign, labeled \"Marked non-taxable\", with a small orange warning triangle. A person with a magnifying glass looks at the three invoices from the front and sees only the identical faces. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Three identical invoices each show tax of zero euros. Behind them stand three different causes: the buyer accounts for the tax, the seller is not registered, the product was marked non-taxable.",
-  "caption": "Three invoices with the same zero tax line and three different causes; only the reason stored with the amount tells them apart."
-}
--->
+![Three identical invoices each show tax of zero euros. Behind them stand three different causes: the buyer accounts for the tax, the seller is not registered, the product was marked non-taxable.](assets/images/30-tax/30-three-zeros.jpeg)
+**Figure 2:** *Three invoices with the same zero tax line and three different causes; only the reason stored with the amount tells them apart.*
 
 The reverse-charge zero has its own weakness: it rests on a tax number the customer typed. "Stripe Tax uses customer tax identification numbers to determine whether a transaction is B2B", business-to-business, and it "doesn't validate whether the provided tax identification number exists or is valid" (How Stripe Tax works). Stripe Billing does check EU VAT numbers against VIES, the European Commission's VAT number database, and reports a status such as `verified` or `unverified`. But the check does not gate the calculation: "Stripe Tax applies the reverse charge or zero rate according to applicable laws when the tax ID has the required number format, regardless of the government verification result", and "you're responsible for determining how to handle an `unverified` tax ID" (Stripe's page on customer tax IDs, n.d., accessed November 2026). By that description, a well-formed number that fails verification keeps producing a zero until the seller acts.
 
@@ -131,19 +109,8 @@ One provider has a calculator and the other has none on record, so a business on
 | Independent tax engine (for example Avalara AvaTax or Vertex O Series) | What you send | The engine's vendor | Several providers, an ERP, many jurisdictions or product categories | One more vendor and one more call in the checkout path |
 | Your own rate table | Everything in your system | You | One country and few rates, or sellers who set their own rate | You must notice every rule change yourself |
 
-<!-- illustration-placeholder
-{
-  "id": "30-partial-sight",
-  "status": "pending",
-  "asset": "assets/images/30-tax/30-partial-sight.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of four designs",
-  "visual_goal": "Show that a threshold monitor inside one provider sees only that provider's share of a seller's sales, while the threshold counts all of them.",
-  "prompt": "Structural diagram. Left: a small office building tagged \"Seller\". From it three horizontal streams of euro coins flow to the right, stacked one above the other: the top stream passes through a generic building labeled \"Provider A\", the middle stream passes through a generic building labeled \"Provider B\", the bottom stream passes through a paper invoice icon labeled \"Other invoices\". Above the top stream only, a monitor screen with a gauge is labeled \"Threshold monitor\" and a blue cone of light from it covers the top stream alone; the middle and bottom streams are in soft gray shade. Far right: the three streams pour into one tall glass container with a horizontal orange line across it labeled \"Threshold\"; the combined coins rise above the line, while a small ghost outline shows that the top stream alone would stay below it. A teal arrow labeled \"import\" curves from the two shaded streams up to the monitor. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A seller's sales flow in three streams through two providers and other invoices. A threshold monitor lights only the first stream, while all three together pass the threshold.",
-  "caption": "A monitor built into Provider A (Stripe, in this chapter) counts only the sales Provider A processes, while a registration threshold counts all of the seller's sales; importing the rest is one of the two fixes."
-}
--->
+![A seller's sales flow in three streams through two providers and other invoices. A threshold monitor lights only the first stream, while all three together pass the threshold.](assets/images/30-tax/30-partial-sight.jpeg)
+**Figure 3:** *A monitor built into Provider A (Stripe, in this chapter) counts only the sales Provider A processes, while a registration threshold counts all of the seller's sales; importing the rest is one of the two fixes.*
 
 The rule I use: built-in tax while one provider carries all your taxable sales. From the day a second channel exists, either feed its sales into the first provider's tax product or move the calculation to an independent engine. These are the only two fixes for partial sight: bring the unseen sales to the calculator, or take the calculator out of the provider. I keep a rate table only where sellers set their own rates in one country, which is the case of a studio selling classes. Merchant of record is a different decision, because it changes who the seller is and takes the choice away: Stripe's Managed Payments lists "Third-party tax integrations" among the integrations it does not support (Stripe documentation, n.d., accessed November 2026).
 

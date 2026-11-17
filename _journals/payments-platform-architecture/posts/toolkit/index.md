@@ -57,19 +57,8 @@ The chapters mostly teach these records as a Larkfield section and a list of que
 
 Most changes touch several cards, and the cards meet at two of them. The payment state card says what you believe about a payment. The reconciliation card says how that belief is checked against the provider's report.
 
-<!-- illustration-placeholder
-{
-  "id": "toolkit-cards-meet-at-two",
-  "status": "pending",
-  "asset": "assets/images/toolkit/toolkit-cards-meet-at-two.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that says the cards meet at the payment state card and the reconciliation card",
-  "visual_goal": "Show sixteen record cards as one connected set in which two central cards, the payment state card and the reconciliation card, are the ones every other card points to.",
-  "prompt": "Structural diagram on a light background. Center: two large document cards side by side. The left one is blue and labeled \"Payment state\"; it shows a small row of five connected dots. The right one is green and labeled \"Reconciliation\"; it shows a small report sheet with a check mark. A thick double arrow between them is labeled \"checked against\". Around the two central cards, four loose groups of smaller unlabeled cards, each group in one accent color with one short group label above it. Top left group, teal, three small cards, labeled \"Calls and events\", with an arrow labeled \"moves a state\" pointing to the blue card. Bottom left group, orange, three small cards, labeled \"Backward flows\", with an arrow labeled \"child record\" pointing to the blue card. Top right group, teal, four small cards, labeled \"Balances and payouts\", with an arrow labeled \"report line\" pointing to the green card. Bottom right group, orange, three small cards, labeled \"Providers\", with one arrow to each central card, both labeled \"per provider\". Above everything, one small gray card labeled \"Decision record\" with thin dashed arrows fanning down to the four groups, labeled once \"changes a row\". Every card, large or small, has three tiny icons in its footer: a document, a person and a calendar. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two central cards, Payment state and Reconciliation, joined by an arrow labeled checked against; four groups of smaller cards point to them, and a Decision record card above points to all groups. Every card carries a document, a person and a calendar icon.",
-  "caption": "The sixteen cards meet at two: the payment state card records what you believe about a payment, and the reconciliation card checks that belief against the provider's report. A decision record changes a row on one of the others, and every card names a record, an owner and a date."
-}
--->
+![Two central cards, Payment state and Reconciliation, joined by an arrow labeled checked against; two groups of smaller cards point to them, and a Decision record card above points to both groups. Every card carries a document, a person and a calendar icon.](assets/images/toolkit/toolkit-cards-meet-at-two.jpeg)
+**Figure 1:** *The sixteen cards meet at two: the payment state card records what you believe about a payment, and the reconciliation card checks that belief against the provider's report. A decision record changes a row on one of the others, and every card names a record, an owner and a date.*
 
 In plain words: a change to what moves a payment into a state, or to which report line proves it, changes those two cards whatever card it started on. The idempotency key card and the webhook contract move states, the funds-flow template and the platform liability card say whose balance a report line belongs to, and a decision record (Tool 16) names the cards it changes.
 
@@ -187,7 +176,7 @@ The switch is a failover and not a migration. It would move Mila's €120.00 pas
 | **What can take it back** | A refund, a chargeback, a payout return or a negative balance: who is debited, and after how long |
 | **Record that is the truth** | The report line or entry that shows the amount |
 
-**When and who.** Fill one template per charge type and provider before the first seller is paid. Fill it again when a split, a fee or a payout schedule changes.
+**When and who.** Fill one template per charge type and provider before the first seller is paid. Fill it again when a split, a fee or a payout schedule changes. The owner of the ledger owns the template.
 
 **Larkfield example** (fictional; Mila's €120.00 pass at Studio Noord, on Adyen, bought on Tuesday 9 March 2027):
 

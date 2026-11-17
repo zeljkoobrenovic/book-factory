@@ -56,19 +56,8 @@ A **refund**, by contrast, sends money, because the promise has already been kep
 
 A **dispute** is the route the merchant does not start. Visa defines it as "A Transaction that an Issuer returns to an Acquirer", the acquirer being the bank or provider that collects card payments for the merchant ([[journey-of-a-payment]]). Chargeback is the older, still common name for it and for the money taken back. The cardholder starts it by complaining to the issuer, and the issuer rules. Stripe's dispute documentation (n.d., accessed November 2026) says the outcome "is at the sole discretion of the account owner’s bank". The figure below places all three routes on one payment's timeline.
 
-<!-- illustration-placeholder
-{
-  "id": "04-three-routes-timeline",
-  "status": "pending",
-  "asset": "assets/images/04-refunds-reversals-and-disputes/04-three-routes-timeline.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that defines a dispute, at the end of the section Three Routes Back, Three Different Owners",
-  "visual_goal": "Show that the three backward routes start from different points on one payment's timeline and that the dispute reaches back from long after payout.",
-  "prompt": "A horizontal timeline for one card payment drawn left to right across the middle of the image, with five evenly marked points labeled 'Approved', 'Captured', 'Settled', 'Paid out' and, far to the right after a visibly long gap, 'Day 120'. Above the timeline, three curved arrows point backward (right to left) toward a small cardholder figure with a bank card at the far left. The first arrow, in teal, starts between 'Approved' and 'Captured' and is labeled 'Cancel'; it is thin and carries no coins. The second arrow, in blue, starts just after 'Captured' and is labeled 'Refund'; it carries a small stack of euro coins and starts from a merchant shop icon placed below the timeline. The third arrow, in orange, starts at the far right near 'Day 120', is the longest, is labeled 'Dispute', carries euro coins, and starts from a generic bank building icon placed above the right end of the timeline. A small euro sign with the amount '€120' sits beside the cardholder. Below the timeline a thin bracket spans from 'Captured' to 'Day 120' with the label 'Still open'. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Timeline of one card payment with three backward arrows: a cancel before capture, a refund after capture and a dispute reaching back from day 120.",
-  "caption": "One payment, three routes back: a cancel before capture, a refund after it, and a dispute that can start as late as day 120."
-}
--->
+![Timeline of one card payment with three backward arrows: a cancel before capture, a refund after capture and a dispute reaching back from day 120.](assets/images/04-refunds-reversals-and-disputes/04-three-routes-timeline.jpeg)
+**Figure 1:** *One payment, three routes back: a cancel before capture, a refund after it, and a dispute that can start as late as day 120.*
 
 ## A Refund Is a Second Payment, and It Can Fail
 
@@ -105,19 +94,8 @@ Within that time the issuer needs a ground, called a **reason code**, and the gr
 
 After the dispute, the steps depend on the family. In Visa's consumer and processing disputes the acquirer answers with a Dispute Response, long known as the **representment** because the merchant's side presents the transaction again with evidence; if the issuer rejects it, the issuer must open pre-arbitration, a last exchange between the two banks before the network is asked to rule. In fraud and authorization disputes the merchant's answer is itself the pre-arbitration attempt (Visa's Tables 11-2 and 11-3). Adyen (n.d., accessed November 2026) calls the two flows Collaboration and Allocation, and lists Mastercard's as notification of chargeback, chargeback, information supplied, chargeback reversed, pre-arbitration, second chargeback and scheme arbitration. The older first step, a retrieval request for information, is one that Stripe says "Mastercard and Visa no longer use". The trade name "Visa Claims Resolution" does not appear in the current rule text.
 
-<!-- illustration-placeholder
-{
-  "id": "04-dispute-lifecycle-flow",
-  "status": "pending",
-  "asset": "assets/images/04-refunds-reversals-and-disputes/04-dispute-lifecycle-flow.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that describes the stages of a dispute, in the section How a Card Dispute Runs",
-  "visual_goal": "Show the path of a card dispute between the parties and that the merchant appears on it once, as the sender of a single response.",
-  "prompt": "A left-to-right flow diagram with five generic actors drawn as simple icons in a row: a cardholder figure at the far left, then a bank building labeled 'Issuer', then a hub of connected nodes labeled 'Network', then an office block labeled 'Provider', then a small studio shopfront labeled 'Merchant' at the far right. Arrow 1, orange, runs from the cardholder to the Issuer and is labeled 'Complaint'. Arrow 2, orange, runs from the Issuer through the Network and the Provider to the Merchant along the top and is labeled 'Dispute'; small euro coins travel with it from right to left underneath, showing money being taken back. Arrow 3, blue, runs from the Merchant back along the bottom through the Provider and the Network to the Issuer and is labeled 'One response'; it carries a single document icon. A green tick and an orange cross sit beside the Issuer under the label 'Ruling'. From the Issuer a thin dashed arrow rises to a small judge's gavel icon placed above the Network, labeled 'Arbitration'. A small clock icon sits beside the Merchant. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Flow of a card dispute from the cardholder's complaint through issuer, network and provider to the merchant, with one response going back and the issuer ruling.",
-  "caption": "A dispute travels from the cardholder's bank to the merchant, the merchant sends one response back, and the issuer rules; the network decides only in arbitration."
-}
--->
+![Flow of a card dispute from the cardholder's complaint through issuer, network and provider to the merchant, with one response going back and the issuer ruling.](assets/images/04-refunds-reversals-and-disputes/04-dispute-lifecycle-flow.jpeg)
+**Figure 2:** *A dispute travels from the cardholder's bank to the merchant, the merchant sends one response back, and the issuer rules; the network decides only in arbitration.*
 
 The merchant's part in those stages is small. Stripe's page on responding (n.d., accessed November 2026) says "You’ve only one opportunity to submit your response", and its page on how disputes work gives the time to do so as "usually 7-21 days, depending on the card network"; its Dispute object carries the exact deadline as `evidence_details.due_by`. Adyen publishes its deadlines: 18 days for a Visa chargeback (9 for payments processed locally in the United States and Canada, since 21 July 2025), and for Mastercard "You must provide your defense documents within **40 days**. There is no opportunity later in the process to provide information or to update information you provided." Later stages are open only to eligible businesses on both providers: Stripe requires that appeals are enabled, Adyen additional configuration and its approval.
 
@@ -177,19 +155,8 @@ The second decision is how to answer a claim, and there are four answers. They d
 
 My rule is to decide by three things: the amount against the fee, whether the evidence already exists, and how far the account is from a monitoring threshold. I would make that decision once, as policy with amounts in it, and not case by case under a deadline. Providers reason the same way in public: Stripe's advice on early fraud warnings is that "It’s likely not worthwhile to refund EFWs on charges more than 35 percent higher than your dispute fee." That is Stripe's analysis, not a general law, and my rule fails near a threshold, where staying out of the count is worth more than any single payment.
 
-<!-- illustration-placeholder
-{
-  "id": "04-paid-is-not-final",
-  "status": "pending",
-  "asset": "assets/images/04-refunds-reversals-and-disputes/04-paid-is-not-final.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that gives the author's rule, at the end of the section Two Design Decisions",
-  "visual_goal": "Make memorable that a paid-out payment is still attached to the cardholder's bank until the dispute window closes.",
-  "prompt": "A conceptual scene on a long horizontal calendar strip that runs across the bottom of the image, with a marker near the left end labeled 'Day 2' and a marker at the far right labeled 'Day 120'. At the left, above 'Day 2', a studio owner at a front desk holds a small stack of euro banknotes, with the label 'Paid out' beside the stack. A long, thin orange string is tied around the stack of banknotes and stretches all the way to the right side of the image, where its other end is held loosely in the hand of a generic bank building with a small door. The string sags gently over the calendar strip. Above the string, in the middle, a small padlock drawn open with the label 'Still open'. At the far right, just past 'Day 120', a small pair of scissors cuts the string, with the label 'Final'. A single euro sign with '€120' floats above the banknotes. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A stack of euro notes paid out on day 2 is tied by a long string to a bank, and the string is cut only after day 120.",
-  "caption": "Paid out on day 2 is a position on the calendar: the €120 stays tied to the cardholder's bank until day 120 at the earliest."
-}
--->
+![A stack of euro notes paid out on day 2 is tied by a long string to a bank, and the string is cut only after day 120.](assets/images/04-refunds-reversals-and-disputes/04-paid-is-not-final.jpeg)
+**Figure 3:** *Paid out on day 2 is a position on the calendar: the €120 stays tied to the cardholder's bank until day 120 at the earliest.*
 
 ## Stripe and Adyen: Where They Differ
 
@@ -205,19 +172,8 @@ On seven aspects of a backward flow the two providers document different shapes,
 | Capture state unknown | No separate request; an early refund may be processed as a reversal | A reversal request; cancel by merchant reference for 24 hours | Adyen names the unknown-outcome case in its API |
 | After an apparently final state | A "late win": `lost` can become `won` | A second chargeback after a reversed one | Neither provider's last event is safely the last |
 
-<!-- illustration-placeholder
-{
-  "id": "04-dispute-balance-two-providers",
-  "status": "pending",
-  "asset": "assets/images/04-refunds-reversals-and-disputes/04-dispute-balance-two-providers.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the comparison table in the section Stripe and Adyen: Where They Differ",
-  "visual_goal": "Show that the same dispute produces two money movements on one provider and three or four on the other, one of them provisional.",
-  "prompt": "Two horizontal step charts stacked one above the other on a shared time axis that runs left to right, each showing a merchant balance as a thick line. The upper chart is labeled 'Provider A' at its left edge: the line starts level, steps down once near the left under a small label 'Debit', stays low for a long stretch, then steps back up once near the right under a small label 'Won'. The lower chart is labeled 'Provider B' at its left edge: the line starts level, steps down under a small label 'Debit', steps back up soon after as a dashed segment under the label 'Provisional', then splits into two possible endings near the right: a solid green continuation that stays up, and an orange branch that steps down again under the label 'Second debit'. A small euro coin icon sits at each step. Along the shared time axis at the bottom, three tick marks without numbers. The upper line is blue, the lower line is teal, the dashed segment is light teal, the final down-step is orange. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two balance lines for the same dispute: Provider A steps down once and up once; Provider B steps down, up provisionally, and may step down again.",
-  "caption": "One contested dispute as each provider documents it: Provider A (Stripe) debits once and returns the amount only on a win; Provider B (Adyen) can return it provisionally and take it again."
-}
--->
+![Two balance lines for the same dispute: Provider A steps down once and up once; Provider B steps down, up provisionally, and may step down again.](assets/images/04-refunds-reversals-and-disputes/04-dispute-balance-two-providers.jpeg)
+**Figure 4:** *One contested dispute as each provider documents it: Provider A (Stripe) debits once and returns the amount only on a win; Provider B (Adyen) can return it provisionally and take it again.*
 
 The practical consequence differs by provider. On Stripe, mirror the Dispute object, store its status verbatim, and let a `lost` record reopen, because a late win is documented. On Adyen, build the dispute from its events, keyed by the dispute's reference and the original payment's, and book a `CHARGEBACK_REVERSED` credit as provisional until the defense is accepted or the issuer's time runs out. On both, read the deadline from the provider, and for Adyen take the fee from your contract.
 

@@ -54,19 +54,8 @@ Then the **markup**: what the acquirer or provider charges for its own service. 
 
 Once the three are defined, the last question is how they are collected, and none is invoiced by the party that earns it. They travel on the path the money already takes ([[clearing-and-settlement]]). Mastercard's filing says "We administer the collection and remittance of interchange fees through the settlement process", so the issuer's share is taken as the banks settle, and the provider then deducts or bills the total. As a matter of industry practice, the interchange a payment carries is decided by its clearing record, not by its approval, so a fee computed at authorization can still change. Adyen's documentation (n.d., accessed November 2026) gives a case: capturing after an authorization has expired risks "Increased interchange fees".
 
-<!-- illustration-placeholder
-{
-  "id": "05-three-payments-inside-one-fee",
-  "status": "pending",
-  "asset": "assets/images/05-payment-economics/05-three-payments-inside-one-fee.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that explains how the three parts of the fee are collected through settlement",
-  "visual_goal": "Show one card payment travelling from the customer's bank to the merchant, with three small payments splitting off on the way: interchange to the customer's bank, scheme fees to the card network and a markup to the provider.",
-  "prompt": "Create a funds-flow diagram reading left to right. Far left: a bank building labeled \"Customer's bank\". Center top: a network hub of connected nodes labeled \"Card network\". Center right: a generic payment provider building labeled \"Provider\". Far right: a small yoga studio shopfront labeled \"Merchant\". A thick blue arrow labeled \"Payment\" runs from the customer's bank through the provider to the merchant, getting slightly thinner after each split. Three thin orange arrows split off the thick arrow: one curving back to the customer's bank labeled \"Interchange\", one rising to the card network labeled \"Scheme fees\", and one dropping into the provider labeled \"Markup\". Each thin arrow ends in a small coin with a euro sign. No amounts. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Diagram of a card payment flowing from the customer's bank through the provider to the merchant, with three small payments splitting off: interchange, scheme fees and markup.",
-  "caption": "One card fee is three payments: interchange to the customer's bank, scheme fees to the card network and a markup to the provider."
-}
--->
+![Diagram of a card payment flowing to the merchant, with three small payments splitting off: interchange to the customer's bank, scheme fees to the card network and a markup to the provider.](assets/images/05-payment-economics/05-three-payments-inside-one-fee.jpeg)
+**Figure 1:** *One card fee is three payments: interchange to the customer's bank, scheme fees to the card network and a markup to the provider.*
 
 ## What the Law Caps, and What It Leaves Alone
 
@@ -105,19 +94,8 @@ Taken together, the two definitions point to differences that go beyond presenta
 | How easy is the cost to forecast? | Easy: volume times rate | Harder: it needs the card mix |
 | What must the provider compute per transaction? | The total | Each network cost, itemized |
 
-<!-- illustration-placeholder
-{
-  "id": "05-closed-box-and-open-box",
-  "status": "pending",
-  "asset": "assets/images/05-payment-economics/05-closed-box-and-open-box.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table that compares blended and interchange-plus-plus pricing",
-  "visual_goal": "Make the difference between a blended price and a pass-through price memorable: the same contents in a closed box with one price tag and in an open box with three labeled parts.",
-  "prompt": "Create a two-panel conceptual illustration, split by a thin vertical line. Left panel, labeled \"Provider A\" at the top: a closed opaque cardboard box on a counter with a single large price tag hanging from it labeled \"One rate\". A studio owner looks at the box with a puzzled expression. Right panel, labeled \"Provider B\" at the top: the same box but open and transparent, showing three separate blocks inside, a large blue block labeled \"Interchange\", a small teal block labeled \"Scheme fees\" and a medium orange block labeled \"Markup\", each with its own small blank tag. A finance professional with a clipboard checks the three blocks. Both boxes are the same size. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two boxes of the same size: a closed one with a single price tag and an open one showing three labeled parts, interchange, scheme fees and markup.",
-  "caption": "A blended price (Provider A, priced like Stripe's published default) shows one rate; a pass-through price (Provider B, priced like Adyen's published default) shows the three parts inside it."
-}
--->
+![Two boxes of the same size: a closed one with a single price tag and an open one showing three labeled parts, interchange, scheme fees and markup.](assets/images/05-payment-economics/05-closed-box-and-open-box.jpeg)
+**Figure 2:** *A blended price (Provider A, priced like Stripe's published default) shows one rate; a pass-through price (Provider B, priced like Adyen's published default) shows the three parts inside it.*
 
 One row of that table matters more than the others, because it connects pricing to engineering: who gains when a network cost falls. Under a blended price the merchant's bill does not change, so the saving stays with the provider. Under pass-through the bill falls and the markup is what it was. The same cost-reducing feature is therefore margin for a blended provider and, for a pass-through provider, something to offer the merchant, perhaps at a price. This is reasoning from the definitions, not a documented fact about either company.
 
@@ -196,19 +174,8 @@ On Adyen, to begin with, Larkfield is on negotiated pass-through pricing *(assum
 | Larkfield (the platform) | Its fee less the provider cost | €1.92 | €2.53 − €0.61 |
 | Studio Noord (the merchant) | The sale | €117.47 | €120.00 − €2.53 |
 
-<!-- illustration-placeholder
-{
-  "id": "05-fee-stack-on-120-euros",
-  "status": "pending",
-  "asset": "assets/images/05-payment-economics/05-fee-stack-on-120-euros.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table that splits the fee on Mila's 120 euro payment",
-  "visual_goal": "Show how one 120 euro payment is divided among five parties, and how small the bank's, the network's and the provider's parts are next to the studio's and the platform's.",
-  "prompt": "Create a funds-split diagram. At the top center, a phone showing a payment with a large label \"€120.00\". Below it, one long horizontal bar. Most of the bar is a wide green segment; at its right end a magnifying glass enlarges a thin slice of the bar into four smaller segments shown in a zoomed strip. Five arrows lead down from the segments to five figures in a row. From the wide green segment an arrow to a yoga studio shopfront labeled \"Studio €117.47\". From the zoomed strip: a blue segment with an arrow to an office building labeled \"Platform €1.92\"; an orange segment with an arrow to a payment provider building labeled \"Provider €0.31\"; a teal segment with an arrow to a bank building labeled \"Customer's bank €0.24\"; a small grey segment with an arrow to a network hub labeled \"Card network €0.06\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A 120 euro payment shown as a bar divided into 117.47 for the studio, 1.92 for the platform, 0.31 for the provider, 0.24 for the customer's bank and 0.06 for the card network.",
-  "caption": "The illustrative split of Mila's €120.00: €117.47 to the studio, €1.92 to the platform, €0.31 to the provider, €0.24 to the customer's bank and €0.06 to the card network."
-}
--->
+![A 120 euro payment shown as a bar divided into 117.47 for the studio, 1.92 for the platform, 0.31 for the provider, 0.24 for the customer's bank and 0.06 for the card network.](assets/images/05-payment-economics/05-fee-stack-on-120-euros.jpeg)
+**Figure 3:** *The illustrative split of Mila's €120.00: €117.47 to the studio, €1.92 to the platform, €0.31 to the provider, €0.24 to the customer's bank and €0.06 to the card network.*
 
 Had Studio Noord been on Stripe, by contrast, the statement would show one line. At Larkfield's negotiated blended rate for standard European cards, 0.6% + €0.15 *(assumption)*, the fee is €0.87 and Larkfield keeps €1.66. At the public list price of 1.5% + €0.25 it would be €2.05, leaving €0.48. Either way the same €0.24 goes to Mila's bank and the same assumed €0.06 to Visa. They are inside the fee and not shown.
 
@@ -220,19 +187,8 @@ The one payment in the ledger that came back, unlike Mila's, shows the backward 
 
 Lay the timeline of the last four chapters and this chapter's fee stack on one line, and they are the same picture. The issuer makes the first promise and is paid interchange. The network runs the settlement between the banks and is paid scheme fees. The acquirer or provider pays the merchant out and is paid the markup. Each party that says yes on the way forward is paid for it, and each backward flow adds a new cost for whoever was left holding the promise, usually the merchant. On 2 February his bank, Mastercard, Adyen and Larkfield were each paid for a yes. None of those yeses could stop the €120 and a €15 fee being taken back on 24 February, because the right to dispute belongs to the cardholder and outlasts them all. A provider's pricing model decides how much of this picture you are shown.
 
-<!-- illustration-placeholder
-{
-  "id": "05-promises-and-fees-on-one-line",
-  "status": "pending",
-  "asset": "assets/images/05-payment-economics/05-promises-and-fees-on-one-line.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the first paragraph of What to Take Away",
-  "visual_goal": "Show that the timeline of promises and the fee stack are one picture: above the line, who makes each promise; below the line, who is paid for it; at the end, the dispute arrow that can take the money back.",
-  "prompt": "Create a horizontal timeline illustration. A single long line runs left to right with three markers on it labeled \"Approval\", \"Settlement\" and \"Payout\", followed by a long shaded stretch labeled \"Dispute window\". Above the line, over each marker, a building: a bank building over the first marker, a network hub over the second, a payment provider building over the third. Below the line, under each marker, a coin with a euro sign and a short label: \"Interchange\" under the first, \"Scheme fees\" under the second, \"Markup\" under the third. At the far right, a merchant shopfront receives the payment; from the shaded stretch a curved orange arrow labeled \"Chargeback\" runs back from the merchant toward the left, with one extra small coin labeled \"Fee\" leaving the merchant. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A timeline with approval, settlement and payout markers, a party above each and the fee it earns below, followed by a dispute window with a chargeback arrow running back from the merchant.",
-  "caption": "Each party that makes a promise on the way forward is paid for it; a chargeback in the dispute window adds a cost for the merchant."
-}
--->
+![A timeline with approval, settlement and payout markers, a party above each and the fee it earns below, followed by a dispute window with a chargeback arrow running back from the merchant.](assets/images/05-payment-economics/05-promises-and-fees-on-one-line.jpeg)
+**Figure 4:** *Each party that makes a promise on the way forward is paid for it; a chargeback in the dispute window adds a cost for the merchant.*
 
 **Established.** The parts of that picture the field agrees on:
 

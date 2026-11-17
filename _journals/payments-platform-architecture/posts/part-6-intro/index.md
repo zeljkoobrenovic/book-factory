@@ -16,37 +16,15 @@ timetoread: 5 min read
 <br>
 On 1 October 2026 the renewal job at **Larkfield, the fictional studio-software platform this book follows**, hit its provider's rate limit, and 7,900 membership renewals slipped to the next day. The job marked them failed with no card charged, and an email job that could not tell a decline from a card never charged sent failure notices. On 1 November a provider call timed out, the job retried with a new idempotency key (the identifier meant to make a repeat harmless), and 1,840 members were charged twice. €71,300 was refunded, and 212 members disputed anyway. Every card payment in those two months did what it was asked. **The fault was in the thing that decides when to ask, and for which month.**
 
-<!-- illustration-placeholder
-{
-  "id": "part-6-late-then-twice",
-  "status": "pending",
-  "asset": "assets/images/part-6-intro/part-6-late-then-twice.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the opening paragraph",
-  "visual_goal": "Show two renewal faults, one late and one doubled, sitting above payments that all succeeded.",
-  "prompt": "Create a wide explainer illustration in two panels side by side. Left panel: a calendar page labeled \"1 Oct\" with a stack of small membership cards sliding along a dashed orange arrow to a second calendar page labeled \"2 Oct\"; an orange clock above the arrow; a bold tag labeled \"Late\". Right panel: a calendar page labeled \"1 Nov\" with one membership card and two identical charge slips beside it, each slip showing a euro sign; a bold orange tag labeled \"Twice\". Across the bottom of both panels, one row of small payment icons, each with a green check mark, labeled \"Payments OK\". Above both panels, a small blue gear with a clock face, joined by thin blue arrows to both calendar pages, labeled \"Renewal job\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two panels: on 1 October a stack of renewals slides to the next day, labeled Late; on 1 November one membership has two charge slips, labeled Twice; below both, a row of payments with green check marks.",
-  "caption": "Larkfield's two renewal incidents of 2026: 7,900 renewals a day late on 1 October and 1,840 members charged twice on 1 November, while every payment did what it was asked."
-}
--->
+![Two panels: on 1 October a stack of renewals slides to the next day, labeled Late; on 1 November one membership has two charge slips, labeled Twice; below both, a row of payments with green check marks.](assets/images/part-6-intro/part-6-late-then-twice.jpeg)
+**Figure 1:** *Larkfield's two renewal incidents of 2026: 7,900 renewals a day late on 1 October and 1,840 members charged twice on 1 November, while every payment did what it was asked.*
 
 In Parts I to V a customer starts each payment, and the questions are whether it was approved, recorded and safe. Part VI is about **payments nobody present starts**: a clock starts them, for a billing period, from a stored card. You know them as the subscription that renewed unnoticed.
 
 Something has to supply what the click supplied. The part's claim is that **revenue needs a second state machine above the payment**. It decides what is owed, for which period and when to ask, and it hands the payment engine an invoice: the record of one debt for one period. Its failures are failures of time: October's renewals were late, November's were taken twice. The third kind is quieter: a studio chain pays €1,890 on 1 February 2027 for a year of software, and a dashboard shows €1,890 of February revenue where the books carry €144.99. That is a charge counted **in the wrong period**.
 
-<!-- illustration-placeholder
-{
-  "id": "part-6-one-invoice-six-chapters",
-  "status": "pending",
-  "asset": "assets/images/part-6-intro/part-6-one-invoice-six-chapters.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that states the part's claim",
-  "visual_goal": "Show the part's shape: one invoice moving through six stations, started by a clock, with the payment as one step below it.",
-  "prompt": "Create a wide conceptual diagram. A horizontal path runs left to right through six round stations, alternating blue and teal, with the last in orange. The stations are labeled, in order, \"Schedule\", \"Count\", \"Collect\", \"Tax\", \"Recognize\", \"Seller\". One paper document with a few lines and a euro sign, labeled \"Invoice\", is drawn large above the middle of the path, and a thin solid blue arrow labeled \"one invoice\" runs along the whole path under it. Above the first station, a clock with a small arrow pointing down to it, labeled \"Clock\". Below the third station, a payment card icon joined to the station by a short solid green arrow labeled \"payment\". Below the fourth and fifth stations, a small map pin and a small calendar, without labels. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "One invoice travels a path of six stations labeled Schedule, Count, Collect, Tax, Recognize and Seller; a clock starts the path and a payment card sits below the Collect station.",
-  "caption": "The shape of Part VI: a clock starts the path, one invoice travels through six chapters, and the payment is a single step below it."
-}
--->
+![One invoice travels a path of six stations labeled Schedule, Count, Collect, Tax, Recognize and Seller; a clock starts the path and a payment card sits below the Collect station.](assets/images/part-6-intro/part-6-one-invoice-six-chapters.jpeg)
+**Figure 2:** *The shape of Part VI: a clock starts the path, one invoice travels through six chapters, and the payment is a single step below it.*
 
 The invoice also settles who can do the rest of the work: only a party that knows what is owed, for which period and by whom can collect the debt, tax it and count it as revenue. So before comparing providers' billing features, I ask one question: **where does the invoice live?** Where the provider holds none, your billing system or a third party's has to.
 

@@ -42,19 +42,8 @@ So she writes four questions on the whiteboard before any payment moves: **who s
 
 A card payment fails in one of three places. Stripe's documentation (n.d., accessed November 2026) says: "There are three reasons why a payment might fail": issuer declines, blocked payments and invalid API calls. The **issuer** is the bank that gave the customer the card and answers every authorization request. A **blocked payment** is one the provider stops itself before it reaches the card network (Visa, Mastercard or another network that carries the request to the issuer), as a risk block (its fraud screening judges the payment too risky; see [[payment-fraud-and-risk]]) or, as later sections show, to save a fee: "When Stripe blocks a payment, it doesn't obtain authorization from the card issuer." Only the first of the three is the bank's decision.
 
-<!-- illustration-placeholder
-{
-  "id": "09-three-places-a-payment-stops",
-  "status": "pending",
-  "asset": "assets/images/09-authorization-optimization/09-three-places-a-payment-stops.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that names the three places a payment can fail",
-  "visual_goal": "Show that a payment can stop at three points on its way to the bank and that only the last one is the bank's decision.",
-  "prompt": "Create a left-to-right flow diagram with four generic boxes in a row: a shop labeled \"Merchant\", a payment company building labeled \"Provider\", a hub labeled \"Card network\", and a bank building labeled \"Issuer\". One thick arrow labeled \"Request\" runs from the merchant through the provider and the network to the issuer. Three exit arrows drop downward out of the path: the first, just before the provider, ends in an orange tag labeled \"Invalid\"; the second, leaving the provider box, ends in an orange tag labeled \"Blocked\"; the third, leaving the issuer, ends in an orange tag labeled \"Declined\". A green arrow labeled \"Approved\" returns from the issuer to the merchant along the top. A dashed bracket under the first two exits is labeled \"Bank never asked\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Flow from merchant through provider and card network to issuer, with three exits labeled Invalid, Blocked and Declined.",
-  "caption": "A payment can stop in three places, and only the last, the issuer's decline, is the bank's decision."
-}
--->
+![Flow from merchant through provider and card network to issuer, with three exits labeled Invalid, Blocked and Declined.](assets/images/09-authorization-optimization/09-three-places-a-payment-stops.jpeg)
+**Figure 1:** *A payment can stop in three places, and only the last, the issuer's decline, is the bank's decision.*
 
 The issuer's decision is a model's judgement, made alone. Stripe's documentation says the issuer's "automated systems and models decide whether to authorize it. These tools analyze signals such as spending habits, account balance, and card data (expiration date, address information, and CVC)". The request reaches the bank as an ISO 8583 message, the standard format for card transaction messages, and Stripe's guide adds: "there are 128 fields in the ISO 8583 message, and each issuing bank can choose how to interpret and combine them". The same request can be approved by one bank and refused by another, which is what a provider can adapt to.
 
@@ -91,19 +80,8 @@ A second choice multiplies the readings: count per attempt or per purchase. Stri
 | Renewals paid in the end | 200,550 | 95.5% per renewal (deduplicated) |
 | All attempts | 243,600 | 82.3% per attempt (raw: 200,550 / 243,600) |
 
-<!-- illustration-placeholder
-{
-  "id": "09-three-readings-of-one-month",
-  "status": "pending",
-  "asset": "assets/images/09-authorization-optimization/09-three-readings-of-one-month.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table that computes three rates from one month of renewals",
-  "visual_goal": "Make memorable that one set of payments gives three different approval rates depending on the counting rule.",
-  "prompt": "Create a conceptual illustration: in the center, one large transparent jar filled with small card-shaped tokens, most green and some orange, on a plate labeled \"One month\". Three measuring gauges stand around the jar, each connected to it by a thin line. The left gauge reads \"82.3%\" with a tag labeled \"Per attempt\". The middle gauge reads \"91.0%\" with a tag labeled \"First attempt\". The right gauge reads \"95.5%\" with a tag labeled \"Per renewal\". A generic engineer at the right looks at the three dials, puzzled. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "One jar of payments measured by three gauges reading 82.3%, 91.0% and 95.5%.",
-  "caption": "The same month of card renewals reads 82.3%, 91.0% or 95.5%, depending on whether attempts, first attempts or renewals are counted."
-}
--->
+![One jar of payments measured by three gauges reading 82.3%, 91.0% and 95.5%.](assets/images/09-authorization-optimization/09-three-readings-of-one-month.jpeg)
+**Figure 2:** *The same month of card renewals reads 82.3%, 91.0% or 95.5%, depending on whether attempts, first attempts or renewals are counted.*
 
 The denominators also show what a block does to the numbers. A blocked payment, one the provider stops before the network because it expects a refusal or a penalty fee, leaves the authorization-rate denominator; Stripe's record of one reads `"type": "blocked"`, `"network_status": "not_sent_to_network"`. Take Stripe's example and block 1,000 more payments that would have been declined: the authorization rate becomes 93,000 / 97,000 = 95.9%, the payment success rate stays at 93%, and nobody has sold anything more. If 50 of those 1,000 would have been approved, 50 sales are lost and the authorization rate still rises. A block is not an issuer decline: it raises one rate and can only lower sales.
 
@@ -138,19 +116,8 @@ Adyen documents the same kinds of action under Uplift, launched on 9 January 202
 
 So one API call no longer equals one request to a bank. It can produce several network attempts, as when Adyen's updater retries and the result "appears as a single transaction". It can use another network than the merchant expected, as when Stripe decides to "reattempt a declined payment on an alternative card network". Or it can produce no attempt at all, as when Stripe's outcome reads `not_sent_to_network`. The merchant receives one result each time, so its count of attempts and the network's can differ.
 
-<!-- illustration-placeholder
-{
-  "id": "09-one-call-several-attempts",
-  "status": "pending",
-  "asset": "assets/images/09-authorization-optimization/09-one-call-several-attempts.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that says one API call can stand for several network attempts or none",
-  "visual_goal": "Show one request entering the provider, several attempts leaving it toward the bank, and one result coming back to the merchant.",
-  "prompt": "Create a sequence-style diagram with three vertical lanes headed by a shop labeled \"Merchant\", a payment company building labeled \"Provider\" and a bank building labeled \"Issuer\". From the merchant, one blue arrow labeled \"One call\" enters the provider lane, where a small gear is labeled \"Model\". From the provider, three arrows go to the issuer, stacked top to bottom: the first labeled \"Attempt 1\" returns as an orange arrow labeled \"Declined\"; the second labeled \"Reformatted\" returns as an orange arrow labeled \"Declined\"; the third labeled \"New credential\" returns as a green arrow labeled \"Approved\". From the provider back to the merchant runs one green arrow labeled \"One result\". A small counter beside the merchant shows \"1\"; a counter beside the issuer shows \"3\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "One call from the merchant becomes three attempts from the provider to the issuer and one result back.",
-  "caption": "One API call can stand for several network attempts: the merchant counts one request, the issuer may have seen more."
-}
--->
+![One call from the merchant becomes three attempts from the provider to the issuer and one result back.](assets/images/09-authorization-optimization/09-one-call-several-attempts.jpeg)
+**Figure 3:** *One API call can stand for several network attempts: the merchant counts one request, the issuer may have seen more.*
 
 Both companies say machine-learned models take these decisions, and each has published a different half of the picture. Stripe names the model: "Our previous approach, based on a gradient-boosted tree model (XGBoost), saved Stripe users billions of dollars in revenue... We transitioned to a TabTransformer-based deep neural network, which we call TabTransformer+", and "We can now train and deploy new versions of our Adaptive Acceptance model multiple times per week" (12 February 2025). The call's behavior can therefore change from week to week. Adyen describes the system around its models: a collection of models "optimized globally through Reinforcement Learning", within an "SLA for transaction processing: 1 second including acquirer communications which consumes around 600 ms" (listed among its platform numbers for 2023), where each transaction over the Black Friday weekend of 2024 "touched between 2 and 5 different AI endpoints" with "an allocated latency of 20 ms (median)" (17 January 2025).
 

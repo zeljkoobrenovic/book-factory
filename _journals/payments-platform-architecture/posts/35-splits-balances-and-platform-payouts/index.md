@@ -50,35 +50,13 @@ A **split** is the instruction that divides one customer payment among the selle
 
 Two kinds of movement carry this. A **transfer** moves money between two balances inside the provider; a **payout** moves it from a balance to a bank account outside ([[payouts-and-money-movement]]). Adyen's documentation (n.d., accessed November 2026) draws the line in the same words: an internal funds transfer "moves funds between balance accounts within your platform. For comparison: a payout is an *external* funds transfer". A split consists of transfers; each party is paid later, by a payout from its own balance.
 
-<!-- illustration-placeholder
-{
-  "id": "35-three-bookings",
-  "status": "pending",
-  "asset": "assets/images/35-splits-balances-and-platform-payouts/35-three-bookings.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that distinguishes a transfer from a payout",
-  "visual_goal": "Show one €120.00 payment booked to a seller balance and a platform balance inside the provider, the provider's cost taken from the platform's part, and each balance paid out later to a bank.",
-  "prompt": "A funds-flow diagram read left to right. Far left: a phone showing a paid class pass, labeled \"€120.00\". A blue arrow named \"capture\" leads into a large rounded box in the center labeled \"Provider's books\". Inside the box are two trays, one above the other: a large upper tray with a small yoga-studio icon labeled \"Seller balance\" and the amount \"€117.47\", and a small lower tray with an office icon labeled \"Platform balance\" and the amount \"€2.53\". Two teal arrows named \"booking\" fan from the entry point to the two trays. From the lower tray a short orange arrow named \"provider cost\" points down to a small coin slot on the box's edge labeled \"€0.61\". To the right, outside the box, two generic bank buildings: the upper labeled \"Studio's bank\", the lower labeled \"Platform's bank\". A green dashed arrow named \"payout\" runs from each tray to its bank, each with a small calendar icon to show it happens later. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A €120.00 payment booked inside the provider to a seller balance of €117.47 and a platform balance of €2.53, with €0.61 of provider cost taken from the platform's part and a later payout from each balance to a bank.",
-  "caption": "A split books €120.00 to two balances inside the provider, €117.47 for the seller and €2.53 for the platform, takes the provider's €0.61 from the platform's part, and pays nobody until each balance is paid out."
-}
--->
+![A €120.00 payment booked inside the provider to a seller balance of €117.47 and a platform balance of €2.53, with €0.61 of provider cost taken from the platform's part and a later payout from each balance to a bank.](assets/images/35-splits-balances-and-platform-payouts/35-three-bookings.jpeg)
+**Figure 1:** *A split books €120.00 to two balances inside the provider, €117.47 for the seller and €2.53 for the platform, takes the provider's €0.61 from the platform's part, and pays nobody until each balance is paid out.*
 
 The bookings look complete, and the clock says otherwise. Studio Noord is paid on Thursday 11 March, two days after the sale. Mila can ask for a refund whenever the studio agrees to one, and her bank can force the payment back through a **chargeback**, the card networks' dispute process ([[refunds-reversals-and-disputes]], which has the networks' 120-day rule and its source), until about 7 July 2027. Stripe's guidance on instant payouts for platforms (n.d., accessed November 2026) names the gap: they "deliver funds before the dispute window closes". Every payout leaves behind **exposure**: an amount that can still come back through a reversal, which in this chapter means a refund or a chargeback.
 
-<!-- illustration-placeholder
-{
-  "id": "35-window-outlasts-payout",
-  "status": "pending",
-  "asset": "assets/images/35-splits-balances-and-platform-payouts/35-window-outlasts-payout.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that sets two days to pay against about 120 days of exposure",
-  "visual_goal": "Make memorable that the seller is paid on day 2 while the payment stays reversible until about day 120.",
-  "prompt": "A long horizontal calendar ribbon stretching across the image, marked with small ticks. At the far left end a green flag labeled \"Sale\". Very close to it, a second flag in blue labeled \"Paid out\" with a small bank icon beneath it. From the \"Paid out\" flag to the far right end of the ribbon, a long translucent orange band lies over the ribbon, labeled \"Can still come back\". At the far right end a closed padlock icon labeled \"Final\". Above the short left stretch a small bracket labeled \"2 days\"; above the long orange band a wide bracket labeled \"120 days\". Below the orange band, an orange curved arrow named \"refund or chargeback\" bends from the middle of the band back toward an empty tray beneath the \"Paid out\" flag. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A timeline with the payout two days after the sale and a long band, about 120 days, during which a refund or chargeback can still come back to an empty balance.",
-  "caption": "The seller is paid two days after the sale, and the payment can come back for about 120 days: the split is final at the end of the long band, not at the payout."
-}
--->
+![A timeline with the payout two days after the sale and a long band, about 120 days, during which a refund or chargeback can still come back to an empty balance.](assets/images/35-splits-balances-and-platform-payouts/35-window-outlasts-payout.jpeg)
+**Figure 2:** *The seller is paid two days after the sale, and the payment can come back for about 120 days: the split is final at the end of the long band, not at the payout.*
 
 When a reversal does arrive, it debits the balance the payment was booked through. If that is the platform's balance, or if the platform stands behind a seller's balance that has gone negative, the platform has paid, and getting the seller's share back is the platform's job. That liability rule belongs to [[platform-payment-models]], and verifying the seller first to [[platform-onboarding-and-verification]]; this chapter covers the mechanics.
 
@@ -139,19 +117,8 @@ All of this assumes the debited balance can pay. When the seller's balance canno
 | Move between balances | Transfer reversal; account debits, which require "legally binding consent" | An internal funds transfer |
 | Platform pays | A reserve on the platform's balance; a transfer after 180 days | "Funds can be deducted from this account if your users' balance accounts incur negative balances due to refunds and chargebacks"; after more than 30 days, at the start of the next month |
 
-<!-- illustration-placeholder
-{
-  "id": "35-refund-after-payout",
-  "status": "pending",
-  "asset": "assets/images/35-splits-balances-and-platform-payouts/35-refund-after-payout.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the recovery table",
-  "visual_goal": "Show a refund arriving at a seller balance that was already paid out, the platform's balance standing behind it, and the recovery paths back from the seller.",
-  "prompt": "A structured diagram with a large rounded box in the center labeled \"Provider's books\". Inside it, two trays side by side: on the left an empty tray with a small yoga-studio icon labeled \"Seller balance\", showing a minus sign; on the right a tray with coins and an office icon labeled \"Platform balance\". To the right of the box, a generic bank building labeled \"Studio's bank\" with a faded green arrow named \"payout\" leading to it from the seller tray, marked with a small calendar showing an earlier day. On the far left, a customer holding a phone; an orange arrow named \"refund\" leaves the seller tray toward the customer, labeled \"€84.00\". A blue arrow named \"stands behind\" runs from the platform tray to the empty seller tray. Two teal dashed arrows return toward the seller tray: one from the bank building named \"bank debit\", one from a small stack of receipts above the tray named \"future sales\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A refund of €84.00 leaves an empty seller balance that was already paid out; the platform balance stands behind it, and future sales or a bank debit refill it.",
-  "caption": "A refund of €84.00 after the payout meets an empty seller balance: the platform's balance stands behind it until future sales or a debit of the seller's bank account refill it."
-}
--->
+![A refund of €84.00 leaves an empty seller balance; the platform balance stands behind it, and future sales or a bank debit refill it.](assets/images/35-splits-balances-and-platform-payouts/35-refund-after-payout.jpeg)
+**Figure 3:** *A refund of €84.00 after the payout meets an empty seller balance: the platform's balance stands behind it until future sales or a debit of the seller's bank account refill it.*
 
 ## Seller Balances, Payout Schedules and Top-Ups
 

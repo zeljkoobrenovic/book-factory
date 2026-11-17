@@ -58,19 +58,8 @@ Only the first row produces clean evidence tied to one payment, and it comes lat
 
 The first decision is made before the card network (Visa or Mastercard, which carries the request between the banks) and the issuer see the payment. Stripe's documentation (n.d., accessed November 2026) shows the record of a payment blocked for risk: `"network_status": "not_sent_to_network"`, `"type": "blocked"`, `"reason": "highest_risk_level"`. Adyen's documentation (n.d., accessed November 2026) describes the same placement and gives the reason: "Pre-authorization: the risk rule conditions are assessed before the payment is authorized. This saves issuer and scheme fees compared to blocking after authorization." ("Scheme" is Adyen's word for a card network.) A blocked payment is one the bank was never asked about, which is why [[authorization-optimization]] kept it out of the issuer's decline count.
 
-<!-- illustration-placeholder
-{
-  "id": "24-two-decision-points",
-  "status": "pending",
-  "asset": "assets/images/24-fraud-and-risk-systems/24-two-decision-points.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on the first decision before the network",
-  "visual_goal": "Show that the risk decision is made twice: once before the bank is asked, with a block that never reaches the bank, and once after the bank answers, when more signals exist.",
-  "prompt": "Create a left-to-right flow diagram with four generic boxes in a row: a shop labeled \"Merchant\", a payment company building labeled \"Provider\", a hub labeled \"Card network\", and a bank building labeled \"Issuer\". A thick blue arrow labeled \"Request\" runs from the merchant to the provider. Inside the provider box draw two round gates. The first gate, on the left, is labeled \"Decision 1\"; an orange arrow labeled \"Blocked\" drops down out of it and ends at a small stop sign, never reaching the network. A blue arrow continues from the first gate through the card network to the issuer. A green arrow labeled \"Answer\" returns from the issuer through the network to the second gate, on the right inside the provider box, labeled \"Decision 2\". From the second gate one green arrow labeled \"Allow\" goes back to the merchant and one teal arrow goes down to a desk with a person, labeled \"Review\". A dashed bracket under the stop sign reads \"Bank never asked\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Flow from merchant to provider, card network and issuer with two decision gates inside the provider, one before the network and one after the issuer's answer.",
-  "caption": "The risk decision is made twice: before the bank is asked, where a block never reaches the bank, and again after the bank answers."
-}
--->
+![Flow from merchant to provider, card network and issuer with two decision gates inside the provider, one before the network and one after the issuer's answer.](assets/images/24-fraud-and-risk-systems/24-two-decision-points.jpeg)
+**Figure 1:** *The risk decision is made twice: before the bank is asked, where a block never reaches the bank, and again after the bank answers.*
 
 A second decision follows the issuer's answer, because some signals exist only then. Adyen's documentation says that in post-authorization rules "the risk evaluation can take extra signals into account that are only available after authorization. For example authentication results, CVC/CVV codes, or AVS responses" (the issuer's check of the three-digit security code and of the billing address). Stripe documents built-in rules that "block certain payments that the card issuer approved". Review by a person comes later still. Stripe: "Payments placed into review are typically already successfully processed, unless you capture authorized payments later" (capture is the separate instruction that takes the money an authorization has reserved). Adyen, if capture is delayed for review, gives "up to seven calendar days to reject a transaction". By then the cardholder's money is already reserved.
 
@@ -93,19 +82,8 @@ The inputs to the estimate are called **fraud signals**, and most of their value
 
 A model learns from **labels**: the after-the-fact record that a given payment was fraud. For card fraud the label is the dispute, and it is slow. Stripe's October 2026 engineering post: "For a payment made with a stolen card, it could take weeks for the cardholder to notice and report it to their bank. When Stripe receives the fraudulent dispute, we gain a fraud label for a payment we scored weeks earlier." The description of its chart puts numbers on the wait: the share of fraud disputes reported reaches "41% by day 14, 66% by day 30, and 86% by day 60 after the payment". Two weeks after any change, more than half of the evidence about it does not exist yet.
 
-<!-- illustration-placeholder
-{
-  "id": "24-label-arrival-curve",
-  "status": "pending",
-  "asset": "assets/images/24-fraud-and-risk-systems/24-label-arrival-curve.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that gives the 41%, 66% and 86% figures",
-  "visual_goal": "Show that fraud reports arrive slowly, so a verdict given two weeks after a change sees less than half of the evidence.",
-  "prompt": "Create a simple chart-style illustration. A horizontal axis is labeled \"Days after payment\" with three tick marks labeled \"14\", \"30\" and \"60\". A smooth rising teal curve starts at the bottom left and flattens toward the top right. Three round markers sit on the curve above the ticks, labeled \"41%\", \"66%\" and \"86%\". Above day 14 stands a small figure of an analyst holding a clipboard next to an orange flag labeled \"Verdict too early\". The area above the curve at day 14 is shaded light orange and labeled \"Not reported yet\". Above day 60 a green flag is labeled \"Judge here\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Rising curve of fraud reports over time with markers at 41%, 66% and 86% for days 14, 30 and 60.",
-  "caption": "Fraud disputes arrive slowly: 41% by day 14, 66% by day 30 and 86% by day 60, so a verdict at two weeks sees less than half of them."
-}
--->
+![Rising curve of fraud reports over time with markers at 41%, 66% and 86% for days 14, 30 and 60.](assets/images/24-fraud-and-risk-systems/24-label-arrival-curve.jpeg)
+**Figure 2:** *Fraud disputes arrive slowly: 41% by day 14, 66% by day 30 and 86% by day 60, so a verdict at two weeks sees less than half of them.*
 
 That delay can reverse a verdict. The same post describes a larger version of Radar's model that "looked better in offline tests and in early results of a production experiment. But, as more fraud reports arrived, its measured performance fell below the earlier model's, and we had to roll back". The cause was the delay itself: training on recent payments without sampling had added "more fraudulent examples labeled as legitimate, about 20 times more", because their disputes had not arrived. If a company with Stripe's volume of data misjudged a change on early results, a merchant judging a new rule after two weeks has less to go on.
 
@@ -119,19 +97,8 @@ How much is known about the model inside this loop differs sharply between the t
 
 Wherever the threshold sits, it trades two errors: fraud allowed, and good customers refused. The merchant pays for both. A refused customer is a lost sale. For accepted fraud, Stripe's documentation is plain: "you're ultimately responsible for payments you choose to accept, including those that are later disputed or found to be fraudulent." The provider makes the estimate; the loss stays with you. Stripe's 2023 post said "Radar incorrectly blocks just 0.1%" of legitimate payments **(Evidence age: 3.6 years.)** That is a vendor's network average, not your rate.
 
-<!-- illustration-placeholder
-{
-  "id": "24-threshold-as-price",
-  "status": "pending",
-  "asset": "assets/images/24-fraud-and-risk-systems/24-threshold-as-price.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that says the threshold trades two errors",
-  "visual_goal": "Show the block threshold as one dial with two costs: moving it one way refuses more good customers, moving it the other way accepts more fraud, and the merchant pays for both.",
-  "prompt": "Create a conceptual illustration centered on a wide horizontal slider with a round orange knob near the middle, labeled \"Threshold\". At the left end of the slider is a group of friendly generic customers turned away from a closed shop door, with a growing stack of euro coins beside them labeled \"Refused customers\". At the right end is a masked generic figure walking out with a shopping bag, with another stack of euro coins labeled \"Accepted fraud\". Two curved arrows show that sliding the knob left makes the left stack taller and sliding it right makes the right stack taller. Below the slider, in the center, a shopkeeper holds a single bill labeled \"Merchant pays\" with two thin lines connecting the bill to both stacks. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A slider labeled Threshold between a stack of costs from refused customers and a stack of costs from accepted fraud, both connected to a bill the merchant pays.",
-  "caption": "One dial, two costs: a stricter threshold refuses more good customers, a looser one accepts more fraud, and the merchant pays for both."
-}
--->
+![A slider labeled Threshold between a stack of costs from refused customers and a stack of costs from accepted fraud, both connected to a bill the merchant pays.](assets/images/24-fraud-and-risk-systems/24-threshold-as-price.jpeg)
+**Figure 3:** *One dial, two costs: a stricter threshold refuses more good customers, a looser one accepts more fraud, and the merchant pays for both.*
 
 The trade can be priced. Block a payment only when its chance of fraud times the cost of a fraud case is greater than its chance of being legitimate times the cost of refusing a good customer. The break-even chance is the cost of a refused customer divided by the sum of the two costs. Take a €200 item that cost the retailer €160, with a €15 dispute fee *(illustrative)*. A fraud case loses €175 and a refused customer loses the €40 margin, so the break-even is 40 ÷ (40 + 175) = 19%. Adyen's documentation says the same in words: "The optimal blocking threshold ... depends on your business model and the difference in cost between a fraud case and a false decline." It recommends a low or medium threshold to thin-margin retailers and a high or very high one to sellers of digital goods, for whom "the cost of a false decline (potential loss of lifetime value) mostly outweighs the cost of a fraud case". The right threshold depends on your margins. The model does not know them.
 
@@ -154,19 +121,8 @@ Test every change to a threshold or rule before and during rollout. Both provide
 
 A model trained on disputes is slow to see this, because no single attempt carries evidence. The Adyen post: "Unlike chargeback fraud ... card testing offers no explicit transaction-level signal." Attackers also hide from simple counters: "Rotational attacks: Fraudsters continuously rotate details—such as IP addresses—to stay well below baseline velocity thresholds." The evidence is in the shape of traffic over minutes. Adyen describes computing features over "subslices" of traffic, such as one range of card numbers at one merchant. A feature language is compiled to Apache Spark for training and to Apache Kafka and Flink for live scoring; "Flink writes these streaming metrics to an Apache Cassandra feature store, where the risk engine fetches the latest subslice values to make real-time block/allow decisions before sending transactions to the issuer." It is the only substantial description of one of its fraud models that I found from Adyen.
 
-<!-- illustration-placeholder
-{
-  "id": "24-card-testing-traffic-shape",
-  "status": "pending",
-  "asset": "assets/images/24-fraud-and-risk-systems/24-card-testing-traffic-shape.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that says the evidence of card testing is in the shape of traffic",
-  "visual_goal": "Show that each card-testing payment looks ordinary on its own, while the same payments seen together as one slice of traffic over a few minutes are obviously an attack.",
-  "prompt": "Create a two-panel conceptual illustration. The left panel is labeled \"One payment\" and shows a magnifying glass over a single small payment card with a tag reading \"€1\" and a green check mark beside it, looking harmless. The right panel is labeled \"One slice, ten minutes\" and shows a bar chart of payment counts over time: several low, even teal bars on the left, then a sudden tall cluster of orange bars on the right, with many tiny identical payment cards tagged \"€1\" raining onto the tall bars from a small generic robot figure. A dashed line across the chart is labeled \"Normal level\". A thick arrow labeled \"Same payments\" leads from the left panel to the right panel. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Left: one harmless-looking one-euro payment under a magnifying glass. Right: a traffic chart where a sudden cluster of one-euro payments rises far above the normal level.",
-  "caption": "Each €1 attempt looks ordinary on its own; the attack is visible only in the shape of one slice of traffic over minutes."
-}
--->
+![Left: one harmless-looking one-euro payment under a magnifying glass. Right: a traffic chart where a sudden cluster of one-euro payments rises far above the normal level.](assets/images/24-fraud-and-risk-systems/24-card-testing-traffic-shape.jpeg)
+**Figure 4:** *Each €1 attempt looks ordinary on its own; the attack is visible only in the shape of one slice of traffic over minutes.*
 
 It is tempting to let the issuers decline the attempts. But declined attempts still cost the merchant. Stripe's documentation lists the effects: extra fees, and "A high decline rate might damage the reputation of your business with card issuers and card networks, which makes all of your transactions appear riskier". The networks count them too. Visa's Acquirer Monitoring Program fact sheet (2025) defines an enumeration ratio as "[Count of Enumerated Authorization Transactions (Approved + Declined)] ÷ [Count of Authorization Transactions (Approved+ Declined)]", with thresholds of 2,000 basis points (20%) and 300,000 enumerated transactions in a month, and says the program "requires acquirers to take proactive steps to prevent merchants from exceeding enumeration thresholds". An acquirer is the licensed party that connects a merchant to the network ([[acquiring-and-network-connectivity]]). A decline at the issuer comes too late.
 

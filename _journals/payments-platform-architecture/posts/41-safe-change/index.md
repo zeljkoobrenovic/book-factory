@@ -46,19 +46,8 @@ The tempting defense is to change rarely, through release windows (fixed times a
 
 Since change cannot be avoided, it helps to sort what a bad one costs by what monitoring can see. A bad change on a money path does **three kinds of damage**. Some payments fail: the request returns an error and the error is counted. Some payments are left with an **unknown outcome**: a request was in flight when the code handling it was withdrawn, and it may have reached the provider without the answer being stored ([[idempotency-and-retries]]). And some records are written wrong while every request succeeds, as in the Version Cliff. Error metrics see only the first kind. The figure below pictures it: the gauges watch the engines, not the logbook.
 
-<!-- illustration-placeholder
-{
-  "id": "41-engine-in-flight",
-  "status": "pending",
-  "asset": "assets/images/41-safe-change/41-engine-in-flight.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that names the three kinds of damage a bad change does",
-  "visual_goal": "Show bounded exposure (one small part of one engine is changed while the rest keeps running) and that the instruments watch the engines but not the record book.",
-  "prompt": "Create a conceptual illustration. A four-engine passenger aircraft flies left to right in a clear sky, seen from the side and slightly above. On the wing, a small mechanic figure in a harness works on one small open panel of one engine; that engine is outlined in orange and labeled \"Change\". The other three engines are outlined in teal and labeled once, with a bracket, \"Still running\". In the lower left, an inset shows a cockpit gauge panel with four round dials, one needle in orange; a thin arrow named \"watches\" runs from the gauge panel to the engines; the panel is labeled \"Metrics\". In the lower right, a second inset shows a closed logbook with a euro sign on its cover, labeled \"Records\"; no arrow reaches it from the gauge panel, and a small dashed gap separates the two insets. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "An aircraft in flight with a mechanic changing a part on one of four engines; a gauge panel watches the engines, and a logbook with a euro sign sits apart, unwatched.",
-  "caption": "A change is made to one small part while the rest keeps running; the metrics watch the engines and do not watch the records."
-}
--->
+![An aircraft in flight with a mechanic changing a part on one of four engines; a gauge panel watches the engines, and a logbook with a euro sign sits apart, unwatched.](assets/images/41-safe-change/41-engine-in-flight.jpeg)
+**Figure 1:** *A change is made to one small part while the rest keeps running; the metrics watch the engines and do not watch the records.*
 
 ## Progressive Rollout: Bounding How Much Traffic a Mistake Reaches
 
@@ -74,19 +63,8 @@ The mechanism that bounds the first two kinds of damage has two parts. A **progr
 
 Stripe has published one account of these stages at work, in the section "How we engineer for reliability" of its 2023 annual letter (published March 2024). New code is deployed "to one of our core API services approximately 400 times in a typical day." Each change first meets "a battery of around 1.4 million tests". It then goes to pre-production, "a mock production environment with synthetic API traffic designed to mimic realistic integration patterns", where "we check that the change can not only be safely rolled out to production, but also that it can be safely undone if required." Then it reaches "a single production machine with a small sliver of traffic, before gradually advancing to 0.5%, then 1%, then 5%, then 20%, and so on", and the letter adds: "We roll all changes out to test-mode API traffic before hitting live-mode traffic." The withdrawal is automatic: "Each progressive rollout is inspected against 55,000 different metrics. If at any moment the system detects anomalous telemetry, the machines running the new code are automatically withdrawn from the pool and traffic is redirected to machines running an older, known-good version." Those are the claim's three properties: bounded exposure, automatic withdrawal, a rehearsed undo. It is also the only detailed public description of Stripe's deployment system that I found; the 2024 conference talk mentions automated tests, staged rollout and rollback in one sentence.
 
-<!-- illustration-placeholder
-{
-  "id": "41-staged-rollout",
-  "status": "pending",
-  "asset": "assets/images/41-safe-change/41-staged-rollout.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that quotes the 2023 annual letter's rollout stages",
-  "visual_goal": "Show a change passing through stages of rising exposure with a monitor watching and an automatic way back to the old version.",
-  "prompt": "Create a structural diagram reading left to right. At the far left, a small package icon labeled \"Change\". An arrow named \"tests\" leads to a box with a checklist icon labeled \"Tests\". An arrow leads to a box drawn with a dashed outline and a small stage-curtain icon labeled \"Rehearsal\". An arrow leads to a narrow lane labeled \"Test traffic\". From there an arrow leads into four lanes that grow wider from left to right, drawn as a road that widens step by step, labeled in order \"0.5%\", \"1%\", \"5%\", \"20%\"; the first lane shows a single server icon. Above the four lanes sits a monitor screen with a line chart, labeled \"Metrics\", with thin dotted lines named \"watch\" going down to each lane. From the \"1%\" lane a bold orange curved arrow labeled \"Withdraw\" returns left and downward to a server box at the bottom labeled \"Old version\", drawn in teal. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A change moves through tests, a rehearsal environment and test traffic into lanes that widen from 0.5% to 20% of traffic; a metrics monitor watches, and an arrow labeled Withdraw returns traffic to the old version.",
-  "caption": "A progressive rollout as Stripe described it in 2024: exposure rises from 0.5% to 1%, 5% and 20% while metrics are watched, and a deviation sends traffic back to the old version."
-}
--->
+![A change moves through tests, a rehearsal environment and test traffic into lanes that widen from 0.5% to 20% of traffic; a metrics monitor watches, and an arrow labeled Withdraw returns traffic to the old version.](assets/images/41-safe-change/41-staged-rollout.jpeg)
+**Figure 2:** *A progressive rollout as Stripe described it in 2024: exposure rises from 0.5% to 1%, 5% and 20% while metrics are watched, and a deviation sends traffic back to the old version.*
 
 The same letter reports what this mechanism let through. On 8 February 2024, between 21:46 and 21:52 UTC, "an erroneous change rolled out all the way to 1% of the critical tier of traffic." The letter calls it "the most significant recent issue", gives the three largest counts of failed payments (39, 15 and 12) and says that "multiple problems had to coincide for users to be impacted." It does not define the critical tier or say what stopped the change. It points to Stripe's status page for the times, and I found no separate root-cause analysis; that paragraph is the public account. **A stage bounds the damage and does not remove it.**
 
@@ -104,19 +82,8 @@ A code change can be withdrawn by routing traffic back to machines that run the 
 
 Stripe's 2017 engineering post "Online migrations at scale" gives the published pattern for this, using its move of "hundreds of millions of Subscriptions objects" to a new table. It calls it the "4 step dual writing pattern": "Dual writing to the existing and new tables to keep them in sync"; "Changing all read paths in our codebase to read from the new table"; "Changing all write paths in our codebase to only write to the new table"; "Removing old data that relies on the outdated data model". Before trusting the new reads, Stripe ran both read paths in production and compared them with GitHub's Scientist library, which works by "alerting you if two expressions ever yield different results in production." **(Evidence age: 9 years; whether Stripe uses the same tooling today is not public.)** The comparison is what licenses each next step, and every step but the last can be undone. The figure below shows the four steps.
 
-<!-- illustration-placeholder
-{
-  "id": "41-dual-write-four-steps",
-  "status": "pending",
-  "asset": "assets/images/41-safe-change/41-dual-write-four-steps.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that quotes the four-step dual writing pattern",
-  "visual_goal": "Show the four steps of a dual-writing migration and that the comparison between the two stores sits before reads are trusted.",
-  "prompt": "Create a structural diagram of four equal panels in a row, numbered with small circles 1 to 4. Every panel shows an application box at the top labeled \"App\" and below it two database cylinders side by side, the left in blue labeled \"Old\" and the right in green labeled \"New\". Panel 1: two solid arrows named \"write\" go from the app to both cylinders; a solid arrow named \"read\" comes from the old cylinder up to the app. Panel 2: the two write arrows remain; the read arrow now comes from the new cylinder; between the two cylinders sits an orange equals sign in a circle labeled \"Compare\". Panel 3: one write arrow goes only to the new cylinder and the read arrow comes from the new cylinder; the old cylinder is drawn faded. Panel 4: only the new cylinder remains with its write and read arrows; the old cylinder is shown as a dashed empty outline. Under panels 1 to 3 runs a teal bracket labeled \"Can go back\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Four panels: writes go to an old and a new store; reads move to the new store while the two are compared; writes go only to the new store; the old store is removed. A bracket marks the first three as reversible.",
-  "caption": "The dual-writing pattern Stripe described in 2017: write to both stores, move the reads after a comparison, move the writes, and only then remove the old data."
-}
--->
+![Four panels: writes go to an old and a new store; reads move to the new store while the two are compared; writes go only to the new store; the old store is removed. A bracket marks the first three as reversible.](assets/images/41-safe-change/41-dual-write-four-steps.jpeg)
+**Figure 3:** *The dual-writing pattern Stripe described in 2017: write to both stores, move the reads after a comparison, move the writes, and only then remove the old data.*
 
 Stripe's 2024 account of moving data between database shards has the same shape one level down. A **shard** is one of many databases that each hold a slice of the same kind of data; [[payment-data-stores-and-consistency]] covers the system in detail. During a move, changes "get replicated bidirectionally", and the post gives the reason: "We made this design choice to provide the flexibility to revert traffic to the source shards if any issues emerge". Before the switch comes "a comprehensive check for data completeness and correctness by comparing point-in-time snapshots". The switch itself is brief: "The entire traffic switch protocol takes less than two seconds to execute, and all failed reads and writes directed to the source shard succeed on retries." The same three properties are designed in: two live paths, a comparison, and a way back.
 
@@ -171,19 +138,8 @@ Once the dark run passes, the live change is staged by studio. The pull request 
 
 When the flag reaches every studio, the change is still open. It has an owner, and it closes only when two checks have passed: the reconciliation job, run when each provider's reports are ready ([[payment-reconciliation-and-reporting]]), has shown no new open item that traces to the change, and the May close ties the finance export to Stripe's own report for the month. Only then are the old version and the flag deleted, in June. That is my rule applied: finished means that the records agree for a full reporting period.
 
-<!-- illustration-placeholder
-{
-  "id": "41-finished-when-records-agree",
-  "status": "pending",
-  "asset": "assets/images/41-safe-change/41-finished-when-records-agree.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that says when Larkfield closes the change",
-  "visual_goal": "Show that a rollout reaching all traffic is not the finish; the finish is the later point where the records are compared and agree.",
-  "prompt": "Create a conceptual illustration. A straight running track runs from left to right. A runner figure in blue is mid-stride a little past the middle of the track. Just behind the runner, a dashed line crosses the track with a small sign above it labeled \"100%\". Further to the right, a solid checkered finish line crosses the track with a banner above it labeled \"Finished\". Beside the finish line stands a large balance scale in teal; on each pan lies a neat stack of paper sheets of equal height, and the scale is level; the scale is labeled \"Records agree\". A thin dotted arrow named \"still open\" runs along the track from the dashed line to the finish line. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A runner has passed a dashed line marked 100% but the checkered finish line lies further on, beside a level balance scale holding two equal stacks of documents.",
-  "caption": "The rollout reaching 100% of traffic is not the finish; a change is finished when the records agree."
-}
--->
+![A runner has passed a dashed line marked 100% but the checkered finish line lies further on, beside a level balance scale holding two equal stacks of documents.](assets/images/41-safe-change/41-finished-when-records-agree.jpeg)
+**Figure 4:** *The rollout reaching 100% of traffic is not the finish; a change is finished when the records agree.*
 
 ## When It Goes Wrong: After a Rollout Is Withdrawn
 

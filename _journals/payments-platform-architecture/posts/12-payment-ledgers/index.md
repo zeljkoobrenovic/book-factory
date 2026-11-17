@@ -67,19 +67,8 @@ Two changes fix both limits. First, money is recorded as append-only entries tha
 | What does a seller owe back? | A status, at best | A balance that stays until recovered |
 | How does an error show? | A total that differs from someone else's | A clearing account that is not at zero |
 
-<!-- illustration-placeholder
-{
-  "id": "12-payment-row-versus-ledger-entries",
-  "status": "pending",
-  "asset": "assets/images/12-payment-ledgers/12-payment-row-versus-ledger-entries.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table that compares the payment table with the ledger",
-  "visual_goal": "Contrast one overwritten payment row with a growing list of entries that are never changed.",
-  "prompt": "Create a two-panel before-and-after explainer illustration. Left panel, labeled \"Payment row\": a single database row drawn as one wide card with a status field; the old status \"paid\" is struck through and replaced by \"refunded\"; a faded ghost of the earlier card behind it shows that the earlier state is lost; a small question mark sits above a calendar page. Right panel, labeled \"Ledger entries\": a vertical stack of four small cards added from top to bottom, each with a plus line and a minus line of equal length to suggest balance; the newest card at the bottom is labeled \"refund\"; none of the earlier cards is altered; a small padlock icon sits beside the stack. A thin arrow labeled \"append only\" runs down the side of the stack. Between the panels, a neutral divider. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two panels: a single payment row whose status is overwritten from paid to refunded, and a stack of ledger entries where the refund is added as a new entry and earlier entries stay unchanged.",
-  "caption": "A payment row keeps only its latest state; a ledger adds the refund as a new entry and leaves the earlier ones untouched."
-}
--->
+![Two panels: a single payment row whose status is overwritten from paid to refunded, and a stack of ledger entries where the refund is added as a new entry and earlier entries stay unchanged.](assets/images/12-payment-ledgers/12-payment-row-versus-ledger-entries.jpeg)
+**Figure 1:** *A payment row keeps only its latest state; a ledger adds the refund as a new entry and leaves the earlier ones untouched.*
 
 ## Entries, Accounts and Clearing Accounts: How a Ledger Works
 
@@ -89,19 +78,8 @@ Entries are also **immutable**: nothing is edited and nothing is deleted. A corr
 
 A **clearing account** is the special kind of account that holds an amount only while a process with several steps is in flight. It must return to zero when the process completes. An account such as "owed to merchant" or "cash at bank", by contrast, is meant to hold a balance. Stripe's 2024 post pictures it as plumbing: "At steady state, terminal (nonclearing) reservoirs are full, and intermediate (clearing) pipes are empty. If there is water stuck in the pipes, then you have a problem".
 
-<!-- illustration-placeholder
-{
-  "id": "12-pipes-and-reservoirs",
-  "status": "pending",
-  "asset": "assets/images/12-payment-ledgers/12-pipes-and-reservoirs.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that defines a clearing account with the pipes and reservoirs image",
-  "visual_goal": "Make the rule that clearing accounts must be empty at rest memorable as plumbing.",
-  "prompt": "Create a conceptual explainer illustration of a simple plumbing system seen from the side. Three large open tanks stand in a row from left to right, labeled \"network\", \"provider\" and \"merchant\"; the tanks hold calm blue water at different levels. Two horizontal transparent pipes connect the tanks. The left pipe is completely empty and has a small green check mark above it. The right pipe has a short slug of orange water stuck in its middle, with a small orange warning triangle above it and the label \"€18,400\". Below the pipes, one caption-like tag reads \"pipes empty\" under the left pipe and \"stuck\" under the right pipe. A small magnifying glass hovers over the stuck water. No people. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Three tanks connected by two pipes; one pipe is empty and marked with a check, the other has water stuck in it, marked with a warning and the amount 18,400 euros.",
-  "caption": "Accounts meant to hold money are the tanks; clearing accounts are the pipes, and €18,400 stuck in a pipe is a flow that did not finish."
-}
--->
+![Three tanks connected by two pipes; one pipe is empty and marked with a check, the other has water stuck in it, marked with a warning and the amount 18,400 euros.](assets/images/12-payment-ledgers/12-pipes-and-reservoirs.jpeg)
+**Figure 2:** *Accounts meant to hold money are the tanks; clearing accounts are the pipes, and €18,400 stuck in a pipe is a flow that did not finish.*
 
 A **fund flow** strings these accounts together. It is the fixed path an amount takes through accounts for one kind of business event, and it is a state machine: the accounts are the states and the entries are the transitions. The term and that reading are Stripe's (2024): "Ledger encodes a state machine representation of producer systems, and models its behavior as a logical fund flow—the movement of balances (events) between accounts (states)." The table below is a teaching model of one fund flow for a €120.00 card payment as a provider might book it. It is not either company's chart of accounts, and it leaves out every fee ([[payment-economics]]). A positive line means the book holds or is owed more; a negative line means it owes more or holds less. "Captured" means the approved payment was claimed, and the network "settles" when it moves the money between the banks ([[clearing-and-settlement]]).
 
@@ -116,19 +94,8 @@ A **fund flow** strings these accounts together. It is the fixed path an amount 
 | 4 | The bank statement shows the transfer | Payout in transit *(clearing)* | +120.00 |
 | | | Cash at bank | −120.00 |
 
-<!-- illustration-placeholder
-{
-  "id": "12-fund-flow-through-clearing-accounts",
-  "status": "pending",
-  "asset": "assets/images/12-payment-ledgers/12-fund-flow-through-clearing-accounts.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of four entries for the 120 euro card payment",
-  "visual_goal": "Show one amount moving through four accounts in four steps, with the two clearing accounts ending empty.",
-  "prompt": "Create a structural explainer diagram of a fund flow, read left to right. Four account boxes in a row: first box labeled \"expected from network\" drawn with a dashed outline; second box labeled \"cash at bank\" with a solid outline; third box labeled \"owed to merchant\" with a solid outline; fourth box labeled \"payout in transit\" with a dashed outline. Above the row, a single coin token labeled \"€120\". Four numbered arrows show the steps: arrow \"1 captured\" points into the first and third boxes; arrow \"2 settled\" goes from the first box to the second box; arrow \"3 payout\" goes from the third box to the fourth box; arrow \"4 confirmed\" goes from the fourth box out to a small generic bank building at the far right. Under each dashed box, a small gauge reading \"0\" with a green check mark, to show that it ends empty. A small legend at the bottom: a dashed square labeled \"clearing\" and a solid square labeled \"lasting\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Diagram of 120 euros moving through four accounts in four numbered steps; the two dashed clearing accounts show zero at the end.",
-  "caption": "One €120 payment is four entries; when the flow completes, both clearing accounts are back at zero."
-}
--->
+![Diagram of 120 euros moving through four accounts in four numbered steps; the two dashed clearing accounts show zero at the end.](assets/images/12-payment-ledgers/12-fund-flow-through-clearing-accounts.jpeg)
+**Figure 3:** *One €120 payment is four entries; when the flow completes, both clearing accounts are back at zero.*
 
 After entry 4 every account in the table is back at zero. The construction rests on four rules: every movement is a balanced entry, entries are never edited, a correction is a new entry, and every amount in flight sits in a clearing account that must return to zero. Under those rules a missing, late or misidentified movement cannot hide. If entry 2 never arrives, €120.00 stays in "card funds expected from the network". Finding it takes one query, however many payments there are. Stripe's 2024 post says so directly: "Even when we have billions of transactions, a single missing, late, or incorrect transaction immediately creates a detectable accuracy issue with a simple query—for example, 'Find the clearing Accounts with nonzero balance.'"
 
@@ -178,19 +145,8 @@ Why does each company sit where it does? My reading is that the choice follows t
 
 > **INFERENCE, NOT DOCUMENTED:** Neither company says this. It is consistent with Stripe's 2024 description of many producers and Adyen's 2021 description of one in-house accounting framework. The designs also overlap. Stripe refuses some transfers "at the platform level" (2026), and Adyen's 2021 post describes matching partners' reports to its records after the fact, in a framework that would "first parse a file and then split it into the relevant parts for each cluster".
 
-<!-- illustration-placeholder
-{
-  "id": "12-prevent-at-write-versus-detect-after",
-  "status": "pending",
-  "asset": "assets/images/12-payment-ledgers/12-prevent-at-write-versus-detect-after.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the inference block that explains the choice by the number of writers",
-  "visual_goal": "Contrast one gated write path with many writers publishing into a log that is checked afterwards.",
-  "prompt": "Create a two-panel comparison diagram. Left panel, headed by a small tag \"Provider A\": one source box labeled \"payment layer\" sends a single arrow labeled \"entry\" through a gate drawn as a turnstile labeled \"template\"; a balanced entry passes into a ledger book icon, while a second, lopsided entry is stopped at the gate with a small red cross and the label \"refused\". Right panel, headed by a small tag \"Provider B\": five small source boxes of different sizes, unlabeled, each send an arrow labeled once as \"events\" into a long horizontal scroll labeled \"immutable log\"; after the scroll, an arrow leads to a panel with three small gauges labeled \"clearing\", \"timeliness\" and \"completeness\"; a small clock icon beside the gauges is labeled \"4 days\". Between the two panels, a neutral divider. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two panels: on the left one writer passes entries through a template gate that refuses an unbalanced one; on the right many writers publish events into an immutable log that is checked afterwards by three gauges.",
-  "caption": "Provider A is Adyen as it described itself in 2021 (templates refuse an unbalanced entry); Provider B is Stripe as it described itself in 2024 (many writers, three checks afterwards, 99.99% of dollar volume within four days)."
-}
--->
+![Two panels: on the left one writer passes entries through a template gate that refuses an unbalanced one; on the right many writers publish events into an immutable log that is checked afterwards by three gauges.](assets/images/12-payment-ledgers/12-prevent-at-write-versus-detect-after.jpeg)
+**Figure 4:** *Provider A is Adyen as it described itself in 2021 (templates refuse an unbalanced entry); Provider B is Stripe as it described itself in 2024 (many writers, three checks afterwards, 99.99% of dollar volume within four days).*
 
 Where the two designs agree matters as much. Both keep the ledger off the path that answers the payment, because the two have opposite priorities: the payment must be fast and available, and the book must be complete and consistent. The table below states what a ledger has to promise. A contrast company reached the same separation from the other direction: Uber's 2020 post says its older design had separate systems for collecting and disbursing with "no holistic view of end-to-end money movements", and that its replacement "is a single, integrated, SOX-compliant system built on the principles of double-entry accounting and can reconcile itself" (SOX is the US Sarbanes-Oxley Act on financial controls). **(Evidence age: 6 years.)** ([[case-uber-payments]] follows that case.)
 

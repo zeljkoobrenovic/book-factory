@@ -16,37 +16,15 @@ timetoread: 5 min read
 <br>
 On 1 October 2026 the renewal job at **Larkfield, the fictional studio-software platform this book follows**, hit its provider's rate limit. 7,900 membership renewals were turned away before any card was charged and ran a day late. The job marked them failed, and an email job that could not tell a decline from a card never charged sent those members dunning emails, the reminders sent after a failed payment. On 1 November 2026 a provider call timed out during the same monthly run. The job retried with a new idempotency key (the identifier by which a provider recognizes a repeated request), and 1,840 members were charged twice: €71,300 refunded, and 212 disputes anyway. **The first month was late. The second was wrong.**
 
-<!-- illustration-placeholder
-{
-  "id": "part-8-late-and-wrong",
-  "status": "pending",
-  "asset": "assets/images/part-8-intro/part-8-late-and-wrong.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the opening paragraph",
-  "visual_goal": "Show two monthly runs side by side: one that was only late, and one that was wrong and had to be paid back.",
-  "prompt": "Create a wide explainer illustration in two halves separated by a thin vertical divider. Left half: a large calendar page showing the number 1, with a small tag above it labeled \"October\". Beside it, a neat stack of envelopes waits in front of a closed gate, with a round clock above the stack. An orange dashed arrow labeled \"next day\" curves from the stack past the gate. Under the left half, a blue banner labeled \"Late\". Right half: a second large calendar page showing the number 1, with a small tag above it labeled \"November\". Beside it, one generic studio member holds one payment card, and two identical receipt slips, each with a euro sign, come out of the card side by side. A green arrow labeled \"refund\" runs from the second receipt back to the member. Under the right half, an orange banner labeled \"Wrong\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two halves: in October a stack of renewals waits at a closed gate until the next day, marked Late; in November one card produces two identical receipts and one is refunded, marked Wrong.",
-  "caption": "Two first-of-month runs at Larkfield: in October 2026, 7,900 renewals were a day late; in November 2026, 1,840 members were charged twice."
-}
--->
+![Two halves: in October a stack of renewals waits at a closed gate until the next day, marked Late; in November one card produces two identical receipts and one is refunded, marked Wrong.](assets/images/part-8-intro/part-8-late-and-wrong.jpeg)
+**Figure 1:** *Two first-of-month runs at Larkfield: in October 2026, 7,900 renewals were a day late; in November 2026, 1,840 members were charged twice.*
 
 That is not the order most engineers would give them. Parts II to VII described each mechanism for one payment at a time ending in [[part-7]] with the account model. Part VIII puts the same mechanisms under conditions no single payment shows: a dependency that fails, data that outgrows one database, a law on where data may sit, a month of renewals in six hours, and several hundred deployments a day. Engineers usually count the cost of failure in minutes of downtime. Larkfield's two months point the other way. The late run cost emails; the wrong run cost refunds and disputes. In a money path the order of priorities is **the reverse of a content site's**.
 
 So the part's claim is about what is given up. **A payment platform is run at scale by deciding in advance what gives way**: the freshness of the books under failure, a system-wide transaction under growth, a global identifier under a localization law (one that fixes the country where data is stored), a caller's burst at peak, the reach of a rollout under change. Larkfield's October was the fourth of these, met without a plan: a burst that had to wait. In every design Stripe or Adyen has published, the record of money is not among the things relaxed. That is my reading of their accounts; neither company states it as a principle ([[payment-reliability-and-availability]]).
 
-<!-- illustration-placeholder
-{
-  "id": "part-8-what-gives-way",
-  "status": "pending",
-  "asset": "assets/images/part-8-intro/part-8-what-gives-way.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph that states the part's claim",
-  "visual_goal": "Show five things that compress under pressure, one per chapter, around one record that does not move.",
-  "prompt": "Create a wide conceptual diagram. At the center, a thick closed ledger book with a euro sign on its cover, standing on a solid stone plinth and outlined in green, labeled \"Record\". Around it, in a half circle from left to right, five large coil springs, each fixed at one end to the plinth and each visibly compressed by a blue arrow pushing inward from outside. The five springs are labeled, in order from left to right, \"Freshness\", \"Transaction\", \"Identifier\", \"Burst\", \"Rollout\". Next to each pushing arrow sits one small icon and no text: a broken plug, a database cylinder split in two, a courthouse, a calendar page showing the number 1, and a wrench. The springs alternate teal and orange. The ledger and the plinth are drawn perfectly upright and undisturbed. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A ledger labeled Record stands unmoved on a plinth while five springs around it, labeled Freshness, Transaction, Identifier, Burst and Rollout, are compressed by arrows marked with icons for failure, growth, law, peak and change.",
-  "caption": "The shape of Part VIII: under failure, growth, law, peak and change, five things give way, one per chapter, and the record of money is not one of them."
-}
--->
+![A ledger labeled Record stands unmoved on a plinth while five springs beside it, labeled Freshness, Transaction, Identifier, Burst and Rollout, are compressed by arrows marked with icons for failure, growth, law, peak and change.](assets/images/part-8-intro/part-8-what-gives-way.jpeg)
+**Figure 2:** *The shape of Part VIII: under failure, growth, law, peak and change, five things give way, one per chapter, and the record of money is not one of them.*
 
 That reading has less to stand on here than anywhere in the book. The two companies have documented their choices on outages, data stores, limits and rollouts. **Neither has published a cell design, the topology or timing of a failover between regions or which data is replicated synchronously**, or how its webhook sender is built ([[payment-webhooks-and-events]]). A sentence about either provider's regions that carries no source is a guess, and an uptime figure does not replace one: the published figures measure five different things and cannot rank the two.
 

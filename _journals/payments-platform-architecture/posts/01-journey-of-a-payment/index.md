@@ -38,19 +38,8 @@ On Wednesday 10 March 2027, the morning after Mila's purchase, Ines Bakker opens
 
 Femke de Graaf, who has led payments engineering since January, answers with four questions that the word `paid` cannot answer. Who approved this payment? Has any money moved yet? When will the studio receive it? Until when can it be taken back? Each has a different party behind it: a bank Larkfield has no contract with, a card network's overnight process, the provider's payout schedule, and Mila herself. **One word in the record stands for four facts held by four parties**, and the rest of this chapter is what Femke needs to answer Ines properly.
 
-<!-- illustration-placeholder
-{
-  "id": "01-one-tick-four-promises",
-  "status": "pending",
-  "asset": "assets/images/01-journey-of-a-payment/01-one-tick-four-promises.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph in the Larkfield scene that lists the four questions the word paid cannot answer",
-  "visual_goal": "Show that the single success tick a customer sees stands for four separate promises, each held by a different party with its own clock.",
-  "prompt": "Create a conceptual explainer illustration in two halves. Left third: a smartphone held by a generic customer, its screen showing one large green check mark and the label \"Paid\". Right two thirds: four paper notes pinned in a row from left to right, each with a small clock above it showing a different time. The first note is held by a small bank building and labeled \"Approved\"; the second is held by a small shop front and labeled \"Claimed\"; the third is held by a hub with lines to two bank buildings and labeled \"Settled\"; the fourth is held by an office building with a payout chute and labeled \"Paid out\". A thin arrow labeled \"one answer\" runs from the phone to the first note only. A dashed curved arrow labeled \"can come back\" runs from the fourth note back over the top toward the phone. The four clocks are visibly different sizes, the last one largest. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "A phone showing one green tick beside four pinned notes labeled Approved, Claimed, Settled and Paid out, each with its own clock.",
-  "caption": "One answer on the screen stands for four separate facts, each held by a different party on its own clock."
-}
--->
+![A phone showing one green tick beside four pinned notes labeled Approved, Claimed, Settled and Paid out, each with its own clock.](assets/images/01-journey-of-a-payment/01-one-tick-four-promises.jpeg)
+**Figure 1:** *One answer on the screen stands for four separate facts, each held by a different party on its own clock.*
 
 ## The Parties: Four in the Model, More in Practice
 
@@ -82,19 +71,8 @@ Who holds the money, and who loses when something goes wrong, also changes from 
 | Provider or payment facilitator | Usually, between settlement and payout | Its merchants' losses |
 | Merchant, or the seller on a platform | After payout | Refunds, chargebacks, fees |
 
-<!-- illustration-placeholder
-{
-  "id": "01-four-party-model",
-  "status": "pending",
-  "asset": "assets/images/01-journey-of-a-payment/01-four-party-model.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of who holds the money and which risk each party carries",
-  "visual_goal": "Show where each party sits: cardholder and issuer on one side, merchant and acquirer on the other, the card network between the two institutions, with the provider and the platform on the merchant's side.",
-  "prompt": "Create a structural explainer diagram of a card payment's parties. Left side, top: a generic person holding a phone, labeled \"Cardholder\". Left side, bottom: a bank building labeled \"Issuer\". Center: a round hub labeled \"Network\". Right side, bottom: a second bank building labeled \"Acquirer\", with a smaller box attached to its left edge labeled \"Provider\". Right side, top: a small yoga studio front labeled \"Merchant\", with a tablet-shaped box attached to its left edge labeled \"Platform\". Arrows: a solid arrow from Cardholder to Merchant labeled \"buys\"; a solid vertical line between Cardholder and Issuer labeled \"account\"; a solid vertical line between Merchant and Acquirer labeled \"contract\"; a double-headed arrow from Issuer to Network labeled \"messages\"; a double-headed arrow from Network to Acquirer labeled \"messages\"; a thicker orange arrow from Issuer through the Network hub to Acquirer labeled \"money\"; a green arrow from Acquirer up to Merchant labeled \"payout\". The Issuer and Acquirer buildings are the same size; the Network hub is clearly not a bank building. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Diagram of the four-party model: cardholder and issuer on the left, merchant and acquirer on the right, the card network between the two banks, with a provider beside the acquirer and a platform beside the merchant.",
-  "caption": "The four-party model: cardholder and issuer on one side, merchant and acquirer on the other, and the card network between the two institutions; the provider stands with the acquirer and the platform with the merchant."
-}
--->
+![Diagram of the four-party model: cardholder and issuer on the left, merchant and acquirer on the right, the card network between the two banks, with a provider beside the acquirer and a platform beside the merchant.](assets/images/01-journey-of-a-payment/01-four-party-model.jpeg)
+**Figure 2:** *The four-party model: cardholder and issuer on one side, merchant and acquirer on the other, and the card network between the two institutions; the provider stands with the acquirer and the platform with the merchant.*
 
 ## The Timeline: A Message, a Record, Then Money
 
@@ -111,19 +89,8 @@ Add the merchant's claim, the provider's payout and the cardholder's right to ob
 | 5. **Payout** | Days after capture, set by the provider | The provider | Money, by bank transfer to the merchant | Provider: "this is yours to withdraw" |
 | 6. **Dispute window** | About 120 days, sometimes longer | The cardholder, through the issuer | Possibly the money, backward | None: until it closes, nothing is final |
 
-<!-- illustration-placeholder
-{
-  "id": "01-six-step-timeline",
-  "status": "pending",
-  "asset": "assets/images/01-journey-of-a-payment/01-six-step-timeline.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of the six steps in the timeline section",
-  "visual_goal": "Show the six steps on one line and make visible that a message moves first, a record second and money only at settlement and payout, with the dispute window stretching far beyond.",
-  "prompt": "Create a structural timeline diagram running left to right. Six round stations on one horizontal line, evenly spaced for the first five and with a long stretch before the sixth. Station labels in order: \"Authorization\", \"Capture\", \"Clearing\", \"Settlement\", \"Payout\", \"Dispute window\". Above the line, three colored brackets group the stations: a blue bracket over the first two labeled \"message\", a teal bracket over the third labeled \"record\", and an orange bracket over the fourth and fifth labeled \"money\". Under the first station a small envelope icon; under the third a sheet-of-paper icon; under the fourth and fifth a euro coin icon. Below the line, a time ruler with three marks labeled \"seconds\", \"days\" and \"120 days\", the last mark under the sixth station. A dashed arrow labeled \"taken back\" curves from the sixth station back to the fifth. The stretch between the fifth and sixth stations is drawn as a long dotted line to show waiting. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Timeline with six stations from Authorization to Dispute window, grouped under message, record and money, with a time ruler from seconds to 120 days.",
-  "caption": "Six steps on one line: a message moves at authorization, a record at clearing, and money only at settlement and payout, while the dispute window stays open for about 120 days."
-}
--->
+![Timeline with six stations from Authorization to Dispute window, grouped under message, record and money, with a time ruler from seconds to 120 days.](assets/images/01-journey-of-a-payment/01-six-step-timeline.jpeg)
+**Figure 3:** *Six steps on one line: a message moves at authorization, a record at clearing, and money only at settlement and payout, while the dispute window stays open for about 120 days.*
 
 Steps one and two move no money. In Visa's description the acquirer passes the transaction to Visa, "which in turn sends the transaction data to the issuer to check the account holder’s account balance or credit line for authorization". An approving issuer commonly places a **hold**, reserving the amount on the cardholder's account: Mila's €120 was still hers at 19:43 and no longer hers to spend. **Capture** is the merchant's instruction to collect on that promise. Many integrators never see it, because it is automatic unless they ask otherwise; Adyen's documentation (n.d., accessed November 2026) says "By default, payments are captured automatically without a delay, immediately after authorization of the payment request." The promise also expires: Visa's rules (edition of 24 October 2026) give an acquirer at most 10 calendar days to process an ordinary online payment that the customer started. [[payment-authorization]] takes this step apart.
 
@@ -161,19 +128,8 @@ So far "the provider" has stood loosely beside the acquirer. It can stand in one
 | **Payment facilitator under an acquiring bank** | The bank, often called the *sponsor bank*; under Visa's rules it is "liable for all acts, omissions, and other adverse conditions caused by the Payment Facilitator and its Sponsored Merchants" | Usually the facilitator, once the bank has passed the settlement on | Facilitator, bank | Many small merchants, where the provider has no acquiring license |
 | **The provider is the acquirer** | The provider | The provider | Provider only | Where the provider holds license and membership: one counterparty |
 
-<!-- illustration-placeholder
-{
-  "id": "01-provider-positions",
-  "status": "pending",
-  "asset": "assets/images/01-journey-of-a-payment/01-provider-positions.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table of the three positions a provider can take",
-  "visual_goal": "Show the three places a provider can stand between a merchant and the card network, and that the number of parties in between differs.",
-  "prompt": "Create a structural explainer diagram with three horizontal lanes stacked top to bottom, each running from a small shop front on the left labeled \"Merchant\" to a round hub on the right labeled \"Network\". Top lane, labeled \"Gateway\" at its left margin: between the shop and the hub sit a thin pipe-shaped box and then a bank building; the bank building carries a small membership badge. Middle lane, labeled \"Facilitator\" at its left margin: between the shop and the hub sit an office-shaped box and then a bank building; the bank building carries the membership badge and a small tag labeled \"Sponsor bank\". Bottom lane, labeled \"Acquirer\" at its left margin: between the shop and the hub sits one combined office-and-bank building carrying the membership badge. In each lane a small euro coin icon sits on the element that holds the merchant's funds: on the bank in the top lane, on the office-shaped box in the middle lane, on the combined building in the bottom lane. Arrows in each lane run left to right and are labeled \"payment\" once in the top lane only. A small legend shows the badge with the label \"member\" and the coin with the label \"holds funds\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Three lanes from merchant to network showing a gateway in front of a separate acquirer, a facilitator under a sponsor bank, and a provider that is itself the acquirer.",
-  "caption": "Three places a provider can stand: a gateway in front of a separate acquirer, a payment facilitator under an acquiring bank, or the acquirer itself."
-}
--->
+![Three lanes from merchant to network showing a gateway in front of a separate acquirer, a facilitator under a sponsor bank, and a provider that is itself the acquirer.](assets/images/01-journey-of-a-payment/01-provider-positions.jpeg)
+**Figure 4:** *Three places a provider can stand: a gateway in front of a separate acquirer, a payment facilitator under an acquiring bank, or the acquirer itself.*
 
 One distinction prevents a common misreading: **a direct connection to a network is not the same as being the acquirer of record**, the member under whose name a payment enters the network. Stripe announced in April 2020 that it "now processes card transactions through direct integrations with all six major card networks in North America, Latin America, Europe and Asia Pacific". **(Evidence age: 6 years; the current system may differ.)** That is about who exchanges messages with the network. Stripe's acquirer disclosure (n.d., accessed November 2026) is about who holds the membership, and for the United States it reads "Stripe, LLC is a Payment Facilitator of the following Payment Method Acquirers", followed by five banks and one Stripe entity. Both can be true: a company can send messages straight to a network while a bank holds the membership and the liability.
 

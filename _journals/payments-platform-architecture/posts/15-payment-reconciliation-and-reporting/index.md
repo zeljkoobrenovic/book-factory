@@ -54,19 +54,8 @@ Because the three records differ in this way, comparing them cannot be a compari
 
 Then come the items that do not match. Each is an **exception**, and **exception aging** means recording how long each has been open and who owns it. Most exceptions are timing: the other record has not arrived yet. The ones that stay open are a missing file, a duplicate, a wrong amount or money that never came. Age separates the two groups without anyone inspecting each item, and in my experience an unexplained amount is harder to recover the longer it is left.
 
-<!-- illustration-placeholder
-{
-  "id": "15-three-records-one-payment",
-  "status": "pending",
-  "asset": "assets/images/15-payment-reconciliation-and-reporting/15-three-records-one-payment.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on exception aging",
-  "visual_goal": "Show one payment as three records matched item by item, with unmatched items kept on a dated, owned list.",
-  "prompt": "Create a structural explainer diagram. On the left, three stacked documents: a ledger book labeled \"Ledger\", a file labeled \"Clearing file\", a sheet labeled \"Bank statement\". Three arrows, one from each, run right into a central station of two interlocking puzzle pieces labeled \"Match\". From it a green arrow labeled \"Matched\" goes right to a green checkmark box, and an orange arrow labeled \"Unmatched\" goes down-right to a clipboard labeled \"Open items\" with three rows, each with a calendar icon and a person icon. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Diagram of a ledger, a clearing file and a bank statement feeding a matching step, with matched items closed and unmatched items placed on a list with an age and an owner.",
-  "caption": "One payment is three records with three writers; reconciliation matches them item by item and keeps what does not match on a list with an age and an owner."
-}
--->
+![Diagram of a ledger, a clearing file and a bank statement feeding a matching step, with matched items closed and unmatched items placed on a list with an age and an owner.](assets/images/15-payment-reconciliation-and-reporting/15-three-records-one-payment.jpeg)
+**Figure 1:** *One payment is three records with three writers; reconciliation matches them item by item and keeps what does not match on a list with an age and an owner.*
 
 ## What Stripe and Adyen Have Published About Proving Their Own Books
 
@@ -98,19 +87,8 @@ Adyen's main report is built on a different unit: the **payable batch**, the set
 
 On timing Adyen names an event for this report, and one number. “When the payable batch closes, we create a Settlement details report” (its Getting paid page, n.d., accessed November 2026). Under Sales day payout “the payable batch always closes two hours after your sales day closing time”. A customer learns that a report exists from a webhook: “When a new report has been generated, you will receive a **REPORT_AVAILABLE** webhook” with the download URL (documentation, n.d., accessed November 2026). The number is on its page about report time zones (n.d., accessed November 2026): “If you have configured automatic generation of the Settlement details report at batch closure, you can expect the report to be generated within 3 hours after the batch closes.” For other ways of producing a report Adyen publishes (n.d., accessed November 2026) a window and a warning: reports on a daily schedule are generated “each day between 02:00 and 10:00 CET” (Central European Time), and a report requested by hand “may take several hours to generate, depending on its size”.
 
-<!-- illustration-placeholder
-{
-  "id": "15-payout-versus-batch",
-  "status": "pending",
-  "asset": "assets/images/15-payment-reconciliation-and-reporting/15-payout-versus-batch.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the paragraph on the timing of Adyen's settlement details report",
-  "visual_goal": "Show the two units of reconciliation side by side: the payout and the sales-day batch.",
-  "prompt": "Create a side-by-side comparison diagram split by a thin vertical divider. Left half tagged \"Provider A\": coins and receipt icons flow through a funnel into an envelope labeled \"Payout\" with a tag labeled \"Payout ID\"; an arrow labeled \"one credit\" goes from the envelope to a generic bank building. Right half tagged \"Provider B\": a calendar page labeled \"Sales day\" pours coins and receipt icons into an open box labeled \"Batch\" with a tag labeled \"Batch number\"; a small arrow labeled \"adjustments\" drops a refund icon into the box from above; an arrow labeled \"one credit\" goes from the box to a generic bank building. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Two panels: movements grouped into a payout with a payout ID, and a sales day with its adjustments grouped into a batch with a batch number; each ends in one bank credit.",
-  "caption": "Provider A is Stripe, whose report is keyed on the payout; Provider B is Adyen, whose report is keyed on the payable batch, by default one sales day plus the adjustments that occurred on it."
-}
--->
+![Two panels: movements grouped into a payout with a payout ID, and a sales day with its adjustments grouped into a batch with a batch number; each ends in one bank credit.](assets/images/15-payment-reconciliation-and-reporting/15-payout-versus-batch.jpeg)
+**Figure 2:** *Provider A is Stripe, whose report is keyed on the payout; Provider B is Adyen, whose report is keyed on the payable batch, by default one sales day plus the adjustments that occurred on it.*
 
 The table lists these and the other reports this chapter uses. Platforms such as Larkfield need one more. Adyen's platform reporting documentation (n.d., accessed November 2026) marks the Balance Platform Accounting Report, the payment accounting report and the monthly invoice as “Required for full financial reconciliation”, and the settlement details report as “Optional for full financial reconciliation”. The balance platform is the part of Adyen that holds a balance account for each of the platform's users, so its daily report, not the batch report, is where a platform sees each user's money. Balance platform reports have their own readiness signal, a `balancePlatform.report.created` webhook that carries the download URL, and Adyen also documents a Balance Platform Payout Report that lists the transactions in each scheduled payout to a platform's user.
 
@@ -134,19 +112,8 @@ The trouble is that the two channels promise different things, and the providers
 | **Webhook** | Prompt notice that one event happened | Delivery, order, or an event for every balance change ([[payment-webhooks-and-events]]) |
 | **Report** | Every movement behind a payout or batch, with fees and adjustments, as of a stated cut-off | Speed: the money can arrive first |
 
-<!-- illustration-placeholder
-{
-  "id": "15-doorbell-and-statement",
-  "status": "pending",
-  "asset": "assets/images/15-payment-reconciliation-and-reporting/15-doorbell-and-statement.jpeg",
-  "aspect_ratio": "16:9",
-  "placement": "after the table that contrasts what a webhook and a report promise",
-  "visual_goal": "Contrast a prompt signal that can be missed with a complete statement that arrives later.",
-  "prompt": "Create a conceptual two-panel illustration. Left panel: a front door with a ringing doorbell, a clock showing an early time, and three notification cards flying toward the door, one drawn as a faded dotted outline because it never arrived. Label under the panel: \"Prompt\". Right panel: a desk with a long itemized statement, every line ticked, a total line with a euro sign, and a clock showing a later time. Label under the panel: \"Complete\". Between the panels an arrow from left to right labeled \"confirm\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
-  "alt": "Left: a ringing doorbell with notification cards, one of them missing. Right: a complete itemized statement being checked later in the day.",
-  "caption": "A webhook is the doorbell: prompt, and possibly missing. A report is the statement: complete, and later. The books are written from the statement."
-}
--->
+![Left: a ringing doorbell with notification cards, one of them missing. Right: a complete itemized statement being checked later in the day.](assets/images/15-payment-reconciliation-and-reporting/15-doorbell-and-statement.jpeg)
+**Figure 3:** *A webhook is the doorbell: prompt, and possibly missing. A report is the statement: complete, and later. The books are written from the statement.*
 
 The difference shows as money once the event stream is used as the complete record. Suppose a team books each night from that day's “payment succeeded” notifications, and on Thursday the bank credit is €1,930 lower than their sum *(an illustrative figure)*. The €1,930 is probably made of things those notifications never carried: the provider's fees, refunds, chargebacks, an increase in a reserve or deposit the provider holds back, and sales that belong to a different payout or batch than the day they were notified. Each of those is a line in the itemized report of the payout or batch.
 
