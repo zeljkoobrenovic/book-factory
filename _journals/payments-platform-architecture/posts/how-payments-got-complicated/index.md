@@ -50,8 +50,6 @@ The price is the shopkeeper's, and it has two parts. The customer may never pay.
 
 A shopkeeper who sells on promises therefore has to manage that risk, and the notebook is the tool. Who gets credit at all: the family down the road, not the traveler passing through. How much: a week of bread, not a year of it. When to stop: no more goods for a customer whose old debt is still open. And how to survive the debts that are never paid: by setting prices that leave room for them. The book calls this work **risk management**. Every later way of paying does it too, with a model in place of the shopkeeper's memory ([[payment-fraud-and-risk]]).
 
-One risk is of a different kind. A customer who cannot pay is unlucky; one who never meant to pay is cheating. A stranger says "put it on my cousin's account". A customer denies ever taking the flour. And the notebook can cheat too, with a line for goods nobody took. Deceiving someone on purpose to get goods or money is **fraud**, and it needs its own defenses: knowing who is really at the counter, and a record both sides can check ([[payment-fraud-and-risk]]).
-
 **When is it really paid?** On payday, if the customer comes. **Who is on the hook until then?** The shopkeeper, whose only proof is the notebook.
 
 ## The Check: A Promise on Paper, Carried Between Banks
@@ -160,7 +158,7 @@ Here are the nine steps side by side, each with what it made possible and what i
 | Step | What it made possible | What it added | New party or delay | What can now go wrong |
 | --- | --- | --- | --- | --- |
 | Cash | Two strangers trade with no trust | A payment that is complete on the spot | None | Loss, theft, forgery |
-| Shop credit | The family eats before payday; the shop keeps its customer | A promise, a ledger, reconciliation, risk management, a first defense against fraud | A wait until payday | The debt is never paid; two records disagree; someone lies about who they are or what they took |
+| Shop credit | The family eats before payday; the shop keeps its customer | A promise, a ledger, reconciliation, risk management | A wait until payday | The debt is never paid; two records disagree |
 | Check | Trade with another town without carrying cash | Clearing and settlement | Two banks; days | The check comes back unpaid after the goods are gone |
 | Card | The shop sells to a stranger; the customer pays later | The issuer and its guarantee, for a fee | The card company | The shop breaks a rule and the guarantee does not hold |
 | Card network | One card for any shop; any bank's card for the shop | The acquirer, authorization, interchange | A second bank and a network; money a day or more after the answer | **The Phantom Payment**, **The Black-Box Balance** |
