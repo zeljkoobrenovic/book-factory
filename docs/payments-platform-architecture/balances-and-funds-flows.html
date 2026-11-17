@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pending, Available, Reserved: Balances and Funds Flows</title>
+    <meta name="description" content="Between the customer paying and the merchant being paid, where is the money and whose is it? The cash is in transit or pooled at the provider, and the merchant holds a claim whose states (pending, available, reserved) are the provider's decisions; Adyen documents paying before it is paid, and Stripe's documentation does not say.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SETTLED: Architecting Payments and Revenue Infrastructure">
+    <meta property="og:title" content="Pending, Available, Reserved: Balances and Funds Flows">
+    <meta property="og:description" content="Between the customer paying and the merchant being paid, where is the money and whose is it? The cash is in transit or pooled at the provider, and the merchant holds a claim whose states (pending, available, reserved) are the provider's decisions; Adyen documents paying before it is paid, and Stripe's documentation does not say.">
+    <meta property="og:url" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/balances-and-funds-flows.html">
+    <meta property="og:image" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/assets/images/13-balances-and-funds-flows/logo.jpeg">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="site.css">
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-129891352-1"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+        dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'UA-129891352-1');
+</script>
+    <style>
+        body {
+            line-height: 1.65;
+        }
+
+        main {
+            padding-top: 32px;
+        }
+
+        nav.post-nav {
+            font-size: 14px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: baseline;
+            flex-wrap: wrap;
+        }
+
+        nav.post-nav a {
+            color: var(--muted);
+            text-decoration: none;
+        }
+
+        nav.post-nav a:hover {
+            color: var(--accent);
+        }
+
+        nav.post-nav .nav-right {
+            margin-left: auto;
+            display: inline-flex;
+            gap: 4px;
+            align-items: baseline;
+        }
+
+        nav.post-nav .nav-sep {
+            color: var(--muted);
+        }
+
+        footer nav.post-nav {
+            margin-top: 24px;
+            margin-bottom: 0;
+        }
+
+        header.post {
+            margin-bottom: 32px;
+        }
+
+        header.post .section {
+            color: var(--muted);
+            font-size: 13px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin: 0 0 -6px;
+        }
+
+        header.post .section a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        header.post .section a:hover {
+            color: var(--accent);
+        }
+
+        header.post .section .post-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        header.post .section .post-status .status-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        header.post .logo {
+            display: block;
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            border: 1px solid lightgrey;
+
+        }
+
+        header.post .logo-credit {
+            color: var(--muted);
+            font-size: 12px;
+            margin: -4px 0 24px;
+            text-align: right;
+        }
+
+        header.post h1 {
+            font-size: 52px;
+            line-height: 1.2;
+            margin: 0 0 2px;
+            padding: 0;
+            letter-spacing: -0.01em;
+            font-weight: normal;
+        }
+
+        header.post .byline {
+            color: var(--muted);
+            font-size: 15px;
+            margin: 0;
+        }
+
+        header.post .byline .spec-link {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        header.post .byline .spec-link:hover {
+            text-decoration: underline;
+        }
+
+        header.post .byline .spec-link-drifted {
+            color: #b8650f;
+        }
+
+        header.post .byline .spec-link-superseded {
+            color: var(--muted);
+        }
+
+        header.post .ai-credit {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 4px 0 0;
+        }
+
+        header.post .ai-credit a {
+            color: inherit;
+        }
+
+        header.post .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 10px 0 10px;
+        }
+
+        header.post .tags .tag {
+            font-size: 14px;
+            padding: 1px 8px;
+            border: 1px solid deepskyblue;
+            color: blue;
+            border-radius: 999px;
+            background-color: var(--tag-bg);
+        }
+
+        nav.modality-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--rule);
+            margin: 0 0 28px;
+            flex-wrap: wrap;
+        }
+
+        nav.modality-tabs button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font: inherit;
+            font-size: 14px;
+            color: var(--muted);
+            padding: 8px 14px;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            letter-spacing: 0.02em;
+        }
+
+        nav.modality-tabs button:hover {
+            color: var(--accent);
+        }
+
+        nav.modality-tabs button.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        #content .pane[hidden] {
+            display: none;
+        }
+
+        #content .pane:focus {
+            outline: none;
+        }
+
+        #content .pane:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 6px;
+        }
+
+        article h2 {
+            font-size: 26px;
+            margin: 40px 0 12px;
+            letter-spacing: -0.01em;
+        }
+
+        article h3 {
+            font-size: 20px;
+            margin: 28px 0 8px;
+        }
+
+        article h4 {
+            font-size: 17px;
+            margin: 20px 0 6px;
+        }
+
+        article p {
+            margin: 0 0 16px;
+        }
+
+        article a {
+            color: var(--accent);
+        }
+
+        article a.image-link {
+            display: inline-block;
+            line-height: 0;
+        }
+
+        article img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        article a.image-link img {
+            display: block;
+        }
+
+        article ul, article ol {
+            padding-left: 24px;
+            margin: 0 0 16px;
+        }
+
+        article li {
+            margin-bottom: 6px;
+        }
+
+        article ul.task-list {
+            list-style: none;
+            padding-left: 4px;
+        }
+
+        article ul.task-list li.task > input[type="checkbox"] {
+            margin-right: 8px;
+            accent-color: var(--accent);
+        }
+
+        article hr {
+            border: none;
+            border-top: 1px solid var(--rule);
+            margin: 32px 0;
+        }
+
+        article blockquote {
+            margin: 16px 0;
+            padding: 12px 18px;
+            background: var(--quote-bg);
+            border-left: 3px solid var(--accent);
+            color: #333;
+        }
+
+        article blockquote p:last-child {
+            margin-bottom: 0;
+        }
+
+        article code {
+            background: var(--code-bg);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 0.92em;
+        }
+
+        article pre {
+            background: var(--code-bg);
+            padding: 14px 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        article pre code {
+            background: none;
+            padding: 0;
+        }
+
+        article .table-wrap {
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+
+        article table {
+            border-collapse: collapse;
+            margin: 16px 0;
+            width: 100%;
+            font-size: 15px;
+        }
+
+        article .table-wrap table {
+            margin: 0;
+        }
+
+        /* Wide tables scroll on narrow screens instead of crushing their columns.
+           A table wrapped in <div class="table-compact"> opts out: it has few,
+           short columns and wraps its cells to fit the screen instead. */
+        @media (max-width: 640px) {
+            article .table-wrap table {
+                min-width: 560px;
+            }
+            article .table-compact .table-wrap table {
+                min-width: 0;
+            }
+        }
+
+        /* Tables that actually overflow get a visible cue and keyboard focus
+           (markScrollableTables() sets the class and attributes). */
+        article .table-wrap.is-scrollable::before {
+            content: "Scroll sideways to see the whole table";
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        article .table-wrap.is-scrollable:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        article th, article td {
+            border: 1px solid var(--rule);
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        article th {
+            background: var(--code-bg);
+            font-weight: 600;
+        }
+
+        /* GFM column alignment from the separator row. Right-aligned columns
+           hold numbers; their cells never wrap, so a sign, a currency symbol
+           and its amount stay on one line while label columns still wrap. */
+        article th.num, article td.num {
+            text-align: right;
+        }
+
+        article td.num {
+            white-space: nowrap;
+        }
+
+        article th.center, article td.center {
+            text-align: center;
+        }
+
+        article .mermaid {
+            text-align: center;
+            margin: 24px 0;
+        }
+
+        article .force-graph {
+            margin: 24px 0;
+            border: 1px solid var(--rule);
+            border-radius: 6px;
+            background: #fff;
+            height: 480px;
+            overflow: hidden;
+        }
+
+        article .bubble-chart {
+            margin: 24px 0;
+            text-align: center;
+        }
+
+        article .bubble-chart svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <nav class="post-nav"><a class="nav-back" href="index.html">SETTLED: Architecting Payments and Revenue Infrastructure</a><span class="nav-right"><a class="nav-prev" href="payment-ledgers.html" title="The Book of Record: How Payment Companies Build Ledgers">← Previous</a><span class="nav-sep">&nbsp;|&nbsp;</span><a class="nav-next" href="payouts-and-money-movement.html" title="Getting Money Out: Payouts and Money Movement">Next →</a></span></nav>
+    <header class="post" id="post-header">
+        <p class="section">Part III — LEDGER: Recording and Moving Money</p>
+        <h1>Pending, Available, Reserved: Balances and Funds Flows</h1>
+        <p class="byline">Željko Obrenović  ·  2026-11-17  ·  25 min read · <a class="spec-link" href="balances-and-funds-flows.spec.html">View spec</a></p>
+        <p class="ai-credit">AI-assisted: researched and written with Claude Code; illustrations generated with Gemini. <a href="https://zeljkoobrenovic.github.io/book-factory/foundations/ai-mediated-authoring.html">How this works</a></p>
+        <div class="tags" id="tags"></div>
+        <a href="assets/images/13-balances-and-funds-flows/logo.jpeg" target="_blank" rel="noopener noreferrer" aria-label="Open header illustration at full size"><img class="logo" src="assets/images/13-balances-and-funds-flows/logo.jpeg" alt=""></a>
+        <p class="logo-credit">Image generated by Google Gemini (gemini-3-pro-image-preview)</p>
+    </header>
+    <nav class="modality-tabs" id="modality-tabs" hidden role="tablist" aria-label="Reading formats"></nav>
+    <div id="content"></div>
+    <footer>
+        <nav class="post-nav"><a class="nav-back" href="index.html">SETTLED: Architecting Payments and Revenue Infrastructure</a><span class="nav-right"><a class="nav-prev" href="payment-ledgers.html" title="The Book of Record: How Payment Companies Build Ledgers">← Previous</a><span class="nav-sep">&nbsp;|&nbsp;</span><a class="nav-next" href="payouts-and-money-movement.html" title="Getting Money Out: Payouts and Money Movement">Next →</a></span></nav>
+    </footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/force-graph"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script id="data" type="application/json">{"meta": {"title": "Pending, Available, Reserved: Balances and Funds Flows", "date": "2026-11-17", "author": "Željko Obrenović", "excerpt": "Between the customer paying and the merchant being paid, where is the money and whose is it? The cash is in transit or pooled at the provider, and the merchant holds a claim whose states (pending, available, reserved) are the provider's decisions; Adyen documents paying before it is paid, and Stripe's documentation does not say.", "permalink": "balances-and-funds-flows", "timetoread": "25 min read", "icon": "assets/icons/13-balances-and-funds-flows.png", "logo": "assets/images/13-balances-and-funds-flows/logo.jpeg", "logo_credit": "Image generated by Google Gemini (gemini-3-pro-image-preview)"}, "tags": [], "modalities": [{"key": "index", "label": "Article", "meta": {}, "blocks": [{"type": "markdown", "content": "> **IN THIS CHAPTER, YOU WILL:** Follow Mila's €120 through three balances and learn to read pending, available and reserved as a provider's decisions about a debt.\n\n> **KEY POINTS:**\n>\n> * **A balance is a claim on the provider, not money in an account.** Between payment and payout the cash is moving through the card network or sitting in pooled bank accounts that are not the merchant's. The merchant has a line in the provider's books.\n> * **\"Pending\", \"available\" and \"reserved\" are decisions, and only one provider says what \"available\" assumes.** Stripe dates every transaction by a schedule per country and payment method, and does not say whether that schedule waits for the network, beyond terms that let a payout wait when a network fails to pay Stripe. Adyen dates a whole sales day, states that it pays whether or not the card scheme has paid it, and takes back what has not settled within 30 days.\n> * **Money leaves a balance without a payout.** Refunds, chargebacks, fees, holds and reversals are booked when they occur. Store one entry per movement with its own dates, and map vocabularies by function: \"reserve\" is the provider's hold at Stripe and the merchant's own buffer at Adyen.\n\n> **[FAILURE PATTERNS THIS CHAPTER ADDRESSES](where-payment-systems-go-wrong.html):**\n>\n> * **The Black-Box Balance** — a provider total copied into your own system cannot be broken down into sales, fees, refunds and holds, so nobody can say why it changed.\n> * **The Orphaned Refund** — a refund or chargeback is booked on the day it occurs, against a balance that paid out the original sale long before.\n> * **A Card by Any Other Name** — availability differs by payment method: on Stripe's schedule a Dutch card payment waits three business days and a SEPA Direct Debit six.\n\n<br>\nA balance on a payment provider's dashboard looks like a bank balance, and nearly everyone reads it as one. A studio owner sells a €120 class pass on Tuesday evening. On Wednesday morning her payments screen shows €117.47, and her bank account shows nothing. She asks what sounds like one question and is three: **is that money mine, where is it right now, and why can I not have it until Thursday?**\n\nThis chapter's answer is that **she holds a claim, not money**. Between the payment and the payout, the cash is moving through the card network or sitting in bank accounts that are not hers, and her share exists only as the provider's record of what it owes her. \"Pending\", \"available\" and \"reserved\" are the provider's decisions about when and how much of that debt it will pay. This is the book's gap between the instant answer and the slow truth, seen from the merchant's side. Adyen's terms say that it pays \"irrespective of whether the funds are actually received by Adyen\"; Stripe's documentation gives a schedule and does not say whether it waits for the network.\n\nFor an integrator the consequence is a modeling one. A team that stores the balance as one running total gets **the Black-Box Balance**: a figure nobody can break down into sales, fees, refunds and holds. Larkfield, the fictional studio-software platform this book follows, ended 2025 with its own \"owed to studios\" figure €412,000 away from its providers' balances.\n\n**Where we are in the payment's journey.** Mila Janssen bought her ten-class pass for €120.00 on Tuesday 9 March 2027 at 19:42, and the payment was captured (the instruction to collect an approved amount) at once. Studio Noord's payout arrives on Thursday 11 March. This chapter covers the two days in between, after [The Slow Truth: Capture, Clearing and Settlement](clearing-and-settlement.html) and before [Getting Money Out: Payouts and Money Movement](payouts-and-money-movement.html).\n\nThe chapter starts with the question as it reached Larkfield. It then says what a provider balance is, and shows how Stripe and then Adyen decide when an amount becomes payable. Next comes what each has published about paying a merchant before the network has paid the provider, then what takes money out of a balance without a payout: fees, holds, negative balances and currency conversion. Three ways to model a balance follow, then the two providers side by side, Mila's €120 worked through, and the ways a balance goes wrong.\n\n## Setting the Scene at Larkfield: Whose €117.47 Is It?\n\nOn Wednesday 10 March 2027, Ines Bakker, who owns Studio Noord in Utrecht, opened Larkfield's back office and saw €117.47 against Mila's pass: the €120.00 less the fee of €2.53 that Larkfield, as the platform, takes on the sale. Studio Noord takes its payments through Adyen. She wrote to support: is this mine, where is it, and why does it only arrive on Thursday? Aylin Demir, Head of Studio Support, could answer the third part from habit and neither of the others.\n\nFemke de Graaf, Larkfield's Head of Payments Engineering, looked at why. The back office showed each studio one running total per provider, copied from the provider, with no dates and no reasons. The **1,140 studios** that take online payments through Stripe and front-desk payments through Adyen saw two totals, in two vocabularies, and support had no table saying which words meant the same thing.\n\nShe rewrote Ines's question as three that a system could answer. **Where is the cash? Who decides when the studio may use the amount, and by what rule? What can still be taken out of it?** The next sections take them in that order.\n\n## A Balance Is a Claim on the Provider, Not an Account\n\nA **merchant balance** is the net amount the provider's books say it owes the merchant at a given moment: sales credited, less everything debited, less what has already been paid out. Adyen's documentation (n.d., accessed November 2026) says: \"Adyen pays you on a net basis. This means your payable batch is made up from your sales figure from which we deduct\" transaction costs, refunds, chargebacks and other adjustments. Stripe's (n.d., accessed November 2026) says of its payments balance: \"When a customer initiates a refund or files a dispute, funds are also deducted from the payments balance.\"\n\nIt has to be a figure in a book, because no bank account holds one merchant's sales. A card network (Visa or Mastercard, also called a scheme) settles with its member banks in net amounts ([The Slow Truth: Capture, Clearing and Settlement](clearing-and-settlement.html)). The acquirer, the licensed institution that takes card payments in on the merchant's side, receives one amount per network and currency, and commonly keeps it in pooled accounts with the money of many other merchants. Adyen's first step from capture to payout reads: \"A payment is captured, and the card scheme or payment method sends the funds to Adyen.\" One merchant's share exists only as a line in the provider's ledger ([The Book of Record: How Payment Companies Build Ledgers](payment-ledgers.html)). Which accounts hold the pooled cash, and what protects it, is the subject of [Whose Money Is It? Licences, Safeguarding and Where Funds Sit](licences-and-safeguarding.html).\n\nBetween payment and payout, four parties each hold something different, and only one of the four things is cash.\n\n| Party | In plain words | What it holds between payment and payout | What it risks |\n| --- | --- | --- | --- |\n| Issuer | The cardholder's bank, which approved the payment | The cash, until it settles with the network | A cardholder who does not repay a credit card |\n| Card network (scheme) | The rules and the switch between banks | An obligation to settle net amounts between its members | A member bank that fails to settle |\n| Acquirer or provider | Stripe or Adyen, taking the payment in for the merchant | Pooled cash once the network pays, and a debt to the merchant | Paying the merchant and not being paid; a merchant who cannot cover later refunds |\n| Merchant | Studio Noord | A claim on the provider: the balance | A claim that is reduced later |\n\n![Two-lane diagram: cash moves from the cardholder's bank through the card network into the provider's pooled account, while the studio holds only a line in the provider's ledger.](assets/images/13-balances-and-funds-flows/13-claim-not-cash.jpeg)\n**Figure 1:** *The cash stops in the provider's pooled account; what the merchant holds until the payout is a line in the provider's book.*\n\nFive terms describe the state of that claim. Each is a statement about the debt, and none says where cash is.\n\n* **Pending funds** — owed to the merchant, not yet payable.\n* **Available funds** — payable now, and what refunds are taken from.\n* **Reserve** — owed, but held back by the provider against refunds and chargebacks that may still come. A chargeback is a payment reversed by the cardholder's bank after a dispute ([Money Flowing Backward: Refunds, Reversals and Disputes](refunds-reversals-and-disputes.html)).\n* **Negative balance** — the debits exceed the credits, so the merchant owes the provider.\n* **Pre-funding** — the provider pays the merchant before the network has paid the provider.\n\n## Stripe: A Balance per Currency and a Date on Every Transaction\n\nStripe's documentation (n.d., accessed November 2026) describes an account that \"can have one or more balances that hold funds for different products and currencies\". The main one is the payments balance; beside it are a refunds and disputes balance the merchant can fund in advance and a reserve balance that Stripe creates. Funds are in one of two states. \"For example, when a customer makes a card payment, the charge amount (minus Stripe’s fee) appears in your pending balance until settlement.\" Then: \"After the funds settle, they move to your available balance.\" The fee is taken off before the amount appears.\n\nEvery change to a balance is a **balance transaction**. Stripe's API reference (n.d., accessed November 2026) gives it an `amount`, a `fee`, a `net` (\"You can calculate the net impact of a transaction on a balance by `amount` - `fee`\"), a `type`, a `source` (the payment, refund or payout behind it), a `status` that is \"either `available` or `pending`\", and `available_on`: \"The date that the transaction’s net funds become available in the Stripe balance.\" The availability date belongs to each entry, not to the balance. A comment in an example query in Stripe's documentation for Sigma, its SQL reporting product, calls the table of these objects \"the canonical record of changes to your Stripe balance\".\n\n> **INFERENCE, NOT DOCUMENTED:** A balance transaction is a one-sided statement line: one amount against one balance. It reads like a merchant's view of the two-sided ledger Stripe described in 2024 ([The Book of Record: How Payment Companies Build Ledgers](payment-ledgers.html)), but no public source says how the one is derived from the other, or how quickly a ledger entry becomes visible in the API.\n\nThe value of `available_on` comes from a published schedule. Stripe defines its term: \"Settlement time is the time between when a payment or a funding transaction is made and when the funds become available in your Stripe balance.\" In this documentation \"settle\" therefore means the schedule running out, a different event from the network settling with its banks. The schedule is by country: 2 business days in the United States, and in the Netherlands, Germany, Belgium and the United Kingdom 7 calendar days for an account's first payout and 3 business days after that. It is also by payment method: a SEPA Direct Debit (a payment pulled from a euro bank account, which the payer's bank can send back) takes 6 business days. Stripe gives the reason: \"These payments have a higher risk of returns or reversals, which factors into their longer settlement periods.\" Availability is a risk decision written as a date.\n\nSales are only one `type` of balance transaction. The list also includes `refund`, `stripe_fee`, `reserve_hold`, `payout`, `transfer` and `adjustment`, which is how a dispute appears. Stripe's list of types says: \"When a customer disputes a charge, Stripe deducts the disputed amount from your balance.\" Each is booked when it happens. Nor is every fee netted on its sale: \"Your account might have fees debited from your balance on a daily or monthly basis.\"\n\n## Adyen: A Batch per Sales Day and a Delay Computed From the Mix\n\nAdyen's unit is a day, where Stripe's is a transaction. Its documentation (n.d., accessed November 2026) describes what happens after capture: \"The funds are assigned to a payable batch based on your payout model. The payable batch closes according to your payout frequency. If the payable balance is positive when the payable batch closes, Adyen instructs the payout to you.\" A **payable batch** is the set of entries paid together. Under Sales day payout, the default model, \"You get all the funds from a particular sales day in a single payout batch, with a fixed payout delay.\" A sales day runs from midnight to midnight in the account's time zone unless configured otherwise.\n\nThe payout delay is computed. \"The payout delay is calculated to be the break-even point, where faster payment methods settle enough funds to make up for the funds not yet settled by the slower payment methods.\" For a typical mix, Adyen gives 2 business days when at least 80% of transactions are in one of eight listed currencies (the euro, the pound and the US dollar among them) and acquired in that currency's own region, and 3 business days otherwise (3, 7 or 12 for an account that came to Adyen through a partner). A mix dominated by a slow-settling scheme gets a longer delay. The date is a liquidity calculation over the whole mix; it does not wait for each payment.\n\nAdyen pays net, and what it nets is booked when it occurs: \"Refunds, chargebacks, and other adjustments are added to the payable batch as they occur and are not related to the sales day of the original transaction.\" Fees reach the merchant twice. Transaction costs are deducted in the batch, and then, per Adyen's invoice documentation, \"Each month, Adyen gives you a Payment processing invoice\", after which \"There can be a difference between the costs in the invoice and the deductions from your settlement batches during the month. Adyen will credit or debit the difference to the next settlement batch\".\n\nThe names of the resulting balances are where a reader coming from Stripe goes wrong. Adyen's Balances page defines **available funds** as a sum of parts, among them \"Pending: the gross amount of sales and refunds that have not yet been settled by the respective card scheme or payment method\" and \"Next payout: the current amount to be settled to your bank account at the next moment of payout\". At Adyen, then, \"available funds\" contains \"pending\"; at Stripe the two are opposite states. The other parts of the sum are a reserve and a negative refund allowance; beside available funds Adyen keeps a second balance, the deposit. The reserve and the deposit are taken up two sections below.\n\nLarkfield's studios are on Adyen for Platforms, where the claim sits in a **balance account** per studio and the same day-based rule applies under the name settlement delay. Adyen's platform documentation (n.d., accessed November 2026) says: \"Adyen settles a settlement batch after its sales day ends and the configured settlement delay has passed. The date when the schemes or payment methods transfer the funds to Adyen does not affect this timing.\" Each entry in the platform's accounting report has two dates: \"The booking date is when the event (like a payment) took place, and the value date is when the actual balance is credited or debited to a balance account.\" That is the same pair as Stripe's `created` and `available_on`.\n\n## Paying Before Being Paid: Pre-Funding and Who Carries the Gap\n\nBoth schedules fix when an amount becomes payable, and neither mentions the day the network pays the provider. Put a fixed payout delay of two business days next to a scheme that, in Adyen's words, \"has a settlement delay of 7 days\", and on some payments the provider has paid out money it has not yet received. That is **pre-funding** (Adyen writes \"prefinancing\"): the provider pays the merchant from its own liquidity. The question for an integrator is whether \"available\" tells you that the network has paid.\n\nAt Adyen it does not, and Adyen says so twice. Its Sales Day Payout Terms of Service (last updated 17 June 2024) state that Adyen will \"initiate payout of the Net Captured Volume to Merchant on the Payout Day, irrespective of whether the funds are actually received by Adyen from the Acquirer or Scheme Owner\". Its documentation (n.d., accessed November 2026) names the mechanism: \"Adyen prefinances your payments. When Adyen settles a transaction's funds to your payable batch before the card scheme or payment method settles those funds to Adyen, Adyen advances you the funds while settlement is still pending.\" Adyen's Annual Report 2025 is more cautious: its risk section calls paying \"only after funds have been received\" the \"default setup\" and places liquidity mismatches \"primarily through pre-financing in accelerated payout schedules\". The two statements cannot be reconciled from public text.\n\nThe advance has a limit and a way back. \"Prefinancing is capped at 30 days. If the card scheme, payment method, or acquirer does not settle the funds within 30 days, Adyen reverses the prefinanced amount from your payable batch. These reversals appear as SettledReversed and RefundNotCleared entries.\" If the money turns up later, it is booked again. The platform model has the same rule: \"If Adyen does not receive the funds within 30 days after a payment's capture, we subtract those funds from the current settlement batch.\" The reversal is also quiet: the `SETTLED_REVERSED` and `REFUND_NOT_CLEARED` webhook event types \"apply to all payment methods and are disabled by default\".\n\n![Timeline with two tracks: the merchant is paid on day 2, the provider is paid by the network later, and an advance outstanding at the 30-day cap is taken back.](assets/images/13-balances-and-funds-flows/13-paid-before-being-paid.jpeg)\n**Figure 2:** *Under Adyen's Sales day payout as its documentation describes it, the merchant is paid on a fixed day, the network pays the provider later, and an advance still unsettled after 30 days is taken back.*\n\nAdyen bounds the risk it takes by advancing. Under the terms, payment methods that settle late or unpredictably are excluded and paid only on receipt, and \"If more than 25% of the Captured Volume on a sub-account consists of Payment Methods that structurally settle to Adyen later than the Payout Day, Adyen will have the right to accordingly delay the Payout Day by one or more business days.\" Activation is subject to Adyen's review of the merchant. Its other model, Pass-through payout, pays on receipt, and Adyen's documentation calls it \"the only available payout model in Africa, Brazil, and India\". Pre-funding is a credit decision about the merchant and its mix.\n\nStripe documents an advance explicitly in one product. Its Instant Payouts documentation (n.d., accessed November 2026) says of the funds that can be paid out at once: \"Card payment funds are available immediately, including pending funds within your payout schedule window. Bank debit funds (ACH, SEPA) are only included after they fully settle, since they can be reversed before that point.\" The loss follows liability. On a platform, Stripe's Connect documentation says: \"When platforms and marketplaces are liable for losses, you’re liable for uncovered negative balances due to refunds or disputes on instantly paid out funds.\"\n\nFor Stripe's standard payouts, the public record stops at the schedule. The balances, payouts and Connect balance pages, as read in November 2026, give the schedule and use no term such as pre-financing, and the list of balance transaction types has no entry described as taking back an advance that the network never settled. The nearest entry is `payment_reversal`, \"Created when a debit/failure related to a payment is detected from a banking partner\", which \"takes funds that were previously credited to the merchant for a payment out of the merchant balance\"; the list does not say which payment methods it covers or whether it applies after a payout. Stripe's services terms (last modified 28 September 2026) add two rights: a payout can be held back by \"a delay or failure of a Financial Provider to settle a Transaction to Stripe\", and Stripe may reverse a settlement if \"the Payment Method Provider invalidates the Transaction\". **No public source (documentation, terms or support site) says whether `available_on` otherwise waits for the network's settlement of a payment, or does not.** The absence is not evidence either way.\n\n> **INFERENCE, NOT DOCUMENTED:** At Adyen the two risks are split. Adyen carries the timing gap with its own liquidity, for at most 30 days. The merchant carries the outcome: an amount that never settles is taken back from a later batch by set-off (netting a debt against money owed). For Stripe's standard payouts the terms let Stripe delay or reverse; who carries the timing gap in the normal case is not public.\n\n## What Leaves a Balance Without a Payout: Fees, Holds, Negative Balances and Currency\n\nThe reversal of an advance is one of six kinds of movement that reduce a balance with no payout. At each provider one itemized record says which it was: the balance transactions at Stripe, and at Adyen the journal types (the kinds of entry) in the settlement details report, which Adyen creates when a payable batch closes (both sets of documentation n.d., accessed November 2026).\n\n| Movement | Stripe: balance transaction `type` | Adyen: journal type |\n| --- | --- | --- |\n| A refund | `refund` | `Refunded` |\n| A chargeback | `adjustment`, with the dispute as `source` | `Chargeback`, `SecondChargeback` |\n| A fee debited apart from the sale | `stripe_fee` | `Fee`, `InvoiceDeduction` |\n| A hold raised by the provider | `reserve_hold`, `reserved_funds` | `DepositCorrection` |\n| A pre-funded amount taken back | Not public for standard payouts; the nearest type is `payment_reversal` | `SettledReversed`, `CaptureFailed` |\n| The merchant's own buffer refilled | `payout_minimum_balance_hold` | `ReserveAdjustment` |\n\nBoth providers hold back part of a merchant's money against refunds and chargebacks still to come. Stripe calls this a **reserve**. Its support article on reserves (n.d., accessed November 2026) says: \"A reserve is a temporary hold on a portion of a business’s funds for a predetermined period of time\", and names two types, fixed and rolling. Adyen calls its hold a **deposit** and sizes it continuously: \"Unlike the reserve, you cannot determine your own deposit amount. Adyen calculates the deposit requirement for your account daily, based on variables such as your processing volume and the number of chargebacks and refunds.\" A hold can therefore grow on any day, out of that day's sales.\n\nBoth also let the merchant keep a buffer of its own. At Stripe it is a minimum balance: \"Automatic payouts only pay out funds exceeding this minimum balance to your bank account.\" At Adyen it is the **reserve**: \"the available amount you configure to cover for refunds, chargebacks, and other operational expenses\". So \"reserve\" names the provider's hold at one and the merchant's buffer at the other. Map the two by what they do.\n\n| Function | Stripe term | Adyen term |\n| --- | --- | --- |\n| Held by the provider for risk | Reserve | Deposit |\n| Buffer set by the merchant | Minimum balance | Reserve |\n\nWhen debits exceed credits, the merchant owes the provider. Stripe's payouts documentation (n.d., accessed November 2026) gives the example: \"if you receive 100 USD in payments but refund 200 USD of prior payments, your account balance would be -100 USD.\" Without further payments to cover it, Stripe creates a payout that debits the merchant's bank account, \"a Payout object with a negative `amount`\". On a platform, where each seller has its own connected account, the Connect documentation adds a step: an account property says whether Stripe or the platform is responsible for a seller's negative balance. Where it is the platform, \"Stripe holds a reserve on your platform account’s `available` balance\", and \"When a connected account holds a negative balance amount for 180 days, Stripe transfers a portion of your balance to zero out that account’s balance\". Meanwhile the seller cannot be paid out.\n\nAdyen's documented default is to net forward. Under its Sales Day Payout terms (2024), if the amount to be paid out is negative, \"Adyen may in its discretion (i) transfer such negative balance to the immediately following Payout Day, or (ii) exercise its set-off right or other rights in accordance with the terms of the Agreement.\" The settlement details report shows the carry-over as its own journal type, `Balancetransfer`. On a platform, the platform's own account stands behind its sellers. Adyen's account structure page (n.d., accessed November 2026) defines the liable balance account as \"the account where your business' funds are held. Funds can be deducted from this account if your users' balance accounts incur negative balances due to refunds and chargebacks.\"\n\nCurrency adds one more movement: a sale in one currency reaches a balance in another, at a rate recorded on the entry. Stripe's documentation (n.d., accessed November 2026) says: \"Stripe automatically converts all incoming funds into your default currency.\" With multi-currency settlement, a merchant can instead keep balances in up to 18 currencies. The balance transaction carries an `exchange_rate`. Adyen \"offers like-for-like (no currency conversion) settlement if the currency is also supported as a settlement currency by the payment method\", and where it converts, the settlement details report has an Exchange Rate column. Read the recorded rate; do not recompute it. Part of Larkfield's €412,000 came from a rounding rule of its own.\n\n## Three Ways to Model a Provider Balance in Your Own System\n\nA balance moved by many kinds of entry, on their own dates and in two vocabularies, has to be held somehow in your own system. The first design copies the provider's total and shows it. It costs almost nothing, and it is what Larkfield's back office did before Keel, its 2027 program for the payments estate. It explains nothing: the number has no date, no parts and no reason. I would accept it only where the figure is displayed and nobody else is owed anything from it.\n\nThe second design recomputes the balance from your own payment records: paid payments, less refunds, less the fees you expect. It can say which sales make up the figure, and it drifts from the provider with every entry that is not a sale. Larkfield's Unexplained €0.4 Million was this design: the three causes found (refunds after payout, chargeback fees, a conversion rounding rule) were all entries for which the payment table had no row.\n\nThe third design keeps one internal entry for every movement the provider reports, and it is the one I would build. Each entry has a type assigned by function, an amount, a booked-at time, an available-at time and the provider's own reference. Both providers expose these fields: Stripe on the balance transaction (`type`, `created`, `available_on`, `source`), Adyen in the settlement details report (journal type, payment reference, batch) and the platform accounting report (booking date, value date). Larkfield's Keel decision K3, \"a ledger entry for every movement\", is this design.\n\nWhat decides between the three designs is whether anyone else is owed from the balance.\n\n| Design | What it can answer | What it misses | When it is right |\n| --- | --- | --- | --- |\n| Mirror the provider's total | What the provider says now | Why it changed; what is payable when | Display only, and nobody else is owed from the balance |\n| Recompute from your payments | Which sales make up the figure | Every entry that is not a sale: separate fees, holds, reversals, conversions, adjustments for other days | As a cross-check on the entry model, never as the record |\n| One entry per provider movement | Why it changed, what is payable on which date, what is held | Nothing the provider reports; it costs a mapping per provider and a reconciliation ([Proving the Money: Reconciliation Inside the Provider and Out](payment-reconciliation-and-reporting.html)) | As soon as you owe sellers from the balance or must explain it to finance |\n\n## Stripe and Adyen: Where They Differ\n\nSix documented differences separate the two models. The Stripe and Adyen columns restate facts cited above (documentation accessed in November 2026; Adyen's terms of June 2024). The last column is my reading, an inference.\n\n| Aspect | Stripe | Adyen | What the difference suggests |\n| --- | --- | --- | --- |\n| Unit of the claim | A balance per product and currency; one balance transaction per change | A payable batch per merchant account; a balance account per user on platforms | Stripe's view is account-like; Adyen's is batch-like for merchants, account-like for platforms |\n| When funds become payable | Per transaction, at `available_on`, by a schedule per country and payment method | Per sales day, after a computed payout delay (typically 2 or 3 business days) | Stripe ages a transaction; Adyen ages a day |\n| Tie to the network's settlement | Not public for standard payouts, beyond terms that allow a delay when a network fails to settle to Stripe (2026); documented for Instant Payouts | Documented: pays whether or not funds were received; reversal after 30 days | Only Adyen tells an integrator what \"available\" assumes |\n| Fees | Netted per transaction; some fees debited daily or monthly | Netted in the batch; a monthly invoice trued up in the next batch | Adyen needs an invoice reconciliation; Stripe shows the fee on each entry |\n| Provider's hold and merchant's buffer | Reserve; minimum balance | Deposit; reserve | Same two functions, crossed names |\n| Negative balance | A negative payout debits the bank account; on platforms, a transfer from the platform after 180 days | Carried to the next payout day or set off; on platforms, the liable balance account can be debited | Stripe documents a pull from the bank; Adyen documents netting forward |\n\nOn Stripe, read `available_on` on each balance transaction instead of assuming a number of days, and expect a negative balance to be collected from the bank account. On Adyen, reconcile per batch, enable the `SETTLED_REVERSED` and `REFUND_NOT_CLEARED` events that are off by default, and reconcile the monthly invoice against the fees already netted.\n\n## In Practice at Larkfield: The Three Balances Behind Mila's €120\n\nOn the evening of Tuesday 9 March, Mila's €120.00 becomes three figures in Adyen's books. Larkfield's split instruction ([Dividing the Money: Splits, Platform Balances and Seller Payouts](splits-balances-and-platform-payouts.html)) books the studio's share to Studio Noord's balance account and Larkfield's fee to Larkfield's liable balance account. Adyen's documentation (n.d., accessed November 2026) says of transaction fees on platforms: \"By default, these costs are deducted from your liable balance account\". So the processing cost comes out of Larkfield's figure. None of the three is a bank account of Studio Noord's.\n\n| Figure in the provider's books | Whose claim | Amount |\n| --- | --- | --- |\n| Studio Noord's balance account | Studio Noord's | €117.47 |\n| Larkfield's liable balance account | Larkfield's: its fee of €2.53 less the processing cost | €1.92 |\n| The processing cost | Nobody's claim; the provider keeps it and passes part on to the issuer and the network ([Who Earns What: Interchange, Scheme Fees and Provider Pricing](payment-economics.html)) | €0.61 *(assumption)* |\n| Total | | €120.00 |\n\n![A €120.00 payment divided in a ledger book into €117.47 for the studio, €1.92 for the platform and €0.61 of processing cost.](assets/images/13-balances-and-funds-flows/13-three-balances.jpeg)\n**Figure 3:** *Mila's €120.00 becomes three figures in the provider's book: €117.47 owed to the studio, €1.92 owed to Larkfield and €0.61 of processing cost.*\n\nThe studio's €117.47 is booked on Tuesday and changes state on Thursday 11 March. Studio Noord's settlement delay is two business days (a Larkfield contract detail, illustrative), which matches the example in Adyen's platform documentation: sales captured on a Monday \"are settled two business days later, on Wednesday, regardless of when the schemes pay out the funds.\" The payout that includes the pass reaches Ines's bank the same Thursday. Whether Visa had paid Adyen by then, Ines cannot know, and it changes nothing for her unless the funds have still not arrived after 30 days.\n\nHad Studio Noord been on Stripe, the same sale would be a balance transaction with `status` pending and an `available_on` of Friday 12 March, on Stripe's documented Dutch default of three business days. If it were the account's first payout, the wait would be seven calendar days. The claim is the same and the date differs, for a reason unrelated to Mila's card.\n\nOn 18 March Mila asks for a refund of the seven unused classes, €84.00. Adyen books refunds \"as they occur\", so the debit lands on 18 March, against a balance that no longer contains Mila's payment: that was paid out on the 11th. What covers it is whatever Studio Noord has sold since, €212.40 that day *(assumption)*, so the refund is covered; where a studio's later sales are not enough, the platform funds the shortfall ([Dividing the Money: Splits, Platform Balances and Seller Payouts](splits-balances-and-platform-payouts.html)). The point here is the date: an entry that belongs to a sale of 9 March sits in the batch of 18 March.\n\nUnder Keel decision K3, Larkfield replaced the copied total with entries, and the back office now answers Ines with three amounts and their dates: on its way, ready to pay out, and held. I would use words of your own like these: they force the mapping to be done by function, once, in code.\n\n| Larkfield's field | Fed at Stripe by | Fed at Adyen by |\n| --- | --- | --- |\n| On its way | Balance transactions with `status` pending, each with its `available_on` | Bookings whose value date is still in the future |\n| Ready to pay out | Balance transactions with `status` available | Amounts settled to the balance account |\n| Held by the provider for risk | Reserve | Deposit |\n| Buffer the merchant set | Minimum balance | Reserve |\n\n## When It Goes Wrong\n\nThe commonest failure is a balance that fell with no payout. The total will never say why. List the entries since the last figure you can explain and group them by type: balance transactions by `created` and `type` at Stripe, the settlement details report by journal type at Adyen, or the accounting report on a platform. The answer is one of the six movements in the table above. With entries of your own this is a query; with a total it is a support ticket.\n\nThe failure that arrives latest is an advance taken back. Adyen books `SettledReversed` \"when it does not receive the funds from the card scheme or payment method within 30 days after capture. No action is required. Adyen adjusts your balance automatically.\" That describes Adyen's side. On yours, a sale paid out a month ago has just been debited, and with the event disabled by default you learn of it only from the report. Enable the event, post the reversal against the original payment, and decide in advance who bears it: the seller or you.\n\nThe third failure stops payouts without a failed API call. A hold is raised, or a balance goes negative, and the next payout is smaller or absent. At Adyen, \"If the deposit requirement increases, funds from your sales are booked to the deposit\". At Stripe, a connected account with a negative balance cannot be paid out at all. Both show up only as entries. Watch for the hold types and for the sign of each balance, and tell the seller before they ask.\n\n## What to Take Away\n\n**Established.**\n\n- A provider balance is a net figure in the provider's books. Stripe and Adyen both document it as sales less refunds, disputes, fees and other adjustments.\n- Both publish the rule that makes funds payable: Stripe a schedule per country and payment method on each transaction, Adyen a computed payout delay on each sales day.\n- Both book adjustments when they occur. A day's payout cannot be recomputed from that day's sales.\n- Adyen documents that it pays before it is paid, capped at 30 days and reversed by a later entry.\n\n**Depends on context.**\n\n- How long funds stay pending depends on country, payment method and the provider's risk view of the account. Read the date on the entry.\n- Whether a hold applies, and how large it is, is the provider's decision and can change daily at Adyen.\n- Who covers a seller's negative balance depends on the platform's liability set-up ([One Payment, Three Parties: Platform and Marketplace Models](platform-payment-models.html)). Where the platform is liable, a seller's refund can become the platform's loss.\n\n**The author's synthesis.**\n\n- \"Available\" is a risk decision expressed as a timestamp. I keep entries with a booked-at and an available-at time and never a bare total, because every question a seller or an auditor asks is about a date or a reason.\n- I map provider vocabularies by function and never by name, and I treat a provider's silence about what availability assumes as a question to put to it, not a fact to infer.\n\n## Questions to Ask\n\n1. Can we show the entries behind every balance figure in our system, each with its type and dates?\n2. Do we store when an amount becomes payable as a date on each entry, or do we assume a fixed number of days?\n3. What does this provider's \"available\" assume about the card network having paid, and where is that written?\n4. Which events or report rows say that an amount already paid out was taken back, and are they enabled?\n5. Which term at each provider means the provider's hold, and which a buffer we set?\n6. What happens when a seller's balance goes negative: who is debited, after how long, and do payouts stop meanwhile?\n7. Where do fees appear: on each sale, as separate debits, on a monthly invoice, or all three?\n8. Do we book currency conversions at the provider's recorded rate?\n\nInes's €117.47 was never cash waiting for her. On Wednesday it was a debt Adyen had recorded, and on Thursday it became a debt Adyen had decided to pay. Paying it means leaving the provider's ledger for a bank rail, where the provider can record that it sent the money and cannot see whether it arrived. That is the subject of [Getting Money Out: Payouts and Money Movement](payouts-and-money-movement.html).\n\n## Sources and Evidence\n\n*Company, product and investor sources*\n\n- [Balances and settlement time](https://docs.stripe.com/payments/balances), Stripe documentation, n.d., accessed 2026-11 — balance types, pending and available, settlement timing by country and payment method, fees debited daily or monthly.\n- [The Balance Transaction object](https://docs.stripe.com/api/balance_transactions/object), Stripe API reference, n.d., accessed 2026-11 — fields (`amount`, `fee`, `net`, `status`, `available_on`, `exchange_rate`) and the `type` list.\n- [Balance transaction types](https://docs.stripe.com/reports/balance-transaction-types), Stripe documentation, n.d., accessed 2026-11 — disputes booked as adjustments, reserve and minimum-balance types, `payment_reversal`.\n- [Sigma data freshness](https://docs.stripe.com/data/data-freshness), Stripe documentation, n.d., accessed 2026-11 — the balance transactions table as \"the canonical record\" (a comment in an example query).\n- [Receive payouts from Stripe](https://docs.stripe.com/payouts), Stripe documentation, n.d., accessed 2026-11 — negative balances and negative payouts.\n- [Understanding Connect account balances](https://docs.stripe.com/connect/account-balances), Stripe documentation, n.d., accessed 2026-11 — responsibility for negative balances, the platform reserve, the 180-day transfer, payouts stopped while negative.\n- [Instant Payouts for Stripe Dashboard users](https://docs.stripe.com/payouts/instant-payouts), Stripe documentation, n.d., accessed 2026-11 — which funds are eligible before they are available.\n- [Instant Payouts for Connect](https://docs.stripe.com/connect/instant-payouts), Stripe documentation, n.d., accessed 2026-11 — platform liability for instantly paid funds.\n- [Stripe Services Agreement: Services Terms](https://stripe.com/legal/ssa-service-terms), Stripe, last modified 2026-09-28 — Stripe Payments Terms on the transfer of settlement funds and on reversals; the definition of Payout Delay.\n- [Annual Report 2025](https://investors.adyen.com/financials/2025), Adyen N.V., signed 2026-03-05 — the risk section: paying \"only after funds have been received\" as the \"default setup\"; liquidity mismatches \"primarily through pre-financing in accelerated payout schedules\" (audited; read in the PDF this page offers for download).\n- [Minimum balances for automatic payouts](https://docs.stripe.com/payouts/minimum-balances-for-automatic-payouts), Stripe documentation, n.d., accessed 2026-11 — the merchant-set buffer.\n- [Multi-currency settlement](https://docs.stripe.com/payouts/multi-currency-settlement), Stripe documentation, n.d., accessed 2026-11 — conversion to the default currency and balances in up to 18 currencies.\n- [Ledger: Stripe's system for tracking and validating money movement](https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement), Ilya Ganelin, Stripe, 2024-02-16 — that Stripe's internal ledger is double-entry (the fact behind the inference about balance transactions).\n- [Reserves - Frequently Asked Questions](https://support.stripe.com/questions/reserves-frequently-asked-questions), Stripe support, n.d., accessed 2026-11 — definition of a reserve; fixed and rolling reserves.\n- [Getting paid](https://docs.adyen.com/account/getting-paid), Adyen documentation, n.d., accessed 2026-11 — the payable batch, payout models, net payouts, like-for-like settlement, where Pass-through payout is the only model.\n- [Sales day payout](https://docs.adyen.com/account/sales-day-payout), Adyen documentation, n.d., accessed 2026-11 — the payout delay and its calculation, adjustments as they occur, reversal events disabled by default.\n- [Upgrade to Sales day payout](https://docs.adyen.com/account/sales-day-payout/upgrade-to-sdp), Adyen documentation, n.d., accessed 2026-11 — \"Adyen prefinances your payments\", the 30-day cap, the reversal journal types.\n- [Pass-through payout](https://docs.adyen.com/account/pass-through-payout), Adyen documentation, n.d., accessed 2026-11 — the model that pays on receipt.\n- [Sales Day Payout Terms of Service](https://www.adyen.com/legal/sales-day-payout-terms-of-service), Adyen, last update 2024-06-17 — payout irrespective of receipt, the 25% rule, excluded payment methods, negative balance.\n- [Balances](https://docs.adyen.com/account/balances), Adyen documentation, n.d., accessed 2026-11 — available funds, pending, next payout, reserve and deposit.\n- [Settlement details report](https://docs.adyen.com/reporting/settlement-reconciliation/transaction-level/settlement-details-report), Adyen documentation, n.d., accessed 2026-11 — journal types and the Exchange Rate column.\n- [Payment processing invoice](https://docs.adyen.com/reporting/invoice-reconciliation/payment-processing-invoice), Adyen documentation, n.d., accessed 2026-11 — the monthly invoice and the difference booked to the next batch.\n- [Settle funds](https://docs.adyen.com/platforms/settle-funds), Adyen for Platforms documentation, n.d., accessed 2026-11 — sales day settlement, the settlement delay, settlement reversal after 30 days.\n- [Account structure](https://docs.adyen.com/platforms/account-structure-resources), Adyen for Platforms documentation, n.d., accessed 2026-11 — the liable balance account.\n- [Transaction fees](https://docs.adyen.com/platforms/online-payments/transaction-fees), Adyen for Platforms documentation, n.d., accessed 2026-11 — fees deducted from the liable balance account by default.\n- [Balance Platform Accounting Report](https://docs.adyen.com/platforms/reports-and-fees/balance-platform-accounting-report), Adyen for Platforms documentation, n.d., accessed 2026-11 — booking date and value date.\n\n*Standards, regulation and official documentation*\n\n- None.\n\n*Research and practitioner sources*\n\n- None.\n\nLarkfield is fictional; architectural recommendations, labeled inferences and labeled assumptions are the author's judgement.\n"}]}]}</script>
+<script>
+    (function () {
+        const data = JSON.parse(document.getElementById('data').textContent);
+        const root = document.getElementById('content');
+
+        const postId = (data.meta && data.meta.id) ? String(data.meta.id) : '';
+        const postStatusRaw = (data.meta && data.meta.status) ? String(data.meta.status) : '';
+        if (postId || postStatusRaw) {
+            const header = document.getElementById('post-header');
+            let sectionEl = header.querySelector('p.section');
+            if (!sectionEl) {
+                sectionEl = document.createElement('p');
+                sectionEl.className = 'section';
+                header.insertBefore(sectionEl, header.firstChild);
+            }
+            // Status pill goes first, then a " / " separator before the existing
+            // content (section name and/or id).
+            if (postStatusRaw) {
+                const parts = postStatusRaw.split(':');
+                const statusName = parts[0].trim();
+                const statusColor = (parts[1] || '').trim();
+                const wrap = document.createElement('span');
+                wrap.className = 'post-status';
+                const dot = document.createElement('span');
+                dot.className = 'status-dot';
+                if (statusColor) dot.style.background = statusColor;
+                wrap.appendChild(dot);
+                wrap.appendChild(document.createTextNode(statusName));
+                if (sectionEl.firstChild) {
+                    sectionEl.insertBefore(document.createTextNode(' • '), sectionEl.firstChild);
+                    sectionEl.insertBefore(wrap, sectionEl.firstChild);
+                } else {
+                    sectionEl.appendChild(wrap);
+                }
+            }
+            if (postId) {
+                if (sectionEl.firstChild) sectionEl.appendChild(document.createTextNode(' • '));
+                sectionEl.appendChild(document.createTextNode(postId));
+            }
+        }
+
+        const tagsHost = document.getElementById('tags');
+        (data.tags || []).forEach(function (t) {
+            const span = document.createElement('span');
+            span.className = 'tag';
+            span.textContent = t;
+            tagsHost.appendChild(span);
+        });
+
+        // Minimal markdown renderer. Supports: ATX headings, paragraphs, blockquotes,
+        // unordered/ordered lists, fenced code, inline code, bold/italic/strikethrough, links, images, hr.
+        // Sufficient for the posts in this repo; replace with a fuller parser if needed.
+        function renderMarkdown(src) {
+            const lines = src.replace(/\r\n/g, '\n').split('\n');
+            const out = [];
+            let i = 0;
+
+            const bullet = /^(\s*)([-*])\s+(.*)$/;
+            const ordered = /^(\s*)(\d+)\.\s+(.*)$/;
+            const tableRow = /^\s*\|(.+)\|\s*$/;
+            const tableSep = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+
+            function splitRow(s) {
+                let t = s.trim();
+                if (t.startsWith('|')) t = t.slice(1);
+                if (t.endsWith('|')) t = t.slice(0, -1);
+                return t.split('|').map(c => c.trim());
+            }
+
+            function inline(s) {
+                // Posts are trusted content, so raw HTML passes through unescaped
+                // (some posts embed inline <blockquote>, <div>, etc.).
+                // Stray ampersands still get fixed up.
+                s = s.replace(/&(?![a-zA-Z]+;|#\d+;)/g, '&amp;');
+                s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<a class="image-link" href="$2" target="_blank" rel="noopener noreferrer"><img alt="$1" src="$2"></a>');
+                s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+                s = s.replace(/`([^`]+)`/g, function (_, c) {
+                    return '<code>' + c.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
+                });
+                // Bold/italic, including nested combinations: ***x***,
+                // **a *b*** / ***a* b** (shared delimiters), and **a *b* c**.
+                s = s.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+                s = s.replace(/\*\*([^*\n]+)\*([^*\n]+)\*\*\*/g, '<strong>$1<em>$2</em></strong>');
+                s = s.replace(/\*\*\*([^*\n]+)\*([^*\n]+)\*\*/g, '<strong><em>$1</em>$2</strong>');
+                s = s.replace(/\*\*((?:[^*\n]|\*(?!\*)[^*\n]+\*(?!\*))+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+                s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+                return s;
+            }
+
+            while (i < lines.length) {
+                const line = lines[i];
+                if (!line.trim()) {
+                    i++;
+                    continue;
+                }
+
+                const fence = line.match(/^```(\w*)\s*$/);
+                if (fence) {
+                    i++;
+                    const buf = [];
+                    while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+                        buf.push(lines[i]);
+                        i++;
+                    }
+                    i++;
+                    const escaped = buf.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const cls = fence[1] ? ' class="lang-' + fence[1] + '"' : '';
+                    out.push('<pre><code' + cls + '>' + escaped + '</code></pre>');
+                    continue;
+                }
+
+                const h = line.match(/^(#{1,6})\s+(.*)$/);
+                if (h) {
+                    out.push('<h' + h[1].length + '>' + inline(h[2]) + '</h' + h[1].length + '>');
+                    i++;
+                    continue;
+                }
+
+                if (/^\s*(?:-\s*){3,}\s*$/.test(line) || /^\s*\*{3,}\s*$/.test(line)) {
+                    out.push('<hr>');
+                    i++;
+                    continue;
+                }
+
+                if (/^>\s?/.test(line)) {
+                    const buf = [];
+                    while (i < lines.length && /^>\s?/.test(lines[i])) {
+                        buf.push(lines[i].replace(/^>\s?/, ''));
+                        i++;
+                    }
+                    out.push('<blockquote>' + renderMarkdown(buf.join('\n')) + '</blockquote>');
+                    continue;
+                }
+
+                if (tableRow.test(line) && i + 1 < lines.length && tableSep.test(lines[i + 1])) {
+                    const headers = splitRow(line);
+                    const aligns = splitRow(lines[i + 1]).map(function (c) {
+                        c = c.trim();
+                        const left = c.startsWith(':'), right = c.endsWith(':');
+                        return left && right ? 'center' : right ? 'num' : '';
+                    });
+                    const cellOpen = function (tag, idx) {
+                        return aligns[idx] ? '<' + tag + ' class="' + aligns[idx] + '">' : '<' + tag + '>';
+                    };
+                    i += 2;
+                    const rows = [];
+                    while (i < lines.length && tableRow.test(lines[i])) {
+                        rows.push(splitRow(lines[i]));
+                        i++;
+                    }
+                    let html = '<div class="table-wrap"><table><thead><tr>';
+                    headers.forEach((h, idx) => {
+                        html += cellOpen('th', idx) + inline(h) + '</th>';
+                    });
+                    html += '</tr></thead><tbody>';
+                    rows.forEach(r => {
+                        html += '<tr>';
+                        r.forEach((c, idx) => {
+                            html += cellOpen('td', idx) + inline(c) + '</td>';
+                        });
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                    out.push(html);
+                    continue;
+                }
+
+                if (bullet.test(line) || ordered.test(line)) {
+                    // Indent of the first bullet defines this list's base level.
+                    // Deeper-indented bullets become nested lists (rendered by
+                    // recursing into renderMarkdown). Same-or-less indent at a
+                    // bullet starts a sibling item (or ends the list).
+                    const firstMatch = line.match(bullet) || line.match(ordered);
+                    const baseIndent = firstMatch[1].length;
+                    const isOrdered = ordered.test(line);
+                    const items = [];
+                    let hasTask = false;
+                    while (i < lines.length) {
+                        const cur = lines[i];
+                        if (!cur.trim()) {
+                            // blank line breaks the list (matches CommonMark-ish behaviour)
+                            i++;
+                            break;
+                        }
+                        const mBul = cur.match(bullet);
+                        const mOrd = cur.match(ordered);
+                        const m = mBul || mOrd;
+                        if (!m) break;
+                        if (m[1].length < baseIndent) break;
+                        if (m[1].length > baseIndent) break; // shouldn't happen at top of loop
+                        // Same-type check: switching between -/* and 1. closes the list
+                        if (isOrdered !== !!mOrd) break;
+
+                        const itemBuf = [m[3]];
+                        const nestedBuf = [];
+                        i++;
+                        while (i < lines.length) {
+                            const nxt = lines[i];
+                            if (!nxt.trim()) break;
+                            const nBul = nxt.match(bullet);
+                            const nOrd = nxt.match(ordered);
+                            const nm = nBul || nOrd;
+                            if (nm) {
+                                if (nm[1].length > baseIndent) {
+                                    // nested list line — dedent and stash
+                                    nestedBuf.push(nxt.slice(baseIndent + 2));
+                                    i++;
+                                    continue;
+                                }
+                                // sibling or end of list
+                                break;
+                            }
+                            // Plain continuation text
+                            if (nestedBuf.length) {
+                                // continuation inside the nested block
+                                nestedBuf.push(nxt.slice(baseIndent + 2));
+                            } else {
+                                itemBuf.push(nxt.trim());
+                            }
+                            i++;
+                        }
+
+                        // GitHub-style task items: "- [ ] text" / "- [x] text"
+                        // render as (clickable, unpersisted) checkboxes.
+                        const itemText = itemBuf.join('\n');
+                        const task = !isOrdered && itemText.match(/^\[( |x|X)\]\s+/);
+                        let liHtml = inline(task ? itemText.slice(task[0].length) : itemText);
+                        if (task) {
+                            hasTask = true;
+                            liHtml = '<input type="checkbox"' + (task[1] === ' ' ? '' : ' checked') + '>' + liHtml;
+                        }
+                        if (nestedBuf.length) {
+                            liHtml += renderMarkdown(nestedBuf.join('\n'));
+                        }
+                        items.push(task ? '<li class="task">' + liHtml + '</li>' : '<li>' + liHtml + '</li>');
+                    }
+                    out.push((isOrdered ? '<ol>' : (hasTask ? '<ul class="task-list">' : '<ul>')) + items.join('') + (isOrdered ? '</ol>' : '</ul>'));
+                    continue;
+                }
+
+                const buf = [line];
+                i++;
+                while (i < lines.length && lines[i].trim() && !/^#{1,6}\s/.test(lines[i]) && !/^>\s?/.test(lines[i]) && !bullet.test(lines[i]) && !ordered.test(lines[i]) && !/^```/.test(lines[i]) && !tableRow.test(lines[i])) {
+                    buf.push(lines[i]);
+                    i++;
+                }
+                out.push('<p>' + inline(buf.join(' ')) + '</p>');
+            }
+            return out.join('\n');
+        }
+
+        // Block dispatcher. New block types plug in here.
+        const renderers = {
+            markdown: function (block) {
+                const div = document.createElement('div');
+                div.innerHTML = renderMarkdown(block.content);
+                return div;
+            },
+            mermaid: function (block) {
+                // Mermaid scans elements with class "mermaid" whose textContent
+                // is the diagram source. We collect these nodes and run
+                // mermaid.run() once after all blocks are in the DOM.
+                const div = document.createElement('div');
+                div.className = 'mermaid';
+                div.textContent = block.content;
+                return div;
+            },
+            'force-graph': function (block) {
+                // build.py emits parsed JSON: {nodes:[{id,size}], links:[{source,target}]}.
+                // We instantiate force-graph after the container is in the DOM
+                // so it can measure its own width.
+                const div = document.createElement('div');
+                div.className = 'force-graph';
+                const data = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.ForceGraph) return;
+                    const maxSize = data.nodes.reduce((m, n) => Math.max(m, n.size || 1), 1);
+                    window.ForceGraph()(div)
+                        .graphData(data)
+                        .width(div.clientWidth)
+                        .height(div.clientHeight)
+                        .nodeRelSize(4)
+                        .nodeVal(n => Math.max(20 * (n.size || 1) / maxSize, 0.001))
+                        .nodeLabel(n => n.id + ' (' + (n.size || 1) + ')')
+                        .nodeColor(() => 'rgba(135, 206, 235, 0.7)')
+                        .linkColor(() => 'rgba(60, 60, 60, 0.4)')
+                        .linkDirectionalArrowLength(4)
+                        .linkDirectionalArrowRelPos(1)
+                        .linkWidth(1);
+                });
+                return div;
+            },
+            'bubble-chart': function (block) {
+                // build.py emits {nodes:[{name,size}]}. Renders a D3 circle-pack
+                // SVG (same shape as the obren.io reference, just inline).
+                const wrap = document.createElement('div');
+                wrap.className = 'bubble-chart';
+                const payload = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.d3) return;
+                    const diameter = 480;
+                    const fill = '#c0deed';
+                    const textColor = '#111111';
+                    const fontSize = 12;
+
+                    const svg = window.d3.select(wrap).append('svg')
+                        .attr('viewBox', '0 0 ' + diameter + ' ' + diameter)
+                        .attr('width', diameter)
+                        .attr('height', diameter);
+
+                    const root = window.d3.hierarchy({children: payload.nodes})
+                        .sum(d => d.size || 0)
+                        .sort((a, b) => b.value - a.value);
+
+                    window.d3.pack().size([diameter, diameter]).padding(2)(root);
+
+                    const node = svg.selectAll('g')
+                        .data(root.leaves())
+                        .enter().append('g')
+                        .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+
+                    node.append('title').text(d => d.data.name + ': ' + d.value);
+                    node.append('circle').attr('r', d => d.r).style('fill', fill);
+                    node.append('text')
+                        .attr('dy', '.3em')
+                        .style('text-anchor', 'middle')
+                        .style('fill', textColor)
+                        .style('font-size', fontSize + 'px')
+                        .text(d => d.data.name.substring(0, Math.max(0, Math.floor(d.r / 3))));
+                });
+                return wrap;
+            }
+        };
+
+        // Render one modality's blocks into a host element. Mermaid runs
+        // scoped to just the nodes created here, so lazily rendered tabs get
+        // their diagrams on first activation.
+        let mermaidInitialized = false;
+        function renderBlocksInto(blocks, host) {
+            const mermaidNodes = [];
+            blocks.forEach(function (block) {
+                const r = renderers[block.type];
+                if (!r) {
+                    const pre = document.createElement('pre');
+                    pre.textContent = '[unknown block type: ' + block.type + ']';
+                    host.appendChild(pre);
+                    return;
+                }
+                const node = r(block);
+                if (node instanceof Node) {
+                    host.appendChild(node);
+                    if (block.type === 'mermaid') mermaidNodes.push(node);
+                }
+            });
+            if (mermaidNodes.length && window.mermaid) {
+                if (!mermaidInitialized) {
+                    window.mermaid.initialize({startOnLoad: false, theme: 'default'});
+                    mermaidInitialized = true;
+                }
+                window.mermaid.run({nodes: mermaidNodes});
+            }
+            markScrollableTables(host);
+        }
+
+        // A table wider than its wrapper scrolls sideways. Mark those wrappers
+        // so the CSS can show a cue, and make them focusable so keyboard users
+        // can reach and scroll them. Hidden panes measure 0 and are re-marked
+        // when activated or when the window is resized.
+        function markScrollableTables(host) {
+            host.querySelectorAll('.table-wrap').forEach(function (wrap) {
+                const scrolls = wrap.scrollWidth > wrap.clientWidth + 1;
+                wrap.classList.toggle('is-scrollable', scrolls);
+                if (scrolls) {
+                    wrap.setAttribute('tabindex', '0');
+                    wrap.setAttribute('role', 'region');
+                    wrap.setAttribute('aria-label', 'Table that scrolls sideways');
+                } else {
+                    wrap.removeAttribute('tabindex');
+                    wrap.removeAttribute('role');
+                    wrap.removeAttribute('aria-label');
+                }
+            });
+        }
+
+        // Modality tabs. One <article class="pane"> per modality; panes are
+        // rendered lazily on first activation (force-graph / D3 / mermaid
+        // need a visible, measurable container). With a single modality the
+        // tab bar stays hidden and the page looks exactly like before.
+        const mods = data.modalities;
+        const tabBar = document.getElementById('modality-tabs');
+        const panes = {};
+        const tabButtons = {};
+        const renderedPanes = {};
+
+        // With several modalities each pane is a tabpanel labelled by its
+        // tab (W3C APG tabs pattern); tabindex=0 lets keyboard users move
+        // from the tab list straight into the active content.
+        mods.forEach(function (m) {
+            const pane = document.createElement('article');
+            pane.className = 'pane';
+            pane.dataset.key = m.key;
+            pane.hidden = true;
+            if (mods.length > 1) {
+                pane.id = 'pane-' + m.key;
+                pane.setAttribute('role', 'tabpanel');
+                pane.setAttribute('aria-labelledby', 'tab-' + m.key);
+                pane.setAttribute('tabindex', '0');
+            }
+            root.appendChild(pane);
+            panes[m.key] = pane;
+        });
+
+        const defaultKey = mods.some(m => m.key === 'index') ? 'index' : mods[0].key;
+
+        function activate(key, updateHash) {
+            mods.forEach(function (m) {
+                const isActive = m.key === key;
+                panes[m.key].hidden = !isActive;
+                if (tabButtons[m.key]) {
+                    tabButtons[m.key].classList.toggle('active', isActive);
+                    tabButtons[m.key].setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    // Roving tabindex: only the selected tab is in the Tab
+                    // order; the arrow keys move between tabs.
+                    tabButtons[m.key].setAttribute('tabindex', isActive ? '0' : '-1');
+                }
+            });
+            // Unhide first, then render: the chart libraries measure widths.
+            if (!renderedPanes[key]) {
+                renderBlocksInto(mods.find(m => m.key === key).blocks, panes[key]);
+                renderedPanes[key] = true;
+            } else {
+                markScrollableTables(panes[key]);
+            }
+            if (updateHash) {
+                history.replaceState(null, '',
+                    key === defaultKey ? location.pathname + location.search : '#' + key);
+            }
+        }
+
+        if (mods.length > 1) {
+            mods.forEach(function (m) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = m.label;
+                btn.id = 'tab-' + m.key;
+                btn.dataset.key = m.key;
+                btn.setAttribute('role', 'tab');
+                btn.setAttribute('aria-controls', 'pane-' + m.key);
+                btn.addEventListener('click', function () { activate(m.key, true); });
+                tabBar.appendChild(btn);
+                tabButtons[m.key] = btn;
+            });
+            // Keyboard support per the W3C APG tabs pattern (automatic
+            // activation): Left/Right move between tabs and wrap, Home/End
+            // jump to the first/last tab, and the focused tab is selected.
+            tabBar.addEventListener('keydown', function (ev) {
+                const keys = mods.map(function (m) { return m.key; });
+                const focused = document.activeElement;
+                const current = focused && focused.dataset ? keys.indexOf(focused.dataset.key) : -1;
+                if (current < 0) return;
+                let next = null;
+                if (ev.key === 'ArrowRight') next = (current + 1) % keys.length;
+                else if (ev.key === 'ArrowLeft') next = (current - 1 + keys.length) % keys.length;
+                else if (ev.key === 'Home') next = 0;
+                else if (ev.key === 'End') next = keys.length - 1;
+                if (next === null) return;
+                ev.preventDefault();
+                activate(keys[next], true);
+                tabButtons[keys[next]].focus();
+            });
+            tabBar.hidden = false;
+        }
+
+        // The hash selects a tab only when it matches a modality key, so
+        // existing anchors keep working.
+        const initialHash = location.hash.slice(1);
+        activate(mods.some(m => m.key === initialHash) ? initialHash : defaultKey, false);
+        window.addEventListener('hashchange', function () {
+            const k = location.hash.slice(1);
+            if (mods.some(m => m.key === k)) activate(k, false);
+        });
+        window.addEventListener('resize', function () { markScrollableTables(root); });
+    })();
+</script>
+</body>
+</html>

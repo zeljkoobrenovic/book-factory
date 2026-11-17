@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Keys, Sandboxes and Limits: The Developer Platform Around the API</title>
+    <meta name="description" content="What else has to exist around a payment API before developers can safely build on it? Credentials that limit what each caller can do, a test environment whose gaps are stated and request limits you can plan for; each is a term of the API's contract, and Stripe and Adyen publish very different amounts about them.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SETTLED: Architecting Payments and Revenue Infrastructure">
+    <meta property="og:title" content="Keys, Sandboxes and Limits: The Developer Platform Around the API">
+    <meta property="og:description" content="What else has to exist around a payment API before developers can safely build on it? Credentials that limit what each caller can do, a test environment whose gaps are stated and request limits you can plan for; each is a term of the API's contract, and Stripe and Adyen publish very different amounts about them.">
+    <meta property="og:url" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/payment-developer-platform.html">
+    <meta property="og:image" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/assets/images/21-developer-platform/logo.jpeg">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="site.css">
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-129891352-1"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+        dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'UA-129891352-1');
+</script>
+    <style>
+        body {
+            line-height: 1.65;
+        }
+
+        main {
+            padding-top: 32px;
+        }
+
+        nav.post-nav {
+            font-size: 14px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: baseline;
+            flex-wrap: wrap;
+        }
+
+        nav.post-nav a {
+            color: var(--muted);
+            text-decoration: none;
+        }
+
+        nav.post-nav a:hover {
+            color: var(--accent);
+        }
+
+        nav.post-nav .nav-right {
+            margin-left: auto;
+            display: inline-flex;
+            gap: 4px;
+            align-items: baseline;
+        }
+
+        nav.post-nav .nav-sep {
+            color: var(--muted);
+        }
+
+        footer nav.post-nav {
+            margin-top: 24px;
+            margin-bottom: 0;
+        }
+
+        header.post {
+            margin-bottom: 32px;
+        }
+
+        header.post .section {
+            color: var(--muted);
+            font-size: 13px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin: 0 0 -6px;
+        }
+
+        header.post .section a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        header.post .section a:hover {
+            color: var(--accent);
+        }
+
+        header.post .section .post-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        header.post .section .post-status .status-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        header.post .logo {
+            display: block;
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            border: 1px solid lightgrey;
+
+        }
+
+        header.post .logo-credit {
+            color: var(--muted);
+            font-size: 12px;
+            margin: -4px 0 24px;
+            text-align: right;
+        }
+
+        header.post h1 {
+            font-size: 52px;
+            line-height: 1.2;
+            margin: 0 0 2px;
+            padding: 0;
+            letter-spacing: -0.01em;
+            font-weight: normal;
+        }
+
+        header.post .byline {
+            color: var(--muted);
+            font-size: 15px;
+            margin: 0;
+        }
+
+        header.post .byline .spec-link {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        header.post .byline .spec-link:hover {
+            text-decoration: underline;
+        }
+
+        header.post .byline .spec-link-drifted {
+            color: #b8650f;
+        }
+
+        header.post .byline .spec-link-superseded {
+            color: var(--muted);
+        }
+
+        header.post .ai-credit {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 4px 0 0;
+        }
+
+        header.post .ai-credit a {
+            color: inherit;
+        }
+
+        header.post .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 10px 0 10px;
+        }
+
+        header.post .tags .tag {
+            font-size: 14px;
+            padding: 1px 8px;
+            border: 1px solid deepskyblue;
+            color: blue;
+            border-radius: 999px;
+            background-color: var(--tag-bg);
+        }
+
+        nav.modality-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--rule);
+            margin: 0 0 28px;
+            flex-wrap: wrap;
+        }
+
+        nav.modality-tabs button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font: inherit;
+            font-size: 14px;
+            color: var(--muted);
+            padding: 8px 14px;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            letter-spacing: 0.02em;
+        }
+
+        nav.modality-tabs button:hover {
+            color: var(--accent);
+        }
+
+        nav.modality-tabs button.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        #content .pane[hidden] {
+            display: none;
+        }
+
+        #content .pane:focus {
+            outline: none;
+        }
+
+        #content .pane:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 6px;
+        }
+
+        article h2 {
+            font-size: 26px;
+            margin: 40px 0 12px;
+            letter-spacing: -0.01em;
+        }
+
+        article h3 {
+            font-size: 20px;
+            margin: 28px 0 8px;
+        }
+
+        article h4 {
+            font-size: 17px;
+            margin: 20px 0 6px;
+        }
+
+        article p {
+            margin: 0 0 16px;
+        }
+
+        article a {
+            color: var(--accent);
+        }
+
+        article a.image-link {
+            display: inline-block;
+            line-height: 0;
+        }
+
+        article img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        article a.image-link img {
+            display: block;
+        }
+
+        article ul, article ol {
+            padding-left: 24px;
+            margin: 0 0 16px;
+        }
+
+        article li {
+            margin-bottom: 6px;
+        }
+
+        article ul.task-list {
+            list-style: none;
+            padding-left: 4px;
+        }
+
+        article ul.task-list li.task > input[type="checkbox"] {
+            margin-right: 8px;
+            accent-color: var(--accent);
+        }
+
+        article hr {
+            border: none;
+            border-top: 1px solid var(--rule);
+            margin: 32px 0;
+        }
+
+        article blockquote {
+            margin: 16px 0;
+            padding: 12px 18px;
+            background: var(--quote-bg);
+            border-left: 3px solid var(--accent);
+            color: #333;
+        }
+
+        article blockquote p:last-child {
+            margin-bottom: 0;
+        }
+
+        article code {
+            background: var(--code-bg);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 0.92em;
+        }
+
+        article pre {
+            background: var(--code-bg);
+            padding: 14px 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        article pre code {
+            background: none;
+            padding: 0;
+        }
+
+        article .table-wrap {
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+
+        article table {
+            border-collapse: collapse;
+            margin: 16px 0;
+            width: 100%;
+            font-size: 15px;
+        }
+
+        article .table-wrap table {
+            margin: 0;
+        }
+
+        /* Wide tables scroll on narrow screens instead of crushing their columns.
+           A table wrapped in <div class="table-compact"> opts out: it has few,
+           short columns and wraps its cells to fit the screen instead. */
+        @media (max-width: 640px) {
+            article .table-wrap table {
+                min-width: 560px;
+            }
+            article .table-compact .table-wrap table {
+                min-width: 0;
+            }
+        }
+
+        /* Tables that actually overflow get a visible cue and keyboard focus
+           (markScrollableTables() sets the class and attributes). */
+        article .table-wrap.is-scrollable::before {
+            content: "Scroll sideways to see the whole table";
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        article .table-wrap.is-scrollable:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        article th, article td {
+            border: 1px solid var(--rule);
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        article th {
+            background: var(--code-bg);
+            font-weight: 600;
+        }
+
+        /* GFM column alignment from the separator row. Right-aligned columns
+           hold numbers; their cells never wrap, so a sign, a currency symbol
+           and its amount stay on one line while label columns still wrap. */
+        article th.num, article td.num {
+            text-align: right;
+        }
+
+        article td.num {
+            white-space: nowrap;
+        }
+
+        article th.center, article td.center {
+            text-align: center;
+        }
+
+        article .mermaid {
+            text-align: center;
+            margin: 24px 0;
+        }
+
+        article .force-graph {
+            margin: 24px 0;
+            border: 1px solid var(--rule);
+            border-radius: 6px;
+            background: #fff;
+            height: 480px;
+            overflow: hidden;
+        }
+
+        article .bubble-chart {
+            margin: 24px 0;
+            text-align: center;
+        }
+
+        article .bubble-chart svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <nav class="post-nav"><a class="nav-back" href="index.html">SETTLED: Architecting Payments and Revenue Infrastructure</a><span class="nav-right"><a class="nav-prev" href="payment-webhooks-and-events.html" title="The Provider Calls You: Webhooks and Events">← Previous</a><span class="nav-sep">&nbsp;|&nbsp;</span><a class="nav-next" href="part-5.html" title="Part V — TRUST: Card Data, Fraud, Authentication and Compliance">Next →</a></span></nav>
+    <header class="post" id="post-header">
+        <p class="section">Part IV — INTERFACE: The API as the Product</p>
+        <h1>Keys, Sandboxes and Limits: The Developer Platform Around the API</h1>
+        <p class="byline">Željko Obrenović  ·  2026-11-17  ·  22 min read · <a class="spec-link" href="payment-developer-platform.spec.html">View spec</a></p>
+        <p class="ai-credit">AI-assisted: researched and written with Claude Code; illustrations generated with Gemini. <a href="https://zeljkoobrenovic.github.io/book-factory/foundations/ai-mediated-authoring.html">How this works</a></p>
+        <div class="tags" id="tags"></div>
+        <a href="assets/images/21-developer-platform/logo.jpeg" target="_blank" rel="noopener noreferrer" aria-label="Open header illustration at full size"><img class="logo" src="assets/images/21-developer-platform/logo.jpeg" alt=""></a>
+        <p class="logo-credit">Image generated by Google Gemini (gemini-3-pro-image-preview)</p>
+    </header>
+    <nav class="modality-tabs" id="modality-tabs" hidden role="tablist" aria-label="Reading formats"></nav>
+    <div id="content"></div>
+    <footer>
+        <nav class="post-nav"><a class="nav-back" href="index.html">SETTLED: Architecting Payments and Revenue Infrastructure</a><span class="nav-right"><a class="nav-prev" href="payment-webhooks-and-events.html" title="The Provider Calls You: Webhooks and Events">← Previous</a><span class="nav-sep">&nbsp;|&nbsp;</span><a class="nav-next" href="part-5.html" title="Part V — TRUST: Card Data, Fraud, Authentication and Compliance">Next →</a></span></nav>
+    </footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/force-graph"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script id="data" type="application/json">{"meta": {"title": "Keys, Sandboxes and Limits: The Developer Platform Around the API", "date": "2026-11-17", "author": "Željko Obrenović", "excerpt": "What else has to exist around a payment API before developers can safely build on it? Credentials that limit what each caller can do, a test environment whose gaps are stated and request limits you can plan for; each is a term of the API's contract, and Stripe and Adyen publish very different amounts about them.", "permalink": "payment-developer-platform", "timetoread": "22 min read", "icon": "assets/icons/21-developer-platform.png", "logo": "assets/images/21-developer-platform/logo.jpeg", "logo_credit": "Image generated by Google Gemini (gemini-3-pro-image-preview)"}, "tags": [], "modalities": [{"key": "index", "label": "Article", "meta": {}, "blocks": [{"type": "markdown", "content": "> **IN THIS CHAPTER, YOU WILL:** Learn what an API key may do, what a passing test run proves, and how to plan a batch against a request limit at Stripe and Adyen.\n\n> **KEY POINTS:**\n>\n> * **Keys, test environments and limits are terms of the API.** Each decides something no endpoint does: what a leaked key can do, what a green test run has shown, and whether a request sent at a peak is accepted.\n> * **Stripe publishes its limits and its test gaps; Adyen publishes neither for payments.** Stripe's documentation (accessed November 2026) gives 100 requests a second per account in live mode and 25 per endpoint. Adyen's lists no rate limit for its payments APIs, so a throughput has to be agreed in advance.\n> * **A refusal is not a decline.** HTTP 429 means the provider did not try the payment. Pace a predictable peak yourself, repeat a refused request with the same key, and never tell a customer that their payment failed because of it.\n\n> **[FAILURE PATTERNS THIS CHAPTER ADDRESSES](where-payment-systems-go-wrong.html):**\n>\n> * **The First of the Month** — a renewal peak everyone could predict met a per-endpoint limit nobody had read.\n> * **The Phantom Payment** — a request refused for volume was recorded as a failed payment, although the provider had never tried it.\n> * **The Borrowed Blueprint** — Stripe's four limiters explain a provider that serves every customer at once; an integrator needs one bucket per endpoint.\n\n<br>\nOn 1 October 2026 the renewal job at Larkfield, the fictional studio-software platform this book follows ([Meet Larkfield](meet-larkfield.html)), ran code that had passed every test. By the next morning 7,900 members had an email saying their membership payment had failed. No bank had declined any of those payments, and nobody had asked a bank. **The provider had refused the requests because too many arrived at once.**\n\nNobody had planned for that refusal, and it points at what this chapter claims. The earlier chapters of this part produced a careful integrator: a payment service that retries with stored keys, receivers that read the provider's record after every event, a sweep over pending payments, a rehearsal before each version upgrade. All of that is traffic on a shared API, sent with credentials and rehearsed in a test environment. So three things have to exist around a payment API before anyone can safely build on it: **credentials that limit what each caller can do, a test environment whose gaps are stated, and request limits an integrator can plan for.** Each is a term of the API's contract, to be designed against like any field, because each decides something the endpoints do not: what a leaked key can do, what a passing test has shown, and whether a request sent at a peak is accepted.\n\n**Where we are in the payment's journey.** This chapter is off the path of Mila Janssen's €120.00 class pass, bought from Studio Noord on Tuesday 9 March 2027 at 19:42, and it bears on every step of it. The request that created her payment carried a credential, counted against a limit, and ran code that was first exercised in a test environment.\n\nThe chapter starts with that Larkfield morning and the three questions it left. It then takes the three terms in the order an integration meets them: credentials, test environments and request limits. Next it sets Stripe and Adyen side by side, paces the Renewal Wave with Larkfield's numbers, and ends with the ways these terms go wrong.\n\n## Setting the Scene at Larkfield: Three Questions About One Morning\n\nFor years the renewal job had a simple shape. On the 1st of each month, 38% of Larkfield's monthly renewals, about 357,000 payments worth €17.5 million, were attempted in a six-hour window. The job had no rate of its own: a pool of workers took renewals from a queue and sent each one as soon as the previous answer came back. In September 2026 the team raised the pool from 12 workers to 48 to finish sooner. On 1 October the part of the job that charges through Stripe began to receive HTTP 429, \"Too Many Requests\". The job treated every answer other than success as a failed attempt, retried three times at once and then marked the renewal failed. That status triggered the dunning email, the reminder a billing system sends after a failed payment ([From Invoice to Cash: Invoicing, Collections and Dunning](invoicing-collections-and-dunning.html)). 7,900 renewals ended the day that way and were run again on 2 October.\n\nBecause of what the job did, the review looked for a bug and found none. When Femke de Graaf, who joined as head of payments engineering in January 2027, went through the incident with Tom Hendriks, the engineer who built the payment service, they found three questions that nobody had asked. Which key was the job using? It was an unrestricted Stripe secret key from 2017, shared with four other systems, and it could refund or pay out anything in the account. What had the test run shown? The job's tests sent a few hundred renewals to the test environment, never a wave. And which limit applied, and where was it written? The key did no harm that day; it is here because the review found it in the same place as the limit, among the terms of the API that nobody had read. The figure below shows the three.\n\n![A caller's request passes a rack of keys and a turnstile on its way to a service counter, with a side loop to a rehearsal stage.](assets/images/21-developer-platform/21-three-terms-around-the-api.jpeg)\n**Figure 1:** *Three terms stand between a caller and a payment API: the key it holds, the rehearsal it ran and the limit it sends into.*\n\n## Credentials: What One Key Is Allowed to Do\n\nA key to most APIs reads data. A key to a payment API can create refunds and payouts, which send money out of the account. The reach of each key is therefore a design decision: if a key leaks, or the system that holds it has a bug, the damage is whatever that key is allowed to do. **Least privilege** is the rule that follows: each calling system holds a credential that can do its own task and nothing else. Stripe's guidance on keys (n.d., accessed November 2026) states the rule as \"People and systems must have only the privileges required to perform their jobs\", and its keys page states the risk: \"If a fraudulent actor obtains your secret key, they can harm your business.\"\n\nStripe, for example, lists four types of key (documentation n.d., accessed November 2026). An integration of one account uses three; the fourth, an organization key, spans several accounts. A **publishable key** (`pk_…`) identifies the account from a browser or an app, and Stripe says it is safe to embed in client code ([Never Touch the Card: Tokenization, Vaults and PCI Scope](tokenization-vaulting-and-pci.html) covers what it is for). A **secret key** (`sk_…`) is an \"API key that has unrestricted permissions on all Stripe APIs\". A **restricted key** (`rk_…`) is a key whose permission you set per resource to None, Read or Write, and \"The default value for all permissions is None\". Test or live is part of the key: live keys \"start with `pk_live_`, `rk_live_`, and `sk_live_`\". What has changed is the advice. Of secret keys Stripe now writes: \"Because you can’t limit their permissions, we don’t recommend using secret keys for new use cases, and for existing integrations, we recommend migrating secret key usage to RAKs\", its abbreviation for restricted API keys. In server code, it adds, \"restricted API keys are drop-in replacements for secret API keys\".\n\nWhere Stripe makes restriction a kind of key, Adyen makes it part of every credential. Two terms first: an Adyen customer has one **company account** and, under it, one or more **merchant accounts**, the sub-accounts in which payments are processed. Adyen's documentation (n.d., accessed November 2026) defines an API credential as a username, an API key and \"**Roles**: Permissions that define what the credential is allowed to do\". Its scope follows the account: \"Credentials created on a company account can access the company account, including all linked merchant accounts. Credentials created on a merchant account can only access that merchant account.\" Roles are per API and action, such as the \"Checkout webservice role\", and a credential can be tied to an allowed range of IP addresses. Adyen's advice is to split: \"we strongly recommend creating a separate API credential for each channel\" where a business sells both online and in person. The browser gets its own **client key**, which \"is not used when making requests to our APIs\".\n\n## Test Environments: What a Passing Run Has Shown\n\nAfter the key comes the rehearsal. A **test environment** (Stripe calls its own a sandbox; older material says test mode) is a copy of the API in which calls create simulated objects and no card network or bank is contacted. You choose the outcome. A **test card** is a card number that works only there and returns a known result, so a card that always answers \"insufficient funds\" lets you run your decline path. That is what a passing run shows: **your code handles each shape and state the API can return.** It cannot show how often real issuers (the cardholders' banks) decline, how long calls take or which limits apply, because the simulation produces none of these.\n\nStripe is the first example. It separates test from live by key, inside one account. Its documentation (n.d., accessed November 2026) lets an account \"Use up to five sandboxes\" besides a legacy test-mode sandbox, and says \"API objects in one mode aren’t accessible to the other\". Sandboxes are recent: Stripe's developer digest announced a private beta in June 2024 and wrote on 30 August 2024 that \"Sandboxes is now in public beta\"; its developer blog wrote on 7 May 2025 that \"Stripe Sandboxes are now generally available (GA)\". More useful is that Stripe states gaps. In a sandbox \"the payments you create aren’t processed by card networks or payment providers\". On load, \"API limits are lower in a sandbox\", and \"creating a charge in live mode sends a request to a payment gateway and that request is mocked in a sandbox, resulting in significantly different latency profiles\". On events ([The Provider Calls You: Webhooks and Events](payment-webhooks-and-events.html)), \"We retry event deliveries created in a sandbox three times over the course of a few hours\", against up to three days in live mode. A sandbox run therefore cannot rehearse the limit, the latency or the retry window you will meet in production.\n\nAdyen, by contrast, separates by environment. Test and live have different endpoints, different Customer Areas (the Customer Area is Adyen's web portal for payments, settings, credentials and logs) and different credentials: \"When you switch to your live environment, you must generate a new API key in your live Customer Area\" (n.d., accessed November 2026). A live account is applied for, and each company account gets its own live hostname. Configuration does not travel either: \"Adyen does not provide a \"copy\" function for moving your webhook configurations from the test environment to the live environment.\" **Adyen publishes no list of what its test environment cannot simulate.** It states gaps one payment method at a time, for example \"MobilePay cannot be tested in the test environment\". The nearest general statement is in a November 2026 engineering article about a simulator for payment methods that finish outside the checkout: \"Getting a green happy-path response during integration testing doesn’t prove your integration will hold up under the conditions that actually matter at go-live.\"\n\nBecause only one provider lists the gaps, you have to write the list yourself and verify each item in production while someone watches. The Stripe entries below repeat its documentation. For Adyen they are my inference, not documentation: a simulation does not contact issuers, and the rate limits Adyen does publish for its Management API are given for live only.\n\n- **Issuer behavior.** How many payments real banks decline, and with which codes. A test card returns what you asked for.\n- **Latency.** How long a call takes when it passes through a card network.\n- **Live limits.** The request limits of the live account: higher than a sandbox's at Stripe, unpublished for payments at Adyen.\n- **The retry schedule for events.** At Stripe, three attempts in a sandbox against three days in live mode.\n- **Live configuration.** Endpoints, credentials and roles, which at Adyen are created again in live and which a Stripe sandbox copies from live only \"at creation time\".\n\n## Request Limits: Rate Limiting and Load Shedding\n\nThe third term is the one the renewal job met. One API serves every customer of the provider, so one customer's runaway script or sudden peak can slow payments for all the others. The provider's defense is to refuse requests, and there are two kinds of refusal. Stripe's engineering post of March 2017 defines both. \"A rate limiter is used to control the rate of traffic sent or received on the network\": a **rate limit** caps what one caller may send, and a caller who exceeds it gets HTTP 429. **Load shedding** is different: \"A load shedder makes its decisions based on the whole state of the system rather than the user who is making the request.\" When the system itself is overloaded, it drops lower-priority requests from everyone so that critical ones keep working. You can plan against a rate limit; load shedding happens to you.\n\nThat post is also the only limiter design I found from either company. **(Evidence age: 9 years; the current system may differ.)** \"At Stripe, we operate 4 different types of limiters in production\", wrote its author, Paul Tarjan. Two act per user. The request rate limiter \"restricts each user to N requests per second\". The concurrent requests limiter caps work in progress: \"You can only have 20 API requests in progress at the same time\". Two are load shedders. The fleet usage load shedder splits traffic into \"critical API methods (e.g. creating charges) and non-critical methods (e.g. listing charges.)\" and reserves capacity for the first kind: with a 20% reservation, \"any non-critical request over their 80% allocation would be rejected with status code 503\". The worker utilization load shedder \"is the final line of defense\" and sheds by priority, \"starting with test mode traffic\" and reaching critical methods last. The post names its mechanism: \"We use the token bucket algorithm\", implemented with Redis. The figure below shows the four in one path.\n\n![Requests pass four gates in a row: a rate gate and a concurrency gate that turn back one fast caller, then two shedding gates that turn away low-priority requests while critical ones reach the workers.](assets/images/21-developer-platform/21-four-limiters-in-one-path.jpeg)\n**Figure 2:** *The four limiters Stripe described in 2017: two refuse one caller's excess, two shed lower-priority requests from everyone so that critical requests still reach a worker.*\n\nNine years later, Stripe's documentation (n.d., accessed November 2026) confirms part of that account. It confirms rate limits and concurrency limits per account, and it still speaks of the \"concurrency limiter\" shedding new requests. It contradicts one sentence: in 2017 \"Our API provides the same rate limiting behavior in both test and live modes\"; today sandbox limits are lower. It says nothing about the two load shedders, and no current source confirms that they still exist. What it adds is the numbers an integrator plans against. A refused request returns 429 with a `Stripe-Rate-Limited-Reason` header whose value names the limit that was hit, for example `global-rate` or `endpoint-rate`, and a large increase should be requested \"at least 6 weeks in advance\". Note the third row of the table: a batch that sends one kind of request meets the 25, not the 100.\n\n| Limit, per Stripe account | Documented value |\n| --- | --- |\n| All API requests, live mode | 100 requests per second |\n| All API requests, sandbox | 25 requests per second |\n| One endpoint, unless noted (\"each named API operation\" is one) | 25 requests per second |\n| Requests in progress at once, live mode | 50 by default |\n| Creating payouts | 15 requests per second |\n| Read requests | An average of at most 500 per transaction over 30 days |\n\nAdyen publishes none of this for payments. Its documentation sitemap and help center (n.d., accessed November 2026) have no page on API rate limits, and the published definition of its Checkout API, version 72, contains neither the phrase nor a 429 response. Adyen does limit requests: its page on handling responses describes 429 as \"You have sent too many requests in a short period\" and advises \"a retry mechanism that uses exponential backoff with jitter\". It gives figures away from the payment path. The Legal Entity Management API, used to onboard a platform's sellers, states \"Live environments: 700 requests per 5 seconds. Test environments: 200 requests per 5 seconds.\" Terminal-management endpoints of the Management API have per-minute limits that Adyen calls \"indicative\". Whether payment requests are limited per company account or per credential, and how Adyen sheds load, I found in neither its documentation nor its engineering posts.\n\nThe integrator has three designs for meeting a limit, compared in the table below. A **token bucket**, used in the second, is a counter refilled at a fixed rate: each request takes a token and waits when none is left. Both providers document the first design. Stripe documents the second (\"a client-side token bucket rate-limiting algorithm\") and the third. On Adyen the third is my recommendation, because there is no figure to pace against. None of the three calls for copying the four limiters of 2017: those protect a fleet from every caller at once, and an integrator needs one bucket per provider endpoint. [The Biggest Day: Peak Load and Capacity](payment-peak-load.html) takes pacing, fairness and capacity further.\n\n| Design | What it needs | What it costs | When it is right |\n| --- | --- | --- | --- |\n| **React**: back off with jitter on 429 and repeat | A retry path that keeps the idempotency key | Requests are delayed after the limit is already hit; a tight loop makes it worse | Always, as the floor; enough alone for interactive traffic |\n| **Pace**: a client-side token bucket below the limit | A known figure; one place through which all calls pass | The batch takes longer | A predictable batch against a published limit |\n| **Agree**: ask the provider for a figure or an increase | Lead time; your own computed rate | A dependency on an answer | No published limit, or a peak above it |\n\n## Stripe and Adyen: Where They Differ\n\nTaken together, the two providers document credentials and environments in comparable detail and differ most in what they publish about limits and test gaps. The last column of the table is my inference; the other cells are documented above or in \"When It Goes Wrong\" below (documentation n.d., accessed November 2026, unless a year is given).\n\n| Aspect | Stripe | Adyen | What the difference suggests |\n| --- | --- | --- | --- |\n| Server credentials | Secret keys with all permissions; restricted keys with None, Read or Write per resource, now advised over secret keys | Username, API key and roles; scoped to the company account or to merchant accounts; allowed IP range | Restriction is a choice of key at Stripe and a property of every credential at Adyen |\n| Test environment | Sandboxes inside one account (up to five besides the legacy one), told apart by key prefix | A separate environment with its own endpoints, Customer Area and credentials; webhook configuration is not copied to live | A call to the wrong environment is harder at Adyen; drift between test and live configuration is likelier |\n| Stated gaps of test | No card networks; lower limits; mocked latency; three webhook retries over a few hours | No list published; gaps stated per payment method; a 2026 engineering article says a green happy path proves little | At Adyen you write the list yourself |\n| Rate limits for payment requests | 100 per second per account live, 25 in a sandbox, 25 per endpoint, 50 in progress | None published; 429 documented; figures only for Legal Entity Management and parts of the Management API | Stripe's limits can be read; Adyen's have to be asked for |\n| Limiter design | Four limiters, described in 2017 (evidence age: 9 years) | Not public | No inference about Adyen is warranted |\n| Request logs | Request logs in Workbench (2024) and a log link on each error; per a support article, 31 days for GET requests and 15 months for other requests | API logs for thirty days (JSON requests only); a seven-day dashboard | Stripe shows what you wrote for longer; keep your own request log on both |\n\nSo on Stripe, plan from the published page and ask only when your computed rate exceeds it. On Adyen, ask for the rate your company account may send before the first large batch, and write your own list of what test did not show. On both, treat live configuration as something you create and check deliberately.\n\n## In Practice at Larkfield: Pacing the Renewal Wave\n\nStart with Larkfield's arithmetic. The wave is about 357,000 renewals in six hours, which is 21,600 seconds: an average of about 17 requests a second, far below 100. Assume the wave splits between providers as volume does, 44% to Stripe and 56% to Adyen *(assumption)*: about 157,000 renewals on Stripe, or 7 a second, and about 200,000 on Adyen, or 9 a second. The average was never the problem. Each renewal is one request to the endpoint that creates a payment. Assume a call takes half a second *(assumption)*: 12 workers then send at most 24 requests a second, under Stripe's 25 per endpoint by luck, and 48 workers send up to 96. The rule: **requests ÷ seconds gives the average; workers ÷ seconds per call gives the burst; compare both with the per-endpoint and the per-account limit.**\n\n![Left: a tall burst of requests crosses a limit line and its top is refused. Right: the same requests spread as a low band under the line.](assets/images/21-developer-platform/21-burst-versus-paced.jpeg)\n**Figure 3:** *The same renewals sent as a burst cross the limit and are refused; paced over a longer window they stay under it.*\n\nDecision K5 of Keel, Larkfield's 2027 program for its payment systems, answers the burst: renewals are spread and rate-limited by Larkfield, not by the provider. The wave now runs over 18 hours (64,800 seconds), which needs about 2.4 requests a second on Stripe and 3.1 on Adyen. The payment service holds one token bucket per provider and endpoint. The Stripe bucket for creating payments is set to 10 a second, well under 25, because members buying a pass in the app use the same endpoint and are waiting; they are served before the batch. The Adyen bucket is set to 5 a second, and is raised only after Larkfield has asked Adyen what its company account may send. A 429 changes no payment state: the renewal returns to the queue and is sent again after a backoff with the same idempotency key, as K1 requires ([Exactly Once, Over a Network That Does Not Allow It: Idempotency and Retries](idempotency-and-retries.html)). Stripe documents why that is safe: \"Errors that occur before execution begins, such as invalid parameters, an invalid API key, or rate limiting, don’t cache a result.\"\n\nWith the limit planned for, the keys came next. Under K1 every money-moving call goes through the payment service, so only its credential can move money, and the shared 2017 secret key was retired once the last system had moved.\n\n| Calling system | Task | On Stripe | On Adyen | What a leak allows |\n| --- | --- | --- | --- | --- |\n| Payment service | Create payments, refunds, payouts | Restricted key, write on those resources | Credential with the payment and transfer roles | Moving money; so it exists in one place |\n| Webhook receivers | Re-read a payment after an event (K2) | Restricted key, read on payments | None: the Checkout API has no call that returns a payment ([One Object, Many Outcomes: The Payment State Machine](payment-state-machines.html)) | Reading payment data |\n| Reconciliation job, data warehouse | Fetch payouts and reports | Restricted key, read only | Credential with only the roles its reports need | Reading financial data |\n| Billing integration | Studio subscriptions | Restricted key, write on billing resources | None | Changing subscriptions, not paying out |\n| Front-desk app back end | Terminal payments | None | Its own credential, as Adyen advises per channel | In-person payments only |\n| Booking app in the browser | Show the payment form | Publishable key | Client key | Nothing by API |\n\nFinally, the first paced wave ran with people watching, because no test could show it. They watched four things: the count of 429s by reason, call latency, the share of issuer declines, and whether the wave finished inside 18 hours. A load test in a Stripe sandbox would have shown none of them, since its limit is 25 a second for everything and its latency is mocked; Stripe's own page says it \"generally discourage[s]\" the practice.\n\n## When It Goes Wrong\n\nThe planning above still leaves three failures. The first is **a refusal recorded as a failed payment**. This is the Phantom Payment in reverse: your system believes a payment failed when the provider never tried it. It is detectable from the response alone. At both providers a refusal for volume is HTTP 429, and at Stripe it carries the reason header; Stripe adds that a 429 without that header \"might be a lock timeout\" on one object. A decline is a payment result with a refusal reason ([The First Promise: Authorization](payment-authorization.html)). If your payment record has no way to say \"not attempted\", every refusal will be filed under \"failed\".\n\nThe second is **a key that leaks or does more than its task**. Permissions contain it first; rotation ends it. Stripe's documentation says \"Rotating an API key revokes it and generates a replacement key that’s ready to use immediately\", and a rotation in the Dashboard can keep the old key working \"for up to 7 days\". Adyen's overlap is fixed: \"When you generate a new API key, it becomes active immediately. The previous key remains active for 24 hours to allow you to update your systems.\" A rotation you have never rehearsed is an outage of your own making.\n\nThe third is **a question about past requests that the logs can no longer answer**. Both recoveries begin with \"what did we send?\", and each provider shows you for a bounded time. Adyen's API logs hold \"all API requests made in your test or live environment in the past thirty days\", only for requests that use JSON; its developer dashboard covers seven days. Stripe's Workbench, announced in August 2024 as \"our new home for developers within the Dashboard\", shows request logs, and every Stripe error carries a `request_log_url`. Stripe's documentation pages give no retention period; an undated article on its support site (accessed November 2026) gives 31 days for GET request logs and 15 months for all other requests. Stripe's command-line tool can tail request logs, but \"only supports displaying request logs from a sandbox\"; Adyen's documentation index lists no command-line tool. The durable log of your requests is the one you keep.\n\n## What to Take Away\n\n**Established.**\n\n- A payment key's permissions bound the damage of its leak. Stripe documents restricted keys and advises them over secret keys; Adyen documents roles and an account scope on every credential.\n- A test environment simulates. Stripe states that sandbox payments reach no card network and that sandbox limits, latency and webhook retries differ from live.\n- Stripe publishes its request limits (100 a second per account, 25 per endpoint) and described four limiters in 2017. Adyen publishes no general limit for its payments APIs and no limiter design.\n\n**Depends on context.**\n\n- One credential per calling system is right once more than one system calls the provider; a single service behind which everything passes needs fewer.\n- Reacting to 429 is enough for interactive traffic. A batch whose size you know needs pacing, and needs an agreed figure where none is published.\n- How much a green test run is worth depends on what the provider states about its gaps; where it states nothing, assume the gaps and verify in production.\n\n**The author's synthesis.**\n\n- I read a limit as a field of the API. The 7,900 emails of the opening were sent by code that was correct about every endpoint and had never read the page of numbers beside them.\n- I give the money-moving key one home and treat a green test run as a statement about code paths only, because both mistakes stay invisible until the day they cost money.\n\nAcross this part, every protection the API offers turns out to have an edge. An idempotency key is remembered for at least 24 hours at Stripe and for 7 to 14 days at Adyen ([Exactly Once, Over a Network That Does Not Allow It: Idempotency and Retries](idempotency-and-retries.html)). An undelivered event is retried for up to three days at Stripe and up to 30 days at Adyen ([The Provider Calls You: Webhooks and Events](payment-webhooks-and-events.html)). A version is served until its notice runs out; Adyen gives two years after a Checkout version is deprecated ([Changing the API Without Breaking a Million Integrations: Versioning](payment-api-versioning.html)). A request is accepted up to a rate. Inside those edges the API can stand in for the slow process; outside them you are back in the gap between the instant answer and the slow truth, and only your own record of each payment, checked against the provider's, covers it. Each of Larkfield's four incidents assumed a contract wider than the documented one: a retry recognized without the same key (the Double Charge), a version that would never move (the Version Cliff), an event that always arrives (the Silent Webhook), a limit a predictable peak would not reach (the Renewal Wave). Keel decisions K1, K7, K2 and K5 restate those contracts in Larkfield's own terms. So for each provider, write down five terms from its documentation: what can be read back by identifier, key retention, the version pin and its notice period, the webhook retry window and acknowledgement deadline, and the request limits. Next to each, write what your own system does once that term runs out. That is why the payment service holds the keys, the receivers store before they acknowledge, and reconciliation against the provider's reports runs however reliable the webhooks have been.\n\n## Questions to Ask\n\n1. Which of our systems hold a credential that can create a refund or a payout, and why more than one?\n2. If each key leaked today, what could its holder do, and how long would rotation take?\n3. Which request limits does the provider publish per account and per endpoint, and how are a platform's requests on behalf of its sellers' accounts counted? (Stripe's rate-limit page says it for the read allocation only.)\n4. Where no limit is published, what rate has the provider confirmed for our account, and in writing?\n5. What is our batch's average rate and its burst rate, and which limit does each meet first?\n6. Does our payment record have a state for \"refused, not attempted\" that sends no customer message?\n7. What did our last test run not show, and who watched those things in production?\n8. Which live configuration was created by hand, and how would we notice that it differs from test?\n9. For how long can we answer \"what did we send?\" from our own logs?\n\nThis part showed what an API can hide when its contracts and their edges are designed in. Some things it cannot hide: the controls in the request path that decide who may hold a card number, who is trusted to be paying and who may be paid. Those do not disappear behind an interface; they assign data and losses to named parties, and [Part V — TRUST: Card Data, Fraud, Authentication and Compliance](part-5.html) begins with them.\n\n## Sources and Evidence\n\n*Company, product and investor sources*\n\n- [Scaling your API with rate limiters](https://stripe.com/blog/rate-limiters), Paul Tarjan, Stripe, 2017-03-30 — definitions of rate limiting and load shedding; the four limiters; token bucket and Redis (evidence age: 9 years).\n- [Workbench: A new way to debug, monitor, and grow your Stripe integration](https://stripe.com/blog/workbench-a-new-way-to-debug-monitor-and-grow-your-stripe-integration), Michael Glukhovsky and Tomer Elmalem, Stripe, 2024-08-19 — Workbench announcement.\n- [Stripe Developer Digest (June 2024)](https://stripe.dev/blog/stripe-developer-digest-june-2024-join-the-sandboxes-private-beta), Stripe, 2024-06-30 — Sandboxes private beta.\n- [Stripe Developer Digest (August 2024)](https://stripe.dev/blog/stripe-developer-digest-august-2024-workbench-is-now-available-to-everyone), Stripe, 2024-08-30 — Sandboxes public beta.\n- [Sessions 2025 Developer Track resources](https://stripe.dev/blog/sessions-2025-dev-track-resources), Ashley Ansari, James Beswick and Jon Byrum, Stripe, 2025-05-07 — Sandboxes generally available.\n- [Making payment method testing repeatable: building the Adyen Payment Simulator](https://medium.com/adyen/making-payment-method-testing-repeatable-building-the-adyen-payment-simulator-5c11d6fcbe18), Ayodeji Ogundare, Henk Grent, Marc Sernatinger and Shantanu Tarey, Adyen, 2026-11-09 — what a green happy-path test does not prove (read through the publication's feed).\n\n*Standards, regulation and official documentation*\n\n- [API keys](https://docs.stripe.com/keys.md), Stripe documentation, n.d., accessed 2026-11 — the four key types and their prefixes, the advice against secret keys, rotation and its grace period (volatile).\n- [Restricted API keys](https://docs.stripe.com/keys/restricted-api-keys.md), Stripe documentation, n.d., accessed 2026-11 — None, Read or Write per resource; drop-in replacement.\n- [Best practices for managing secret API keys](https://docs.stripe.com/keys-best-practices.md), Stripe documentation, n.d., accessed 2026-11 — least privilege.\n- [Sandboxes](https://docs.stripe.com/sandboxes.md), Stripe documentation, n.d., accessed 2026-11 — sandbox payments are not processed by card networks.\n- [Testing use cases](https://docs.stripe.com/testing-use-cases.md), Stripe documentation, n.d., accessed 2026-11 — up to five sandboxes; objects not shared between modes; settings copied at creation.\n- [Rate limits](https://docs.stripe.com/rate-limits.md), Stripe documentation, n.d., accessed 2026-11 — every limit in the table, the reason header, load testing, limit increases (volatile).\n- [Receive Stripe events in your webhook endpoint](https://docs.stripe.com/webhooks.md), Stripe documentation, n.d., accessed 2026-11 — retries in a sandbox and in live mode.\n- [Advanced error handling](https://docs.stripe.com/error-low-level.md), Stripe documentation, n.d., accessed 2026-11 — rate-limited requests cache no idempotent result.\n- [Idempotent requests](https://docs.stripe.com/api/idempotent_requests.md), Stripe API reference, n.d., accessed 2026-11 — keys removable once at least 24 hours old.\n- [Errors](https://docs.stripe.com/api/errors.md), Stripe API reference, n.d., accessed 2026-11 — `request_log_url`.\n- [Stripe CLI](https://docs.stripe.com/cli.md), Stripe documentation, n.d., accessed 2026-11 — `logs tail` in a sandbox only.\n- [Stripe request log retention period](https://support.stripe.com/questions/stripe-request-log-retention-period), Stripe Support, n.d., accessed 2026-11 — request logs viewable for 31 days (GET) and 15 months (other requests).\n- [API credentials](https://docs.adyen.com/development-resources/api-credentials.md), Adyen documentation, n.d., accessed 2026-11 — username, key and roles; account scope; allowed IP range; separate credentials per channel; a new key in live; the 24-hour overlap on rotation.\n- [Roles](https://docs.adyen.com/development-resources/api-credentials/roles.md), Adyen documentation, n.d., accessed 2026-11 — role names per API, including the Checkout webservice role.\n- [Account structure](https://docs.adyen.com/account/account-structure.md), Adyen documentation, n.d., accessed 2026-11 — company and merchant accounts.\n- [Client-side authentication](https://docs.adyen.com/development-resources/client-side-authentication.md), Adyen documentation, n.d., accessed 2026-11 — the client key makes no API requests.\n- [Live endpoints](https://docs.adyen.com/development-resources/live-endpoints.md), Adyen documentation, n.d., accessed 2026-11 — live account and hostname per company account.\n- [Configure and manage webhooks](https://docs.adyen.com/development-resources/webhooks/configure-and-manage.md), Adyen documentation, n.d., accessed 2026-11 — no copy of webhook configuration from test to live.\n- [Troubleshoot webhooks](https://docs.adyen.com/development-resources/webhooks/troubleshoot.md), Adyen documentation, n.d., accessed 2026-11 — retries for up to 30 days.\n- [HTTP status codes](https://docs.adyen.com/development-resources/response-handling.md), Adyen documentation, n.d., accessed 2026-11 — HTTP 429 and backoff with jitter.\n- [Alternative payment methods test credentials](https://docs.adyen.com/development-resources/test-cards-and-credentials/alternative-payment-method-credentials.md), Adyen documentation, n.d., accessed 2026-11 — MobilePay cannot be tested in the test environment.\n- [Adyen documentation index](https://docs.adyen.com/llms.txt) and [sitemap](https://docs.adyen.com/sitemap.xml), Adyen documentation, n.d., accessed 2026-11 — no rate-limit page and no command-line tool listed; the help center and Adyen's knowledge hub were searched as well.\n- [Adyen OpenAPI definitions](https://github.com/Adyen/adyen-openapi), Adyen, accessed 2026-11 — Legal Entity Management API v4 limits; Checkout API v72 declares no 429.\n- [Automate the management of your terminals](https://docs.adyen.com/point-of-sale/automating-terminal-management.md), Adyen documentation, n.d., accessed 2026-11 — Management API limits, \"indicative\".\n- [API idempotency](https://docs.adyen.com/development-resources/api-idempotency.md), Adyen documentation, n.d., accessed 2026-11 — keys valid 7 to 14 days.\n- [Upgrade your integration](https://docs.adyen.com/online-payments/upgrade-your-integration.md), Adyen documentation, n.d., accessed 2026-11 — two years to upgrade after deprecation.\n- [API logs](https://docs.adyen.com/development-resources/logs-resources/api-logs.md), Adyen documentation, n.d., accessed 2026-11 — thirty days of API logs, JSON requests only.\n- [Developer dashboard](https://docs.adyen.com/development-resources/developer-dashboard.md), Adyen documentation, n.d., accessed 2026-11 — the seven-day dashboard.\n\n*Research and practitioner sources*\n\n- None.\n\nLarkfield is fictional; architectural recommendations, labeled inferences and labeled assumptions are the author's judgement.\n"}]}]}</script>
+<script>
+    (function () {
+        const data = JSON.parse(document.getElementById('data').textContent);
+        const root = document.getElementById('content');
+
+        const postId = (data.meta && data.meta.id) ? String(data.meta.id) : '';
+        const postStatusRaw = (data.meta && data.meta.status) ? String(data.meta.status) : '';
+        if (postId || postStatusRaw) {
+            const header = document.getElementById('post-header');
+            let sectionEl = header.querySelector('p.section');
+            if (!sectionEl) {
+                sectionEl = document.createElement('p');
+                sectionEl.className = 'section';
+                header.insertBefore(sectionEl, header.firstChild);
+            }
+            // Status pill goes first, then a " / " separator before the existing
+            // content (section name and/or id).
+            if (postStatusRaw) {
+                const parts = postStatusRaw.split(':');
+                const statusName = parts[0].trim();
+                const statusColor = (parts[1] || '').trim();
+                const wrap = document.createElement('span');
+                wrap.className = 'post-status';
+                const dot = document.createElement('span');
+                dot.className = 'status-dot';
+                if (statusColor) dot.style.background = statusColor;
+                wrap.appendChild(dot);
+                wrap.appendChild(document.createTextNode(statusName));
+                if (sectionEl.firstChild) {
+                    sectionEl.insertBefore(document.createTextNode(' • '), sectionEl.firstChild);
+                    sectionEl.insertBefore(wrap, sectionEl.firstChild);
+                } else {
+                    sectionEl.appendChild(wrap);
+                }
+            }
+            if (postId) {
+                if (sectionEl.firstChild) sectionEl.appendChild(document.createTextNode(' • '));
+                sectionEl.appendChild(document.createTextNode(postId));
+            }
+        }
+
+        const tagsHost = document.getElementById('tags');
+        (data.tags || []).forEach(function (t) {
+            const span = document.createElement('span');
+            span.className = 'tag';
+            span.textContent = t;
+            tagsHost.appendChild(span);
+        });
+
+        // Minimal markdown renderer. Supports: ATX headings, paragraphs, blockquotes,
+        // unordered/ordered lists, fenced code, inline code, bold/italic/strikethrough, links, images, hr.
+        // Sufficient for the posts in this repo; replace with a fuller parser if needed.
+        function renderMarkdown(src) {
+            const lines = src.replace(/\r\n/g, '\n').split('\n');
+            const out = [];
+            let i = 0;
+
+            const bullet = /^(\s*)([-*])\s+(.*)$/;
+            const ordered = /^(\s*)(\d+)\.\s+(.*)$/;
+            const tableRow = /^\s*\|(.+)\|\s*$/;
+            const tableSep = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+
+            function splitRow(s) {
+                let t = s.trim();
+                if (t.startsWith('|')) t = t.slice(1);
+                if (t.endsWith('|')) t = t.slice(0, -1);
+                return t.split('|').map(c => c.trim());
+            }
+
+            function inline(s) {
+                // Posts are trusted content, so raw HTML passes through unescaped
+                // (some posts embed inline <blockquote>, <div>, etc.).
+                // Stray ampersands still get fixed up.
+                s = s.replace(/&(?![a-zA-Z]+;|#\d+;)/g, '&amp;');
+                s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<a class="image-link" href="$2" target="_blank" rel="noopener noreferrer"><img alt="$1" src="$2"></a>');
+                s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+                s = s.replace(/`([^`]+)`/g, function (_, c) {
+                    return '<code>' + c.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
+                });
+                // Bold/italic, including nested combinations: ***x***,
+                // **a *b*** / ***a* b** (shared delimiters), and **a *b* c**.
+                s = s.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+                s = s.replace(/\*\*([^*\n]+)\*([^*\n]+)\*\*\*/g, '<strong>$1<em>$2</em></strong>');
+                s = s.replace(/\*\*\*([^*\n]+)\*([^*\n]+)\*\*/g, '<strong><em>$1</em>$2</strong>');
+                s = s.replace(/\*\*((?:[^*\n]|\*(?!\*)[^*\n]+\*(?!\*))+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+                s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+                return s;
+            }
+
+            while (i < lines.length) {
+                const line = lines[i];
+                if (!line.trim()) {
+                    i++;
+                    continue;
+                }
+
+                const fence = line.match(/^```(\w*)\s*$/);
+                if (fence) {
+                    i++;
+                    const buf = [];
+                    while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+                        buf.push(lines[i]);
+                        i++;
+                    }
+                    i++;
+                    const escaped = buf.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const cls = fence[1] ? ' class="lang-' + fence[1] + '"' : '';
+                    out.push('<pre><code' + cls + '>' + escaped + '</code></pre>');
+                    continue;
+                }
+
+                const h = line.match(/^(#{1,6})\s+(.*)$/);
+                if (h) {
+                    out.push('<h' + h[1].length + '>' + inline(h[2]) + '</h' + h[1].length + '>');
+                    i++;
+                    continue;
+                }
+
+                if (/^\s*(?:-\s*){3,}\s*$/.test(line) || /^\s*\*{3,}\s*$/.test(line)) {
+                    out.push('<hr>');
+                    i++;
+                    continue;
+                }
+
+                if (/^>\s?/.test(line)) {
+                    const buf = [];
+                    while (i < lines.length && /^>\s?/.test(lines[i])) {
+                        buf.push(lines[i].replace(/^>\s?/, ''));
+                        i++;
+                    }
+                    out.push('<blockquote>' + renderMarkdown(buf.join('\n')) + '</blockquote>');
+                    continue;
+                }
+
+                if (tableRow.test(line) && i + 1 < lines.length && tableSep.test(lines[i + 1])) {
+                    const headers = splitRow(line);
+                    const aligns = splitRow(lines[i + 1]).map(function (c) {
+                        c = c.trim();
+                        const left = c.startsWith(':'), right = c.endsWith(':');
+                        return left && right ? 'center' : right ? 'num' : '';
+                    });
+                    const cellOpen = function (tag, idx) {
+                        return aligns[idx] ? '<' + tag + ' class="' + aligns[idx] + '">' : '<' + tag + '>';
+                    };
+                    i += 2;
+                    const rows = [];
+                    while (i < lines.length && tableRow.test(lines[i])) {
+                        rows.push(splitRow(lines[i]));
+                        i++;
+                    }
+                    let html = '<div class="table-wrap"><table><thead><tr>';
+                    headers.forEach((h, idx) => {
+                        html += cellOpen('th', idx) + inline(h) + '</th>';
+                    });
+                    html += '</tr></thead><tbody>';
+                    rows.forEach(r => {
+                        html += '<tr>';
+                        r.forEach((c, idx) => {
+                            html += cellOpen('td', idx) + inline(c) + '</td>';
+                        });
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                    out.push(html);
+                    continue;
+                }
+
+                if (bullet.test(line) || ordered.test(line)) {
+                    // Indent of the first bullet defines this list's base level.
+                    // Deeper-indented bullets become nested lists (rendered by
+                    // recursing into renderMarkdown). Same-or-less indent at a
+                    // bullet starts a sibling item (or ends the list).
+                    const firstMatch = line.match(bullet) || line.match(ordered);
+                    const baseIndent = firstMatch[1].length;
+                    const isOrdered = ordered.test(line);
+                    const items = [];
+                    let hasTask = false;
+                    while (i < lines.length) {
+                        const cur = lines[i];
+                        if (!cur.trim()) {
+                            // blank line breaks the list (matches CommonMark-ish behaviour)
+                            i++;
+                            break;
+                        }
+                        const mBul = cur.match(bullet);
+                        const mOrd = cur.match(ordered);
+                        const m = mBul || mOrd;
+                        if (!m) break;
+                        if (m[1].length < baseIndent) break;
+                        if (m[1].length > baseIndent) break; // shouldn't happen at top of loop
+                        // Same-type check: switching between -/* and 1. closes the list
+                        if (isOrdered !== !!mOrd) break;
+
+                        const itemBuf = [m[3]];
+                        const nestedBuf = [];
+                        i++;
+                        while (i < lines.length) {
+                            const nxt = lines[i];
+                            if (!nxt.trim()) break;
+                            const nBul = nxt.match(bullet);
+                            const nOrd = nxt.match(ordered);
+                            const nm = nBul || nOrd;
+                            if (nm) {
+                                if (nm[1].length > baseIndent) {
+                                    // nested list line — dedent and stash
+                                    nestedBuf.push(nxt.slice(baseIndent + 2));
+                                    i++;
+                                    continue;
+                                }
+                                // sibling or end of list
+                                break;
+                            }
+                            // Plain continuation text
+                            if (nestedBuf.length) {
+                                // continuation inside the nested block
+                                nestedBuf.push(nxt.slice(baseIndent + 2));
+                            } else {
+                                itemBuf.push(nxt.trim());
+                            }
+                            i++;
+                        }
+
+                        // GitHub-style task items: "- [ ] text" / "- [x] text"
+                        // render as (clickable, unpersisted) checkboxes.
+                        const itemText = itemBuf.join('\n');
+                        const task = !isOrdered && itemText.match(/^\[( |x|X)\]\s+/);
+                        let liHtml = inline(task ? itemText.slice(task[0].length) : itemText);
+                        if (task) {
+                            hasTask = true;
+                            liHtml = '<input type="checkbox"' + (task[1] === ' ' ? '' : ' checked') + '>' + liHtml;
+                        }
+                        if (nestedBuf.length) {
+                            liHtml += renderMarkdown(nestedBuf.join('\n'));
+                        }
+                        items.push(task ? '<li class="task">' + liHtml + '</li>' : '<li>' + liHtml + '</li>');
+                    }
+                    out.push((isOrdered ? '<ol>' : (hasTask ? '<ul class="task-list">' : '<ul>')) + items.join('') + (isOrdered ? '</ol>' : '</ul>'));
+                    continue;
+                }
+
+                const buf = [line];
+                i++;
+                while (i < lines.length && lines[i].trim() && !/^#{1,6}\s/.test(lines[i]) && !/^>\s?/.test(lines[i]) && !bullet.test(lines[i]) && !ordered.test(lines[i]) && !/^```/.test(lines[i]) && !tableRow.test(lines[i])) {
+                    buf.push(lines[i]);
+                    i++;
+                }
+                out.push('<p>' + inline(buf.join(' ')) + '</p>');
+            }
+            return out.join('\n');
+        }
+
+        // Block dispatcher. New block types plug in here.
+        const renderers = {
+            markdown: function (block) {
+                const div = document.createElement('div');
+                div.innerHTML = renderMarkdown(block.content);
+                return div;
+            },
+            mermaid: function (block) {
+                // Mermaid scans elements with class "mermaid" whose textContent
+                // is the diagram source. We collect these nodes and run
+                // mermaid.run() once after all blocks are in the DOM.
+                const div = document.createElement('div');
+                div.className = 'mermaid';
+                div.textContent = block.content;
+                return div;
+            },
+            'force-graph': function (block) {
+                // build.py emits parsed JSON: {nodes:[{id,size}], links:[{source,target}]}.
+                // We instantiate force-graph after the container is in the DOM
+                // so it can measure its own width.
+                const div = document.createElement('div');
+                div.className = 'force-graph';
+                const data = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.ForceGraph) return;
+                    const maxSize = data.nodes.reduce((m, n) => Math.max(m, n.size || 1), 1);
+                    window.ForceGraph()(div)
+                        .graphData(data)
+                        .width(div.clientWidth)
+                        .height(div.clientHeight)
+                        .nodeRelSize(4)
+                        .nodeVal(n => Math.max(20 * (n.size || 1) / maxSize, 0.001))
+                        .nodeLabel(n => n.id + ' (' + (n.size || 1) + ')')
+                        .nodeColor(() => 'rgba(135, 206, 235, 0.7)')
+                        .linkColor(() => 'rgba(60, 60, 60, 0.4)')
+                        .linkDirectionalArrowLength(4)
+                        .linkDirectionalArrowRelPos(1)
+                        .linkWidth(1);
+                });
+                return div;
+            },
+            'bubble-chart': function (block) {
+                // build.py emits {nodes:[{name,size}]}. Renders a D3 circle-pack
+                // SVG (same shape as the obren.io reference, just inline).
+                const wrap = document.createElement('div');
+                wrap.className = 'bubble-chart';
+                const payload = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.d3) return;
+                    const diameter = 480;
+                    const fill = '#c0deed';
+                    const textColor = '#111111';
+                    const fontSize = 12;
+
+                    const svg = window.d3.select(wrap).append('svg')
+                        .attr('viewBox', '0 0 ' + diameter + ' ' + diameter)
+                        .attr('width', diameter)
+                        .attr('height', diameter);
+
+                    const root = window.d3.hierarchy({children: payload.nodes})
+                        .sum(d => d.size || 0)
+                        .sort((a, b) => b.value - a.value);
+
+                    window.d3.pack().size([diameter, diameter]).padding(2)(root);
+
+                    const node = svg.selectAll('g')
+                        .data(root.leaves())
+                        .enter().append('g')
+                        .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+
+                    node.append('title').text(d => d.data.name + ': ' + d.value);
+                    node.append('circle').attr('r', d => d.r).style('fill', fill);
+                    node.append('text')
+                        .attr('dy', '.3em')
+                        .style('text-anchor', 'middle')
+                        .style('fill', textColor)
+                        .style('font-size', fontSize + 'px')
+                        .text(d => d.data.name.substring(0, Math.max(0, Math.floor(d.r / 3))));
+                });
+                return wrap;
+            }
+        };
+
+        // Render one modality's blocks into a host element. Mermaid runs
+        // scoped to just the nodes created here, so lazily rendered tabs get
+        // their diagrams on first activation.
+        let mermaidInitialized = false;
+        function renderBlocksInto(blocks, host) {
+            const mermaidNodes = [];
+            blocks.forEach(function (block) {
+                const r = renderers[block.type];
+                if (!r) {
+                    const pre = document.createElement('pre');
+                    pre.textContent = '[unknown block type: ' + block.type + ']';
+                    host.appendChild(pre);
+                    return;
+                }
+                const node = r(block);
+                if (node instanceof Node) {
+                    host.appendChild(node);
+                    if (block.type === 'mermaid') mermaidNodes.push(node);
+                }
+            });
+            if (mermaidNodes.length && window.mermaid) {
+                if (!mermaidInitialized) {
+                    window.mermaid.initialize({startOnLoad: false, theme: 'default'});
+                    mermaidInitialized = true;
+                }
+                window.mermaid.run({nodes: mermaidNodes});
+            }
+            markScrollableTables(host);
+        }
+
+        // A table wider than its wrapper scrolls sideways. Mark those wrappers
+        // so the CSS can show a cue, and make them focusable so keyboard users
+        // can reach and scroll them. Hidden panes measure 0 and are re-marked
+        // when activated or when the window is resized.
+        function markScrollableTables(host) {
+            host.querySelectorAll('.table-wrap').forEach(function (wrap) {
+                const scrolls = wrap.scrollWidth > wrap.clientWidth + 1;
+                wrap.classList.toggle('is-scrollable', scrolls);
+                if (scrolls) {
+                    wrap.setAttribute('tabindex', '0');
+                    wrap.setAttribute('role', 'region');
+                    wrap.setAttribute('aria-label', 'Table that scrolls sideways');
+                } else {
+                    wrap.removeAttribute('tabindex');
+                    wrap.removeAttribute('role');
+                    wrap.removeAttribute('aria-label');
+                }
+            });
+        }
+
+        // Modality tabs. One <article class="pane"> per modality; panes are
+        // rendered lazily on first activation (force-graph / D3 / mermaid
+        // need a visible, measurable container). With a single modality the
+        // tab bar stays hidden and the page looks exactly like before.
+        const mods = data.modalities;
+        const tabBar = document.getElementById('modality-tabs');
+        const panes = {};
+        const tabButtons = {};
+        const renderedPanes = {};
+
+        // With several modalities each pane is a tabpanel labelled by its
+        // tab (W3C APG tabs pattern); tabindex=0 lets keyboard users move
+        // from the tab list straight into the active content.
+        mods.forEach(function (m) {
+            const pane = document.createElement('article');
+            pane.className = 'pane';
+            pane.dataset.key = m.key;
+            pane.hidden = true;
+            if (mods.length > 1) {
+                pane.id = 'pane-' + m.key;
+                pane.setAttribute('role', 'tabpanel');
+                pane.setAttribute('aria-labelledby', 'tab-' + m.key);
+                pane.setAttribute('tabindex', '0');
+            }
+            root.appendChild(pane);
+            panes[m.key] = pane;
+        });
+
+        const defaultKey = mods.some(m => m.key === 'index') ? 'index' : mods[0].key;
+
+        function activate(key, updateHash) {
+            mods.forEach(function (m) {
+                const isActive = m.key === key;
+                panes[m.key].hidden = !isActive;
+                if (tabButtons[m.key]) {
+                    tabButtons[m.key].classList.toggle('active', isActive);
+                    tabButtons[m.key].setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    // Roving tabindex: only the selected tab is in the Tab
+                    // order; the arrow keys move between tabs.
+                    tabButtons[m.key].setAttribute('tabindex', isActive ? '0' : '-1');
+                }
+            });
+            // Unhide first, then render: the chart libraries measure widths.
+            if (!renderedPanes[key]) {
+                renderBlocksInto(mods.find(m => m.key === key).blocks, panes[key]);
+                renderedPanes[key] = true;
+            } else {
+                markScrollableTables(panes[key]);
+            }
+            if (updateHash) {
+                history.replaceState(null, '',
+                    key === defaultKey ? location.pathname + location.search : '#' + key);
+            }
+        }
+
+        if (mods.length > 1) {
+            mods.forEach(function (m) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = m.label;
+                btn.id = 'tab-' + m.key;
+                btn.dataset.key = m.key;
+                btn.setAttribute('role', 'tab');
+                btn.setAttribute('aria-controls', 'pane-' + m.key);
+                btn.addEventListener('click', function () { activate(m.key, true); });
+                tabBar.appendChild(btn);
+                tabButtons[m.key] = btn;
+            });
+            // Keyboard support per the W3C APG tabs pattern (automatic
+            // activation): Left/Right move between tabs and wrap, Home/End
+            // jump to the first/last tab, and the focused tab is selected.
+            tabBar.addEventListener('keydown', function (ev) {
+                const keys = mods.map(function (m) { return m.key; });
+                const focused = document.activeElement;
+                const current = focused && focused.dataset ? keys.indexOf(focused.dataset.key) : -1;
+                if (current < 0) return;
+                let next = null;
+                if (ev.key === 'ArrowRight') next = (current + 1) % keys.length;
+                else if (ev.key === 'ArrowLeft') next = (current - 1 + keys.length) % keys.length;
+                else if (ev.key === 'Home') next = 0;
+                else if (ev.key === 'End') next = keys.length - 1;
+                if (next === null) return;
+                ev.preventDefault();
+                activate(keys[next], true);
+                tabButtons[keys[next]].focus();
+            });
+            tabBar.hidden = false;
+        }
+
+        // The hash selects a tab only when it matches a modality key, so
+        // existing anchors keep working.
+        const initialHash = location.hash.slice(1);
+        activate(mods.some(m => m.key === initialHash) ? initialHash : defaultKey, false);
+        window.addEventListener('hashchange', function () {
+            const k = location.hash.slice(1);
+            if (mods.some(m => m.key === k)) activate(k, false);
+        });
+        window.addEventListener('resize', function () { markScrollableTables(root); });
+    })();
+</script>
+</body>
+</html>

@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Spec: From Invoice to Cash: Invoicing, Collections and Dunning</title>
+    <meta name="description" content="What happens between “an amount is owed” and “it has been paid”, especially when the first attempt fails? Between the two stands the invoice, a frozen record of a debt that is collected through as many attempts and payment methods as it takes; Stripe retries an invoice it holds, while Adyen retries a payment that the merchant ties to its own invoice by a reference.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SETTLED: Architecting Payments and Revenue Infrastructure">
+    <meta property="og:title" content="Spec: From Invoice to Cash: Invoicing, Collections and Dunning">
+    <meta property="og:description" content="What happens between “an amount is owed” and “it has been paid”, especially when the first attempt fails? Between the two stands the invoice, a frozen record of a debt that is collected through as many attempts and payment methods as it takes; Stripe retries an invoice it holds, while Adyen retries a payment that the merchant ties to its own invoice by a reference.">
+    <meta property="og:url" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/invoicing-collections-and-dunning.spec.html">
+    <meta property="og:image" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/assets/images/29-invoicing-collections-and-dunning/logo.jpeg">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="site.css">
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-129891352-1"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+        dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'UA-129891352-1');
+</script>
+    <style>
+        body {
+            line-height: 1.65;
+        }
+
+        main {
+            padding-top: 32px;
+        }
+
+        nav.post-nav {
+            font-size: 14px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: baseline;
+            flex-wrap: wrap;
+        }
+
+        nav.post-nav a {
+            color: var(--muted);
+            text-decoration: none;
+        }
+
+        nav.post-nav a:hover {
+            color: var(--accent);
+        }
+
+        nav.post-nav .nav-right {
+            margin-left: auto;
+            display: inline-flex;
+            gap: 4px;
+            align-items: baseline;
+        }
+
+        nav.post-nav .nav-sep {
+            color: var(--muted);
+        }
+
+        footer nav.post-nav {
+            margin-top: 24px;
+            margin-bottom: 0;
+        }
+
+        header.post {
+            margin-bottom: 32px;
+        }
+
+        header.post .section {
+            color: var(--muted);
+            font-size: 13px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin: 0 0 -6px;
+        }
+
+        header.post .section a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        header.post .section a:hover {
+            color: var(--accent);
+        }
+
+        header.post .section .post-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        header.post .section .post-status .status-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        header.post .logo {
+            display: block;
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            border: 1px solid lightgrey;
+
+        }
+
+        header.post .logo-credit {
+            color: var(--muted);
+            font-size: 12px;
+            margin: -4px 0 24px;
+            text-align: right;
+        }
+
+        header.post h1 {
+            font-size: 52px;
+            line-height: 1.2;
+            margin: 0 0 2px;
+            padding: 0;
+            letter-spacing: -0.01em;
+            font-weight: normal;
+        }
+
+        header.post .byline {
+            color: var(--muted);
+            font-size: 15px;
+            margin: 0;
+        }
+
+        header.post .byline .spec-link {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        header.post .byline .spec-link:hover {
+            text-decoration: underline;
+        }
+
+        header.post .byline .spec-link-drifted {
+            color: #b8650f;
+        }
+
+        header.post .byline .spec-link-superseded {
+            color: var(--muted);
+        }
+
+        header.post .ai-credit {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 4px 0 0;
+        }
+
+        header.post .ai-credit a {
+            color: inherit;
+        }
+
+        header.post .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 10px 0 10px;
+        }
+
+        header.post .tags .tag {
+            font-size: 14px;
+            padding: 1px 8px;
+            border: 1px solid deepskyblue;
+            color: blue;
+            border-radius: 999px;
+            background-color: var(--tag-bg);
+        }
+
+        nav.modality-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--rule);
+            margin: 0 0 28px;
+            flex-wrap: wrap;
+        }
+
+        nav.modality-tabs button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font: inherit;
+            font-size: 14px;
+            color: var(--muted);
+            padding: 8px 14px;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            letter-spacing: 0.02em;
+        }
+
+        nav.modality-tabs button:hover {
+            color: var(--accent);
+        }
+
+        nav.modality-tabs button.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        #content .pane[hidden] {
+            display: none;
+        }
+
+        #content .pane:focus {
+            outline: none;
+        }
+
+        #content .pane:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 6px;
+        }
+
+        article h2 {
+            font-size: 26px;
+            margin: 40px 0 12px;
+            letter-spacing: -0.01em;
+        }
+
+        article h3 {
+            font-size: 20px;
+            margin: 28px 0 8px;
+        }
+
+        article h4 {
+            font-size: 17px;
+            margin: 20px 0 6px;
+        }
+
+        article p {
+            margin: 0 0 16px;
+        }
+
+        article a {
+            color: var(--accent);
+        }
+
+        article a.image-link {
+            display: inline-block;
+            line-height: 0;
+        }
+
+        article img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        article a.image-link img {
+            display: block;
+        }
+
+        article ul, article ol {
+            padding-left: 24px;
+            margin: 0 0 16px;
+        }
+
+        article li {
+            margin-bottom: 6px;
+        }
+
+        article ul.task-list {
+            list-style: none;
+            padding-left: 4px;
+        }
+
+        article ul.task-list li.task > input[type="checkbox"] {
+            margin-right: 8px;
+            accent-color: var(--accent);
+        }
+
+        article hr {
+            border: none;
+            border-top: 1px solid var(--rule);
+            margin: 32px 0;
+        }
+
+        article blockquote {
+            margin: 16px 0;
+            padding: 12px 18px;
+            background: var(--quote-bg);
+            border-left: 3px solid var(--accent);
+            color: #333;
+        }
+
+        article blockquote p:last-child {
+            margin-bottom: 0;
+        }
+
+        article code {
+            background: var(--code-bg);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 0.92em;
+        }
+
+        article pre {
+            background: var(--code-bg);
+            padding: 14px 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        article pre code {
+            background: none;
+            padding: 0;
+        }
+
+        article .table-wrap {
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+
+        article table {
+            border-collapse: collapse;
+            margin: 16px 0;
+            width: 100%;
+            font-size: 15px;
+        }
+
+        article .table-wrap table {
+            margin: 0;
+        }
+
+        /* Wide tables scroll on narrow screens instead of crushing their columns.
+           A table wrapped in <div class="table-compact"> opts out: it has few,
+           short columns and wraps its cells to fit the screen instead. */
+        @media (max-width: 640px) {
+            article .table-wrap table {
+                min-width: 560px;
+            }
+            article .table-compact .table-wrap table {
+                min-width: 0;
+            }
+        }
+
+        /* Tables that actually overflow get a visible cue and keyboard focus
+           (markScrollableTables() sets the class and attributes). */
+        article .table-wrap.is-scrollable::before {
+            content: "Scroll sideways to see the whole table";
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        article .table-wrap.is-scrollable:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        article th, article td {
+            border: 1px solid var(--rule);
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        article th {
+            background: var(--code-bg);
+            font-weight: 600;
+        }
+
+        /* GFM column alignment from the separator row. Right-aligned columns
+           hold numbers; their cells never wrap, so a sign, a currency symbol
+           and its amount stay on one line while label columns still wrap. */
+        article th.num, article td.num {
+            text-align: right;
+        }
+
+        article td.num {
+            white-space: nowrap;
+        }
+
+        article th.center, article td.center {
+            text-align: center;
+        }
+
+        article .mermaid {
+            text-align: center;
+            margin: 24px 0;
+        }
+
+        article .force-graph {
+            margin: 24px 0;
+            border: 1px solid var(--rule);
+            border-radius: 6px;
+            background: #fff;
+            height: 480px;
+            overflow: hidden;
+        }
+
+        article .bubble-chart {
+            margin: 24px 0;
+            text-align: center;
+        }
+
+        article .bubble-chart svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <nav class="post-nav"><a class="nav-back" href="invoicing-collections-and-dunning.html">← From Invoice to Cash: Invoicing, Collections and Dunning</a><span class="nav-right"></span></nav>
+    <header class="post" id="post-header">
+        <p class="section"><span>SPEC</span> • <span class="post-status"><span class="status-dot" style="background:green"></span>accepted</span> • <span>revised 2026-11-17</span></p>
+        <h1>Spec: From Invoice to Cash: Invoicing, Collections and Dunning</h1>
+        <p class="byline"></p>
+        
+        <div class="tags" id="tags"></div>
+        
+    </header>
+    <nav class="modality-tabs" id="modality-tabs" hidden role="tablist" aria-label="Reading formats"></nav>
+    <div id="content"></div>
+    <footer>
+        <nav class="post-nav"><a class="nav-back" href="invoicing-collections-and-dunning.html">← From Invoice to Cash: Invoicing, Collections and Dunning</a><span class="nav-right"></span></nav>
+    </footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/force-graph"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script id="data" type="application/json">{"meta": {}, "tags": [], "modalities": [{"key": "spec", "label": "Spec", "meta": {}, "blocks": [{"type": "markdown", "content": "## Intent\n\n**After reading, the reader should:**\n\n- **Know:** The invoice's states as Stripe documents them (draft, open, paid, void, uncollectible), what finalization fixes, and why corrections are credit notes.\n- **Know:** What dunning and involuntary churn are; the difference between a hard and a soft decline for retry purposes; why direct debit needs its own retry rules.\n- **Know:** What each provider documents for recovery: Stripe's Smart Retries on invoices (for new accounts, up to 8 retries within 2 weeks by default) and automatic card updates; Adyen's Auto Rescue on payments (a rescue window of one calendar month by default for cards) and its account updater, with Adyen's documentation pages cited as undated.\n- **Believe:** What is being recovered is a debt on an invoice, not a failed payment.\n- **Believe:** Published recovery and churn percentages are vendor claims, nearly all without a stated baseline (Adyen's 2020 retry experiment is the exception), and the chapter's argument does not depend on them.\n- **Be able to:** Design a dunning policy that branches on decline type and payment method and ends in a defined subscription state.\n- **Be able to:** Correct a finalized invoice without editing it.\n- **Be able to:** On a provider that holds no invoice, say how retry results are tied back to the invoice in their own system.\n\n**Acceptance criteria**\n\n| Id | Criterion | Check | Method | Severity |\n| --- | --- | --- | --- | --- |\n| AC-1 | Given two failed renewals with different causes in a case the chapter does not contain, the reader prescribes different handling and gives the reason. *Probe:* A streaming service has two failed renewals of €9.99. The first card payment came back 'stolen card'. The second, a SEPA Direct Debit (a bank debit the customer authorized in advance), came back days later as 'insufficient funds'. What should the collection process do in each case, and why not the same thing? | `custom` | cold_reader | major |\n| AC-2 | The reader corrects a finalized invoice by a credit note or by voiding and reissuing, and can say why editing is not allowed. *Probe:* An invoice for €500 was finalized yesterday with the wrong customer address and €50 too much. What do you do, and why can you not just fix the invoice? | `custom` | cold_reader | major |\n| AC-3 | No involuntary-churn share or recovery rate appears without attribution to the vendor that published it, and the chapter states that no independent measurement was found. | `custom` | rubric | blocker |\n\n## Thesis\n\n**Question:** What happens between 'an amount is owed' and 'it has been paid', especially when the first attempt fails?\n\n> **Claim:** Between owed and paid stands the invoice: once finalized it is frozen, and it is then collected as one debt through as many attempts, payment methods and partial payments as it takes, so recovery acts on the debt and not on the failed payment. Which party holds the invoice decides what a provider can recover: Stripe retries an invoice it holds (Smart Retries, by default up to 8 retries within 2 weeks on new accounts), while Adyen's Auto Rescue retries a payment linked to the billing cycle only by a reference the merchant supplies, and the invoice stays in the merchant's system.\n\n**Disputed by:** The view that a failed renewal is a payment problem solved by charging the card again on a fixed schedule, and that the invoice is a PDF produced afterwards for the customer's records.\n\n**So what:** The reader models retries against the invoice, so that a new card, a bank transfer or a partial payment can all settle the same debt; separates hard from soft declines before scheduling anything; gives direct debit its own schedule; and, on Adyen, plans to hold the invoice state and join Auto Rescue results to it by reference.\n\n**How and why:** Finalization assigns the number and freezes the fields that matter for tax, which Stripe's documentation explains by the requirement to retain invoices as issued; every later change is a credit note. Because the debt outlives any one attempt, the useful questions are whether another attempt can succeed at all (Stripe schedules but does not execute retries on hard declines until a new payment method appears; SEPA and Bacs debits get at most 2 retries in 30 days) and whether the credential can be repaired first (Stripe's network-dependent automatic card updates; Adyen's Real Time Account Updater, which checks for new card details and retries inside the same refused payment). The public record on the retry logic is one engineering post each: Stripe's of 23 January 2024 on Smart Retries ('more than 500 attributes') and Adyen's of 3 December 2020 on Auto Rescue (a contextual bandit; 'about 6% more orders than the baseline' in one experiment); neither publishes the model now running or the timing for a given decline. Stripe's recovery figures and the one customer result Adyen has published for Auto Rescue are vendor claims without definitions, and no independent measurement of involuntary churn was found, so the chapter quotes no churn share.\n\n**Supporting claims**\n\n- **C1** — An invoice is a numbered record of a debt that is frozen when it is finalized; every later change is a new document (a credit note, or a void and a reissue), because tax rules commonly require the invoice to be kept as issued.\n- **C2** — The invoice outlives every payment made against it: one debt is collected through as many attempts, payment methods and partial payments as it takes, so dunning has to be modeled against the invoice and started by a failed attempt, not by a missing payment.\n- **C3** — Whether another attempt can succeed is decided by the decline type and the payment method: a hard decline needs a new credential, a soft decline needs time inside the networks' limits, a direct debit needs its own slower and capped schedule, and repairing the credential or asking the customer comes before retrying.\n- **C4** — Which party holds the invoice decides what a provider can recover: Stripe's Smart Retries retry an invoice Stripe holds, while Adyen's Auto Rescue retries a payment tied to the billing cycle only by a reference the merchant supplies, so on Adyen the invoice and its state stay in the merchant's system.\n- **C5** — The public record of the retry logic is thin and dated and offers no independent measurement of involuntary churn: each company has one engineering post on its model (2024, 2020), Stripe's documentation names two example signals, Adyen's says 'smart logic' and 'optimal times', and the published recovery figures are vendor claims without definitions.\n\n## Role in the part\n\nSupplies the invoice's state machine and the collection process, the place where the part's 'late' failure is handled on purpose, and the clearest documented consequence of where the billing engine sits on each provider. Supports P6-3, P6-5 of part `part-6`.\n\n## Flow\n\n**Pattern:** `problem_solution` (also `prerequisite_order` in the-invoice, attempts-against-a-debt, can-another-attempt-succeed: the debt, then the attempts against it, then the decision about the next attempt; each uses the terms of the one before.; `comparison` in designs and where-they-differ)\n\nThe reader first sees a collection process that knew only payments and emailed 7,900 people in error, so the invoice arrives as the missing object and not as paperwork. The three middle sections follow Femke's three questions in the only order that works: an attempt cannot be described before the debt it is made against, and the choice of the next step cannot be described before attempts and their outcomes exist. Bank transfers follow as the case where the customer, not the merchant, starts the payment, which stretches the same model. Only then can the designs be compared, because they differ in who holds the object the earlier sections defined; the two-company table follows the designs because its first rows are those designs as products. Larkfield's case comes after the comparison because it uses both providers, and the failures come last because each is a broken link between a payment and the debt. Moving the comparison before the mechanism would leave 'retries an invoice' and 'retries a payment' as slogans.\n\n## Introduction\n\n**Hook** (`puzzling_scenario`): On 1 April 2027 the card payment for Mila Janssen's €49.00 membership is declined: not enough money in the account. On 4 April the studio's platform charges the same card again and the bank approves. Everyone calls this 'the payment was retried'. But the payment of 1 April failed and stays failed; the charge of 4 April is a different payment with its own identifier. What was retried, then? Something outlived the failure and was still there to be paid three days later.\n\n**Bridge:** An engineer sees a failed renewal as a failed request: call the payment API again on a schedule until it returns success, then generate a PDF for the customer. → What is being collected is a debt with a number, an amount and a period, which exists before the first attempt and after the last, and the process that chases it has to know why an attempt failed, which payment method it used and where the chase ends.\n\n**Thesis statement** (KEY POINTS bullets 1 and 3, and paragraph p02): Between owed and paid stands the invoice: once finalized it is frozen, and it is then collected as one debt through as many attempts, payment methods and partial payments as it takes. Which party holds the invoice decides what a provider can recover: Stripe retries an invoice it holds, Adyen's Auto Rescue retries a payment the merchant ties to its own invoice by a reference.\n\n**Roadmap** (IN THIS CHAPTER callout and paragraph p04):\n\n- Start from 7,900 failure emails Larkfield sent about payments nobody had attempted, and come back to them with one record of each period's debt and a dunning policy. *Kept in:* scene, in-practice.\n- Define the invoice, its five states, what finalization freezes and how a finalized invoice is corrected. *Kept in:* the-invoice.\n- Show why one invoice has many payment attempts, and define dunning and involuntary churn. *Kept in:* attempts-against-a-debt.\n- Work out whether another attempt can succeed, by decline type and by payment method. *Kept in:* can-another-attempt-succeed.\n- Cover money the customer sends on their own: bank transfers, partial payments and cash application. *Kept in:* cash-application.\n- Compare three designs for who runs the collection, then Stripe and Adyen. *Kept in:* designs, where-they-differ.\n- Show how collection fails and how each failure is caught. *Kept in:* when-it-goes-wrong.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p01 | context | Mila's €49.00 renewal is declined on 1 April 2027 and paid on 4 April by a different payment, so what was 'retried' was not the payment but something that outlived it. | scenario: Mila's membership renewal: €49.00, declined on 1 April 2027 for insufficient funds, retried and approved on 4 April (ledger). |  |\n| p02 | claim | What outlives the failed payment is the invoice, a frozen record of a debt that is collected through as many attempts and methods as it takes, and the party that holds it decides what a provider can recover. |  | `cause_effect`: The question of what was retried. → The answer and the chapter's thesis: the debt on an invoice, and why it matters who holds that invoice. |\n| p03 | context | On the payment's journey this chapter covers the days between Mila's declined renewal on 1 April and its payment on 4 April; her one-off class pass needed no such process because its amount was owed and paid in the same minute. | scenario: Mila's class pass of €120.00 on 9 March 2027 at 19:42, approved at once; her renewal declined on 1 April and paid on 4 April (ledger). | `place`: The debt that outlives a failed payment. → Where that debt sits on the book's recurring payment. |\n| p04 | transition | The chapter goes from Larkfield's mistaken failure emails to the invoice and its states, the attempts made against it, whether another attempt can succeed, money that arrives by bank transfer, three designs for who runs collection, the comparison of Stripe and Adyen, Larkfield's renewal record and policy, and the failures. |  | `sequence`: The chapter's place on the payment's journey. → The order of its sections. |\n\n## Sections\n\n### Setting the Scene at Larkfield: 7,900 Emails About Payments Nobody Attempted\n\n**Controlling idea** (`example`, id `scene`): Larkfield told 7,900 members their payment had failed when no payment had been attempted, because its collection process was started by the absence of a payment and had no record of the debt or of the attempts against it.\n\n**Advances the thesis** (C2): Shows, before any vocabulary, what goes wrong when collection is driven by 'no payment yet' instead of by a failed attempt on a recorded debt.\n\n**Transition in:** `example`: The introduction's claim that what is collected is a debt, not a payment. → A company whose collection process knew only payments.\n\n**Order of paragraphs** (`chronological`): The night of 1 October 2026, then what Femke finds in the job in 2027, then the three questions she writes; the questions name the next sections, so they come last.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p05 | context | On 1 October 2026 Larkfield's renewal job hit a provider rate limit, 7,900 renewals were put off to the next day, and that evening every one of those members received a 'your payment failed' email. | scenario: The Renewal Wave: 38% of monthly membership volume attempted in a 6-hour window; on 1 October 2026 the renewal job hit the provider's rate limit and 7,900 renewals were delayed to the next day; dunning emails went to members who had done nothing wrong (ledger). |  |\n| p06 | analysis | The email job selected memberships that were due and had no successful payment, so it could not tell a declined card from a card that had not been charged yet. | scenario: Larkfield before Keel (local detail consistent with the ledger): the booking app held a membership with a next-renewal date, the payment record store held payments; no record stood for 'the amount owed for October' or listed the attempts made against it. | `cause_effect`: The mistaken emails. → The query behind them and what it could not see. |\n| p07 | transition | Femke de Graaf turns the incident into three questions that any collection process must answer: what exactly is owed and is that final, what has been tried and how did it end, and what happens next and where does it stop. |  | `problem_solution`: A process that could read only 'not paid'. → The three questions that the rest of the chapter answers in order. |\n\n### The Invoice: A Debt With a Number and a Freeze Point\n\n**Controlling idea** (`definition`, id `the-invoice`): An invoice is the record of what is owed; it moves through five states, is frozen at finalization for tax reasons, and is corrected afterwards only by new documents.\n\n**Advances the thesis** (C1): Establishes the object the rest of the chapter collects, and why it cannot be edited once issued.\n\n**Transition in:** `elaboration`: Femke's first question: what exactly is owed, and is that final? → The invoice, the record that answers it.\n\n**Order of paragraphs** (`prerequisite_order`): What an invoice is, then its states, then the one transition that matters most (finalization), then how to correct what finalization froze, then the two ends without money, then the coming change to the document itself. Corrections cannot be explained before the freeze, and void and uncollectible are easier to tell apart once the credit note has shown what 'still owed' means.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p08 | definition | An invoice is a numbered, dated statement of what one customer owes for which goods or period, and it is a different thing from a payment, which is one attempt to move money; Stripe holds such an object and Adyen's documented model does not. | fact: Stripe documents an invoice object ('Invoices are statements of amounts owed by a customer'); nothing in Adyen's documentation describes an invoice, a point owned by subscriptions-and-billing-engines (consistency ruling 6). |  |\n| p09 | description | Stripe documents five invoice states (draft, open, paid, void, uncollectible) and a small set of transitions between them, each with an endpoint and a webhook. | table: State table from Stripe's transitions page: draft → open (finalize, invoice.finalized); open → paid (pay, invoice.paid); open → open on a failed payment (invoice.payment_failed); open → void; open → uncollectible; uncollectible → paid or void; a draft can be deleted.; figure: Figure: the invoice state machine with five states, the finalize transition marked as the freeze point and a loop on 'open' for a failed attempt. | `elaboration`: The invoice as a record. → The states it moves through. |\n| p10 | explanation | Finalization is the freeze point: it assigns the number, makes the invoice payable and fixes the amounts and the customer's details, and Stripe gives the reason as tax rules that require invoices to be kept as issued. | quotation: \"It allows the invoice to be paid. It ensures that an invoice number is present. It makes certain properties immutable on the invoice. It creates an incomplete payment intent for the invoice.\"; quotation: \"This is to satisfy the common tax-compliance requirement that finalized invoices be retained—as they were finalized—for a legally required minimum time period.\"; customer name, address, tax IDs and tax-exempt status are copied onto the invoice and made immutable. | `emphasis`: The five states. → The one transition after which nothing may be edited. |\n| p11 | process | A finalized invoice is corrected by a new document: a credit note reduces what is owed without touching the original, and a wrong customer detail is fixed by voiding the invoice and issuing a corrected copy. | quotation: \"Credit notes are documents that decrease the amount of an `open` or `paid` invoice\"; \"a credit note doesn’t void and replace the original invoice\"; \"The sum of all credit notes issued for an invoice can’t exceed the total amount of the invoice.\"; fact: To change a customer-related property Stripe documents three steps: void the current invoice, duplicate the voided invoice, update the customer information on the new invoice.; example: Larkfield invoice from the ledger (chapter 28's addition): Studio Noord's March 2027 invoice on the €89 plan with €57.68 of billed SMS overage, €146.68 before tax; 180 messages were counted twice; a credit note for 180 × €0.07 = €12.60 leaves €134.08 due and the invoice unchanged. | `problem_solution`: An invoice that may no longer be edited. → The two ways to correct it anyway. |\n| p12 | comparison | Two states end an invoice without money and mean opposite things: void says the amount was never owed, uncollectible says it is owed and written off, and an uncollectible invoice can still be paid. | fact: Stripe: an uncollectible invoice is one where 'The customer is unlikely to pay the invoice. Normally, you treat it as bad debt in your accounting process'; documented transitions lead from uncollectible to paid or void; only open or uncollectible invoices can be voided. | `contrast`: Corrections that leave the debt in place. → The two states that close it without payment. |\n| p13 | context | The document itself is becoming regulated data: the EU's VAT in the Digital Age package, adopted on 11 March 2025, lets member states require electronic invoices and makes digital reporting based on them mandatory for cross-border business sales from 1 July 2030. | fact: European Commission: the package 'was adopted on 11 March 2025' and 'will be rolled out progressively until January 2035'; 'Upon entry into force (14 April 2025), Member States are able to introduce mandatory e-invoicing under specific conditions'; 'Digital Reporting Requirements will affect cross-border B2B transactions from 1 July 2030'. National mandates were not verified. | `additional_support`: An invoice frozen for tax reasons. → A second tax-driven change: the invoice as structured data reported to an authority. |\n\n### Attempts Against a Debt: Why the Invoice Outlives Its Payments\n\n**Controlling idea** (`explanation`, id `attempts-against-a-debt`): One invoice has many payment attempts, a failed attempt leaves the invoice open, and the process that works through the attempts to a defined end is dunning.\n\n**Advances the thesis** (C2, C5): Gives the data model (one debt, many attempts), defines dunning and involuntary churn against it, and states that no independent figure sizes the problem.\n\n**Transition in:** `elaboration`: Femke's second question: what has been tried, and how did it end? → The attempts as records of their own, attached to the invoice.\n\n**Order of paragraphs** (`prerequisite_order`): The relation between invoice and attempts first, then the process that runs over it, then the name for its failure and the missing measurement of it, then the requirements the process must meet. Dunning cannot be defined before the reader knows what an attempt is to an invoice.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p14 | explanation | Each payment attempt is its own record with its own outcome, attached to the invoice, and a failed attempt changes the attempt and a counter but leaves the invoice open. | fact: Stripe's transition table lists paying an open invoice with the result invoice.payment_failed and end status open; 'The attempt_count attribute on the invoice.payment_failed webhook indicates how many attempts have been made so far.'; figure: Figure: one invoice of €49.00 with three attempts hanging from it (a declined card, a second declined card attempt, a paid attempt with a new card), and the invoice turning from open to paid only at the last. |  |\n| p15 | definition | Dunning is the process of collecting an invoice whose payment failed or is overdue (retries, messages to the customer and a defined end), and involuntary churn is the customer lost when that process fails. | quotation: Recurly's documentation: \"Involuntary churn refers to customer loss caused by factors outside their direct intent — expired credit cards, bank account changes, or failed payment attempts\". | `elaboration`: One invoice with several attempts. → The name of the process that makes those attempts, and of its failure. |\n| p16 | analysis | How much revenue involuntary churn costs is not established by any independent source I found; the figures in circulation are vendor claims without definitions, so this chapter quotes no churn share. | statistic: Stripe's Billing product page: \"Businesses using Stripe recover 55% of failed payments on average\" (after a sentence naming Smart Retries, card account updater and cancellation surveys together) and \"US$8.2bn in failed payments recovered in 2025\"; the page defines neither 'failed payment' nor 'recovered' nor the cohort. Stripe's documentation defines a dashboard recovery rate by volume and by any means. Adyen publishes no average; its knowledge-hub guide of 16 June 2026 gives one customer's result, \"Pinterest saw a 4% improvement in recovery rate on retried transactions, with expectation of reaching 10% over time\", first published as a customer quotation on 4 December 2020, without a baseline.; reasoning: The research for this book found no independent, primary, dated measurement of the share of churn that is involuntary. | `contrast`: A clear definition of involuntary churn. → The absence of a trustworthy measurement of it. |\n| p17 | explanation | A collection process has to guarantee five things whatever its schedule: the debt is paid at most once, every attempt is tied to its invoice, the customer is told only about real failures, attempts stay inside network limits, and the process ends in a defined state. | table: Requirements table (author's): requirement, why, what breaks without it. Rows: paid at most once; every attempt tied to the invoice; a message only after a failed attempt; attempts bounded per card and per network; a defined end (canceled, paused, unpaid) with the invoice void or uncollectible. | `cause_effect`: A debt with many attempts and a process that can fail. → What that process must guarantee. |\n\n### Can Another Attempt Succeed? Decline Type and Payment Method\n\n**Controlling idea** (`analysis`, id `can-another-attempt-succeed`): The next step after a failed attempt depends on why it failed and on the payment method: a hard decline needs a new credential, a soft decline needs time, a direct debit needs a slower and capped schedule, and a repaired credential or a message to the customer can do what no retry can.\n\n**Advances the thesis** (C3, C5): Supplies the branches of a dunning policy with the documented behavior of each provider on each branch, and marks where the published description of the retry logic ends.\n\n**Transition in:** `elaboration`: Femke's third question: what happens next? → The facts that decide it: decline type and payment method.\n\n**Order of paragraphs** (`grouping`): By the question a scheduler asks, in the order it asks them: can this credential ever work (hard decline), if so when (soft decline and timing) and how often (network limits); can the credential be repaired without the customer; does the method follow card rules at all (direct debit); and finally what only the customer can do. The customer message comes last because for a hard decline it is the only remaining instrument.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p18 | explanation | A hard decline means no retry of the same credential can succeed, and Stripe documents exactly that behavior: for a listed set of codes it keeps scheduling retries but executes none until a new payment method appears. | quotation: Stripe: \"A hard decline code means the issuing bank has rejected the transaction and you can't retry it\"; codes listed include `lost_card`, `stolen_card`, `pickup_card`, `incorrect_number`, `revocation_of_authorization`, `authentication_required`, `transaction_not_allowed`; \"Retries continue to be scheduled, and attempt_count continues to increment, but retries only execute after detecting a new payment method.\"; fact: 'Hard decline' and 'soft decline' are industry shorthand, not card-network terms; Visa's rules use four categories, of which category 1 may never be resubmitted (consistency ruling 15; authorization-optimization owns the categories). |  |\n| p19 | comparison | A soft decline can succeed later, so the question becomes when to try: a fixed schedule picks the days in advance, and Stripe's Smart Retries picks the moments inside an envelope the merchant sets. | fact: Fixed schedules: Stripe's custom schedule allows 'up to three retries, each with a specific number of days after the previous attempt'; Orb's essential dunning retries 'after 1, 4, and 9 days from the initial payment attempt'.; quotation: Smart Retries: \"For new Stripe accounts, Stripe enables Smart Retries by default and configures it for up to 8 retries within 2 weeks\"; the window can be 1 week, 2 weeks, 3 weeks, 1 month or 2 months; signals named: \"The number of different devices that have presented a given payment method in the last N hours\" and \"The best time to pay (payments made for debit cards in certain countries might be slightly more successful at 12:01 am in local time zones)\". | `contrast`: Declines that no retry can fix. → Declines that time can fix, and the two ways to choose the time. |\n| p20 | explanation | Any schedule runs inside limits the card networks set and count per card, whichever system sends the attempt. | fact: Visa's rules (Product and Service Rules, edition of 24 October 2026), Table 7-2: no resubmission after a category 1 code; for categories 2, 3 and 4, 'Reattempt permitted (up to 20 attempts in 30 days)'; Stripe 'recommends a maximum of eight retries'. | `additional_support`: A schedule chosen by the merchant or the provider. → The outer limit neither of them sets. |\n| p21 | explanation | A failing credential can sometimes be repaired without the customer: card networks pass on reissued card details, Stripe applies them to saved cards where the issuer takes part, and Adyen's Real Time Account Updater checks for them inside the refused payment and retries at once. | quotation: Stripe: \"Stripe works with card networks and automatically attempts to update saved card details whenever a customer receives a new card\"; \"International support varies from country to country. It isn’t possible to identify cards that support automatic updates\"; event `payment_method.automatically_updated`.; quotation: Adyen: \"When you submit a payment that is refused, our Real Time Account Updater instantly checks for updated card details. If there is an update, we immediately retry the payment with the updated card details. This all happens while the payment is being processed, and appears as a single transaction.\" Conditions: non-zero amount, shopperInteraction ContAuth, no security code.; fact: A network token stays valid when the card behind it is reissued (network-tokens owns the mechanism). | `problem_solution`: A credential that fails. → Ways to repair it without involving the customer. |\n| p22 | explanation | A direct debit needs its own rules because its failure arrives days after an apparent success and the number of re-presentations is capped at two by both providers' documentation. | quotation: Stripe: SEPA Direct Debit payments 'can fail because of insufficient funds, closed or restricted accounts, invalid bank details, revoked or missing authorization, or bank processing errors. Most failures occur within 6 business days after initiation'; retries for SEPA Direct Debit and Bacs Direct Debit: retryable failure 'Insufficient funds', maximum 2 retries, maximum retry period 30 days; 'Direct debit retries use the payment method’s retry configuration, not the general card retry policy.'; quotation: Adyen: \"Because SEPA transactions always have eventCode AUTHORISED in the response, these require a different rescue logic compared to card transactions\"; rescue applies to chargeback reasons AM04 (insufficient funds) and MS03; \"we have a maximum of two rescue attempts within the rescue window\" because the first decline message arrives later and \"chargebacks are typically fined by the issuing bank\"; account-level window 42 days. | `contrast`: Card declines, which answer in seconds. → Direct debit, which answers in days and allows two more tries. |\n| p23 | recommendation | The message to the customer is the one instrument that works on every branch and the only one that works after a hard decline, so it must say what the customer can do and must be sent only after an attempt has failed. | fact: Stripe documents emails for failed payments, expiring cards and renewals that 'include a link to a page where the customer can update their payment method', either 'a Stripe-hosted Customer Portal or your own custom subscription management page'. Adyen documents an optional payment link when Auto Rescue ends unsuccessfully: 'The URL where the shopper can complete the payment. Valid for 5 days.'; reasoning: A message triggered by 'no payment yet' reaches customers whose card was never charged (the Larkfield scene); a message triggered by a failed attempt carries the decline type and can ask for the right action. | `emphasis`: Retries and automatic repairs. → What only the customer can do, and when to ask. |\n\n### Money That Arrives on Its Own: Bank Transfers, Partial Payments and Cash Application\n\n**Controlling idea** (`explanation`, id `cash-application`): When the customer pushes money by bank transfer, the amount and timing are the customer's choice, so collection becomes matching arrived money to open invoices, and unmatched money needs an explicit holding place.\n\n**Advances the thesis** (C2, C4): Shows the strongest case of 'one debt, many payments': an invoice settled by several transfers, or one transfer spread over several invoices, which only a system holding the invoices can do.\n\n**Transition in:** `contrast`: Attempts the merchant starts against a card or a bank account. → Payments the customer starts, in an amount and at a time of their choosing.\n\n**Order of paragraphs** (`problem_solution`): The problem (the payer controls amount and reference), then the documented solution on Stripe (a balance and a matching order), then what the public record shows on Adyen. The Adyen paragraph comes last because it is a statement about absence that only makes sense once the reader has seen what is being looked for.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p24 | definition | A bank transfer inverts collection: the customer decides how much to send and when, so the system's job is cash application, matching money that has arrived to the invoices it was meant to pay. | quotation: Stripe: \"bank transfers don’t allow you to control the amount a customer sends to you, which means that customers might send too much or too little money by accident. To manage common overpayment and underpayment issues, Stripe holds your customer’s bank transfers in a customer balance\"; each customer gets 'a unique virtual bank account number' shown on the invoice. |  |\n| p25 | process | Stripe publishes the order in which it applies arrived money: by invoice number in the transfer reference, then by exact amount, then oldest invoice first, with partial payment of an invoice only when the reference names it, and an ageing rule for what cannot be matched. | fact: Documented order for EUR, USD and other currencies: match the reference to one invoice number; else to one PaymentIntent reference; else find a group of one to five invoices and PaymentIntents 'awaiting the exact amount available'; else fund invoices that can be fully funded, oldest due first; else apply the rest to incomplete PaymentIntents. Partial payment of an invoice only with automatic partial reconciliation enabled and the invoice number in the memo.; fact: Unreconciled funds: after 75 days Stripe 'automatically attempts to return the funds to the customer’s bank account'; by the 90 day mark it sweeps them to the merchant's balance. A tolerance setting can mark an invoice paid if it is partially paid within a set amount (the documentation's example: within 20 USD). | `elaboration`: Money held in a customer balance. → The documented rule that applies it to invoices. |\n| p26 | analysis | On Adyen I found no documented invoice, customer balance for receivables or cash-application feature, which is an absence in the public record and not a statement by Adyen; a merchant that takes bank transfers there applies them to its own invoices in its own system. | reasoning: Searches of Adyen's documentation in November 2026 found bank transfer and direct debit as payment methods and Auto Rescue for SEPA retries, and no object that holds a receivable. Absence of evidence from public documentation, not confirmation. | `contrast`: Stripe's documented matching against invoices it holds. → What the public record shows on Adyen: nothing equivalent. |\n\n### Who Runs the Collection: Three Designs\n\n**Controlling idea** (`comparison`, id `designs`): Collection can be run by a provider that holds the invoice, by a provider that retries a payment for a merchant who holds the invoice, or by the merchant's own billing system; the choice follows from where the invoice lives, and exactly one scheduler may act on a debt.\n\n**Advances the thesis** (C4, C5): Presents Stripe's Smart Retries and Adyen's Auto Rescue as two designs that differ in the unit they act on, with the documented detail of each, and states what neither publishes.\n\n**Transition in:** `cause_effect`: The branches of a collection process and the instruments for each. → Who runs that process: three realistic designs.\n\n**Order of paragraphs** (`comparison`): The three designs in order of how much the provider holds (invoice and schedule; schedule only; neither), then the table that compares them on the same criteria with the rule for choosing, then the limit of the public record that applies to the first two. The limit comes last so the reader knows what the two provider designs are before learning what cannot be known about them.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p27 | description | In the first design the provider holds the invoice and runs the dunning: Stripe's Smart Retries act on the invoice, use whichever payment method is current, and end by moving the subscription to a state the merchant has chosen. | fact: Stripe: Smart Retries choose times 'to increase the chance of successfully paying an invoice'; a documented payment-method order (subscription default payment method first, then customer defaults); 'If recovery fails, the subscription transitions according to your settings': canceled, unpaid, left past_due or paused. |  |\n| p28 | description | In the second design the merchant holds the invoice and the provider retries the payment: Adyen's Auto Rescue retries a refused merchant-initiated payment inside a rescue window and reports each attempt by webhook under a reference the merchant chose to stand for the billing cycle. | quotation: Adyen: Auto Rescue \"automatically retries refused or charged back shopper-not-present transactions such as subscription renewals. It uses smart logic to decide which payments can succeed when retried later, and performs these retries at optimal times\" (documentation n.d., accessed November 2026; ruling 30: last-modified stamps are not used as dates).; fact: Card page: enabled by Adyen's support team; applies to shopperInteraction ContAuth; account-level 'rescue window of one calendar month', or maxDaysToRescue 'between 1 and 48 days' per transaction; the merchant provides 'a unique merchantOrderReference. This should represent a specific billing cycle or subscription'; refused response carries retry.rescueScheduled (false 'when a payment cannot be rescued. For example, because of account closure or fraud'); 'Each Auto Rescue retry attempt is a separate transaction, and thus generates a unique pspReference'; an AUTORESCUE webhook ends the process; the merchant should cancel the rescue when the shopper provides a new payment method. | `contrast`: A provider that retries an invoice it holds. → A provider that retries a payment for a merchant who holds the invoice. |\n| p29 | description | In the third design the merchant's own billing system holds the invoice and schedules every attempt, calling the provider only to charge; Orb, the billing company Adyen acquired on 1 July 2026, documents this design on top of several gateways, and no integrated Adyen product is documented yet. | fact: Orb: 'Orb will automatically retry the charge after 1, 4, and 9 days from the initial payment attempt'; 'If payment method is updated prior to exhaustion of the dunning period, Orb will immediately try to collect on the invoice.' Adyen completed the acquisition of Orb on 1 July 2026 (owned by subscriptions-and-billing-engines); as of November 2026 no Adyen documentation describes an integrated billing product. | `contrast`: Designs in which the provider schedules the retries. → The design in which the merchant's own system does. |\n| p30 | recommendation | The rule I use is to let the system that holds the invoice own the schedule, and never to let two schedulers retry the same debt. | table: Trade-off table, three designs: who holds the invoice; who schedules retries; what the merchant builds; right when; main risk.; reasoning: A scheduler that does not hold the invoice cannot know that the customer paid another way, changed card or canceled; Adyen's own instruction to cancel the rescue in those cases is evidence of the gap. Two schedulers spend one network retry allowance twice (authorization-optimization). | `conclusion_summary`: Three designs described one by one. → Their comparison and the rule for choosing. |\n| p31 | analysis | The public record of the retry logic is thin and dated for both providers: each has described its model in one blog post (Stripe 2024, Adyen 2020), and neither documents the model now running or a recovery rate with a stated basis. | fact: Stripe's documentation names two example signals and says Smart Retries 'are more effective than scheduled retries' without a figure; Adyen's says 'smart logic' and 'optimal times'; Adyen's 2026 knowledge-hub guide gives one customer's 4% improvement in recovery rate on retried transactions, without a baseline; Stripe's 55% is a marketing-page average for its recovery tools together, without a definition. Stripe blog post 'How we built it: Smart Retries' (23 January 2024): a model that 'predicts the optimal time to retry a failed payment', 'more than 500 attributes'. Adyen post 'Rescuing failed subscription payments using contextual multi-armed bandits' (3 December 2020): a contextual bandit over 'all possible future times at which to retry the failed payment'; one experiment converted 'about 6% more orders than the baseline' (a retry every four days). | `contrast`: What each design documents about its controls. → What neither documents: how the times are chosen and how well it works. |\n\n### Stripe and Adyen: Where They Differ\n\n**Controlling idea** (`comparison`, id `where-they-differ`): The two companies differ first in the unit they recover (an invoice or a payment), and the other documented differences in defaults, hard declines, direct debit, card repair and published detail follow from or sit beside that one.\n\n**Advances the thesis** (C4, C5): Sets the documented facts of the earlier sections side by side and reads them as inference.\n\n**Transition in:** `conclusion_summary`: Documented behavior described branch by branch and design by design. → The same facts in one table, with the author's reading.\n\n**Order of paragraphs** (`comparison`): The table carries the facts already cited, the reading follows as advice per provider. It stands after the designs because rows one and two are the first two designs seen as products, and before Larkfield's case, which uses both providers.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p32 | comparison | Seven aspects separate the two in the public record, from the unit being recovered to what each publishes about its retry logic. | table: Where They Differ table, seven rows: unit being recovered; invoice object and corrections; default retry envelope; hard declines; direct debit; card repair; published logic and results. Every Stripe and Adyen cell is a fact cited earlier in the chapter or a statement that nothing was found; the last column is the author's inference. |  |\n| p33 | recommendation | On Stripe an integrator should mirror invoice state from the provider's record and decide the end state on purpose; on Adyen it should build the invoice table first, derive the order reference from invoice and period, and treat rescue webhooks as attempts against that invoice. | reasoning: Follows from the table: Stripe holds the invoice, so the merchant's risk is a stale copy and an unchosen default; Adyen holds only payments, so the merchant's risk is retries that nothing ties to a debt. | `cause_effect`: The documented differences. → What an integrator does differently on each. |\n\n### In Practice at Larkfield: One Period Record, Two Providers\n\n**Controlling idea** (`example`, id `in-practice`): Larkfield holds the invoice for member renewals itself on both providers, so under Keel it gives each renewal a frozen record with attempt rows, a policy that branches on decline type and method, and a recovery curve counted per renewal.\n\n**Advances the thesis** (C2, C3, C4): Applies the model, the branches and the third design to ledger numbers, and repairs the scene's failure.\n\n**Transition in:** `example`: Two providers that recover different units. → A company that uses both and holds its own invoice.\n\n**Order of paragraphs** (`problem_solution`): Where the invoice lives at Larkfield, then the record that Keel adds, then the policy that runs over it with Mila's renewal traced through, then the curve that measures the policy, then the fix to the October emails. The fix comes last because it needs both the record and the policy.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p34 | context | Larkfield has two billing problems with two answers: Stripe holds the invoices for its own studio subscriptions, while for member renewals the booking app holds the debt on both providers and Larkfield runs the only retry scheduler. | scenario: Ledger: studio subscriptions billed with Stripe Billing since 2018; member payments through Stripe Connect and Adyen for Platforms with the payment service routing by studio; decision K5 (renewals paced and retried by Larkfield on a schedule tied to decline codes); Larkfield runs its own retry schedule for member card renewals on both providers (chapter 9's addition). |  |\n| p35 | description | Under Keel each member renewal has the period record chapter 27 introduced (membership, period, amount due, written before the first attempt), extended here with the invoice vocabulary's uncollectible state and one row per attempt, and the attempt's idempotency key and provider reference are derived from it. | scenario: Decision K1: the idempotency key is membership id plus billing period plus the number of the scheduled attempt. Keel's payment record keeps child rows for attempts (chapter 8's addition). Chapter 27's addition: a period record per membership and billing period with states open, paid or void; a member keeps access while it is open inside the retry window. New detail: the state uncollectible; on Adyen the merchantOrderReference of each attempt is the period record's identifier. | `problem_solution`: A debt held by the booking app without a record of its own. → The record Keel introduces. |\n| p36 | example | Larkfield's policy branches on decline type and payment method and always ends in a named state, and Mila's renewal passes through its soft-decline branch in three days. | table: Larkfield dunning policy (illustrative): card soft decline: retry on days 3, 7 and 12, email on the first failure; card hard decline: no retry, email and in-app request for a new card, attempt as soon as one is saved; direct debit failed for insufficient funds: one new collection after 7 days, no more than two in all; direct debit failed for any other reason: ask for a new mandate or another method; day 14 unpaid: membership paused, period record stays open; day 30 unpaid: period record marked uncollectible, membership ended. Access is kept while the record is open inside the 14-day window (chapter 27's addition).; scenario: Mila: €49.00 at Studio Noord (on Adyen), declined on 1 April 2027 with Visa code 51 (category 2), email the same day, scheduled attempt 2 on 4 April approved; the renewal moves from open to paid; two attempt rows, one renewal (ledger and chapter 2's addition). | `sequence`: A record of the debt and its attempts. → The policy that decides the next step from that record. |\n| p37 | analysis | Counted per renewal, December 2026's card renewals show the recovery curve: 90.5% paid at the first attempt, 95.3% within fourteen days, half of the failed first attempts recovered, and a curve that flattens after the first week. | table: Illustrative recovery curve from chapter 9's December 2026 assumptions (540,000 card renewals due on both providers): paid at first attempt 488,760 (90.5%); by day 3: 502,260 (93.0%); by day 7: 509,820 (94.4%); by day 14: 514,380 (95.3%); unpaid after 14 days: 25,620 (about €1.26 million at €49). Of 51,240 failed first attempts, 25,620 were recovered (50%). The day-3 and day-7 figures are new assumptions; the first-attempt and final figures are chapter 9's. | `cause_effect`: A policy with a fourteen-day retry window. → What that window recovers, counted on one basis. |\n| p38 | recommendation | The October failure is repaired by one rule: a failure message is sent on a declined attempt row of an open renewal, never on the absence of a payment, so a renewal the scheduler has not reached yet is 'open, not attempted' and silent. | scenario: On 1 October 2026 the 7,900 delayed renewals had no attempt; under K5 the renewal job paces itself over 18 hours, so on any first of the month many renewals are due and not yet attempted for hours. | `problem_solution`: The record, the policy and the curve. → The fix to the incident the chapter began with. |\n\n### When It Goes Wrong\n\n**Controlling idea** (`analysis`, id `when-it-goes-wrong`): Collection fails in three characteristic ways (a debt paid twice, a result that arrives after the process has ended, and a refund that bypasses the invoice), and each is caught by a check against the invoice.\n\n**Advances the thesis** (C2, C4): Shows that each failure is a break in the link between payments and the debt, which is the thesis seen from the failure side.\n\n**Transition in:** `contrast`: A collection process that works as designed. → The ways it breaks, with detection and recovery.\n\n**Order of paragraphs** (`chronological`): In the order they occur in a debt's life: during collection (paid twice), at its end (a late result), after payment (a correction that skips the invoice).\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p39 | cause_effect | The first failure is a debt paid twice: a scheduled retry and the customer's own payment from the email link both succeed, because the two attempts were not checked against the same open invoice. | fact: Adyen instructs the merchant to cancel the Auto Rescue process when 'your shopper may provide you with a new payment method, or cancel their subscription'; the cancellation is asynchronous (a CANCEL_AUTORESCUE webhook reports whether it succeeded). Larkfield's Double Charge of 1 November 2026 (1,840 members) was the idempotency form of the same damage (ledger). |  |\n| p40 | cause_effect | The second failure is a result that arrives after the process has ended: the merchant pauses or cancels on its own timer while a provider retry or a direct debit is still in flight, and the late success or late failure lands on a closed record. | fact: Adyen, Auto Rescue for SEPA: 'You will receive the webhook 16 days after the rescue attempt'; Stripe: most SEPA Direct Debit failures 'occur within 6 business days after initiation'. Auto Rescue results arrive only by webhook. | `sequence`: A failure during collection. → A failure at its end. |\n| p41 | cause_effect | The third failure comes after payment: a refund is issued on the payment without a credit note on the invoice, so the invoice still says paid in full while the money has gone back. | quotation: Stripe: \"Issuing a credit note doesn’t automatically refund the customer’s payment method\"; for a paid invoice \"the sum of the refund, credit, and out-of-band payment amounts must equal the credit note total.\" | `sequence`: A failure at the end of collection. → A failure after the invoice was paid. |\n\n## Conclusion: What to Take Away\n\n**Synthesis:** The invoice's freeze, the attempts that hang from it, the branches by decline type and method, cash application and the three designs are one idea applied five times: the debt is the stable object and every payment is an event against it. That is also why the two providers differ where they do: a retry feature can only be as aware of new cards, other payments and cancellations as the system that holds the debt lets it be.\n\n**So what:** A team that models renewals as charges to repeat will email customers who owe nothing, retry cards that can never work, charge twice when a customer pays another way, and lose track of what a refund corrected. A team that models the debt first can change schedule, payment method or provider without changing what is owed, and can say for every unpaid renewal what was tried and what happens next.\n\n**Callback:** The opening question: on 4 April, what was retried? The reader can now answer that nothing was retried: the invoice for April stayed open after a soft decline, a second attempt was made against it inside the network's limits, and the invoice, not the payment of 1 April, became paid.\n\n**Takeaway** (`course_of_action`): Give every amount owed a record that is frozen when issued; attach every attempt to it; branch on decline type and payment method; let the system that holds the record own the only schedule; end in a named state. Eight questions for a design review or a provider evaluation follow.\n\n**Hand-off** to [Whose Tax, at What Rate: Tax Calculation in the Payment Path](billing-and-payment-tax.html): `elaboration`: A finalized invoice is frozen for tax reasons and carries the customer's address and tax number. → The tax line on that invoice: who owes it, what decides the rate, and how much of the work a payment provider's tax product does.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p42 | synthesis (list) | Established: a finalized invoice is kept as issued and corrected by credit note; a failed attempt leaves the invoice open; hard declines are not retried on the same credential; direct debit retries are few and slow; both providers document these behaviors. |  |  |\n| p43 | synthesis (list) | Depends on context: who should schedule retries, how long the window should be, whether to use learned timing, and when to stop and what state to end in. |  | `contrast`: What the field agrees on. → What changes with where the invoice lives, the payment method mix and the product. |\n| p44 | recommendation (list) | The author's synthesis: model the debt before the payment, let its holder own the one schedule, and treat every recovery percentage as a number to be measured on your own renewals. |  | `contrast`: What is established and what depends on context. → The author's own position, labeled as such. |\n| p45 | recommendation (list) | Eight questions let the reader test a collection process in a design review or a provider evaluation. |  | `cause_effect`: The take-aways. → Questions that apply them. |\n| p46 | transition | The frozen invoice carries the customer's address and tax number because one of its lines is a tax amount that had to be right before the freeze, which is the subject of the next chapter. |  | `elaboration`: A finalized invoice frozen for tax reasons. → The tax line on it: who owes it, at what rate, and what a provider's tax product does. |\n\n## Non-goals\n\n- Subscriptions, billing cycles, proration, the scheduler that creates the invoice, and the full account of who holds the invoice on each provider and of the Orb acquisition. See [Charging Again and Again: Subscriptions and the Billing Engine](subscriptions-and-billing-engines.html).\n- Usage events, meters, rating and the cut-off after which a usage invoice stops changing. See [Counting Before Charging: Usage Metering and Rating](usage-metering-and-rating.html).\n- Why issuers decline, decline categories and advice codes, network retry limits in detail, approval-rate metrics and in-call optimization. See [Raising the Approval Rate: Retries, Tokens and Optimization](authorization-optimization.html).\n- How network tokens are provisioned and updated. See [The Card Number's Replacement: Network Tokens and Credential Lifecycle](network-tokens.html).\n- Direct debit schemes, mandates and reversal horizons. See [A Payment Is Not a Card: Local Methods and Real-Time Rails](local-payment-methods.html).\n- Tax calculation on the invoice, registrations and filing. See [Whose Tax, at What Rate: Tax Calculation in the Payment Path](billing-and-payment-tax.html).\n- Deferred revenue and how credit notes and uncollectible invoices are recognized. See [Cash Is Not Revenue: Revenue Recognition and the Hand-off to Finance](billing-revenue-recognition.html).\n- Idempotency keys for scheduled attempts and webhook handling. See [Exactly Once, Over a Network That Does Not Allow It: Idempotency and Retries](idempotency-and-retries.html), [The Provider Calls You: Webhooks and Events](payment-webhooks-and-events.html).\n- The failed renewal told end to end across systems. See [Journey 2: A Membership Renewal That Fails, and Comes Back](journey-failed-renewal.html).\n- National e-invoicing mandates and formats; debt collection agencies and late-payment law.\n\n## Modalities\n\nArticle only.\n\n## Open questions\n\n- No independent, primary measurement of involuntary churn was found; the chapter says so and quotes Stripe's marketing figures only as vendor claims. If the author knows a citable study, paragraph p16 can use it.\n- Adyen's Auto Rescue card page contains an internal inconsistency (a window of 1 to 48 days, and an example text that says 'a maximum of 40 days'); the chapter uses the stated range and does not mention the example.\n- Adyen's Auto Rescue overview and Account Updater overview carry last-modified stamps of 2020 and 2019 in their metadata, which ruling 30 does not accept as dates; the sub-pages fetched in November 2026 are consistent with them. Whether Auto Rescue is now sold only inside Adyen Uplift's Optimize module was not settled from the pages read.\n- The recovery-curve figures for days 3 and 7 (502,260 and 509,820 of 540,000) and Larkfield's dunning policy (retries on days 3, 7 and 12; pause at day 14; uncollectible at day 30) are new illustrative assumptions appended to the ledger; journey-failed-renewal may reuse them.\n- Whether and how Orb's dunning will be integrated with Auto Rescue is not public as of November 2026.\n- Flow rubric notes not acted on (the author decides): move the credential-repair paragraph (p21) directly after the hard-decline paragraph (p18); merge the 'public record stops' paragraph (p31) into the comparison table; move the churn-figures paragraph (p16) next to Larkfield's recovery curve (p37); cut or shrink the e-invoicing paragraph (p13). Kept as is because the contract asks for e-invoicing briefly, acceptance criterion AC-3 needs the churn statement where the term is defined, and the writer brief asks for a paragraph on where the evidence stops. Notes acted on in the prose: a forward pointer for network limits in p17, one-clause reminders for Keel and the rescue window.\n\n## Decision log\n\n- **2026-11-17** — The scene is the Renewal Wave's mistaken dunning emails (1 October 2026), not a recovery-rate discussion, because it is the ledger incident in which the absence of an invoice record is the cause, and it matches the part's 'late' failure (acceptance criterion AC-3 of the part). Rejected: Opening the scene on Mila's renewal (used as the hook and the worked case instead); Opening on the Double Charge (owned by idempotency-and-retries)\n- **2026-11-17** — Who holds the invoice is stated in one sentence in the definition paragraph and then used, as consistency ruling 6 requires; the chapter spends its space on what follows from it for recovery. Rejected: A section re-arguing that Adyen has no invoice object\n- **2026-11-17** — Network retry limits, decline categories and account updater mechanics are given one paragraph each with a link to authorization-optimization and network-tokens, which own them. Rejected: Repeating the Visa category table\n- **2026-11-17** — E-invoicing is one paragraph at the end of the invoice section, limited to the European Commission's ViDA dates; national mandates were not verified and are a non-goal. Rejected: A separate e-invoicing section\n- **2026-11-17** — Orb's dunning is presented as an example of the third design (a billing system above the gateway) and as Orb's documentation about Orb, not as an Adyen feature. Rejected: Listing Orb's dunning in the Adyen column of the comparison table\n- **2026-11-17** — Nine body sections: the style guide's fixed elements plus the three mechanism sections that follow Femke's three questions and a short section on bank transfers, which the contract lists and which does not fit under card retries. Rejected: Folding cash application into the designs section\n\n## Sources\n\n- **Internal**\n  - PLAN.md — The chapter contract: question, scope, owned terms (invoice, credit note, dunning, involuntary churn, retry schedule), Larkfield thread.\n  - journal-spec.json — Intent, acceptance criteria, thesis and role, copied unchanged; the previous and next chapters' transitions.\n  - _research/brief-billing-and-revenue.md — Part 3 (invoice states, finalization, credit notes, retries, card updates, churn claims, bank transfers, e-invoicing, comparison), sections 1.9, 1.10 and 7.1, open questions.\n  - _research/brief-optimization-routing-orchestration.md — Sections 1.2, 2.1 to 2.5 and 3.3: decline types, network retry limits, Smart Retries and Auto Rescue, account updater services.\n  - _research/scenario-ledger.md — Larkfield facts: the Renewal Wave, Mila's renewal, K1 and K5, prices, chapter 9's December 2026 renewal counts.\n  - _research/consistency-issues.md — Rulings 6 (who holds the invoice), 13 (idempotency keys and scheduled retries), 15 (soft and hard decline are not network terms), 19 (Visa's limit of 20 in 30 days).\n- **External**\n  - Stripe documentation: invoice status transitions and finalization, invoicing overview, credit notes, Smart Retries, automatic collection, customer emails, revenue recovery, how cards work, SEPA Direct Debit, bank transfers, bank transfers on invoices, customer balance reconciliation (n.d., fetched 17 November 2026); Stripe Billing product page (fetched 17 November 2026) — Every Stripe fact and quotation in the chapter; all pages re-fetched for this spec.\n  - Adyen documentation: Auto Rescue, Auto Rescue for card payments, Auto Rescue for SEPA payments, Account Updater, Real Time Account Updater, Mapping to Visa system integrity fee categories, Bank Transfer (n.d., fetched 17 November 2026); Adyen knowledge hub, 'Recurring payments: A guide for enterprise businesses' (16 June 2026) and 'Rescuing failed payments to make subscriptions unstoppable' (4 December 2020) — Every Adyen fact and quotation in the chapter; all pages re-fetched for this spec.\n  - Orb documentation, 'Essential dunning'; Recurly documentation, 'Involuntary churn'; European Commission, 'VAT in the Digital Age' — The fixed-schedule contrast, the definition of involuntary churn, the e-invoicing dates.\n\n## Changelog\n\n- **2026-11-17** — Reconciliation pass (parts 6-8): fields copied from the journal spec and unit-level controlling ideas and evidence brought into line with the verified page and the consistency rulings; no unit added, dropped, merged or reordered.\n- **2026-11-17** — Verification pass: 92 claims checked (76 confirmed, 5 corrected, 9 hedged, 0 unsupported and removed or relabeled, 0 unreachable; 2 not checked); the page said no recovery figure from Adyen was found, and now quotes Adyen's own claim of one customer's 4% improvement in recovery rate with Auto Rescue (knowledge-hub guide, 16 June 2026) beside Stripe's 55% average, which is for its recovery tools together and not for Smart Retries alone.\n- **2026-11-17** — Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes).\n- **2026-11-17** — First version, written from PLAN.md, the journal spec and the billing and optimization research briefs.\n- **2026-11-17** — Absence audit: 'neither documents its retry model' overturned. Stripe blog post of 23 January 2024 and Adyen technology post of 3 December 2020 describe the Smart Retries and Auto Rescue models; Adyen's post reports one experiment (about 6% more orders than a four-day fixed schedule). Key point, logic paragraph, inference block, comparison row, take-away and sources updated; connective sentences trimmed to stay within max_words. Adyen cash-application absence re-tested against the documentation full text and help center: holds.\n- **2026-11-17** — Journal-spec entry corrected after verification; intent, thesis and role re-synced ('Published recovery and churn percentages are vendor claims w' -> 'Published recovery and churn percentages are vendor claims, ').\n- **2026-11-17** — Journal-spec entry corrected after verification; intent, thesis and role re-synced ('The public record stops at the retry logic: Stripe names two' -> 'The public record on the retry logic is one engineering post').\n- **2026-11-24** — Sweep of rulings 46 to 48: thesis how_why no longer says the record stops at two example signals and 'smart logic'; it names the two engineering posts on the retry models (Stripe, 23 January 2024; Adyen, 3 December 2020) as the prose already does (46a). Prose and units unchanged.\n- **2026-11-17** — Visual layer: 4 figures generated and inspected (article-illustrator).\n"}]}]}</script>
+<script>
+    (function () {
+        const data = JSON.parse(document.getElementById('data').textContent);
+        const root = document.getElementById('content');
+
+        const postId = (data.meta && data.meta.id) ? String(data.meta.id) : '';
+        const postStatusRaw = (data.meta && data.meta.status) ? String(data.meta.status) : '';
+        if (postId || postStatusRaw) {
+            const header = document.getElementById('post-header');
+            let sectionEl = header.querySelector('p.section');
+            if (!sectionEl) {
+                sectionEl = document.createElement('p');
+                sectionEl.className = 'section';
+                header.insertBefore(sectionEl, header.firstChild);
+            }
+            // Status pill goes first, then a " / " separator before the existing
+            // content (section name and/or id).
+            if (postStatusRaw) {
+                const parts = postStatusRaw.split(':');
+                const statusName = parts[0].trim();
+                const statusColor = (parts[1] || '').trim();
+                const wrap = document.createElement('span');
+                wrap.className = 'post-status';
+                const dot = document.createElement('span');
+                dot.className = 'status-dot';
+                if (statusColor) dot.style.background = statusColor;
+                wrap.appendChild(dot);
+                wrap.appendChild(document.createTextNode(statusName));
+                if (sectionEl.firstChild) {
+                    sectionEl.insertBefore(document.createTextNode(' • '), sectionEl.firstChild);
+                    sectionEl.insertBefore(wrap, sectionEl.firstChild);
+                } else {
+                    sectionEl.appendChild(wrap);
+                }
+            }
+            if (postId) {
+                if (sectionEl.firstChild) sectionEl.appendChild(document.createTextNode(' • '));
+                sectionEl.appendChild(document.createTextNode(postId));
+            }
+        }
+
+        const tagsHost = document.getElementById('tags');
+        (data.tags || []).forEach(function (t) {
+            const span = document.createElement('span');
+            span.className = 'tag';
+            span.textContent = t;
+            tagsHost.appendChild(span);
+        });
+
+        // Minimal markdown renderer. Supports: ATX headings, paragraphs, blockquotes,
+        // unordered/ordered lists, fenced code, inline code, bold/italic/strikethrough, links, images, hr.
+        // Sufficient for the posts in this repo; replace with a fuller parser if needed.
+        function renderMarkdown(src) {
+            const lines = src.replace(/\r\n/g, '\n').split('\n');
+            const out = [];
+            let i = 0;
+
+            const bullet = /^(\s*)([-*])\s+(.*)$/;
+            const ordered = /^(\s*)(\d+)\.\s+(.*)$/;
+            const tableRow = /^\s*\|(.+)\|\s*$/;
+            const tableSep = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+
+            function splitRow(s) {
+                let t = s.trim();
+                if (t.startsWith('|')) t = t.slice(1);
+                if (t.endsWith('|')) t = t.slice(0, -1);
+                return t.split('|').map(c => c.trim());
+            }
+
+            function inline(s) {
+                // Posts are trusted content, so raw HTML passes through unescaped
+                // (some posts embed inline <blockquote>, <div>, etc.).
+                // Stray ampersands still get fixed up.
+                s = s.replace(/&(?![a-zA-Z]+;|#\d+;)/g, '&amp;');
+                s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<a class="image-link" href="$2" target="_blank" rel="noopener noreferrer"><img alt="$1" src="$2"></a>');
+                s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+                s = s.replace(/`([^`]+)`/g, function (_, c) {
+                    return '<code>' + c.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
+                });
+                // Bold/italic, including nested combinations: ***x***,
+                // **a *b*** / ***a* b** (shared delimiters), and **a *b* c**.
+                s = s.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+                s = s.replace(/\*\*([^*\n]+)\*([^*\n]+)\*\*\*/g, '<strong>$1<em>$2</em></strong>');
+                s = s.replace(/\*\*\*([^*\n]+)\*([^*\n]+)\*\*/g, '<strong><em>$1</em>$2</strong>');
+                s = s.replace(/\*\*((?:[^*\n]|\*(?!\*)[^*\n]+\*(?!\*))+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+                s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+                return s;
+            }
+
+            while (i < lines.length) {
+                const line = lines[i];
+                if (!line.trim()) {
+                    i++;
+                    continue;
+                }
+
+                const fence = line.match(/^```(\w*)\s*$/);
+                if (fence) {
+                    i++;
+                    const buf = [];
+                    while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+                        buf.push(lines[i]);
+                        i++;
+                    }
+                    i++;
+                    const escaped = buf.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const cls = fence[1] ? ' class="lang-' + fence[1] + '"' : '';
+                    out.push('<pre><code' + cls + '>' + escaped + '</code></pre>');
+                    continue;
+                }
+
+                const h = line.match(/^(#{1,6})\s+(.*)$/);
+                if (h) {
+                    out.push('<h' + h[1].length + '>' + inline(h[2]) + '</h' + h[1].length + '>');
+                    i++;
+                    continue;
+                }
+
+                if (/^\s*(?:-\s*){3,}\s*$/.test(line) || /^\s*\*{3,}\s*$/.test(line)) {
+                    out.push('<hr>');
+                    i++;
+                    continue;
+                }
+
+                if (/^>\s?/.test(line)) {
+                    const buf = [];
+                    while (i < lines.length && /^>\s?/.test(lines[i])) {
+                        buf.push(lines[i].replace(/^>\s?/, ''));
+                        i++;
+                    }
+                    out.push('<blockquote>' + renderMarkdown(buf.join('\n')) + '</blockquote>');
+                    continue;
+                }
+
+                if (tableRow.test(line) && i + 1 < lines.length && tableSep.test(lines[i + 1])) {
+                    const headers = splitRow(line);
+                    const aligns = splitRow(lines[i + 1]).map(function (c) {
+                        c = c.trim();
+                        const left = c.startsWith(':'), right = c.endsWith(':');
+                        return left && right ? 'center' : right ? 'num' : '';
+                    });
+                    const cellOpen = function (tag, idx) {
+                        return aligns[idx] ? '<' + tag + ' class="' + aligns[idx] + '">' : '<' + tag + '>';
+                    };
+                    i += 2;
+                    const rows = [];
+                    while (i < lines.length && tableRow.test(lines[i])) {
+                        rows.push(splitRow(lines[i]));
+                        i++;
+                    }
+                    let html = '<div class="table-wrap"><table><thead><tr>';
+                    headers.forEach((h, idx) => {
+                        html += cellOpen('th', idx) + inline(h) + '</th>';
+                    });
+                    html += '</tr></thead><tbody>';
+                    rows.forEach(r => {
+                        html += '<tr>';
+                        r.forEach((c, idx) => {
+                            html += cellOpen('td', idx) + inline(c) + '</td>';
+                        });
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                    out.push(html);
+                    continue;
+                }
+
+                if (bullet.test(line) || ordered.test(line)) {
+                    // Indent of the first bullet defines this list's base level.
+                    // Deeper-indented bullets become nested lists (rendered by
+                    // recursing into renderMarkdown). Same-or-less indent at a
+                    // bullet starts a sibling item (or ends the list).
+                    const firstMatch = line.match(bullet) || line.match(ordered);
+                    const baseIndent = firstMatch[1].length;
+                    const isOrdered = ordered.test(line);
+                    const items = [];
+                    let hasTask = false;
+                    while (i < lines.length) {
+                        const cur = lines[i];
+                        if (!cur.trim()) {
+                            // blank line breaks the list (matches CommonMark-ish behaviour)
+                            i++;
+                            break;
+                        }
+                        const mBul = cur.match(bullet);
+                        const mOrd = cur.match(ordered);
+                        const m = mBul || mOrd;
+                        if (!m) break;
+                        if (m[1].length < baseIndent) break;
+                        if (m[1].length > baseIndent) break; // shouldn't happen at top of loop
+                        // Same-type check: switching between -/* and 1. closes the list
+                        if (isOrdered !== !!mOrd) break;
+
+                        const itemBuf = [m[3]];
+                        const nestedBuf = [];
+                        i++;
+                        while (i < lines.length) {
+                            const nxt = lines[i];
+                            if (!nxt.trim()) break;
+                            const nBul = nxt.match(bullet);
+                            const nOrd = nxt.match(ordered);
+                            const nm = nBul || nOrd;
+                            if (nm) {
+                                if (nm[1].length > baseIndent) {
+                                    // nested list line — dedent and stash
+                                    nestedBuf.push(nxt.slice(baseIndent + 2));
+                                    i++;
+                                    continue;
+                                }
+                                // sibling or end of list
+                                break;
+                            }
+                            // Plain continuation text
+                            if (nestedBuf.length) {
+                                // continuation inside the nested block
+                                nestedBuf.push(nxt.slice(baseIndent + 2));
+                            } else {
+                                itemBuf.push(nxt.trim());
+                            }
+                            i++;
+                        }
+
+                        // GitHub-style task items: "- [ ] text" / "- [x] text"
+                        // render as (clickable, unpersisted) checkboxes.
+                        const itemText = itemBuf.join('\n');
+                        const task = !isOrdered && itemText.match(/^\[( |x|X)\]\s+/);
+                        let liHtml = inline(task ? itemText.slice(task[0].length) : itemText);
+                        if (task) {
+                            hasTask = true;
+                            liHtml = '<input type="checkbox"' + (task[1] === ' ' ? '' : ' checked') + '>' + liHtml;
+                        }
+                        if (nestedBuf.length) {
+                            liHtml += renderMarkdown(nestedBuf.join('\n'));
+                        }
+                        items.push(task ? '<li class="task">' + liHtml + '</li>' : '<li>' + liHtml + '</li>');
+                    }
+                    out.push((isOrdered ? '<ol>' : (hasTask ? '<ul class="task-list">' : '<ul>')) + items.join('') + (isOrdered ? '</ol>' : '</ul>'));
+                    continue;
+                }
+
+                const buf = [line];
+                i++;
+                while (i < lines.length && lines[i].trim() && !/^#{1,6}\s/.test(lines[i]) && !/^>\s?/.test(lines[i]) && !bullet.test(lines[i]) && !ordered.test(lines[i]) && !/^```/.test(lines[i]) && !tableRow.test(lines[i])) {
+                    buf.push(lines[i]);
+                    i++;
+                }
+                out.push('<p>' + inline(buf.join(' ')) + '</p>');
+            }
+            return out.join('\n');
+        }
+
+        // Block dispatcher. New block types plug in here.
+        const renderers = {
+            markdown: function (block) {
+                const div = document.createElement('div');
+                div.innerHTML = renderMarkdown(block.content);
+                return div;
+            },
+            mermaid: function (block) {
+                // Mermaid scans elements with class "mermaid" whose textContent
+                // is the diagram source. We collect these nodes and run
+                // mermaid.run() once after all blocks are in the DOM.
+                const div = document.createElement('div');
+                div.className = 'mermaid';
+                div.textContent = block.content;
+                return div;
+            },
+            'force-graph': function (block) {
+                // build.py emits parsed JSON: {nodes:[{id,size}], links:[{source,target}]}.
+                // We instantiate force-graph after the container is in the DOM
+                // so it can measure its own width.
+                const div = document.createElement('div');
+                div.className = 'force-graph';
+                const data = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.ForceGraph) return;
+                    const maxSize = data.nodes.reduce((m, n) => Math.max(m, n.size || 1), 1);
+                    window.ForceGraph()(div)
+                        .graphData(data)
+                        .width(div.clientWidth)
+                        .height(div.clientHeight)
+                        .nodeRelSize(4)
+                        .nodeVal(n => Math.max(20 * (n.size || 1) / maxSize, 0.001))
+                        .nodeLabel(n => n.id + ' (' + (n.size || 1) + ')')
+                        .nodeColor(() => 'rgba(135, 206, 235, 0.7)')
+                        .linkColor(() => 'rgba(60, 60, 60, 0.4)')
+                        .linkDirectionalArrowLength(4)
+                        .linkDirectionalArrowRelPos(1)
+                        .linkWidth(1);
+                });
+                return div;
+            },
+            'bubble-chart': function (block) {
+                // build.py emits {nodes:[{name,size}]}. Renders a D3 circle-pack
+                // SVG (same shape as the obren.io reference, just inline).
+                const wrap = document.createElement('div');
+                wrap.className = 'bubble-chart';
+                const payload = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.d3) return;
+                    const diameter = 480;
+                    const fill = '#c0deed';
+                    const textColor = '#111111';
+                    const fontSize = 12;
+
+                    const svg = window.d3.select(wrap).append('svg')
+                        .attr('viewBox', '0 0 ' + diameter + ' ' + diameter)
+                        .attr('width', diameter)
+                        .attr('height', diameter);
+
+                    const root = window.d3.hierarchy({children: payload.nodes})
+                        .sum(d => d.size || 0)
+                        .sort((a, b) => b.value - a.value);
+
+                    window.d3.pack().size([diameter, diameter]).padding(2)(root);
+
+                    const node = svg.selectAll('g')
+                        .data(root.leaves())
+                        .enter().append('g')
+                        .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+
+                    node.append('title').text(d => d.data.name + ': ' + d.value);
+                    node.append('circle').attr('r', d => d.r).style('fill', fill);
+                    node.append('text')
+                        .attr('dy', '.3em')
+                        .style('text-anchor', 'middle')
+                        .style('fill', textColor)
+                        .style('font-size', fontSize + 'px')
+                        .text(d => d.data.name.substring(0, Math.max(0, Math.floor(d.r / 3))));
+                });
+                return wrap;
+            }
+        };
+
+        // Render one modality's blocks into a host element. Mermaid runs
+        // scoped to just the nodes created here, so lazily rendered tabs get
+        // their diagrams on first activation.
+        let mermaidInitialized = false;
+        function renderBlocksInto(blocks, host) {
+            const mermaidNodes = [];
+            blocks.forEach(function (block) {
+                const r = renderers[block.type];
+                if (!r) {
+                    const pre = document.createElement('pre');
+                    pre.textContent = '[unknown block type: ' + block.type + ']';
+                    host.appendChild(pre);
+                    return;
+                }
+                const node = r(block);
+                if (node instanceof Node) {
+                    host.appendChild(node);
+                    if (block.type === 'mermaid') mermaidNodes.push(node);
+                }
+            });
+            if (mermaidNodes.length && window.mermaid) {
+                if (!mermaidInitialized) {
+                    window.mermaid.initialize({startOnLoad: false, theme: 'default'});
+                    mermaidInitialized = true;
+                }
+                window.mermaid.run({nodes: mermaidNodes});
+            }
+            markScrollableTables(host);
+        }
+
+        // A table wider than its wrapper scrolls sideways. Mark those wrappers
+        // so the CSS can show a cue, and make them focusable so keyboard users
+        // can reach and scroll them. Hidden panes measure 0 and are re-marked
+        // when activated or when the window is resized.
+        function markScrollableTables(host) {
+            host.querySelectorAll('.table-wrap').forEach(function (wrap) {
+                const scrolls = wrap.scrollWidth > wrap.clientWidth + 1;
+                wrap.classList.toggle('is-scrollable', scrolls);
+                if (scrolls) {
+                    wrap.setAttribute('tabindex', '0');
+                    wrap.setAttribute('role', 'region');
+                    wrap.setAttribute('aria-label', 'Table that scrolls sideways');
+                } else {
+                    wrap.removeAttribute('tabindex');
+                    wrap.removeAttribute('role');
+                    wrap.removeAttribute('aria-label');
+                }
+            });
+        }
+
+        // Modality tabs. One <article class="pane"> per modality; panes are
+        // rendered lazily on first activation (force-graph / D3 / mermaid
+        // need a visible, measurable container). With a single modality the
+        // tab bar stays hidden and the page looks exactly like before.
+        const mods = data.modalities;
+        const tabBar = document.getElementById('modality-tabs');
+        const panes = {};
+        const tabButtons = {};
+        const renderedPanes = {};
+
+        // With several modalities each pane is a tabpanel labelled by its
+        // tab (W3C APG tabs pattern); tabindex=0 lets keyboard users move
+        // from the tab list straight into the active content.
+        mods.forEach(function (m) {
+            const pane = document.createElement('article');
+            pane.className = 'pane';
+            pane.dataset.key = m.key;
+            pane.hidden = true;
+            if (mods.length > 1) {
+                pane.id = 'pane-' + m.key;
+                pane.setAttribute('role', 'tabpanel');
+                pane.setAttribute('aria-labelledby', 'tab-' + m.key);
+                pane.setAttribute('tabindex', '0');
+            }
+            root.appendChild(pane);
+            panes[m.key] = pane;
+        });
+
+        const defaultKey = mods.some(m => m.key === 'index') ? 'index' : mods[0].key;
+
+        function activate(key, updateHash) {
+            mods.forEach(function (m) {
+                const isActive = m.key === key;
+                panes[m.key].hidden = !isActive;
+                if (tabButtons[m.key]) {
+                    tabButtons[m.key].classList.toggle('active', isActive);
+                    tabButtons[m.key].setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    // Roving tabindex: only the selected tab is in the Tab
+                    // order; the arrow keys move between tabs.
+                    tabButtons[m.key].setAttribute('tabindex', isActive ? '0' : '-1');
+                }
+            });
+            // Unhide first, then render: the chart libraries measure widths.
+            if (!renderedPanes[key]) {
+                renderBlocksInto(mods.find(m => m.key === key).blocks, panes[key]);
+                renderedPanes[key] = true;
+            } else {
+                markScrollableTables(panes[key]);
+            }
+            if (updateHash) {
+                history.replaceState(null, '',
+                    key === defaultKey ? location.pathname + location.search : '#' + key);
+            }
+        }
+
+        if (mods.length > 1) {
+            mods.forEach(function (m) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = m.label;
+                btn.id = 'tab-' + m.key;
+                btn.dataset.key = m.key;
+                btn.setAttribute('role', 'tab');
+                btn.setAttribute('aria-controls', 'pane-' + m.key);
+                btn.addEventListener('click', function () { activate(m.key, true); });
+                tabBar.appendChild(btn);
+                tabButtons[m.key] = btn;
+            });
+            // Keyboard support per the W3C APG tabs pattern (automatic
+            // activation): Left/Right move between tabs and wrap, Home/End
+            // jump to the first/last tab, and the focused tab is selected.
+            tabBar.addEventListener('keydown', function (ev) {
+                const keys = mods.map(function (m) { return m.key; });
+                const focused = document.activeElement;
+                const current = focused && focused.dataset ? keys.indexOf(focused.dataset.key) : -1;
+                if (current < 0) return;
+                let next = null;
+                if (ev.key === 'ArrowRight') next = (current + 1) % keys.length;
+                else if (ev.key === 'ArrowLeft') next = (current - 1 + keys.length) % keys.length;
+                else if (ev.key === 'Home') next = 0;
+                else if (ev.key === 'End') next = keys.length - 1;
+                if (next === null) return;
+                ev.preventDefault();
+                activate(keys[next], true);
+                tabButtons[keys[next]].focus();
+            });
+            tabBar.hidden = false;
+        }
+
+        // The hash selects a tab only when it matches a modality key, so
+        // existing anchors keep working.
+        const initialHash = location.hash.slice(1);
+        activate(mods.some(m => m.key === initialHash) ? initialHash : defaultKey, false);
+        window.addEventListener('hashchange', function () {
+            const k = location.hash.slice(1);
+            if (mods.some(m => m.key === k)) activate(k, false);
+        });
+        window.addEventListener('resize', function () { markScrollableTables(root); });
+    })();
+</script>
+</body>
+</html>

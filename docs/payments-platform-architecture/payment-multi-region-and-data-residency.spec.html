@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Spec: Where the Data Lives: Multi-Region Operation and Data Residency</title>
+    <meta name="description" content="What decides where a payment platform runs and where its data stays? A localization law where one applies, and the provider's hosting model elsewhere; Stripe and Adyen have documented their hosting and a few sentences about regions, so the rest is a question to put to them in writing.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SETTLED: Architecting Payments and Revenue Infrastructure">
+    <meta property="og:title" content="Spec: Where the Data Lives: Multi-Region Operation and Data Residency">
+    <meta property="og:description" content="What decides where a payment platform runs and where its data stays? A localization law where one applies, and the provider's hosting model elsewhere; Stripe and Adyen have documented their hosting and a few sentences about regions, so the rest is a question to put to them in writing.">
+    <meta property="og:url" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/payment-multi-region-and-data-residency.spec.html">
+    <meta property="og:image" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/assets/images/39-multi-region-and-data-residency/logo.jpeg">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="site.css">
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-129891352-1"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+        dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'UA-129891352-1');
+</script>
+    <style>
+        body {
+            line-height: 1.65;
+        }
+
+        main {
+            padding-top: 32px;
+        }
+
+        nav.post-nav {
+            font-size: 14px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: baseline;
+            flex-wrap: wrap;
+        }
+
+        nav.post-nav a {
+            color: var(--muted);
+            text-decoration: none;
+        }
+
+        nav.post-nav a:hover {
+            color: var(--accent);
+        }
+
+        nav.post-nav .nav-right {
+            margin-left: auto;
+            display: inline-flex;
+            gap: 4px;
+            align-items: baseline;
+        }
+
+        nav.post-nav .nav-sep {
+            color: var(--muted);
+        }
+
+        footer nav.post-nav {
+            margin-top: 24px;
+            margin-bottom: 0;
+        }
+
+        header.post {
+            margin-bottom: 32px;
+        }
+
+        header.post .section {
+            color: var(--muted);
+            font-size: 13px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin: 0 0 -6px;
+        }
+
+        header.post .section a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        header.post .section a:hover {
+            color: var(--accent);
+        }
+
+        header.post .section .post-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        header.post .section .post-status .status-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        header.post .logo {
+            display: block;
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            border: 1px solid lightgrey;
+
+        }
+
+        header.post .logo-credit {
+            color: var(--muted);
+            font-size: 12px;
+            margin: -4px 0 24px;
+            text-align: right;
+        }
+
+        header.post h1 {
+            font-size: 52px;
+            line-height: 1.2;
+            margin: 0 0 2px;
+            padding: 0;
+            letter-spacing: -0.01em;
+            font-weight: normal;
+        }
+
+        header.post .byline {
+            color: var(--muted);
+            font-size: 15px;
+            margin: 0;
+        }
+
+        header.post .byline .spec-link {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        header.post .byline .spec-link:hover {
+            text-decoration: underline;
+        }
+
+        header.post .byline .spec-link-drifted {
+            color: #b8650f;
+        }
+
+        header.post .byline .spec-link-superseded {
+            color: var(--muted);
+        }
+
+        header.post .ai-credit {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 4px 0 0;
+        }
+
+        header.post .ai-credit a {
+            color: inherit;
+        }
+
+        header.post .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 10px 0 10px;
+        }
+
+        header.post .tags .tag {
+            font-size: 14px;
+            padding: 1px 8px;
+            border: 1px solid deepskyblue;
+            color: blue;
+            border-radius: 999px;
+            background-color: var(--tag-bg);
+        }
+
+        nav.modality-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--rule);
+            margin: 0 0 28px;
+            flex-wrap: wrap;
+        }
+
+        nav.modality-tabs button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font: inherit;
+            font-size: 14px;
+            color: var(--muted);
+            padding: 8px 14px;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            letter-spacing: 0.02em;
+        }
+
+        nav.modality-tabs button:hover {
+            color: var(--accent);
+        }
+
+        nav.modality-tabs button.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        #content .pane[hidden] {
+            display: none;
+        }
+
+        #content .pane:focus {
+            outline: none;
+        }
+
+        #content .pane:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 6px;
+        }
+
+        article h2 {
+            font-size: 26px;
+            margin: 40px 0 12px;
+            letter-spacing: -0.01em;
+        }
+
+        article h3 {
+            font-size: 20px;
+            margin: 28px 0 8px;
+        }
+
+        article h4 {
+            font-size: 17px;
+            margin: 20px 0 6px;
+        }
+
+        article p {
+            margin: 0 0 16px;
+        }
+
+        article a {
+            color: var(--accent);
+        }
+
+        article a.image-link {
+            display: inline-block;
+            line-height: 0;
+        }
+
+        article img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        article a.image-link img {
+            display: block;
+        }
+
+        article ul, article ol {
+            padding-left: 24px;
+            margin: 0 0 16px;
+        }
+
+        article li {
+            margin-bottom: 6px;
+        }
+
+        article ul.task-list {
+            list-style: none;
+            padding-left: 4px;
+        }
+
+        article ul.task-list li.task > input[type="checkbox"] {
+            margin-right: 8px;
+            accent-color: var(--accent);
+        }
+
+        article hr {
+            border: none;
+            border-top: 1px solid var(--rule);
+            margin: 32px 0;
+        }
+
+        article blockquote {
+            margin: 16px 0;
+            padding: 12px 18px;
+            background: var(--quote-bg);
+            border-left: 3px solid var(--accent);
+            color: #333;
+        }
+
+        article blockquote p:last-child {
+            margin-bottom: 0;
+        }
+
+        article code {
+            background: var(--code-bg);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 0.92em;
+        }
+
+        article pre {
+            background: var(--code-bg);
+            padding: 14px 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        article pre code {
+            background: none;
+            padding: 0;
+        }
+
+        article .table-wrap {
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+
+        article table {
+            border-collapse: collapse;
+            margin: 16px 0;
+            width: 100%;
+            font-size: 15px;
+        }
+
+        article .table-wrap table {
+            margin: 0;
+        }
+
+        /* Wide tables scroll on narrow screens instead of crushing their columns.
+           A table wrapped in <div class="table-compact"> opts out: it has few,
+           short columns and wraps its cells to fit the screen instead. */
+        @media (max-width: 640px) {
+            article .table-wrap table {
+                min-width: 560px;
+            }
+            article .table-compact .table-wrap table {
+                min-width: 0;
+            }
+        }
+
+        /* Tables that actually overflow get a visible cue and keyboard focus
+           (markScrollableTables() sets the class and attributes). */
+        article .table-wrap.is-scrollable::before {
+            content: "Scroll sideways to see the whole table";
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        article .table-wrap.is-scrollable:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        article th, article td {
+            border: 1px solid var(--rule);
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        article th {
+            background: var(--code-bg);
+            font-weight: 600;
+        }
+
+        /* GFM column alignment from the separator row. Right-aligned columns
+           hold numbers; their cells never wrap, so a sign, a currency symbol
+           and its amount stay on one line while label columns still wrap. */
+        article th.num, article td.num {
+            text-align: right;
+        }
+
+        article td.num {
+            white-space: nowrap;
+        }
+
+        article th.center, article td.center {
+            text-align: center;
+        }
+
+        article .mermaid {
+            text-align: center;
+            margin: 24px 0;
+        }
+
+        article .force-graph {
+            margin: 24px 0;
+            border: 1px solid var(--rule);
+            border-radius: 6px;
+            background: #fff;
+            height: 480px;
+            overflow: hidden;
+        }
+
+        article .bubble-chart {
+            margin: 24px 0;
+            text-align: center;
+        }
+
+        article .bubble-chart svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <nav class="post-nav"><a class="nav-back" href="payment-multi-region-and-data-residency.html">← Where the Data Lives: Multi-Region Operation and Data Residency</a><span class="nav-right"></span></nav>
+    <header class="post" id="post-header">
+        <p class="section"><span>SPEC</span> • <span class="post-status"><span class="status-dot" style="background:green"></span>accepted</span> • <span>revised 2026-11-17</span></p>
+        <h1>Spec: Where the Data Lives: Multi-Region Operation and Data Residency</h1>
+        <p class="byline"></p>
+        
+        <div class="tags" id="tags"></div>
+        
+    </header>
+    <nav class="modality-tabs" id="modality-tabs" hidden role="tablist" aria-label="Reading formats"></nav>
+    <div id="content"></div>
+    <footer>
+        <nav class="post-nav"><a class="nav-back" href="payment-multi-region-and-data-residency.html">← Where the Data Lives: Multi-Region Operation and Data Residency</a><span class="nav-right"></span></nav>
+    </footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/force-graph"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script id="data" type="application/json">{"meta": {}, "tags": [], "modalities": [{"key": "spec", "label": "Spec", "meta": {}, "blocks": [{"type": "markdown", "content": "## Intent\n\n**After reading, the reader should:**\n\n- **Know:** The difference between data residency (where data is stored) and data localization (a law that requires it), and what active-active and active-passive mean.\n- **Know:** The Reserve Bank of India's 2018 storage rule and its 2019 clarification, and what Stripe's India page (updated 2023) says the move cost in features.\n- **Know:** What is documented about hosting: Stripe on Amazon Web Services (2023, 2024, current documentation); Adyen on its own infrastructure in data centers (2021, 2025, 2026) with five integration regions named and its data centers listed by continent or country.\n- **Know:** What is not public for either company: which AWS regions Stripe uses and how many, the cities of Adyen's data centers, and how one region or data center takes over from another (Adyen states only that its load balancers fail over between data centers).\n- **Believe:** A localization law is a product constraint as much as a storage one: identifiers, saved cards and fraud signals stop crossing the border.\n- **Believe:** A statement about a provider's regions or failover that the provider has not published should be asked for in writing, not inferred.\n- **Be able to:** Answer 'where is our customers' payment data' for each provider with what is documented, and list what must be asked of the provider.\n- **Be able to:** Say what a new localization rule would change for stored cards, fraud checks and reporting in the affected country.\n\n**Audience:** A software engineer or architect who has read the chapters on reliability and on data stores and is asked, by a customer, an auditor or a colleague, where a payment provider keeps data and what happens when a region fails.\n\n**Already knows:**\n\n- Regions, replication and failover as general engineering.\n- Shards and the consistency boundary (payment-data-stores-and-consistency) and the unknown outcome (payment-reliability-and-availability).\n- Larkfield, its two providers and the studios that use both (meet-larkfield).\n\n**Does not yet know:**\n\n- Data residency against data localization; the Reserve Bank of India's storage rule.\n- What Stripe and Adyen have each published about hosting, regions and India, and what neither has published.\n\n**Acceptance criteria**\n\n| Id | Criterion | Check | Method | Severity |\n| --- | --- | --- | --- | --- |\n| AC-1 | Given a confident sentence about a provider's regions, the reader separates the part the public record supports from the parts it does not. *Probe:* A colleague writes in a design document: 'Stripe runs active-active in three AWS regions, so our European members' data never leaves the EU.' Which parts of this sentence does the public record support, as of November 2026? | `custom` | cold_reader | blocker |\n| AC-2 | Given a new localization law in a country the chapter does not discuss, the reader names what changes for a merchant, going by the documented India case. *Probe:* A country announces that payment data about transactions in the country must be stored only inside it. Going by what happened in India, name three things a merchant using a global provider there should expect to change. | `custom` | cold_reader | major |\n| AC-3 | The chapter contains no inferred topology: every Stripe and Adyen statement about hosting, regions or failover is a dated documented fact or the words 'not public', and a named section lists where the evidence stops. | `custom` | rubric | blocker |\n| AC-4 | The chapter is no longer than its evidence: it does not exceed about 3,800 words before Sources and Evidence. | `custom` | deterministic | minor |\n\n## Thesis\n\n**Question:** What decides where a payment platform runs and where its data stays, and how much of Stripe's and Adyen's answer is public?\n\n> **Claim:** Where a localization law applies, it settles where payment data is stored before any latency or availability goal, and elsewhere the provider's hosting model does. About the two providers the public record supports four kinds of statement and no more: Stripe runs on Amazon Web Services and names no AWS region; Adyen runs its own data centers, names five integration regions and lists its sites by continent or country, no finer; Stripe says it stores Indian payment system data only in India and lists the features that cost, while Adyen describes an isolated India environment; and Adyen says it accepts payments in several data centers at once and that its load balancers fail over between them. Neither says between which places takeover happens or how fast, and Stripe has described takeover only for one system, a two-region design for billing usage events (2025).\n\n**Disputed by:** The view that multi-region operation is an engineering choice made for latency and uptime, that any provider of this size must be active-active across regions, and that its layout can be worked out from its cloud provider or its customer list.\n\n**So what:** The reader answers 'where is our members' data' with two differently shaped facts (a cloud provider whose regions are not named, and a list of regions and countries with no cities and no commitment that data stays there), puts residency and failover questions to each provider in writing, and expects a localization rule to change product behavior, not only storage.\n\n**How and why:** The Reserve Bank of India's 2018 circular requires that payment system data be stored 'only in India' and gives supervisory access, not privacy, as the reason; its 2019 clarification allows processing abroad if the data is brought back within 24 hours. Stripe's page on the move (last updated 2023) lists the cost: payment information 'can no longer be cloned into or out of India', and one card can have two fingerprints. The EU's operational-resilience regulation, applied from 17 January 2025, says in terms that it imposes no localization duty. On hosting the difference is documented: Stripe on AWS (2023 press release, 2024, current documentation), Adyen 'in several data centers around the world' (2021) for reasons it called 'part historical, part legal, and part technical', confirmed in 2025 and 2026; Adyen's documentation (n.d., accessed November 2026) names five regions an integrator can address: Europe, the United States, Australia, Northeast Asia and India. Its website (n.d., accessed November 2026) lists data centers in Europe, the United States, India, Singapore, Japan and Australia and says payments are 'stored in Europe and our isolated India environment', and its peak-season documentation calls the architecture 'active/active' and says load balancers 'manage the failover to the other data centers'. Stripe's Privacy Center (n.d., accessed November 2026) says payment system data is stored only on servers in India where the rule requires it. Nothing first-party names an AWS region Stripe runs in, a city for an Adyen data center, or the topology or timing of a failover at either company, or any mechanism beyond Adyen's load-balancer sentence, and Stripe has published no statement on takeover for payments, only a two-region design with failover for billing usage events (2025). The public record stops there, and so does the chapter.\n\n**Supporting claims**\n\n- **S1** — Two forces spread a payment platform across regions, distance and law, and where a localization law applies it fixes where data is stored before any latency or availability goal is considered.\n- **S2** — A localization law is a product constraint as much as a storage one: in the best-documented case, India, Stripe moved the servers that store India data into the country, stopped payment details crossing the border, gave one card two fingerprints and switched features off.\n- **S3** — Where no such law applies the provider's hosting model decides, and that much is documented: Stripe runs on Amazon Web Services and names no AWS region; Adyen runs its own infrastructure, names five integration regions, and lists its data centers on its website by continent or country (Europe, the United States, India, Singapore, Japan, Australia), no finer.\n- **S4** — Neither company has published how takeover between its sites works. Adyen documents an 'active/active, stateless architecture' whose load balancers 'manage the failover to the other data centers', and says payments are stored in Europe and an isolated India environment, but gives no topology, timings or mechanism; Stripe says nothing on serving from several regions or on failover; the public record stops there.\n- **S5** — An integrator therefore answers 'where is our customers' payment data' with two differently shaped documented facts and a list of questions put to each provider in writing, never with an inferred topology.\n\n## Role in the part\n\nAdds the constraint that comes from outside engineering (law and hosting) and draws the boundary of the public record on regions and failover, so that no later page describes a topology neither company has published. Supports P8-3 of part `part-8`.\n\n## Flow\n\n**Pattern:** `prerequisite_order` (also `problem_solution` in scene to in-practice: the questionnaire is posed in the first section and answered in the sixth; `comparison` in published and where-they-differ)\n\nThe reader meets a question that invites an inferred answer, then gets the vocabulary to read sources (two pulls, residency against localization, three placements). The law case comes before the hosting case because the thesis says law decides first, and because India is the one placement with a documented cost; hosting then covers everywhere else. The comparison needs both. Larkfield's answer needs the comparison; the failure section needs the answer to contrast with; the list of where the evidence stops comes last in the body because each item on it is only meaningful once the reader has seen what is documented next to it. Putting the list first would read as a disclaimer; putting hosting before India would present the provider's choice as the general rule and the law as an exception, which is the view the thesis disputes.\n\n## Introduction\n\n**Hook** (`puzzling_scenario`): A colleague writes in a design document: 'Stripe runs active-active in three AWS regions, so our European members' data never leaves the EU.' The sentence reads like knowledge. As of November 2026 the public record supports one word of it: AWS.\n\n**Bridge:** An engineer is used to reading a system's regions off its documentation or its cloud console, and to choosing them for latency and uptime. → A payment provider's regions are chosen partly by law, and neither Stripe nor Adyen publishes its layout, so the engineer's habit of inferring a topology produces sentences nobody can source.\n\n**Thesis statement** (KEY POINTS bullets 1 to 3, and paragraph p02): Where a localization law applies, it settles where payment data is stored before any latency or availability goal, and elsewhere the provider's hosting model does; the public record supports four kinds of statement about the two providers and no more, and neither says between which places takeover happens or how fast.\n\n**Roadmap** (IN THIS CHAPTER callout and paragraph p04):\n\n- Start from a questionnaire a German studio chain sends Larkfield in April 2027. *Kept in:* scene.\n- Name the two pulls toward regions, the vocabulary and the three ways to place data. *Kept in:* two-pulls.\n- Read the one documented localization case, India, and what it cost in features. *Kept in:* india.\n- Set out what each company has published about where it runs, and compare them. *Kept in:* published, where-they-differ.\n- Answer the questionnaire at Larkfield, show how an unsourced answer fails, and list where the evidence stops. *Kept in:* in-practice, when-it-goes-wrong, evidence-stops.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p01 | context | The previous chapter's data was divided by engineers and described at length by both companies, while this chapter's is divided by law in a part of the record where little is published, which is why a confident sentence about a provider's regions can be almost entirely unsupported. | example: The design-document sentence 'Stripe runs active-active in three AWS regions, so our European members' data never leaves the EU'; of its claims only AWS is documented (Stripe newsroom, 23 January 2023). |  |\n| p02 | claim | Law settles where payment data is stored where a localization rule applies, the provider's hosting model settles it elsewhere, and the public record supports four kinds of statement about Stripe and Adyen and no more (hosting for each, the regions Adyen names, what each has said about India, Adyen's statement that it serves from several data centers at once and fails over between them); neither describes how takeover works, between which places or how fast. |  | `problem_solution`: The sentence that cannot be sourced. → What can be said instead: the thesis and its four documented statements. |\n| p03 | context | Mila's class pass was approved in under a second by systems whose location this book has not asked about, and this chapter asks where the record of that payment is kept and who decided. | scenario: Mila Janssen's €120.00 ten-class pass from Studio Noord (on Adyen), Tuesday 9 March 2027 at 19:42. | `place`: The thesis. → Its bearing on the recurring payment. |\n| p04 | transition | The chapter goes from a questionnaire at Larkfield through the two pulls and the three placements, India's rule, what each company has published and how they differ, to Larkfield's answer, the way an unsourced answer fails and the list of where the evidence stops. |  | `sequence`: Where the chapter stands relative to the payment. → The order of its sections. |\n\n## Sections\n\n### Setting the Scene at Larkfield: One Question, Two Providers\n\n**Controlling idea** (`example`, id `scene`): A studio chain that uses both providers asks Larkfield where its members' payment data is stored, and the first draft of the answer is an inferred topology.\n\n**Advances the thesis** (S5): Poses the integrator's question with a studio whose data sits at both providers, and shows the inferred answer the chapter replaces.\n\n**Transition in:** `example`: The roadmap's first promise. → A real-looking question that needs a sourced answer.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p05 | context | In April 2027 a pilates chain in Hamburg, one of the 1,140 studios that take online payments on Stripe and front-desk payments on Adyen, sends Larkfield a questionnaire asking where its members' payment data is stored and whether it leaves the European Union. | scenario: 1,140 studios onboarded before 2024 in NL and DE are on Stripe online and Adyen terminals; Jonas Weber owns compliance; Femke de Graaf leads payments engineering. The questionnaire is a new ledger addition. |  |\n| p06 | analysis | Tom Hendriks's first draft says both providers keep the data in EU regions and fail over inside the EU, and Femke de Graaf returns it asking for the source of each clause; he finds a source for half a clause (Adyen's website says the payments it processes are stored in Europe, which is not the EU) and none for the rest. | scenario: Tom Hendriks built the payment service in 2024; the draft answer is illustration.; quotation: Adyen infrastructure page (n.d., accessed 2026-11): 'All payments processed are stored in Europe and our isolated India environment.' (https://www.adyen.com/infrastructure). | `cause_effect`: The questionnaire. → The draft answer and the demand for sources, which the rest of the chapter meets. |\n\n### Two Pulls Toward Regions: Distance and Law\n\n**Controlling idea** (`explanation`, id `two-pulls`): Distance and law both push a payment platform into regions, law wins where it applies, and the three ways of placing data cost a money path different things.\n\n**Advances the thesis** (S1): Gives the two causes, the vocabulary (residency, localization, active-active, active-passive) and the trade-offs, so the documented cases can be read.\n\n**Transition in:** `elaboration`: Femke's demand for sources. → The vocabulary needed to read the sources: why platforms spread, and what the placements are called.\n\n**Order of paragraphs** (`prerequisite_order`): The engineering pull first because the reader knows it; then the legal pull and its vocabulary; then the designs that answer both; then their costs side by side.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p07 | explanation | Distance is the engineering pull: a payment waits on every network hop, so a platform puts the systems that answer close to where payments start. | quotation: Adyen, 'Building a GlobalStream' (page dated 6 October 2025): 'data must remain close to producers to reduce latency and meet regulations, while also being centralized for analytics', with the example of a payment on a beach in Australia that should not be 'sent to Europe' (https://www.adyen.com/knowledge-hub/building-a-global-stream). |  |\n| p08 | definition | Law is the other pull, and it comes in two strengths that are often confused: data residency is the fact of where data is stored, data localization is a law that requires it, and the European rules a Dutch platform meets regulate transfers and resilience without requiring storage in the Union. | quotation: Regulation (EU) 2022/2554 (DORA), recital 82, applying from 17 January 2025: 'This Regulation does not impose a data localisation obligation as it does not require data storage or processing to be undertaken in the Union.' (http://publications.europa.eu/resource/celex/32022R2554.ENG).; quotation: Stripe DPA FAQ (n.d., accessed 2026-11): 'Under Article 46 GDPR, the SCCs are one of the ways that organizations can transfer personal data to certain countries, outside of the European Economic Area, including the United States.' (https://stripe.com/us/legal/dpa/faqs). | `contrast`: The pull engineers choose. → The pull they do not, and the two words for it. |\n| p09 | definition | Once a platform runs in more than one region it must choose between active-passive, where one region serves and another waits, and active-active, where several serve at once, and on a money path the second choice raises the question of which region may write a given balance. | quotation: Uber Engineering, 5 December 2018: its payments platform's 'primary design goals were high reliability through an active-active architecture, exactly-once payment processing by the means of idempotency and strong consistency' (https://www.uber.com/blog/payments-platform/); evidence age 8 years.; reasoning: Chapter 38's consistency boundary and chapter 37's unknown outcome: two regions writing the same record need an order between their writes; a takeover leaves in-flight payments unknown. | `sequence`: Why data ends up in several regions. → How the regions share the work. |\n| p10 | comparison | Three placements exist (one writer with a standby, several writers, and a partition by country), and each buys something different at a different cost to the record of money; Adyen's documentation calls its architecture active/active with failover between data centers, and neither company says which site writes which record. | table: Rows: active-passive; active-active; partitioned by jurisdiction. Columns: what it buys; what it costs on a money path; what is documented for Stripe and Adyen (active-passive: not stated by either; active-active: not found for Stripe's payments (a two-region design is published for billing usage events, 2025), and for Adyen the 'active/active' statement of its peak season readiness documentation, with the write rule 'Not public'; the third: Stripe's India move, page updated 2023, and Adyen's 'isolated India environment', n.d.).; figure: Placeholder 39-three-placements: three panels showing a standby, two writers and a walled-off country. | `additional_support`: The two ways regions share work. → A third placement and the costs of all three. |\n\n### When a Law Decides: India's Storage Rule\n\n**Controlling idea** (`evidence`, id `india`): India's rule shows a localization law deciding storage for supervisory reasons, and Stripe's page on its response shows the cost falling on product features and identifiers.\n\n**Advances the thesis** (S1, S2): The one localization case with a first-party account from one of the two companies: the rule's text, then what moving cost.\n\n**Transition in:** `example`: The partition-by-country placement. → The documented case of it.\n\n**Order of paragraphs** (`chronological`): The 2018 rule and its 2019 clarification, then Stripe's 2021 to 2023 response, then what the response means.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p11 | evidence | The Reserve Bank of India's 2018 circular requires payment system data to be stored only in India, gives supervisory access as the reason, and was clarified in 2019 to allow processing abroad if the data returns within 24 hours. | quotation: RBI circular RBI/2017-18/153, 6 April 2018: 'All system providers shall ensure that the entire data relating to payment systems operated by them are stored in a system only in India'; 'it is important to have unfettered supervisory access to data'; compliance to be reported 'latest by October 15, 2018' (https://www.rbi.org.in/Scripts/NotificationUser.aspx?Id=11244&Mode=0). Evidence age 8 years.; quotation: RBI FAQ, 26 June 2019: 'There is no bar on processing of payment transactions outside India'; data 'should be deleted from the systems abroad and brought back to India not later than the one business day or 24 hours from payment processing, whichever is earlier'; applies to 'payment gateways, third party vendors and other entities' (https://www.rbi.org.in/Scripts/FAQView.aspx?Id=130). Evidence age 7 years. |  |\n| p12 | evidence | Stripe's page on its response, last updated in May 2023, records that it was moving the servers that store India data into the country and that the move stopped payment details crossing the border, split the card fingerprint and switched several features off; two current Stripe pages state that the data is stored on servers in India. | quotation: Stripe, 'Important updates on Stripe data storage migration in India', last updated 16 May 2023: 'we're moving the servers that store India data to be located within the country'; 'a substantive infrastructure change'; 'Payment information can no longer be cloned into or out of India'; 'the same card details can have two different fingerprints, one for India and another for the rest of the world'; Card Updater, Revenue Recognition and Sigma 'temporarily disabled in India' from 30 April 2021 (https://stripe.com/india-data-storage-faq). Evidence age 3.5 years.; quotation: Stripe Privacy Center (n.d., accessed 2026-11): 'Where required payment system data will be stored only on servers in India in accordance with the RBI data localization requirements.' (https://stripe.com/us/legal/privacy-center). Stripe Service Providers list (last updated 27 September 2026): 'Stripe India Private Limited stores certain data on servers located in India' (https://stripe.com/us/legal/service-providers). | `cause_effect`: The rule. → What complying with it cost one provider. |\n| p13 | analysis | The fingerprint is the telling line: an identifier that was global becomes two, so whatever relied on matching it (duplicate checks, saved cards, fraud signals) stops matching across the border, which makes a localization rule a product constraint. | reasoning: Stripe documents the two fingerprints and the end of cloning; that fraud and duplicate checks keyed on the fingerprint stop matching across the border is the author's inference and goes in an INFERENCE block.; figure: Placeholder 39-one-card-two-fingerprints: one card, a border, two different identifiers. | `elaboration`: Stripe's list of changes. → Why one line of it matters most. |\n\n### What Each Company Has Published About Where It Runs\n\n**Controlling idea** (`evidence`, id `published`): Outside a localization law the hosting model decides where data sits; the two companies have documented opposite hosting models, Adyen also a list of data-center regions, a storage sentence and the statement that it fails over between data centers, and neither how takeover works.\n\n**Advances the thesis** (S3): Lays out the dated first-party statements on hosting and regions for each company.\n\n**Transition in:** `contrast`: A country where the law decides. → Everywhere else, where the provider's hosting does.\n\n**Order of paragraphs** (`comparison`): Stripe's hosting, then Adyen's, then the regions Adyen lets an integrator address, which have no Stripe counterpart.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p14 | evidence | Stripe has said since 2023 that it runs on Amazon Web Services and has confirmed it since, but names no AWS region, says nothing on how regions share or take over work for payments (its one published two-region design, of January 2025, is for billing usage events), names only two countries (the United States and India) and only for login and identity data, and tells its users that personal data may be processed in any country where it does business. | quotation: Stripe newsroom, 23 January 2023: 'Stripe has long relied on AWS to provide the core compute infrastructure on which Stripe is built'; David Singleton: 'We couldn't run without AWS—and we wouldn't want to' (https://stripe.com/us/newsroom/news/amazon-and-stripe). Evidence age nearly 4 years.; quotation: AWS Cloud Operations blog with Stripe co-authors, 24 October 2024: 'a sophisticated microservice environment built on top of AWS'. Stripe security documentation (n.d., accessed 2026-11): the card data vault runs 'in an isolated Amazon Web Services (AWS) environment that's separate from the rest of the Stripe infrastructure' (https://docs.stripe.com/security).; quotation: Stripe Privacy Center (n.d., accessed 2026-11): 'As a global business, Personal Data may be transferred to, and processed, in any country where we do business'; 'including to the United States'. API reference: base URL https://api.stripe.com.; quotation: Stripe Privacy Center (n.d., accessed 2026-11), 'Why is Stripe storing authentication and authorization data globally?': 'a robust, multi-region infrastructure dedicated to optimizing authentication, authorization, and identity management. This infrastructure spans multiple geographic regions, specifically including our data centers located in the United States and India'; 'this global storage strategy does not extend to any transactional information or other data related to End Customers'. |  |\n| p15 | evidence | Adyen has said since 2021 that it runs its own infrastructure in data centers and not in a public cloud, its 2025 and 2026 statements confirm it and show the estate growing, its corporate website lists the data centers by continent or country and says where processed payments are stored, and its documentation states an active/active architecture with failover between data centers, without topology, timings or mechanism. | quotation: Adyen, 'Design to Duty', 28 July 2021: 'We manage our own infrastructure in several data centers around the world'; 'The reasons we are not deploying to the cloud are part historical, part legal, and part technical' (https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture). Evidence age 5 years.; quotation: Adyen, 31 October 2025: 'end-to-end ownership over every layer, from our data centers to our application logic'; Adyen, August 2026: 'tens of thousands of hosts spread across tens of data centres'; H1 2026 results, 13 August 2026: 'The majority of our CapEx is invested in data centers'.; quotation: Adyen infrastructure page (n.d., accessed 2026-11; https://www.adyen.com/infrastructure): 'Adyen currently hosts its main systems in separate data centers in Europe, the United States, India, Singapore, Japan and Australia'; 'All payments processed are stored in Europe and our isolated India environment'; 'a redundant and stateless service-oriented architecture (SOA) that simultaneously accepts payments on multiple physical hosting locations'. The Dutch and Portuguese versions of the page list fewer places (Europe, the United States and Australia; two data centers in Europe and two in the United States).; quotation: Adyen documentation, 'Peak season readiness' (n.d., accessed 2026-11; https://docs.adyen.com/industries/peak-season): 'Our active/active, stateless architecture allows us to distribute transactions across a pool of highly available resources'; 'With load balancers in front of every data center, transactions can be equally processed through any available data center. In the event that a data center is unavailable, these load balancers also manage the failover to the other data centers.' | `contrast`: Rented cloud. → Owned infrastructure. |\n| p16 | evidence | Adyen's documentation names five regions an integrator can address for online payments, assigns each country's terminals to a data center region, and says a company account's data centers are visible in its Customer Area; what it has published about rerouting names no destination, its privacy statement allows disclosure outside the EEA, and on India it documents a separate company account whose risk rules start without history. | quotation: Adyen docs (n.d., accessed 2026-11), best practices for web integrations: 'Europe (EU) live', 'United States (US) live', 'Australia (AU) live', 'Northeast Asia (NEA) live', 'India (IN) live'. Live endpoints: 'you can see the configured data centres and prefixes for your company account'; 'If you need to connect to a certain data center of the Adyen payments platform (for example, US or AU data centers), you can set up location-based live endpoints'; 'alternative routing can be enabled to backup infrastructure and new infrastructure can be provisioned on demand'. Building a cloud integration: a 'Regional data center overview' table assigns each country to a data center region (the Netherlands and Germany to EU); 'make sure to select the data center closest to your geographical location'.; quotation: Adyen privacy statement (version of 4 August 2025; https://www.adyen.com/privacy-policy): information 'may be disclosed to other Adyen group companies outside of the European Economic Area'. Adyen India compliance guide (n.d., accessed 2026-11): local processing needs 'a separate company account for your business in India'. India go-live checklist (n.d., accessed 2026-11): velocity risk rules 'will not work as well for your India company account at first, because they rely on historical transaction data'.; quotation: Adyen incident update dated 21 April 2025 (https://www.adyen.com/knowledge-hub/mitigating-a-ddos-april-2025): 'a DDoS attack targeting services across our European datacenters'; no other region is named.; figure: Placeholder 39-two-shapes-of-answer: Provider A as a cloud with unnamed regions, Provider B as five named integration regions and six map pins at continent or country level, tagged 'no cities'. | `elaboration`: Adyen's own data centers. → What of them an integrator can see and address. |\n\n### Stripe and Adyen: Where They Differ\n\n**Controlling idea** (`comparison`, id `where-they-differ`): The documented difference is in hosting, in whether a region is part of the integration, in how much each says about where its data centers are, and in that only Adyen states that it fails over between them; on how takeover works the two are alike in publishing nothing.\n\n**Advances the thesis** (S3, S4): The required comparison: every cell a dated fact from the previous sections or 'Not public'.\n\n**Transition in:** `conclusion_summary`: The statements of the last two sections. → The same facts side by side, with the author's reading.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p17 | comparison | Aspect by aspect the two companies differ in hosting, in named regions, in what they say about where their data centers are and where European and Indian payments are stored, and in that Adyen states that it fails over between data centers while Stripe states nothing; neither describes how takeover works. | table: Rows: hosting; regions an integrator can name; where the data centers are; India; European data; several regions at once, and takeover. Cells from the sources in sections 'india' and 'published'; last column the author's inference. |  |\n| p18 | recommendation | On Stripe an integrator has no region to choose and asks the residency question through the contract; on Adyen the region is a setting to check in the Customer Area and to match in client-side code; on both, takeover is a question to put in writing. | fact: Stripe base URL https://api.stripe.com and its Data Processing Agreement FAQ; Adyen's live-endpoints page on configured data centres and region-specific client URLs. | `cause_effect`: The differences in the table. → What to do differently on each. |\n\n### In Practice at Larkfield: The Answer That Went Back\n\n**Controlling idea** (`example`, id `in-practice`): Larkfield answers the questionnaire with what each provider documents and what it has asked each in writing, and adds a localization line to its market-entry checklist.\n\n**Advances the thesis** (S5): The worked example: the questionnaire answered from the record, and the India lesson applied to Larkfield's own design.\n\n**Transition in:** `problem_solution`: The scene's question and the comparison. → The answer Larkfield sends.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p19 | example | Femke's answer to the Hamburg chain has two parts per provider, what the provider has published and what Larkfield has asked it in writing, and it says plainly that the members' data is held by two providers under two hosting models, with 44% of Larkfield's volume on one and 56% on the other. | scenario: 2026 share of member payment volume: Stripe 44% (€493M), Adyen 56% (€627M); the chain's online payments on Stripe (Stripe Technology Europe, Ltd.), its terminals on Adyen (Adyen N.V.).; table: Two rows (Stripe, Adyen), columns 'Documented' and 'Asked in writing'; the Adyen row cites the EU data center region for German terminals and the website's 'stored in Europe', and asks whether that is a commitment. |  |\n| p20 | recommendation | Larkfield has no market with a localization law, so Femke writes the India lesson into the market-entry checklist: in such a country stored cards would have to be collected again, the member id would be the only identifier that crosses the border, the K8 switch would need a second provider inside the country, and exports to the data warehouse would need their own review. | scenario: Markets NL, DE, UK, BE, US; K4 (provider tokens), K8 (rehearsed switch), member id as the shared payer identifier (chapter 11 addition), the data warehouse. | `additional_support`: The answer about today's markets. → The same lesson applied to a market Larkfield might enter. |\n\n### When It Goes Wrong: The Sentence Nobody Can Source\n\n**Controlling idea** (`cause_effect`, id `when-it-goes-wrong`): The failure this chapter guards against is a commitment built on an inferred topology, found by asking each clause for its source and repaired by a written answer from the provider.\n\n**Advances the thesis** (S5, S4): Shows the cost of ignoring the boundary of the record: detection and recovery for the chapter's own failure mode.\n\n**Transition in:** `contrast`: The sourced answer. → What happens when the unsourced one is sent instead.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p21 | cause_effect | An inferred topology fails late: it enters a customer contract or a recovery plan as fact, and is discovered to be a guess when an auditor asks for evidence or a regional outage behaves differently from the plan. | reasoning: Tom's draft sentence, had it been sent; K8's switch between providers is Larkfield's documented failover, and that the two providers' hosting differs (AWS; own data centers) is documented, while their independence under failure is the author's judgement. |  |\n\n### Where the Evidence Stops\n\n**Controlling idea** (`evidence`, id `evidence-stops`): Seven things about the two providers' regions and failover are not in any first-party source found as of November 2026, and each is a question to ask, not a gap to fill by inference.\n\n**Advances the thesis** (S4): States the boundary of the public record item by item (AC-3).\n\n**Transition in:** `conclusion_summary`: The failure of inferring. → The exact list of what would have to be inferred.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p22 | evidence (list) | Not public for Stripe: AWS region names and count, whether the API is served from several regions at once, and where European payment data is stored or any commitment to keep it in Europe; not public for Adyen: data-center cities and operators, whether 'stored in Europe' is a commitment and what it covers, and what its isolated India environment changes in features; not public for either: how takeover works (Adyen states that its load balancers fail over between data centers, not between which, how fast or with what effect on records being written). | source: Searches on 17 November 2026 of both documentation indexes and sitemaps (docs.stripe.com, docs.adyen.com), both help-center sitemaps (support.stripe.com, help.adyen.com), both engineering blogs (stripe.dev/blog, adyen.com/knowledge-hub), both companies' legal and privacy pages, Adyen's corporate and investor pages and the web found no first-party statement on any of the seven items. |  |\n\n## Conclusion: What to Take Away\n\n**Synthesis:** The chapter's two halves say the same thing from opposite sides: where a law speaks, the placement of data is known and even its product cost is documented; where no law speaks, placement is whatever the provider's hosting makes it, and Stripe says almost nothing while Adyen offers a few undated sentences on its website and in its documentation. So the better-documented topology is the one a regulator forced into the open.\n\n**So what:** The reader stops treating a provider's regions as something to work out and treats them as something to ask for: two documented facts of different shape, a written question for each gap, and an expectation that the next localization rule will change identifiers and features, not only disks.\n\n**Callback:** The design-document sentence of the opening: 'Stripe runs active-active in three AWS regions, so our European members' data never leaves the EU.' The reader can now strike every clause but 'AWS' and rewrite the sentence as three questions to the provider.\n\n**Takeaway** (`course_of_action`): For each provider, write one page with two columns, 'documented, with source and date' and 'asked in writing, with the answer', and let no sentence about regions or failover into a contract or a recovery plan unless it sits in one of them.\n\n**Hand-off** to [The Biggest Day: Peak Load and Capacity](payment-peak-load.html): `cause_effect`: The documented hosting difference: Stripe on rented cloud capacity, Adyen on infrastructure it owns. → What follows when load arrives all at once: capacity scaled on demand on one side and bought ahead on the other, and on both a per-customer share that a merchant reaches first.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p23 | synthesis (list) | Established: the Indian rule and its 24-hour clarification; that the EU's resilience regulation imposes no localization duty; Stripe on AWS; Adyen on its own infrastructure with five named integration regions and a website list of data centers by continent or country, and a documented active/active architecture with failover between data centers; Stripe's documented feature cost in India. |  |  |\n| p24 | synthesis (list) | Depends on context: whether residency matters at all depends on the markets and the customers' contracts; whether a region is yours to choose depends on the provider; how much a localization rule costs depends on how many features hang on a global identifier. |  | `contrast`: What is settled. → What changes with the situation. |\n| p25 | recommendation (list) | The author's synthesis: the best-documented topology is the one a regulator forced into the open, so treat every other statement about regions as a question; the opening sentence keeps one word and becomes three questions. |  | `contrast`: What is established and what depends. → The author's own position, returning to the opening sentence. |\n| p26 | recommendation (list) | Seven questions let the reader take the boundary of the record into a provider evaluation or a design review. |  | `cause_effect`: The author's position. → Questions that apply it. |\n| p27 | transition | The hosting difference this chapter documented (rented cloud, owned data centers) has a consequence when load arrives all at once, which the next chapter takes up: capacity is scaled on demand or bought ahead, and a merchant meets its own per-customer limit first. |  | `cause_effect`: The documented hosting difference. → Its effect on capacity at peak, and the limit a merchant reaches before it. |\n\n## Non-goals\n\n- Availability targets, failure isolation, graceful degradation, incident reports and Larkfield's rehearsed switch between providers. See [Down Is Not an Option: Reliability and Availability](payment-reliability-and-availability.html).\n- Shards, online migrations, replication inside a database and the consistency boundary. See [Never Lose a Cent: Data Stores and Consistency](payment-data-stores-and-consistency.html).\n- Capacity, peak figures, rate limits and what each hosting model means for scaling. See [The Biggest Day: Peak Load and Capacity](payment-peak-load.html).\n- Card-data storage rules (PCI DSS, tokenization, India's card-on-file rule) and privacy law as such. See [Never Touch the Card: Tokenization, Vaults and PCI Scope](tokenization-vaulting-and-pci.html), [Know Your Customer, Watch the Money: Compliance as a System](payment-compliance-and-regulation.html).\n- Any description of either company's region layout, cell structure or failover design: not public, and not inferred here.\n\n## Modalities\n\nArticle only.\n\n## Open questions\n\n- Stripe's India page describes Card Updater, Revenue Recognition and Sigma as 'temporarily disabled' and was last updated on 16 May 2023; whether they were restored is not stated on it. The article says so.\n- Adyen's 'configured data centres' for a company account are visible only inside the Customer Area; what the page shows could not be read from public documentation.\n- Third-party pages claim Stripe offers EU data localization to large merchants; no first-party source was found, so the article records the absence and makes no claim.\n- Adyen's infrastructure page is undated and its Dutch and Portuguese versions list fewer data-center regions and no India environment; the article cites the English page and says so. Whether to rely on it at all is the author's call.\n\n## Decision log\n\n- **2026-11-17** — The chapter is planned at about 2,900 words in 27 units, because the journal entry caps it at about 3,000 and the briefs' record for this topic is short. Rejected: A full-length chapter with reference-architecture material on multi-region design, which would read as inferred topology.\n- **2026-11-17** — Designs and trade-offs are one table inside the vocabulary section, and 'Where the Evidence Stops' is its own H2, as AC-3 asks for a named section. Rejected: Separate designs and trade-offs sections.; Folding the list into What to Take Away.\n- **2026-11-17** — Uber's 2018 statement of an active-active design goal is the only non-anchor source, used to show what a published statement looks like. Rejected: Contrasts with Checkout.com or PayPal, for which no first-party architecture source was read.\n- **2026-11-17** — The Larkfield scene uses one of the 1,140 studios on both providers, so that one question needs two answers; Larkfield's own hosting is left unstated so as not to fix a fact chapters 37 and 38 may set. Rejected: Naming a cloud region for Larkfield's payment record store.\n\n## Sources\n\n- **Internal**\n  - _research/brief-reliability-and-scale.md — Part 3 (multi-region and data residency), the open-questions list and the research limitations.\n  - _research/brief-companies-and-bets.md — Sections 1.6 and 3.6 on hosting and capital expenditure.\n  - _research/scenario-ledger.md — The 1,140 studios on both providers, the 44%/56% split, K4 and K8, the cast.\n- **External**\n  - Pages fetched by the writer on 17 November 2026: Stripe India data storage page, Stripe Privacy Center, Stripe DPA FAQ, Stripe security documentation, Stripe newsroom (23 January 2023), Adyen live-endpoints and web-best-practices documentation, Adyen India compliance guide, Adyen privacy statement, Adyen knowledge-hub posts (2021, 2025, 2026), RBI circular and FAQ, Regulation (EU) 2022/2554. — Exact quotations; the Privacy Center's India sentence, Adyen's 'configured data centres' sentence, Adyen's India guide and privacy statement were not in the briefs.\n  - Pages fetched in the verification pass of 17 November 2026 that the writer had not read: Adyen infrastructure page (adyen.com/infrastructure and its en_GB, en_IN, en_AE, nl_NL and pt_PT versions), Adyen incident update of 21 April 2025, Adyen 'Peak season readiness', 'Building a cloud integration' and 'India go-live checklist' documentation, Adyen product update 'India expansion made easy' (January 2026), Stripe Service Providers list, Stripe Privacy Policy, RBI list of withdrawn circulars. — Adyen's data-center regions, its storage sentence and its sentence on accepting payments in several locations at once; the data center region per country for terminals; Stripe's data centers in the United States and India for login and identity data; current confirmation of storage in India for both companies.\n\n## Changelog\n\n- **2026-11-17** — Reconciliation pass (parts 6-8): chapter thesis claim rewritten under rule C (three clauses the verification disproved), with how_why, so_what, know[2], know[3], AC-1, AC-2 and AC-4 corrected in the journal spec and re-synced here; the resolved author note removed from open_questions; Figure 3 placeholder corrected. No unit added, dropped, merged or reordered.\n- **2026-11-17** — Verification pass: 78 claims checked (48 confirmed, 21 corrected, 5 hedged, 3 unsupported and replaced, 0 unreachable; 1 not checked against a primary source); the most significant fix: Adyen's Infrastructure page and peak season readiness documentation name data-center regions, say payments are 'stored in Europe and our isolated India environment' and state active/active operation with failover between data centers, so every 'Not public' on Adyen's regions, Indian storage and failover was replaced by the dated statement and its limits (rulings 39 and 45). Supporting claims S2 to S4, eleven controlling ideas, evidence, sources and length (max 3,800 words) were updated; thesis.claim, thesis.how_why, thesis.so_what, intent.outcome and AC-2 are copied from the journal spec, still carry the contradicted statements, and are listed in open_questions for the author.\n- **2026-11-17** — Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes).\n- **2026-11-17** — After the flow rubric: the controlling ideas of p14 and p16 now state Stripe's silence on takeover and Adyen's silence on Indian storage before the comparison uses them. Notes not acted on, for the author: merge p09 into p10; fold the one-paragraph failure section into the Larkfield section; make the closing questions point back to the list of gaps.\n- **2026-11-17** — First version, written from the PLAN contract, the journal spec entry and the research briefs.\n- **2026-11-17** — Absence audit: statements of absence re-tested (already wide for regions and residency). Narrowed: 'Stripe says nothing' on takeover between regions. A Stripe blog post of 28 January 2025 describes usage-event processing for billing 'in two geographic regions simultaneously' with automatic failover; nothing was found for payments. Key point, two table cells and p-level evidence updated, one source added. The supporting-claim sentence 'Stripe says nothing on serving from several regions or on failover' is locked and was reported, not edited.\n- **2026-11-17** — Journal-spec entry corrected after verification; intent, thesis and role re-synced ('and Stripe says nothing about takeover.' -> 'and Stripe has described takeover only for one system, a two').\n- **2026-11-17** — Journal-spec entry corrected after verification; intent, thesis and role re-synced ('and Stripe has published no statement on takeover.' -> 'and Stripe has published no statement on takeover for paymen').\n- **2026-11-24** — Sweep of rulings 46 to 48: thesis how_why scoped: Stripe has published no statement on takeover for payments, only the two-region design for billing usage events (46g), as the claim and the prose already say. Prose and units unchanged.\n- **2026-11-17** — Visual layer: 3 figures generated and inspected (article-illustrator).\n"}]}]}</script>
+<script>
+    (function () {
+        const data = JSON.parse(document.getElementById('data').textContent);
+        const root = document.getElementById('content');
+
+        const postId = (data.meta && data.meta.id) ? String(data.meta.id) : '';
+        const postStatusRaw = (data.meta && data.meta.status) ? String(data.meta.status) : '';
+        if (postId || postStatusRaw) {
+            const header = document.getElementById('post-header');
+            let sectionEl = header.querySelector('p.section');
+            if (!sectionEl) {
+                sectionEl = document.createElement('p');
+                sectionEl.className = 'section';
+                header.insertBefore(sectionEl, header.firstChild);
+            }
+            // Status pill goes first, then a " / " separator before the existing
+            // content (section name and/or id).
+            if (postStatusRaw) {
+                const parts = postStatusRaw.split(':');
+                const statusName = parts[0].trim();
+                const statusColor = (parts[1] || '').trim();
+                const wrap = document.createElement('span');
+                wrap.className = 'post-status';
+                const dot = document.createElement('span');
+                dot.className = 'status-dot';
+                if (statusColor) dot.style.background = statusColor;
+                wrap.appendChild(dot);
+                wrap.appendChild(document.createTextNode(statusName));
+                if (sectionEl.firstChild) {
+                    sectionEl.insertBefore(document.createTextNode(' • '), sectionEl.firstChild);
+                    sectionEl.insertBefore(wrap, sectionEl.firstChild);
+                } else {
+                    sectionEl.appendChild(wrap);
+                }
+            }
+            if (postId) {
+                if (sectionEl.firstChild) sectionEl.appendChild(document.createTextNode(' • '));
+                sectionEl.appendChild(document.createTextNode(postId));
+            }
+        }
+
+        const tagsHost = document.getElementById('tags');
+        (data.tags || []).forEach(function (t) {
+            const span = document.createElement('span');
+            span.className = 'tag';
+            span.textContent = t;
+            tagsHost.appendChild(span);
+        });
+
+        // Minimal markdown renderer. Supports: ATX headings, paragraphs, blockquotes,
+        // unordered/ordered lists, fenced code, inline code, bold/italic/strikethrough, links, images, hr.
+        // Sufficient for the posts in this repo; replace with a fuller parser if needed.
+        function renderMarkdown(src) {
+            const lines = src.replace(/\r\n/g, '\n').split('\n');
+            const out = [];
+            let i = 0;
+
+            const bullet = /^(\s*)([-*])\s+(.*)$/;
+            const ordered = /^(\s*)(\d+)\.\s+(.*)$/;
+            const tableRow = /^\s*\|(.+)\|\s*$/;
+            const tableSep = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+
+            function splitRow(s) {
+                let t = s.trim();
+                if (t.startsWith('|')) t = t.slice(1);
+                if (t.endsWith('|')) t = t.slice(0, -1);
+                return t.split('|').map(c => c.trim());
+            }
+
+            function inline(s) {
+                // Posts are trusted content, so raw HTML passes through unescaped
+                // (some posts embed inline <blockquote>, <div>, etc.).
+                // Stray ampersands still get fixed up.
+                s = s.replace(/&(?![a-zA-Z]+;|#\d+;)/g, '&amp;');
+                s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<a class="image-link" href="$2" target="_blank" rel="noopener noreferrer"><img alt="$1" src="$2"></a>');
+                s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+                s = s.replace(/`([^`]+)`/g, function (_, c) {
+                    return '<code>' + c.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
+                });
+                // Bold/italic, including nested combinations: ***x***,
+                // **a *b*** / ***a* b** (shared delimiters), and **a *b* c**.
+                s = s.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+                s = s.replace(/\*\*([^*\n]+)\*([^*\n]+)\*\*\*/g, '<strong>$1<em>$2</em></strong>');
+                s = s.replace(/\*\*\*([^*\n]+)\*([^*\n]+)\*\*/g, '<strong><em>$1</em>$2</strong>');
+                s = s.replace(/\*\*((?:[^*\n]|\*(?!\*)[^*\n]+\*(?!\*))+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+                s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+                return s;
+            }
+
+            while (i < lines.length) {
+                const line = lines[i];
+                if (!line.trim()) {
+                    i++;
+                    continue;
+                }
+
+                const fence = line.match(/^```(\w*)\s*$/);
+                if (fence) {
+                    i++;
+                    const buf = [];
+                    while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+                        buf.push(lines[i]);
+                        i++;
+                    }
+                    i++;
+                    const escaped = buf.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const cls = fence[1] ? ' class="lang-' + fence[1] + '"' : '';
+                    out.push('<pre><code' + cls + '>' + escaped + '</code></pre>');
+                    continue;
+                }
+
+                const h = line.match(/^(#{1,6})\s+(.*)$/);
+                if (h) {
+                    out.push('<h' + h[1].length + '>' + inline(h[2]) + '</h' + h[1].length + '>');
+                    i++;
+                    continue;
+                }
+
+                if (/^\s*(?:-\s*){3,}\s*$/.test(line) || /^\s*\*{3,}\s*$/.test(line)) {
+                    out.push('<hr>');
+                    i++;
+                    continue;
+                }
+
+                if (/^>\s?/.test(line)) {
+                    const buf = [];
+                    while (i < lines.length && /^>\s?/.test(lines[i])) {
+                        buf.push(lines[i].replace(/^>\s?/, ''));
+                        i++;
+                    }
+                    out.push('<blockquote>' + renderMarkdown(buf.join('\n')) + '</blockquote>');
+                    continue;
+                }
+
+                if (tableRow.test(line) && i + 1 < lines.length && tableSep.test(lines[i + 1])) {
+                    const headers = splitRow(line);
+                    const aligns = splitRow(lines[i + 1]).map(function (c) {
+                        c = c.trim();
+                        const left = c.startsWith(':'), right = c.endsWith(':');
+                        return left && right ? 'center' : right ? 'num' : '';
+                    });
+                    const cellOpen = function (tag, idx) {
+                        return aligns[idx] ? '<' + tag + ' class="' + aligns[idx] + '">' : '<' + tag + '>';
+                    };
+                    i += 2;
+                    const rows = [];
+                    while (i < lines.length && tableRow.test(lines[i])) {
+                        rows.push(splitRow(lines[i]));
+                        i++;
+                    }
+                    let html = '<div class="table-wrap"><table><thead><tr>';
+                    headers.forEach((h, idx) => {
+                        html += cellOpen('th', idx) + inline(h) + '</th>';
+                    });
+                    html += '</tr></thead><tbody>';
+                    rows.forEach(r => {
+                        html += '<tr>';
+                        r.forEach((c, idx) => {
+                            html += cellOpen('td', idx) + inline(c) + '</td>';
+                        });
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                    out.push(html);
+                    continue;
+                }
+
+                if (bullet.test(line) || ordered.test(line)) {
+                    // Indent of the first bullet defines this list's base level.
+                    // Deeper-indented bullets become nested lists (rendered by
+                    // recursing into renderMarkdown). Same-or-less indent at a
+                    // bullet starts a sibling item (or ends the list).
+                    const firstMatch = line.match(bullet) || line.match(ordered);
+                    const baseIndent = firstMatch[1].length;
+                    const isOrdered = ordered.test(line);
+                    const items = [];
+                    let hasTask = false;
+                    while (i < lines.length) {
+                        const cur = lines[i];
+                        if (!cur.trim()) {
+                            // blank line breaks the list (matches CommonMark-ish behaviour)
+                            i++;
+                            break;
+                        }
+                        const mBul = cur.match(bullet);
+                        const mOrd = cur.match(ordered);
+                        const m = mBul || mOrd;
+                        if (!m) break;
+                        if (m[1].length < baseIndent) break;
+                        if (m[1].length > baseIndent) break; // shouldn't happen at top of loop
+                        // Same-type check: switching between -/* and 1. closes the list
+                        if (isOrdered !== !!mOrd) break;
+
+                        const itemBuf = [m[3]];
+                        const nestedBuf = [];
+                        i++;
+                        while (i < lines.length) {
+                            const nxt = lines[i];
+                            if (!nxt.trim()) break;
+                            const nBul = nxt.match(bullet);
+                            const nOrd = nxt.match(ordered);
+                            const nm = nBul || nOrd;
+                            if (nm) {
+                                if (nm[1].length > baseIndent) {
+                                    // nested list line — dedent and stash
+                                    nestedBuf.push(nxt.slice(baseIndent + 2));
+                                    i++;
+                                    continue;
+                                }
+                                // sibling or end of list
+                                break;
+                            }
+                            // Plain continuation text
+                            if (nestedBuf.length) {
+                                // continuation inside the nested block
+                                nestedBuf.push(nxt.slice(baseIndent + 2));
+                            } else {
+                                itemBuf.push(nxt.trim());
+                            }
+                            i++;
+                        }
+
+                        // GitHub-style task items: "- [ ] text" / "- [x] text"
+                        // render as (clickable, unpersisted) checkboxes.
+                        const itemText = itemBuf.join('\n');
+                        const task = !isOrdered && itemText.match(/^\[( |x|X)\]\s+/);
+                        let liHtml = inline(task ? itemText.slice(task[0].length) : itemText);
+                        if (task) {
+                            hasTask = true;
+                            liHtml = '<input type="checkbox"' + (task[1] === ' ' ? '' : ' checked') + '>' + liHtml;
+                        }
+                        if (nestedBuf.length) {
+                            liHtml += renderMarkdown(nestedBuf.join('\n'));
+                        }
+                        items.push(task ? '<li class="task">' + liHtml + '</li>' : '<li>' + liHtml + '</li>');
+                    }
+                    out.push((isOrdered ? '<ol>' : (hasTask ? '<ul class="task-list">' : '<ul>')) + items.join('') + (isOrdered ? '</ol>' : '</ul>'));
+                    continue;
+                }
+
+                const buf = [line];
+                i++;
+                while (i < lines.length && lines[i].trim() && !/^#{1,6}\s/.test(lines[i]) && !/^>\s?/.test(lines[i]) && !bullet.test(lines[i]) && !ordered.test(lines[i]) && !/^```/.test(lines[i]) && !tableRow.test(lines[i])) {
+                    buf.push(lines[i]);
+                    i++;
+                }
+                out.push('<p>' + inline(buf.join(' ')) + '</p>');
+            }
+            return out.join('\n');
+        }
+
+        // Block dispatcher. New block types plug in here.
+        const renderers = {
+            markdown: function (block) {
+                const div = document.createElement('div');
+                div.innerHTML = renderMarkdown(block.content);
+                return div;
+            },
+            mermaid: function (block) {
+                // Mermaid scans elements with class "mermaid" whose textContent
+                // is the diagram source. We collect these nodes and run
+                // mermaid.run() once after all blocks are in the DOM.
+                const div = document.createElement('div');
+                div.className = 'mermaid';
+                div.textContent = block.content;
+                return div;
+            },
+            'force-graph': function (block) {
+                // build.py emits parsed JSON: {nodes:[{id,size}], links:[{source,target}]}.
+                // We instantiate force-graph after the container is in the DOM
+                // so it can measure its own width.
+                const div = document.createElement('div');
+                div.className = 'force-graph';
+                const data = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.ForceGraph) return;
+                    const maxSize = data.nodes.reduce((m, n) => Math.max(m, n.size || 1), 1);
+                    window.ForceGraph()(div)
+                        .graphData(data)
+                        .width(div.clientWidth)
+                        .height(div.clientHeight)
+                        .nodeRelSize(4)
+                        .nodeVal(n => Math.max(20 * (n.size || 1) / maxSize, 0.001))
+                        .nodeLabel(n => n.id + ' (' + (n.size || 1) + ')')
+                        .nodeColor(() => 'rgba(135, 206, 235, 0.7)')
+                        .linkColor(() => 'rgba(60, 60, 60, 0.4)')
+                        .linkDirectionalArrowLength(4)
+                        .linkDirectionalArrowRelPos(1)
+                        .linkWidth(1);
+                });
+                return div;
+            },
+            'bubble-chart': function (block) {
+                // build.py emits {nodes:[{name,size}]}. Renders a D3 circle-pack
+                // SVG (same shape as the obren.io reference, just inline).
+                const wrap = document.createElement('div');
+                wrap.className = 'bubble-chart';
+                const payload = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.d3) return;
+                    const diameter = 480;
+                    const fill = '#c0deed';
+                    const textColor = '#111111';
+                    const fontSize = 12;
+
+                    const svg = window.d3.select(wrap).append('svg')
+                        .attr('viewBox', '0 0 ' + diameter + ' ' + diameter)
+                        .attr('width', diameter)
+                        .attr('height', diameter);
+
+                    const root = window.d3.hierarchy({children: payload.nodes})
+                        .sum(d => d.size || 0)
+                        .sort((a, b) => b.value - a.value);
+
+                    window.d3.pack().size([diameter, diameter]).padding(2)(root);
+
+                    const node = svg.selectAll('g')
+                        .data(root.leaves())
+                        .enter().append('g')
+                        .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+
+                    node.append('title').text(d => d.data.name + ': ' + d.value);
+                    node.append('circle').attr('r', d => d.r).style('fill', fill);
+                    node.append('text')
+                        .attr('dy', '.3em')
+                        .style('text-anchor', 'middle')
+                        .style('fill', textColor)
+                        .style('font-size', fontSize + 'px')
+                        .text(d => d.data.name.substring(0, Math.max(0, Math.floor(d.r / 3))));
+                });
+                return wrap;
+            }
+        };
+
+        // Render one modality's blocks into a host element. Mermaid runs
+        // scoped to just the nodes created here, so lazily rendered tabs get
+        // their diagrams on first activation.
+        let mermaidInitialized = false;
+        function renderBlocksInto(blocks, host) {
+            const mermaidNodes = [];
+            blocks.forEach(function (block) {
+                const r = renderers[block.type];
+                if (!r) {
+                    const pre = document.createElement('pre');
+                    pre.textContent = '[unknown block type: ' + block.type + ']';
+                    host.appendChild(pre);
+                    return;
+                }
+                const node = r(block);
+                if (node instanceof Node) {
+                    host.appendChild(node);
+                    if (block.type === 'mermaid') mermaidNodes.push(node);
+                }
+            });
+            if (mermaidNodes.length && window.mermaid) {
+                if (!mermaidInitialized) {
+                    window.mermaid.initialize({startOnLoad: false, theme: 'default'});
+                    mermaidInitialized = true;
+                }
+                window.mermaid.run({nodes: mermaidNodes});
+            }
+            markScrollableTables(host);
+        }
+
+        // A table wider than its wrapper scrolls sideways. Mark those wrappers
+        // so the CSS can show a cue, and make them focusable so keyboard users
+        // can reach and scroll them. Hidden panes measure 0 and are re-marked
+        // when activated or when the window is resized.
+        function markScrollableTables(host) {
+            host.querySelectorAll('.table-wrap').forEach(function (wrap) {
+                const scrolls = wrap.scrollWidth > wrap.clientWidth + 1;
+                wrap.classList.toggle('is-scrollable', scrolls);
+                if (scrolls) {
+                    wrap.setAttribute('tabindex', '0');
+                    wrap.setAttribute('role', 'region');
+                    wrap.setAttribute('aria-label', 'Table that scrolls sideways');
+                } else {
+                    wrap.removeAttribute('tabindex');
+                    wrap.removeAttribute('role');
+                    wrap.removeAttribute('aria-label');
+                }
+            });
+        }
+
+        // Modality tabs. One <article class="pane"> per modality; panes are
+        // rendered lazily on first activation (force-graph / D3 / mermaid
+        // need a visible, measurable container). With a single modality the
+        // tab bar stays hidden and the page looks exactly like before.
+        const mods = data.modalities;
+        const tabBar = document.getElementById('modality-tabs');
+        const panes = {};
+        const tabButtons = {};
+        const renderedPanes = {};
+
+        // With several modalities each pane is a tabpanel labelled by its
+        // tab (W3C APG tabs pattern); tabindex=0 lets keyboard users move
+        // from the tab list straight into the active content.
+        mods.forEach(function (m) {
+            const pane = document.createElement('article');
+            pane.className = 'pane';
+            pane.dataset.key = m.key;
+            pane.hidden = true;
+            if (mods.length > 1) {
+                pane.id = 'pane-' + m.key;
+                pane.setAttribute('role', 'tabpanel');
+                pane.setAttribute('aria-labelledby', 'tab-' + m.key);
+                pane.setAttribute('tabindex', '0');
+            }
+            root.appendChild(pane);
+            panes[m.key] = pane;
+        });
+
+        const defaultKey = mods.some(m => m.key === 'index') ? 'index' : mods[0].key;
+
+        function activate(key, updateHash) {
+            mods.forEach(function (m) {
+                const isActive = m.key === key;
+                panes[m.key].hidden = !isActive;
+                if (tabButtons[m.key]) {
+                    tabButtons[m.key].classList.toggle('active', isActive);
+                    tabButtons[m.key].setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    // Roving tabindex: only the selected tab is in the Tab
+                    // order; the arrow keys move between tabs.
+                    tabButtons[m.key].setAttribute('tabindex', isActive ? '0' : '-1');
+                }
+            });
+            // Unhide first, then render: the chart libraries measure widths.
+            if (!renderedPanes[key]) {
+                renderBlocksInto(mods.find(m => m.key === key).blocks, panes[key]);
+                renderedPanes[key] = true;
+            } else {
+                markScrollableTables(panes[key]);
+            }
+            if (updateHash) {
+                history.replaceState(null, '',
+                    key === defaultKey ? location.pathname + location.search : '#' + key);
+            }
+        }
+
+        if (mods.length > 1) {
+            mods.forEach(function (m) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = m.label;
+                btn.id = 'tab-' + m.key;
+                btn.dataset.key = m.key;
+                btn.setAttribute('role', 'tab');
+                btn.setAttribute('aria-controls', 'pane-' + m.key);
+                btn.addEventListener('click', function () { activate(m.key, true); });
+                tabBar.appendChild(btn);
+                tabButtons[m.key] = btn;
+            });
+            // Keyboard support per the W3C APG tabs pattern (automatic
+            // activation): Left/Right move between tabs and wrap, Home/End
+            // jump to the first/last tab, and the focused tab is selected.
+            tabBar.addEventListener('keydown', function (ev) {
+                const keys = mods.map(function (m) { return m.key; });
+                const focused = document.activeElement;
+                const current = focused && focused.dataset ? keys.indexOf(focused.dataset.key) : -1;
+                if (current < 0) return;
+                let next = null;
+                if (ev.key === 'ArrowRight') next = (current + 1) % keys.length;
+                else if (ev.key === 'ArrowLeft') next = (current - 1 + keys.length) % keys.length;
+                else if (ev.key === 'Home') next = 0;
+                else if (ev.key === 'End') next = keys.length - 1;
+                if (next === null) return;
+                ev.preventDefault();
+                activate(keys[next], true);
+                tabButtons[keys[next]].focus();
+            });
+            tabBar.hidden = false;
+        }
+
+        // The hash selects a tab only when it matches a modality key, so
+        // existing anchors keep working.
+        const initialHash = location.hash.slice(1);
+        activate(mods.some(m => m.key === initialHash) ? initialHash : defaultKey, false);
+        window.addEventListener('hashchange', function () {
+            const k = location.hash.slice(1);
+            if (mods.some(m => m.key === k)) activate(k, false);
+        });
+        window.addEventListener('resize', function () { markScrollableTables(root); });
+    })();
+</script>
+</body>
+</html>

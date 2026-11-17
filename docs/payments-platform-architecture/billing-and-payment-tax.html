@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Whose Tax, at What Rate: Tax Calculation in the Payment Path</title>
+    <meta name="description" content="How does indirect tax get calculated, collected and reported when the payment provider is also the tax engine? The provider can do the arithmetic because its invoice holds the facts, but registering, counting thresholds, filing and the liability itself stay with the seller.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SETTLED: Architecting Payments and Revenue Infrastructure">
+    <meta property="og:title" content="Whose Tax, at What Rate: Tax Calculation in the Payment Path">
+    <meta property="og:description" content="How does indirect tax get calculated, collected and reported when the payment provider is also the tax engine? The provider can do the arithmetic because its invoice holds the facts, but registering, counting thresholds, filing and the liability itself stay with the seller.">
+    <meta property="og:url" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/billing-and-payment-tax.html">
+    <meta property="og:image" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/assets/images/30-tax/logo.jpeg">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="site.css">
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-129891352-1"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+        dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'UA-129891352-1');
+</script>
+    <style>
+        body {
+            line-height: 1.65;
+        }
+
+        main {
+            padding-top: 32px;
+        }
+
+        nav.post-nav {
+            font-size: 14px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: baseline;
+            flex-wrap: wrap;
+        }
+
+        nav.post-nav a {
+            color: var(--muted);
+            text-decoration: none;
+        }
+
+        nav.post-nav a:hover {
+            color: var(--accent);
+        }
+
+        nav.post-nav .nav-right {
+            margin-left: auto;
+            display: inline-flex;
+            gap: 4px;
+            align-items: baseline;
+        }
+
+        nav.post-nav .nav-sep {
+            color: var(--muted);
+        }
+
+        footer nav.post-nav {
+            margin-top: 24px;
+            margin-bottom: 0;
+        }
+
+        header.post {
+            margin-bottom: 32px;
+        }
+
+        header.post .section {
+            color: var(--muted);
+            font-size: 13px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin: 0 0 -6px;
+        }
+
+        header.post .section a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        header.post .section a:hover {
+            color: var(--accent);
+        }
+
+        header.post .section .post-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        header.post .section .post-status .status-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        header.post .logo {
+            display: block;
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            border: 1px solid lightgrey;
+
+        }
+
+        header.post .logo-credit {
+            color: var(--muted);
+            font-size: 12px;
+            margin: -4px 0 24px;
+            text-align: right;
+        }
+
+        header.post h1 {
+            font-size: 52px;
+            line-height: 1.2;
+            margin: 0 0 2px;
+            padding: 0;
+            letter-spacing: -0.01em;
+            font-weight: normal;
+        }
+
+        header.post .byline {
+            color: var(--muted);
+            font-size: 15px;
+            margin: 0;
+        }
+
+        header.post .byline .spec-link {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        header.post .byline .spec-link:hover {
+            text-decoration: underline;
+        }
+
+        header.post .byline .spec-link-drifted {
+            color: #b8650f;
+        }
+
+        header.post .byline .spec-link-superseded {
+            color: var(--muted);
+        }
+
+        header.post .ai-credit {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 4px 0 0;
+        }
+
+        header.post .ai-credit a {
+            color: inherit;
+        }
+
+        header.post .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 10px 0 10px;
+        }
+
+        header.post .tags .tag {
+            font-size: 14px;
+            padding: 1px 8px;
+            border: 1px solid deepskyblue;
+            color: blue;
+            border-radius: 999px;
+            background-color: var(--tag-bg);
+        }
+
+        nav.modality-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--rule);
+            margin: 0 0 28px;
+            flex-wrap: wrap;
+        }
+
+        nav.modality-tabs button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font: inherit;
+            font-size: 14px;
+            color: var(--muted);
+            padding: 8px 14px;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            letter-spacing: 0.02em;
+        }
+
+        nav.modality-tabs button:hover {
+            color: var(--accent);
+        }
+
+        nav.modality-tabs button.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        #content .pane[hidden] {
+            display: none;
+        }
+
+        #content .pane:focus {
+            outline: none;
+        }
+
+        #content .pane:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 6px;
+        }
+
+        article h2 {
+            font-size: 26px;
+            margin: 40px 0 12px;
+            letter-spacing: -0.01em;
+        }
+
+        article h3 {
+            font-size: 20px;
+            margin: 28px 0 8px;
+        }
+
+        article h4 {
+            font-size: 17px;
+            margin: 20px 0 6px;
+        }
+
+        article p {
+            margin: 0 0 16px;
+        }
+
+        article a {
+            color: var(--accent);
+        }
+
+        article a.image-link {
+            display: inline-block;
+            line-height: 0;
+        }
+
+        article img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        article a.image-link img {
+            display: block;
+        }
+
+        article ul, article ol {
+            padding-left: 24px;
+            margin: 0 0 16px;
+        }
+
+        article li {
+            margin-bottom: 6px;
+        }
+
+        article ul.task-list {
+            list-style: none;
+            padding-left: 4px;
+        }
+
+        article ul.task-list li.task > input[type="checkbox"] {
+            margin-right: 8px;
+            accent-color: var(--accent);
+        }
+
+        article hr {
+            border: none;
+            border-top: 1px solid var(--rule);
+            margin: 32px 0;
+        }
+
+        article blockquote {
+            margin: 16px 0;
+            padding: 12px 18px;
+            background: var(--quote-bg);
+            border-left: 3px solid var(--accent);
+            color: #333;
+        }
+
+        article blockquote p:last-child {
+            margin-bottom: 0;
+        }
+
+        article code {
+            background: var(--code-bg);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 0.92em;
+        }
+
+        article pre {
+            background: var(--code-bg);
+            padding: 14px 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        article pre code {
+            background: none;
+            padding: 0;
+        }
+
+        article .table-wrap {
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+
+        article table {
+            border-collapse: collapse;
+            margin: 16px 0;
+            width: 100%;
+            font-size: 15px;
+        }
+
+        article .table-wrap table {
+            margin: 0;
+        }
+
+        /* Wide tables scroll on narrow screens instead of crushing their columns.
+           A table wrapped in <div class="table-compact"> opts out: it has few,
+           short columns and wraps its cells to fit the screen instead. */
+        @media (max-width: 640px) {
+            article .table-wrap table {
+                min-width: 560px;
+            }
+            article .table-compact .table-wrap table {
+                min-width: 0;
+            }
+        }
+
+        /* Tables that actually overflow get a visible cue and keyboard focus
+           (markScrollableTables() sets the class and attributes). */
+        article .table-wrap.is-scrollable::before {
+            content: "Scroll sideways to see the whole table";
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        article .table-wrap.is-scrollable:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        article th, article td {
+            border: 1px solid var(--rule);
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        article th {
+            background: var(--code-bg);
+            font-weight: 600;
+        }
+
+        /* GFM column alignment from the separator row. Right-aligned columns
+           hold numbers; their cells never wrap, so a sign, a currency symbol
+           and its amount stay on one line while label columns still wrap. */
+        article th.num, article td.num {
+            text-align: right;
+        }
+
+        article td.num {
+            white-space: nowrap;
+        }
+
+        article th.center, article td.center {
+            text-align: center;
+        }
+
+        article .mermaid {
+            text-align: center;
+            margin: 24px 0;
+        }
+
+        article .force-graph {
+            margin: 24px 0;
+            border: 1px solid var(--rule);
+            border-radius: 6px;
+            background: #fff;
+            height: 480px;
+            overflow: hidden;
+        }
+
+        article .bubble-chart {
+            margin: 24px 0;
+            text-align: center;
+        }
+
+        article .bubble-chart svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <nav class="post-nav"><a class="nav-back" href="index.html">SETTLED: Architecting Payments and Revenue Infrastructure</a><span class="nav-right"><a class="nav-prev" href="invoicing-collections-and-dunning.html" title="From Invoice to Cash: Invoicing, Collections and Dunning">← Previous</a><span class="nav-sep">&nbsp;|&nbsp;</span><a class="nav-next" href="billing-revenue-recognition.html" title="Cash Is Not Revenue: Revenue Recognition and the Hand-off to Finance">Next →</a></span></nav>
+    <header class="post" id="post-header">
+        <p class="section">Part VI — REVENUE: Billing, Tax and Recognition</p>
+        <h1>Whose Tax, at What Rate: Tax Calculation in the Payment Path</h1>
+        <p class="byline">Željko Obrenović  ·  2026-11-17  ·  22 min read · <a class="spec-link" href="billing-and-payment-tax.spec.html">View spec</a></p>
+        <p class="ai-credit">AI-assisted: researched and written with Claude Code; illustrations generated with Gemini. <a href="https://zeljkoobrenovic.github.io/book-factory/foundations/ai-mediated-authoring.html">How this works</a></p>
+        <div class="tags" id="tags"></div>
+        <a href="assets/images/30-tax/logo.jpeg" target="_blank" rel="noopener noreferrer" aria-label="Open header illustration at full size"><img class="logo" src="assets/images/30-tax/logo.jpeg" alt=""></a>
+        <p class="logo-credit">Image generated by Google Gemini (gemini-3-pro-image-preview)</p>
+    </header>
+    <nav class="modality-tabs" id="modality-tabs" hidden role="tablist" aria-label="Reading formats"></nav>
+    <div id="content"></div>
+    <footer>
+        <nav class="post-nav"><a class="nav-back" href="index.html">SETTLED: Architecting Payments and Revenue Infrastructure</a><span class="nav-right"><a class="nav-prev" href="invoicing-collections-and-dunning.html" title="From Invoice to Cash: Invoicing, Collections and Dunning">← Previous</a><span class="nav-sep">&nbsp;|&nbsp;</span><a class="nav-next" href="billing-revenue-recognition.html" title="Cash Is Not Revenue: Revenue Recognition and the Hand-off to Finance">Next →</a></span></nav>
+    </footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/force-graph"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script id="data" type="application/json">{"meta": {"title": "Whose Tax, at What Rate: Tax Calculation in the Payment Path", "date": "2026-11-17", "author": "Željko Obrenović", "excerpt": "How does indirect tax get calculated, collected and reported when the payment provider is also the tax engine? The provider can do the arithmetic because its invoice holds the facts, but registering, counting thresholds, filing and the liability itself stay with the seller.", "permalink": "billing-and-payment-tax", "timetoread": "22 min read", "icon": "assets/icons/30-tax.png", "logo": "assets/images/30-tax/logo.jpeg", "logo_credit": "Image generated by Google Gemini (gemini-3-pro-image-preview)"}, "tags": [], "modalities": [{"key": "index", "label": "Article", "meta": {}, "blocks": [{"type": "markdown", "content": "> **IN THIS CHAPTER, YOU WILL:** Learn what a tax calculation needs, which compliance steps a payment provider performs, and how to tell a correct zero from a missing one.\n\n> **KEY POINTS:**\n>\n> * **A provider can calculate tax; it cannot owe it.** The checkout or invoice holds the facts a calculation needs: who sells, what is sold, where the customer is. Calculating is one of four steps, and the liability for all four stays with the seller.\n> * **Stripe Tax is a calculator with partial sight.** As of November 2026 its documentation says it returns zero where the seller has recorded no registration, counts thresholds only on the sales it sees, and files itself only in the United States and for selected registrations in Ireland and Canada.\n> * **The comparison is one-sided.** No public source was found that shows an Adyen product calculating, collecting or filing tax on a merchant's sales. On Adyen, and for any business on two providers, the calculation lives in your own system or a separate tax engine.\n\n> **[FAILURE PATTERNS THIS CHAPTER ADDRESSES](where-payment-systems-go-wrong.html):**\n>\n> * **The Black-Box Balance** — a seller's payout contains tax that is not its revenue, and nothing in the payment path says how much.\n> * **The Accidental Bank** — a platform can be made liable for its sellers' tax by a rule it never checked, the same way it can become a holder of their money.\n\n<br>\nThree invoices for the same software plan each show a tax line of €0.00. On the first, the customer is a business in another country that must account for the tax itself. On the second, the seller never told the tax calculator that it is registered where the customer lives. On the third, somebody marked the product as non-taxable years ago. **The three zeros look identical on the page, and only the first means that the seller owes nothing.**\n\nA payment provider can calculate tax at all because the checkout or invoice it runs already holds the facts the calculation needs: who sells, what is sold and where the customer is. But **calculating is one of four steps**, next to knowing where tax is due, registering there, and filing and paying, and the liability for all four stays with the seller. [From Invoice to Cash: Invoicing, Collections and Dunning](invoicing-collections-and-dunning.html) said a finalized invoice is frozen for tax reasons; this chapter is about the tax line on it. The public record shows a tax product at Stripe and none at Adyen, so the comparison here is one product against what a merchant must bring itself.\n\n**Where we are in the payment's journey.** Tax is not a step on the path of Mila Janssen's class pass, the payment this book follows at Larkfield, the fictional studio-software platform ([Meet Larkfield](meet-larkfield.html)). It is decided before the path starts and reported after it ends. The €120.00 that Mila's bank approved on Tuesday 9 March 2027 at 19:42 already contained the tax, and Studio Noord, which received €117.47, owes that tax to the Dutch tax authority weeks later. Nothing in the authorization, the settlement or the payout says how much it is.\n\nThe chapter starts with three Larkfield invoices that show no tax. It then defines what indirect tax asks of a seller and goes through what Stripe Tax does, step by step. Next it sets Stripe beside Adyen, compares four places the calculation can live, works two Larkfield cases and ends with the ways tax in the payment path goes wrong.\n\n## Setting the Scene at Larkfield: Three Invoices with No Tax\n\nIn May 2027 the payments team took over Larkfield's billing integration, the Stripe Billing setup that charges studios €89, €189 or €349 a month, from the growth team that had run it since 2018. Femke de Graaf, Larkfield's head of payments engineering, found Stripe Tax, Stripe's tax product, switched on since 2023. It had exactly one tax registration recorded, the Dutch one; a registration is a seller's enrollment with a tax authority, and the next section defines it. Nobody had reviewed the setting since.\n\nThree invoices from that month, in the table below, show what that produced. The rates are the standard rates of value-added tax (VAT): 21% in the Netherlands and 19% in Germany (European Commission, Your Europe portal, table last checked 13 July 2026). The Cologne zero is a reverse charge, a rule under which a business that buys across a border accounts for the tax itself. The Leipzig zero exists because no registration covered Germany. Priya Raman, the finance controller, read the export and asked two questions: \"Two zeros. Which one did we mean? And the dashboard says tax is on, so is this Stripe's job now?\"\n\n| Studio | Plan | Customer's VAT number | Tax on the invoice | Total |\n| --- | --- | --- | --- | --- |\n| Utrecht, Netherlands | €189.00 | On file | €39.69 (21%) | €228.69 |\n| Cologne, Germany | €189.00 | On file | €0.00 | €189.00 |\n| Leipzig, Germany | €89.00 | None | €0.00 | €89.00 |\n\n## What Indirect Tax Asks of a Seller\n\nIndirect tax is a tax on a sale that the seller collects from the buyer and passes on to a tax authority. Europe calls it VAT, Canada and much of the Asia-Pacific region call it goods and services tax (GST), and the United States calls it sales tax. Stripe's documentation (n.d., accessed November 2026) puts the mechanism in one sentence: \"The buyer pays the tax and the seller forwards it to the government\" (the page \"How Stripe Tax works\"). The seller is a collector for the state, which is why the seller answers for a wrong amount. The rate belongs to a place and a product category: \"each member country is responsible for setting its own rates\" (European Commission, same table).\n\nA calculation therefore needs three facts and one piece of state. The facts are who sells and from where, what is sold, and where the customer is. The customer's status refines the third: a business that buys across a border usually accounts for the tax itself, the reverse charge of the Cologne invoice. The state is where the seller is registered. Stripe lists the same inputs: \"Stripe Tax uses your business address, tax registrations, product tax codes, customers' locations, and customer status to determine the correct tax rates\" (same page). A checkout or an invoice holds the facts at the moment the amount is fixed, and the tax must be on the invoice before it freezes: \"Stripe calculates the tax at the published rate at the time of invoice finalization\" (Stripe's page on collecting tax on invoices, n.d., accessed November 2026). That is why the calculation sits beside billing and checkout and not in the ledger, which only records the result.\n\n| Input | Where a billing or checkout flow has it | If it is missing or wrong |\n| --- | --- | --- |\n| Seller's location | Account settings | The wrong country's rules |\n| What is sold | A tax category on the product (Stripe calls it a product tax code) | The wrong rate, or tax on an exempt product |\n| Customer's location, or where a service is performed | Billing address, shipping address or venue | No calculation, or the wrong jurisdiction |\n| Customer's status | A tax number or an exemption flag on the customer | Tax charged to a business that should account for it itself, or the reverse |\n| Seller's registrations | Nowhere, unless the seller enters them | A calculated zero |\n\nA **tax registration** is the seller's enrollment with a tax authority, which allows and obliges it to collect that authority's tax. Whether a seller must register usually depends on a **threshold**, a volume of sales into the territory. In the European Union, the rules that apply since 1 July 2021 set \"a new EU-wide threshold of EUR 10 000\" for cross-border sales to consumers of goods and of telecommunications, broadcasting and electronic services. Below it such sales \"may remain subject to VAT in the Member State where the taxable person is established\"; above it the customer's country taxes them, and a seller can \"register in one EU Member State\" and declare them all through the One Stop Shop (OSS) (European Commission, One Stop Shop page, n.d., accessed November 2026). In the United States the Supreme Court, in *South Dakota v. Wayfair* on 21 June 2018, overruled the rule that only sellers with a physical presence in a state could be made to collect its sales tax; the South Dakota law before it covered sellers that \"deliver more than $100,000 of goods or services into the State or engage in 200 or more separate transactions\" a year (opinion of the Court, 2018). **(Evidence age: 8 years; the holding stands, and the states' current thresholds, which differ, were not verified here.)** A duty that follows from sales volume alone is called economic nexus. In both systems the threshold counts all of the seller's sales into the territory, through every channel.\n\nRegistration is the second of four steps. Stripe's documentation names them: \"1. Understand which locations require you to collect tax. 2. Register for tax in those locations. 3. Calculate and collect tax. 4. File and remit the tax you collected\" (How Stripe Tax works). To remit is to pay over what was collected. A calculation, however exact, is the third step, and the seller owes all four. The only way to hand over the tax itself is to let a provider sell in its own name as merchant of record, the supplier for indirect tax where local rules allow ([Who Is the Seller? Merchant of Record as an Operating Model](merchant-of-record.html)).\n\nFor a platform, though, the law itself can change who the seller is. A **deemed supplier** is a platform that VAT law treats as if it had bought and resold what its sellers sell, so that the platform owes the tax. In the EU, \"Online marketplaces/platforms facilitating supplies of goods are, in certain circumstances, deemed for VAT purposes to have received and supplied the goods themselves\" (European Commission, One Stop Shop page). The VAT in the Digital Age package, adopted on 11 March 2025, extends the idea to services: \"From 1 July 2028: deemed supplier measure for short-term accommodation rental and passenger transport platforms (Member States can delay implementation until 1 January 2030)\" (European Commission, page on VAT in the Digital Age, n.d., accessed November 2026). So who owes the tax is a property of each transaction that a platform must know, and the answer carries a date. My reading, which is not legal advice: a platform for fitness studios is in neither category on the face of these texts, and whether a national rule reaches it is a question for a tax adviser.\n\n## How Stripe Tax Works, Step by Step\n\nStripe Tax calculates wherever Stripe already fixes an amount: in Checkout (Stripe's hosted payment page), on a subscription's invoice at finalization, and through an API for custom flows, including \"when processing payments off-Stripe\" (Stripe's page on its standalone Tax APIs, n.d., accessed November 2026). A calculation is a quote; a tax transaction records that the sale happened, and reports and filing read transactions. When an input is unusable, Stripe stops and does not guess. If a customer's address cannot be resolved, the invoice's tax status becomes `requires_location_inputs`, and then \"Stripe can't calculate the taxes, can't finalize the invoice, and can't collect the payment\" (Stripe's page on collecting taxes for recurring payments, n.d., accessed November 2026). A missing tax input is thus a billing failure: the renewal is not charged. The figure below places the calculation among the four steps.\n\n![A ring of four steps: know where, register, calculate, file and pay. A seller is linked to three of them and a provider to the calculation only.](assets/images/30-tax/30-four-step-cycle.jpeg)\n**Figure 1:** *Calculating and collecting is one of four steps; the provider performs it, and knowing where tax is due, registering and filing stay in the seller's hands.*\n\nA missing registration, by contrast, stops nothing. \"Stripe only calculates tax in jurisdictions where you have an active tax registration. Without a registration in the customer's location, the calculation returns zero tax\" (standalone Tax APIs page). That is the Leipzig invoice. The reason travels in a separate field: \"The API returns the reason for a tax result in the taxability_reason field\", with values such as `reverse_charge`, `customer_exempt`, `zero_rated` and `not_collecting` (Stripe's page on zero tax amounts and reverse charges, n.d., accessed November 2026). Even the reason needs reading: the page calls `not_collecting` \"ambiguous\", because it covers both a missing registration and a product the seller marked non-taxable. So the three zeros of the opening differ in a field that an export of amounts drops, and two of them share a value.\n\n![Three identical invoices each show tax of zero euros. Behind them stand three different causes: the buyer accounts for the tax, the seller is not registered, the product was marked non-taxable.](assets/images/30-tax/30-three-zeros.jpeg)\n**Figure 2:** *Three invoices with the same zero tax line and three different causes; only the reason stored with the amount tells them apart.*\n\nThe reverse-charge zero has its own weakness: it rests on a tax number the customer typed. \"Stripe Tax uses customer tax identification numbers to determine whether a transaction is B2B\", business-to-business, and it \"doesn't validate whether the provided tax identification number exists or is valid\" (How Stripe Tax works). Stripe Billing does check EU VAT numbers against VIES, the European Commission's VAT number database, and reports a status such as `verified` or `unverified`. But the check does not gate the calculation: \"Stripe Tax applies the reverse charge or zero rate according to applicable laws when the tax ID has the required number format, regardless of the government verification result\", and \"you're responsible for determining how to handle an `unverified` tax ID\" (Stripe's page on customer tax IDs, n.d., accessed November 2026). By that description, a well-formed number that fails verification keeps producing a zero until the seller acts.\n\nNext comes the step that reads those calculated transactions: knowing where tax is due. Stripe supports it with a monitor: \"Stripe Tax tracks your Stripe-processed sales (minus refunds) based on each customer's location and compares these sales against local tax registration thresholds.\" The page states its limits: \"We only monitor Stripe-processed sales or imported transactions\", \"Application fees that Connect platforms charge don't count toward the platform's tax registration thresholds\", and \"it's up to you to confirm whether registration is actually required in each jurisdiction\" (the page \"Monitor your obligations\", n.d., accessed November 2026). A threshold counts all of a seller's sales; the monitor counts Stripe's. The documented remedy is to bring the rest in, by file import or by recording a payment taken elsewhere through the Tax API, which then \"is included in threshold monitoring by default in live mode\" (Stripe's pages on imports and on off-Stripe payments, n.d., accessed November 2026).\n\nRegistering and filing then remain mostly the seller's. \"You must register with the tax authority in a location to collect taxes there\" (How Stripe Tax works); Stripe can start a registration in US states and points to a partner elsewhere. As for filing, \"Stripe Tax offers automated filing in the US, as well as automated filing for selected registrations in Ireland and Canada\", namely \"non-Union OSS registrations in Ireland and simplified federal GST/HST registrations in Canada\" (the page \"File and remit\", n.d., accessed November 2026). HST is Canada's harmonized sales tax. Non-Union OSS is \"for businesses based outside the EU selling services to individuals in the EU\" (Stripe's page on tax in the European Union). Elsewhere filing goes through partners, and the page lists global filing as a private preview. By that list, **as of November 2026 a seller based in the EU files its own EU returns or uses a partner.**\n\nOn a platform, the question of the liable party comes before any calculation. Stripe's guide for Connect, its product for platforms, opens with it: \"The first step for using Stripe Tax with Connect requires you to determine which entity has the obligation to collect and report taxes\" (the page \"Use Stripe Tax with Connect\", n.d., accessed November 2026). It offers one setup in which the connected accounts (the platform's sellers) are liable and one in which the platform is, and the tooling follows the answer per charge. With sellers liable, each connected account needs its own settings and registrations, or the silent zero repeats: \"Stripe Tax returns a tax amount of `0.00` and sets the taxability reason to not_collecting\" (the page \"Tax for software platforms\", n.d., accessed November 2026). With the platform liable, some charges still cannot be counted: \"Separate charges and transfers without `on_behalf_of` aren't included. This is because Stripe can't know who the liable party for the transfer is\" (Monitor your obligations). [One Payment, Three Parties: Platform and Marketplace Models](platform-payment-models.html) owns the charge types; the point here is that the funds flow has to carry the liable party.\n\n## Stripe and Adyen: Where They Differ\n\nFor Adyen the evidence stops early. The research for this book searched Adyen's documentation (docs.adyen.com), its help center (help.adyen.com), its product pages and the open web on 17 November 2026, and found no product that calculates, collects or files tax on a merchant's sales. It found four things, the first three in Adyen's documentation (n.d., accessed November 2026). Adyen taxes its own fees: it \"does not deduct sales tax or value-added tax (VAT) from your settlement batches\" and shows the tax on its invoice to the merchant, in some US states and in France (the page \"Payment processing invoice\"). A merchant can send a tax amount it has already computed: \"Level 2/3 enhanced scheme data (ESD) helps you track the amount spent on corporate cards and the amount of sales tax\" (the page \"Level 2/3 data\"), and on a platform a split, the instruction that divides a payment between balances, can have the type `VAT`, which \"Books the value-added tax (VAT) incurred on a payment to the specified `account`\" (the page on splitting transactions). For platform sellers in the United States Adyen files form 1099-K, a report of a seller's payment volume and not a tax on sales (the page \"Provide tax forms (US only)\"). And Adyen's terms and conditions (last updated 1 November 2023) leave the tax with the merchant: \"each party will be required to comply with its own tax obligations under Applicable Law\". The missing calculator is absence of evidence in public pages, not a statement by Adyen. Orb, the billing company whose acquisition Adyen closed on 1 July 2026 (press release of that date), does not calculate tax either: \"Orb connects to third-party tax providers to calculate tax on Orb invoices\" (Orb documentation, n.d., accessed November 2026).\n\nThe table sets the two side by side; its last column is my reading, an inference from the public record. The cells repeat facts cited above (documentation, n.d., accessed November 2026, unless a year is given).\n\n| Aspect | Stripe | Adyen | What the difference suggests |\n| --- | --- | --- | --- |\n| Calculating tax on a sale | Stripe Tax: in Checkout, on invoices, and through an API that also covers payments taken elsewhere | Not public. Documented: the merchant may send a tax amount it computed (Level 2/3 data) | On Adyen the calculation is done in your system before the payment request is built |\n| What a zero result says | Zero where no registration is recorded; the reason is in `taxability_reason` | Not public | Only the system that calculates can explain a zero; on Adyen that is your system |\n| Threshold monitoring | Stripe-processed, imported or API-recorded sales only; the seller confirms the obligation | Not public | A monitor inside one provider undercounts for a business on two |\n| Registration and filing | Starts registrations in US states; files in the US and for selected registrations in Ireland and Canada; partners elsewhere | Not public. Documented: files US form 1099-K for platform sellers | Steps two and four are mostly outside both providers |\n| Liable party on a platform | The platform decides; monitoring follows the charge type | Not public. Documented: a `VAT` split books a tax amount the platform supplies | The liable party belongs in your own payment record on both |\n| Who owes the tax | The seller: \"You must file and remit the tax you collect\" | The merchant: \"each party will be required to comply with its own tax obligations\" (terms and conditions, 2023) | No material difference in the public record |\n\nOn Stripe, treat the registration list and the reason behind every zero as your own data: keep the list in your records, compare it with what Stripe holds, and export `taxability_reason` with every invoice. On Adyen, decide before you integrate which system computes tax, compute it before the payment request is built, and send Adyen the gross amount.\n\n## Four Places the Calculation Can Live\n\nOne provider has a calculator and the other has none on record, so a business on either or both has to choose where the calculation lives. The table below gives the four realistic places. They differ in what the calculator can see and in who maintains the rules. Built into one provider's flows, it sees that provider's sales. As that provider's API, or as an independent tax engine, it sees every channel the seller sends to it: Avalara describes its engine as working \"across your ERP, billing, purchasing and commerce systems\", and Vertex advertises \"tax rules and rates for 19,000 jurisdictions\" (the two vendors' product pages, n.d., accessed November 2026; vendor claims). (ERP: a company's finance and operations system.) As the seller's own rate table it sees everything and knows only the rules the seller wrote.\n\n| Design | What it sees | Who maintains rates and rules | Fits when | Limits |\n| --- | --- | --- | --- | --- |\n| Provider's built-in tax (Stripe Tax in Checkout and on invoices) | That provider's sales | The provider | One provider carries all taxable sales | Thresholds undercount once a second channel exists |\n| Provider's tax API for every channel (Stripe Tax API, with payments taken elsewhere recorded in it) | What you send | The provider | Two providers, one of them Stripe | Tax history and reports sit with one payment provider |\n| Independent tax engine (for example Avalara AvaTax or Vertex O Series) | What you send | The engine's vendor | Several providers, an ERP, many jurisdictions or product categories | One more vendor and one more call in the checkout path |\n| Your own rate table | Everything in your system | You | One country and few rates, or sellers who set their own rate | You must notice every rule change yourself |\n\n![A seller's sales flow in three streams through two providers and other invoices. A threshold monitor lights only the first stream, while all three together pass the threshold.](assets/images/30-tax/30-partial-sight.jpeg)\n**Figure 3:** *A monitor built into Provider A (Stripe, in this chapter) counts only the sales Provider A processes, while a registration threshold counts all of the seller's sales; importing the rest is one of the two fixes.*\n\nThe rule I use: built-in tax while one provider carries all your taxable sales. From the day a second channel exists, either feed its sales into the first provider's tax product or move the calculation to an independent engine. These are the only two fixes for partial sight: bring the unseen sales to the calculator, or take the calculator out of the provider. I keep a rate table only where sellers set their own rates in one country, which is the case of a studio selling classes. Merchant of record is a different decision, because it changes who the seller is and takes the choice away: Stripe's Managed Payments lists \"Third-party tax integrations\" among the integrations it does not support (Stripe documentation, n.d., accessed November 2026).\n\n## In Practice at Larkfield: Two Sellers, Two Calculations\n\nOn Mila's class pass the seller is Studio Noord, and Studio Noord owes the VAT. Larkfield is not the merchant of record and, on my reading above, not a deemed supplier. The €120.00 Mila paid is a tax-inclusive price. The Dutch tax authority (n.d., accessed November 2026) puts giving people the opportunity to do sport under the reduced rate of 9%, puts lessons given without the accommodation under 21% and exempts nonprofit sports organizations. Assume 9% applies here *(assumption: which treatment fits a studio's classes is the studio's question for its own adviser)*: the pass is €110.09 net and €9.91 VAT. The booking app computes that split from a rate the studio sets and sends the provider one number, €120.00. This is the fourth design, and it is the same on Adyen and on Stripe. The €117.47 paid out on 11 March includes €9.91 that is not the studio's revenue. When Mila is refunded €84.00 on 18 March, €6.94 of VAT goes back with it: a refund is a tax event too. In the payment record store every payment names the studio as the liable party.\n\nOn its own subscription, by contrast, Larkfield is the seller, and it uses the first design. The fix for Leipzig is one piece of state. Larkfield registers for the One Stop Shop in the Netherlands and records the registration in Stripe Tax, and the next €89.00 invoice carries 19% German VAT: €16.91, for a total of €105.91. Assume 180 of the 1,450 German studios have no VAT number and are on the €89 plan *(assumption)*: that is 180 × €16.91 = €3,043.80 a month that was never charged. Whether a business customer without a VAT number is taxed as a consumer is a question of law this chapter does not settle; Stripe's calculation treats it so, and in this fiction Priya's adviser agrees. For Cologne, Femke's team stores `taxability_reason` with every invoice line in the finance export and listens for the event that reports a tax number's verification. A person reviews any customer whose number comes back `unverified` before the next invoice.\n\nThere remains the first step, knowing where the next registration is due. Stripe's monitor sees the €24.5 million of subscriptions that Stripe bills, which is 53% of Larkfield's 2026 revenue of €46.0 million. It does not see the €19.8 million of payment fees: the part taken on Adyen never passes through Stripe, and Stripe's own page excludes the application fees a platform charges on Connect. Nor does it see the €1.7 million of other revenue, which is invoiced from the finance system *(assumption)*. Which of those sales are taxable, and where, is the adviser's question; the monitor never counted them. Priya's team now counts sales per territory from the ledger, which covers both providers, and imports into Stripe Tax what Stripe did not process.\n\n## When It Goes Wrong\n\nSix failures recur, and none is exotic. The table gives each with a detection that reads fields Stripe documents; the third is the undercount Larkfield has just met. The last row rests on one line of Stripe's documentation: \"The Tax Transactions page only includes *transactions* and not *calculations*\" (Stripe's page on Stripe Tax with PaymentIntents, n.d., accessed November 2026).\n\n| Failure | What happens | How you detect it | Recovery |\n| --- | --- | --- | --- |\n| Silent zero | No registration is recorded; tax is zero and nothing fails | Count invoices with `not_collecting` per country each month | Record the registration; settle past periods with your adviser |\n| Unverified tax number | A reverse charge rests on a number that failed, or never finished, verification | List customers whose verification status is not `verified` | Review the customer before the next invoice |\n| Undercounted threshold | The monitor counts one provider's sales | Compare the monitor's totals with sales per territory from your ledger | Import the other sales, or count outside the provider |\n| Blocked invoice | An unusable address stops finalization; the renewal is not collected | The `invoice.finalization_failed` event with `requires_location_inputs` | Ask the customer for an address; validate addresses when they are entered |\n| Refund without reversal | In a custom flow the payment is refunded and the tax record is not | Compare refunds with reversal tax transactions | Create the reversal for each refund, as Stripe's off-Stripe guide requires |\n| Calculation without a transaction | Tax was quoted and charged but never recorded | Compare payments with tax transactions | Create the missing transactions |\n\nOnly the blocked invoice raises an error at the moment of the charge. The other five produce an amount that is plausible and wrong, which is the shape of the failures in [Proving the Money: Reconciliation Inside the Provider and Out](payment-reconciliation-and-reporting.html): a statement nobody compared with a second record. So the control is a periodic comparison with a named owner: tax collected per jurisdiction, against the invoices, against the list of registrations. At Larkfield nobody owned the tax setting for four years; since May 2027 Priya Raman owns the registration list and Femke's team owns the export.\n\n## What to Take Away\n\n**Established.**\n\n- The seller owes indirect tax and all four steps: know where it is due, register, calculate and collect, file and remit. Stripe's documentation frames its own product this way.\n- Registration follows thresholds counted over all of a seller's sales into a territory: one EU-wide €10,000 threshold for cross-border consumer sales since 1 July 2021, and sales-based nexus in US states since the *Wayfair* decision of 21 June 2018.\n- Stripe documents that its calculation returns zero where no registration is recorded, and that its monitor counts only Stripe-processed or imported sales.\n- No public source was found for an Adyen product that calculates, collects or files tax on a merchant's sales. That is absence of evidence.\n\n**Depends on context.**\n\n- Where the calculation lives depends on how many providers, jurisdictions and product categories you have: built-in tax fits one provider; a second channel calls for imports or an independent engine.\n- Whether a platform owes its sellers' tax depends on its category and country, and the answer changes: the EU adds two service sectors from 1 July 2028.\n\n**The author's synthesis.**\n\n- A calculated tax can be exact and still wrong, because whether it should have run, for whom and on which sales are decided outside the calculation. So I store the reason with every tax amount, give the registration list an owner, and record the liable party on every platform transaction.\n- The three zeros of the opening differ only in state the seller holds. \"Tax is switched on\" is where the responsibility starts.\n\n## Questions to Ask\n\n1. Where are we registered, and does the list in our provider match the list our finance team holds?\n2. For last month's zero-tax invoices, which reason does each carry, and who reviewed the ones that are not reverse charges?\n3. Which of our sales does the provider's threshold monitor not see, and how do they reach it?\n4. What happens to a renewal when the customer's address cannot be used for tax?\n5. Is a customer's tax number verified before it changes what we charge, and what do we do when verification fails?\n6. On our platform, which party owes the tax on each kind of sale, and where is that recorded per transaction?\n7. Has anyone checked whether our platform's category makes it a deemed supplier, and when was that last rechecked?\n8. Does every refund in a custom flow create a tax reversal?\n\nTax reads the lines of an invoice and asks where the sale took place and who owes the tax. A second calculation reads the same lines and asks a different question: in which period does the amount count as revenue? As with tax, the provider can compute it only for what it sees. [Cash Is Not Revenue: Revenue Recognition and the Hand-off to Finance](billing-revenue-recognition.html) takes that up.\n\n## Sources and Evidence\n\n*Company, product and investor sources*\n\n- [How Stripe Tax works](https://docs.stripe.com/tax/how-tax-works), Stripe documentation, n.d., accessed 2026-11 — the four steps, the inputs, tax numbers and B2B, registering (Stripe in US states, a partner elsewhere).\n- [Standalone Tax APIs](https://docs.stripe.com/tax/standalone-tax-api), Stripe documentation, n.d., accessed 2026-11 — zero tax without an active registration; calculations and transactions for custom and off-Stripe flows.\n- [Zero tax amounts and reverse charges](https://docs.stripe.com/tax/zero-tax), Stripe documentation, n.d., accessed 2026-11 — `taxability_reason` and the ambiguity of `not_collecting`.\n- [Customer tax IDs](https://docs.stripe.com/billing/customer/tax-ids), Stripe documentation, n.d., accessed 2026-11 — VIES validation, verification statuses, reverse charge on number format.\n- [Monitor your obligations](https://docs.stripe.com/tax/monitoring), Stripe documentation, n.d., accessed 2026-11 — what threshold monitoring counts and its exceptions, including Connect charge types and application fees (volatile).\n- [Import transactions into Stripe Tax](https://docs.stripe.com/tax/imports), Stripe documentation, n.d., accessed 2026-11 — imports of sales from other channels.\n- [Collect tax on off-Stripe payments](https://docs.stripe.com/tax/off-stripe), Stripe documentation, n.d., accessed 2026-11 — off-Stripe payments in monitoring; a reversal per refund.\n- [Stripe Tax with PaymentIntents](https://docs.stripe.com/tax/payment-intent), Stripe documentation, n.d., accessed 2026-11 — calculations versus tax transactions.\n- [File and remit](https://docs.stripe.com/tax/filing), Stripe documentation, n.d., accessed 2026-11 — the seller must file and remit; filing in the US, Ireland and Canada, partners, global filing in private preview (volatile).\n- [Use Stripe Tax with Connect](https://docs.stripe.com/tax/connect), Stripe documentation, n.d., accessed 2026-11 — the liable entity as the first decision.\n- [Tax for software platforms](https://docs.stripe.com/tax/tax-for-platforms), Stripe documentation, n.d., accessed 2026-11 — connected accounts' settings and the zero without a registration.\n- [Automatically collect tax on invoices](https://docs.stripe.com/tax/invoicing), Stripe documentation, n.d., accessed 2026-11 — the rate at finalization.\n- [Collect taxes for recurring payments](https://docs.stripe.com/tax/subscriptions), Stripe documentation, n.d., accessed 2026-11 — `requires_location_inputs` and the invoice that cannot finalize.\n- [Tax in the European Union](https://docs.stripe.com/tax/supported-countries/european-union), Stripe documentation, n.d., accessed 2026-11 — the non-Union One Stop Shop scheme.\n- [Managed Payments](https://docs.stripe.com/payments/managed-payments), Stripe documentation, n.d., accessed 2026-11 — third-party tax integrations not supported.\n- [Payment processing invoice](https://docs.adyen.com/reporting/invoice-reconciliation/payment-processing-invoice), Adyen documentation, n.d., accessed 2026-11 — tax on Adyen's own fees (the help-center article \"What kind of tax is applied to my invoice?\" now redirects to this page).\n- [Level 2/3 data](https://docs.adyen.com/payment-methods/cards/enhanced-scheme-data/l2-l3), Adyen documentation, n.d., accessed 2026-11 — a tax amount sent by the merchant.\n- [Split specific transactions between balance accounts](https://docs.adyen.com/platforms/online-payments/split-transactions), Adyen documentation, n.d., accessed 2026-11 — the `VAT` split type.\n- [Provide tax forms (US only)](https://docs.adyen.com/platforms/us-tax-forms), Adyen documentation, n.d., accessed 2026-11 — Adyen files form 1099-K for US platform sellers.\n- [Adyen Terms and Conditions](https://www.adyen.com/legal/adyen-terms-and-conditions), Adyen, last updated 2023-11-01 — clause 4.5: each party complies with its own tax obligations (the clause also has the merchant indemnify Adyen for taxes on what it sells).\n- [Adyen Closes Talon.One and Orb Acquisitions; Announces Leadership Updates Across Product and Finance](https://www.adyen.com/press-and-media/adyen-closes-talonone-and-orb-acquisitions-announces-leadership-updates), Adyen press release, 2026-07-01 — closing date of the Orb acquisition.\n- [Tax: Overview](https://docs.withorb.com/integrations-and-exports/tax), Orb documentation, n.d., accessed 2026-11 — Orb calculates tax through third-party tax providers.\n- [Avalara AvaTax](https://www.avalara.com/us/en/products/calculations.html), Avalara, n.d., accessed 2026-11 — an independent tax engine across systems (vendor claim).\n- [Vertex O Series](https://www.vertexinc.com/solutions/products/vertex-indirect-tax-o-series), Vertex, n.d., accessed 2026-11 — rules and rates for 19,000 jurisdictions (vendor claim).\n\n*Standards, regulation and official documentation*\n\n- [VAT e-Commerce: One Stop Shop](https://vat-one-stop-shop.ec.europa.eu/index_en), European Commission, n.d., accessed 2026-11 — rules from 1 July 2021, the EUR 10 000 threshold, the One Stop Shop, deemed supplier for goods.\n- [VAT in the Digital Age (ViDA)](https://taxation-customs.ec.europa.eu/taxation/vat/vat-digital-age-vida_en), European Commission, n.d., accessed 2026-11 — adoption on 11 March 2025; deemed supplier for two service sectors from 1 July 2028.\n- [VAT rules and rates](https://europa.eu/youreurope/business/finance-and-tax/vat/vat-rules-rates/index_en.htm), European Commission, Your Europe, table last checked 2026-07-13 — standard rates in the Netherlands and Germany; each country sets its own rates.\n- [Btw-tarief gelegenheid geven om te sporten](https://www.belastingdienst.nl/wps/wcm/connect/bldcontentnl/belastingdienst/zakelijk/btw/tarieven_en_vrijstellingen/diensten_9_btw/sportbeoefening_waaronder_zwembaden_en_sauna/gelegenheid_geven_om_te_sporten/), Belastingdienst (Dutch Tax and Customs Administration), n.d., accessed 2026-11, in Dutch — the 9% rate for giving the opportunity to do sport, 21% for lessons given without the accommodation, the exemption for nonprofit sports organizations.\n- [South Dakota v. Wayfair, Inc.](https://www.law.cornell.edu/supremecourt/text/17-494), Supreme Court of the United States, 2018-06-21, text at Cornell Legal Information Institute — the physical-presence rule overruled (evidence age: 8 years).\n\n*Research and practitioner sources*\n\n- None.\n\nLarkfield is fictional; architectural recommendations, labeled inferences and labeled assumptions are the author's judgement.\n"}]}]}</script>
+<script>
+    (function () {
+        const data = JSON.parse(document.getElementById('data').textContent);
+        const root = document.getElementById('content');
+
+        const postId = (data.meta && data.meta.id) ? String(data.meta.id) : '';
+        const postStatusRaw = (data.meta && data.meta.status) ? String(data.meta.status) : '';
+        if (postId || postStatusRaw) {
+            const header = document.getElementById('post-header');
+            let sectionEl = header.querySelector('p.section');
+            if (!sectionEl) {
+                sectionEl = document.createElement('p');
+                sectionEl.className = 'section';
+                header.insertBefore(sectionEl, header.firstChild);
+            }
+            // Status pill goes first, then a " / " separator before the existing
+            // content (section name and/or id).
+            if (postStatusRaw) {
+                const parts = postStatusRaw.split(':');
+                const statusName = parts[0].trim();
+                const statusColor = (parts[1] || '').trim();
+                const wrap = document.createElement('span');
+                wrap.className = 'post-status';
+                const dot = document.createElement('span');
+                dot.className = 'status-dot';
+                if (statusColor) dot.style.background = statusColor;
+                wrap.appendChild(dot);
+                wrap.appendChild(document.createTextNode(statusName));
+                if (sectionEl.firstChild) {
+                    sectionEl.insertBefore(document.createTextNode(' • '), sectionEl.firstChild);
+                    sectionEl.insertBefore(wrap, sectionEl.firstChild);
+                } else {
+                    sectionEl.appendChild(wrap);
+                }
+            }
+            if (postId) {
+                if (sectionEl.firstChild) sectionEl.appendChild(document.createTextNode(' • '));
+                sectionEl.appendChild(document.createTextNode(postId));
+            }
+        }
+
+        const tagsHost = document.getElementById('tags');
+        (data.tags || []).forEach(function (t) {
+            const span = document.createElement('span');
+            span.className = 'tag';
+            span.textContent = t;
+            tagsHost.appendChild(span);
+        });
+
+        // Minimal markdown renderer. Supports: ATX headings, paragraphs, blockquotes,
+        // unordered/ordered lists, fenced code, inline code, bold/italic/strikethrough, links, images, hr.
+        // Sufficient for the posts in this repo; replace with a fuller parser if needed.
+        function renderMarkdown(src) {
+            const lines = src.replace(/\r\n/g, '\n').split('\n');
+            const out = [];
+            let i = 0;
+
+            const bullet = /^(\s*)([-*])\s+(.*)$/;
+            const ordered = /^(\s*)(\d+)\.\s+(.*)$/;
+            const tableRow = /^\s*\|(.+)\|\s*$/;
+            const tableSep = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+
+            function splitRow(s) {
+                let t = s.trim();
+                if (t.startsWith('|')) t = t.slice(1);
+                if (t.endsWith('|')) t = t.slice(0, -1);
+                return t.split('|').map(c => c.trim());
+            }
+
+            function inline(s) {
+                // Posts are trusted content, so raw HTML passes through unescaped
+                // (some posts embed inline <blockquote>, <div>, etc.).
+                // Stray ampersands still get fixed up.
+                s = s.replace(/&(?![a-zA-Z]+;|#\d+;)/g, '&amp;');
+                s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<a class="image-link" href="$2" target="_blank" rel="noopener noreferrer"><img alt="$1" src="$2"></a>');
+                s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+                s = s.replace(/`([^`]+)`/g, function (_, c) {
+                    return '<code>' + c.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
+                });
+                // Bold/italic, including nested combinations: ***x***,
+                // **a *b*** / ***a* b** (shared delimiters), and **a *b* c**.
+                s = s.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+                s = s.replace(/\*\*([^*\n]+)\*([^*\n]+)\*\*\*/g, '<strong>$1<em>$2</em></strong>');
+                s = s.replace(/\*\*\*([^*\n]+)\*([^*\n]+)\*\*/g, '<strong><em>$1</em>$2</strong>');
+                s = s.replace(/\*\*((?:[^*\n]|\*(?!\*)[^*\n]+\*(?!\*))+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+                s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+                return s;
+            }
+
+            while (i < lines.length) {
+                const line = lines[i];
+                if (!line.trim()) {
+                    i++;
+                    continue;
+                }
+
+                const fence = line.match(/^```(\w*)\s*$/);
+                if (fence) {
+                    i++;
+                    const buf = [];
+                    while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+                        buf.push(lines[i]);
+                        i++;
+                    }
+                    i++;
+                    const escaped = buf.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const cls = fence[1] ? ' class="lang-' + fence[1] + '"' : '';
+                    out.push('<pre><code' + cls + '>' + escaped + '</code></pre>');
+                    continue;
+                }
+
+                const h = line.match(/^(#{1,6})\s+(.*)$/);
+                if (h) {
+                    out.push('<h' + h[1].length + '>' + inline(h[2]) + '</h' + h[1].length + '>');
+                    i++;
+                    continue;
+                }
+
+                if (/^\s*(?:-\s*){3,}\s*$/.test(line) || /^\s*\*{3,}\s*$/.test(line)) {
+                    out.push('<hr>');
+                    i++;
+                    continue;
+                }
+
+                if (/^>\s?/.test(line)) {
+                    const buf = [];
+                    while (i < lines.length && /^>\s?/.test(lines[i])) {
+                        buf.push(lines[i].replace(/^>\s?/, ''));
+                        i++;
+                    }
+                    out.push('<blockquote>' + renderMarkdown(buf.join('\n')) + '</blockquote>');
+                    continue;
+                }
+
+                if (tableRow.test(line) && i + 1 < lines.length && tableSep.test(lines[i + 1])) {
+                    const headers = splitRow(line);
+                    const aligns = splitRow(lines[i + 1]).map(function (c) {
+                        c = c.trim();
+                        const left = c.startsWith(':'), right = c.endsWith(':');
+                        return left && right ? 'center' : right ? 'num' : '';
+                    });
+                    const cellOpen = function (tag, idx) {
+                        return aligns[idx] ? '<' + tag + ' class="' + aligns[idx] + '">' : '<' + tag + '>';
+                    };
+                    i += 2;
+                    const rows = [];
+                    while (i < lines.length && tableRow.test(lines[i])) {
+                        rows.push(splitRow(lines[i]));
+                        i++;
+                    }
+                    let html = '<div class="table-wrap"><table><thead><tr>';
+                    headers.forEach((h, idx) => {
+                        html += cellOpen('th', idx) + inline(h) + '</th>';
+                    });
+                    html += '</tr></thead><tbody>';
+                    rows.forEach(r => {
+                        html += '<tr>';
+                        r.forEach((c, idx) => {
+                            html += cellOpen('td', idx) + inline(c) + '</td>';
+                        });
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                    out.push(html);
+                    continue;
+                }
+
+                if (bullet.test(line) || ordered.test(line)) {
+                    // Indent of the first bullet defines this list's base level.
+                    // Deeper-indented bullets become nested lists (rendered by
+                    // recursing into renderMarkdown). Same-or-less indent at a
+                    // bullet starts a sibling item (or ends the list).
+                    const firstMatch = line.match(bullet) || line.match(ordered);
+                    const baseIndent = firstMatch[1].length;
+                    const isOrdered = ordered.test(line);
+                    const items = [];
+                    let hasTask = false;
+                    while (i < lines.length) {
+                        const cur = lines[i];
+                        if (!cur.trim()) {
+                            // blank line breaks the list (matches CommonMark-ish behaviour)
+                            i++;
+                            break;
+                        }
+                        const mBul = cur.match(bullet);
+                        const mOrd = cur.match(ordered);
+                        const m = mBul || mOrd;
+                        if (!m) break;
+                        if (m[1].length < baseIndent) break;
+                        if (m[1].length > baseIndent) break; // shouldn't happen at top of loop
+                        // Same-type check: switching between -/* and 1. closes the list
+                        if (isOrdered !== !!mOrd) break;
+
+                        const itemBuf = [m[3]];
+                        const nestedBuf = [];
+                        i++;
+                        while (i < lines.length) {
+                            const nxt = lines[i];
+                            if (!nxt.trim()) break;
+                            const nBul = nxt.match(bullet);
+                            const nOrd = nxt.match(ordered);
+                            const nm = nBul || nOrd;
+                            if (nm) {
+                                if (nm[1].length > baseIndent) {
+                                    // nested list line — dedent and stash
+                                    nestedBuf.push(nxt.slice(baseIndent + 2));
+                                    i++;
+                                    continue;
+                                }
+                                // sibling or end of list
+                                break;
+                            }
+                            // Plain continuation text
+                            if (nestedBuf.length) {
+                                // continuation inside the nested block
+                                nestedBuf.push(nxt.slice(baseIndent + 2));
+                            } else {
+                                itemBuf.push(nxt.trim());
+                            }
+                            i++;
+                        }
+
+                        // GitHub-style task items: "- [ ] text" / "- [x] text"
+                        // render as (clickable, unpersisted) checkboxes.
+                        const itemText = itemBuf.join('\n');
+                        const task = !isOrdered && itemText.match(/^\[( |x|X)\]\s+/);
+                        let liHtml = inline(task ? itemText.slice(task[0].length) : itemText);
+                        if (task) {
+                            hasTask = true;
+                            liHtml = '<input type="checkbox"' + (task[1] === ' ' ? '' : ' checked') + '>' + liHtml;
+                        }
+                        if (nestedBuf.length) {
+                            liHtml += renderMarkdown(nestedBuf.join('\n'));
+                        }
+                        items.push(task ? '<li class="task">' + liHtml + '</li>' : '<li>' + liHtml + '</li>');
+                    }
+                    out.push((isOrdered ? '<ol>' : (hasTask ? '<ul class="task-list">' : '<ul>')) + items.join('') + (isOrdered ? '</ol>' : '</ul>'));
+                    continue;
+                }
+
+                const buf = [line];
+                i++;
+                while (i < lines.length && lines[i].trim() && !/^#{1,6}\s/.test(lines[i]) && !/^>\s?/.test(lines[i]) && !bullet.test(lines[i]) && !ordered.test(lines[i]) && !/^```/.test(lines[i]) && !tableRow.test(lines[i])) {
+                    buf.push(lines[i]);
+                    i++;
+                }
+                out.push('<p>' + inline(buf.join(' ')) + '</p>');
+            }
+            return out.join('\n');
+        }
+
+        // Block dispatcher. New block types plug in here.
+        const renderers = {
+            markdown: function (block) {
+                const div = document.createElement('div');
+                div.innerHTML = renderMarkdown(block.content);
+                return div;
+            },
+            mermaid: function (block) {
+                // Mermaid scans elements with class "mermaid" whose textContent
+                // is the diagram source. We collect these nodes and run
+                // mermaid.run() once after all blocks are in the DOM.
+                const div = document.createElement('div');
+                div.className = 'mermaid';
+                div.textContent = block.content;
+                return div;
+            },
+            'force-graph': function (block) {
+                // build.py emits parsed JSON: {nodes:[{id,size}], links:[{source,target}]}.
+                // We instantiate force-graph after the container is in the DOM
+                // so it can measure its own width.
+                const div = document.createElement('div');
+                div.className = 'force-graph';
+                const data = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.ForceGraph) return;
+                    const maxSize = data.nodes.reduce((m, n) => Math.max(m, n.size || 1), 1);
+                    window.ForceGraph()(div)
+                        .graphData(data)
+                        .width(div.clientWidth)
+                        .height(div.clientHeight)
+                        .nodeRelSize(4)
+                        .nodeVal(n => Math.max(20 * (n.size || 1) / maxSize, 0.001))
+                        .nodeLabel(n => n.id + ' (' + (n.size || 1) + ')')
+                        .nodeColor(() => 'rgba(135, 206, 235, 0.7)')
+                        .linkColor(() => 'rgba(60, 60, 60, 0.4)')
+                        .linkDirectionalArrowLength(4)
+                        .linkDirectionalArrowRelPos(1)
+                        .linkWidth(1);
+                });
+                return div;
+            },
+            'bubble-chart': function (block) {
+                // build.py emits {nodes:[{name,size}]}. Renders a D3 circle-pack
+                // SVG (same shape as the obren.io reference, just inline).
+                const wrap = document.createElement('div');
+                wrap.className = 'bubble-chart';
+                const payload = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.d3) return;
+                    const diameter = 480;
+                    const fill = '#c0deed';
+                    const textColor = '#111111';
+                    const fontSize = 12;
+
+                    const svg = window.d3.select(wrap).append('svg')
+                        .attr('viewBox', '0 0 ' + diameter + ' ' + diameter)
+                        .attr('width', diameter)
+                        .attr('height', diameter);
+
+                    const root = window.d3.hierarchy({children: payload.nodes})
+                        .sum(d => d.size || 0)
+                        .sort((a, b) => b.value - a.value);
+
+                    window.d3.pack().size([diameter, diameter]).padding(2)(root);
+
+                    const node = svg.selectAll('g')
+                        .data(root.leaves())
+                        .enter().append('g')
+                        .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+
+                    node.append('title').text(d => d.data.name + ': ' + d.value);
+                    node.append('circle').attr('r', d => d.r).style('fill', fill);
+                    node.append('text')
+                        .attr('dy', '.3em')
+                        .style('text-anchor', 'middle')
+                        .style('fill', textColor)
+                        .style('font-size', fontSize + 'px')
+                        .text(d => d.data.name.substring(0, Math.max(0, Math.floor(d.r / 3))));
+                });
+                return wrap;
+            }
+        };
+
+        // Render one modality's blocks into a host element. Mermaid runs
+        // scoped to just the nodes created here, so lazily rendered tabs get
+        // their diagrams on first activation.
+        let mermaidInitialized = false;
+        function renderBlocksInto(blocks, host) {
+            const mermaidNodes = [];
+            blocks.forEach(function (block) {
+                const r = renderers[block.type];
+                if (!r) {
+                    const pre = document.createElement('pre');
+                    pre.textContent = '[unknown block type: ' + block.type + ']';
+                    host.appendChild(pre);
+                    return;
+                }
+                const node = r(block);
+                if (node instanceof Node) {
+                    host.appendChild(node);
+                    if (block.type === 'mermaid') mermaidNodes.push(node);
+                }
+            });
+            if (mermaidNodes.length && window.mermaid) {
+                if (!mermaidInitialized) {
+                    window.mermaid.initialize({startOnLoad: false, theme: 'default'});
+                    mermaidInitialized = true;
+                }
+                window.mermaid.run({nodes: mermaidNodes});
+            }
+            markScrollableTables(host);
+        }
+
+        // A table wider than its wrapper scrolls sideways. Mark those wrappers
+        // so the CSS can show a cue, and make them focusable so keyboard users
+        // can reach and scroll them. Hidden panes measure 0 and are re-marked
+        // when activated or when the window is resized.
+        function markScrollableTables(host) {
+            host.querySelectorAll('.table-wrap').forEach(function (wrap) {
+                const scrolls = wrap.scrollWidth > wrap.clientWidth + 1;
+                wrap.classList.toggle('is-scrollable', scrolls);
+                if (scrolls) {
+                    wrap.setAttribute('tabindex', '0');
+                    wrap.setAttribute('role', 'region');
+                    wrap.setAttribute('aria-label', 'Table that scrolls sideways');
+                } else {
+                    wrap.removeAttribute('tabindex');
+                    wrap.removeAttribute('role');
+                    wrap.removeAttribute('aria-label');
+                }
+            });
+        }
+
+        // Modality tabs. One <article class="pane"> per modality; panes are
+        // rendered lazily on first activation (force-graph / D3 / mermaid
+        // need a visible, measurable container). With a single modality the
+        // tab bar stays hidden and the page looks exactly like before.
+        const mods = data.modalities;
+        const tabBar = document.getElementById('modality-tabs');
+        const panes = {};
+        const tabButtons = {};
+        const renderedPanes = {};
+
+        // With several modalities each pane is a tabpanel labelled by its
+        // tab (W3C APG tabs pattern); tabindex=0 lets keyboard users move
+        // from the tab list straight into the active content.
+        mods.forEach(function (m) {
+            const pane = document.createElement('article');
+            pane.className = 'pane';
+            pane.dataset.key = m.key;
+            pane.hidden = true;
+            if (mods.length > 1) {
+                pane.id = 'pane-' + m.key;
+                pane.setAttribute('role', 'tabpanel');
+                pane.setAttribute('aria-labelledby', 'tab-' + m.key);
+                pane.setAttribute('tabindex', '0');
+            }
+            root.appendChild(pane);
+            panes[m.key] = pane;
+        });
+
+        const defaultKey = mods.some(m => m.key === 'index') ? 'index' : mods[0].key;
+
+        function activate(key, updateHash) {
+            mods.forEach(function (m) {
+                const isActive = m.key === key;
+                panes[m.key].hidden = !isActive;
+                if (tabButtons[m.key]) {
+                    tabButtons[m.key].classList.toggle('active', isActive);
+                    tabButtons[m.key].setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    // Roving tabindex: only the selected tab is in the Tab
+                    // order; the arrow keys move between tabs.
+                    tabButtons[m.key].setAttribute('tabindex', isActive ? '0' : '-1');
+                }
+            });
+            // Unhide first, then render: the chart libraries measure widths.
+            if (!renderedPanes[key]) {
+                renderBlocksInto(mods.find(m => m.key === key).blocks, panes[key]);
+                renderedPanes[key] = true;
+            } else {
+                markScrollableTables(panes[key]);
+            }
+            if (updateHash) {
+                history.replaceState(null, '',
+                    key === defaultKey ? location.pathname + location.search : '#' + key);
+            }
+        }
+
+        if (mods.length > 1) {
+            mods.forEach(function (m) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = m.label;
+                btn.id = 'tab-' + m.key;
+                btn.dataset.key = m.key;
+                btn.setAttribute('role', 'tab');
+                btn.setAttribute('aria-controls', 'pane-' + m.key);
+                btn.addEventListener('click', function () { activate(m.key, true); });
+                tabBar.appendChild(btn);
+                tabButtons[m.key] = btn;
+            });
+            // Keyboard support per the W3C APG tabs pattern (automatic
+            // activation): Left/Right move between tabs and wrap, Home/End
+            // jump to the first/last tab, and the focused tab is selected.
+            tabBar.addEventListener('keydown', function (ev) {
+                const keys = mods.map(function (m) { return m.key; });
+                const focused = document.activeElement;
+                const current = focused && focused.dataset ? keys.indexOf(focused.dataset.key) : -1;
+                if (current < 0) return;
+                let next = null;
+                if (ev.key === 'ArrowRight') next = (current + 1) % keys.length;
+                else if (ev.key === 'ArrowLeft') next = (current - 1 + keys.length) % keys.length;
+                else if (ev.key === 'Home') next = 0;
+                else if (ev.key === 'End') next = keys.length - 1;
+                if (next === null) return;
+                ev.preventDefault();
+                activate(keys[next], true);
+                tabButtons[keys[next]].focus();
+            });
+            tabBar.hidden = false;
+        }
+
+        // The hash selects a tab only when it matches a modality key, so
+        // existing anchors keep working.
+        const initialHash = location.hash.slice(1);
+        activate(mods.some(m => m.key === initialHash) ? initialHash : defaultKey, false);
+        window.addEventListener('hashchange', function () {
+            const k = location.hash.slice(1);
+            if (mods.some(m => m.key === k)) activate(k, false);
+        });
+        window.addEventListener('resize', function () { markScrollableTables(root); });
+    })();
+</script>
+</body>
+</html>

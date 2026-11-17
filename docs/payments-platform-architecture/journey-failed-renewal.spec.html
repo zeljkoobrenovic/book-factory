@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Spec: Journey 2: A Membership Renewal That Fails, and Comes Back</title>
+    <meta name="description" content="When a €49 renewal is declined with nobody present, who decides whether and when to try again, and what is the member in the meantime? The decline code and the card network decide whether, the system that holds the period's debt decides when, and that system is Stripe's invoice on Stripe Billing and your own record on Adyen.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SETTLED: Architecting Payments and Revenue Infrastructure">
+    <meta property="og:title" content="Spec: Journey 2: A Membership Renewal That Fails, and Comes Back">
+    <meta property="og:description" content="When a €49 renewal is declined with nobody present, who decides whether and when to try again, and what is the member in the meantime? The decline code and the card network decide whether, the system that holds the period's debt decides when, and that system is Stripe's invoice on Stripe Billing and your own record on Adyen.">
+    <meta property="og:url" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/journey-failed-renewal.spec.html">
+    <meta property="og:image" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/assets/images/43-journey-failed-renewal/logo.jpeg">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="site.css">
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-129891352-1"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+        dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'UA-129891352-1');
+</script>
+    <style>
+        body {
+            line-height: 1.65;
+        }
+
+        main {
+            padding-top: 32px;
+        }
+
+        nav.post-nav {
+            font-size: 14px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: baseline;
+            flex-wrap: wrap;
+        }
+
+        nav.post-nav a {
+            color: var(--muted);
+            text-decoration: none;
+        }
+
+        nav.post-nav a:hover {
+            color: var(--accent);
+        }
+
+        nav.post-nav .nav-right {
+            margin-left: auto;
+            display: inline-flex;
+            gap: 4px;
+            align-items: baseline;
+        }
+
+        nav.post-nav .nav-sep {
+            color: var(--muted);
+        }
+
+        footer nav.post-nav {
+            margin-top: 24px;
+            margin-bottom: 0;
+        }
+
+        header.post {
+            margin-bottom: 32px;
+        }
+
+        header.post .section {
+            color: var(--muted);
+            font-size: 13px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin: 0 0 -6px;
+        }
+
+        header.post .section a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        header.post .section a:hover {
+            color: var(--accent);
+        }
+
+        header.post .section .post-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        header.post .section .post-status .status-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        header.post .logo {
+            display: block;
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            border: 1px solid lightgrey;
+
+        }
+
+        header.post .logo-credit {
+            color: var(--muted);
+            font-size: 12px;
+            margin: -4px 0 24px;
+            text-align: right;
+        }
+
+        header.post h1 {
+            font-size: 52px;
+            line-height: 1.2;
+            margin: 0 0 2px;
+            padding: 0;
+            letter-spacing: -0.01em;
+            font-weight: normal;
+        }
+
+        header.post .byline {
+            color: var(--muted);
+            font-size: 15px;
+            margin: 0;
+        }
+
+        header.post .byline .spec-link {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        header.post .byline .spec-link:hover {
+            text-decoration: underline;
+        }
+
+        header.post .byline .spec-link-drifted {
+            color: #b8650f;
+        }
+
+        header.post .byline .spec-link-superseded {
+            color: var(--muted);
+        }
+
+        header.post .ai-credit {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 4px 0 0;
+        }
+
+        header.post .ai-credit a {
+            color: inherit;
+        }
+
+        header.post .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 10px 0 10px;
+        }
+
+        header.post .tags .tag {
+            font-size: 14px;
+            padding: 1px 8px;
+            border: 1px solid deepskyblue;
+            color: blue;
+            border-radius: 999px;
+            background-color: var(--tag-bg);
+        }
+
+        nav.modality-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--rule);
+            margin: 0 0 28px;
+            flex-wrap: wrap;
+        }
+
+        nav.modality-tabs button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font: inherit;
+            font-size: 14px;
+            color: var(--muted);
+            padding: 8px 14px;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            letter-spacing: 0.02em;
+        }
+
+        nav.modality-tabs button:hover {
+            color: var(--accent);
+        }
+
+        nav.modality-tabs button.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        #content .pane[hidden] {
+            display: none;
+        }
+
+        #content .pane:focus {
+            outline: none;
+        }
+
+        #content .pane:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 6px;
+        }
+
+        article h2 {
+            font-size: 26px;
+            margin: 40px 0 12px;
+            letter-spacing: -0.01em;
+        }
+
+        article h3 {
+            font-size: 20px;
+            margin: 28px 0 8px;
+        }
+
+        article h4 {
+            font-size: 17px;
+            margin: 20px 0 6px;
+        }
+
+        article p {
+            margin: 0 0 16px;
+        }
+
+        article a {
+            color: var(--accent);
+        }
+
+        article a.image-link {
+            display: inline-block;
+            line-height: 0;
+        }
+
+        article img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        article a.image-link img {
+            display: block;
+        }
+
+        article ul, article ol {
+            padding-left: 24px;
+            margin: 0 0 16px;
+        }
+
+        article li {
+            margin-bottom: 6px;
+        }
+
+        article ul.task-list {
+            list-style: none;
+            padding-left: 4px;
+        }
+
+        article ul.task-list li.task > input[type="checkbox"] {
+            margin-right: 8px;
+            accent-color: var(--accent);
+        }
+
+        article hr {
+            border: none;
+            border-top: 1px solid var(--rule);
+            margin: 32px 0;
+        }
+
+        article blockquote {
+            margin: 16px 0;
+            padding: 12px 18px;
+            background: var(--quote-bg);
+            border-left: 3px solid var(--accent);
+            color: #333;
+        }
+
+        article blockquote p:last-child {
+            margin-bottom: 0;
+        }
+
+        article code {
+            background: var(--code-bg);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 0.92em;
+        }
+
+        article pre {
+            background: var(--code-bg);
+            padding: 14px 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        article pre code {
+            background: none;
+            padding: 0;
+        }
+
+        article .table-wrap {
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+
+        article table {
+            border-collapse: collapse;
+            margin: 16px 0;
+            width: 100%;
+            font-size: 15px;
+        }
+
+        article .table-wrap table {
+            margin: 0;
+        }
+
+        /* Wide tables scroll on narrow screens instead of crushing their columns.
+           A table wrapped in <div class="table-compact"> opts out: it has few,
+           short columns and wraps its cells to fit the screen instead. */
+        @media (max-width: 640px) {
+            article .table-wrap table {
+                min-width: 560px;
+            }
+            article .table-compact .table-wrap table {
+                min-width: 0;
+            }
+        }
+
+        /* Tables that actually overflow get a visible cue and keyboard focus
+           (markScrollableTables() sets the class and attributes). */
+        article .table-wrap.is-scrollable::before {
+            content: "Scroll sideways to see the whole table";
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        article .table-wrap.is-scrollable:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        article th, article td {
+            border: 1px solid var(--rule);
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        article th {
+            background: var(--code-bg);
+            font-weight: 600;
+        }
+
+        /* GFM column alignment from the separator row. Right-aligned columns
+           hold numbers; their cells never wrap, so a sign, a currency symbol
+           and its amount stay on one line while label columns still wrap. */
+        article th.num, article td.num {
+            text-align: right;
+        }
+
+        article td.num {
+            white-space: nowrap;
+        }
+
+        article th.center, article td.center {
+            text-align: center;
+        }
+
+        article .mermaid {
+            text-align: center;
+            margin: 24px 0;
+        }
+
+        article .force-graph {
+            margin: 24px 0;
+            border: 1px solid var(--rule);
+            border-radius: 6px;
+            background: #fff;
+            height: 480px;
+            overflow: hidden;
+        }
+
+        article .bubble-chart {
+            margin: 24px 0;
+            text-align: center;
+        }
+
+        article .bubble-chart svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <nav class="post-nav"><a class="nav-back" href="journey-failed-renewal.html">← Journey 2: A Membership Renewal That Fails, and Comes Back</a><span class="nav-right"></span></nav>
+    <header class="post" id="post-header">
+        <p class="section"><span>SPEC</span> • <span class="post-status"><span class="status-dot" style="background:green"></span>accepted</span> • <span>revised 2026-11-17</span></p>
+        <h1>Spec: Journey 2: A Membership Renewal That Fails, and Comes Back</h1>
+        <p class="byline"></p>
+        
+        <div class="tags" id="tags"></div>
+        
+    </header>
+    <nav class="modality-tabs" id="modality-tabs" hidden role="tablist" aria-label="Reading formats"></nav>
+    <div id="content"></div>
+    <footer>
+        <nav class="post-nav"><a class="nav-back" href="journey-failed-renewal.html">← Journey 2: A Membership Renewal That Fails, and Comes Back</a><span class="nav-right"></span></nav>
+    </footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/force-graph"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script id="data" type="application/json">{"meta": {}, "tags": [], "modalities": [{"key": "spec", "label": "Spec", "meta": {}, "blocks": [{"type": "markdown", "content": "## Intent\n\n**After reading, the reader should:**\n\n- **Know:** The steps of a renewal with the customer absent: the scheduled charge as a merchant-initiated transaction on a stored card, the decline with its code, the decision whether a retry is allowed, the notice to the member, the retry, the recovery, and the branch where recovery fails and the membership lapses; for each, the party, the record, the promise and the failure, with the chapter that owns it.\n- **Know:** The canonical dates: Mila's €49.00 monthly membership at Studio Noord renews on the 1st; on 1 April 2027 the charge is declined for insufficient funds; the retry on 4 April succeeds; the €49 collected on 4 April pays for the period that began on 1 April.\n- **Know:** What the rules and documentation say as of November 2026: Visa sorts decline codes into those a merchant must never resubmit and those it may reattempt within a limit (20 attempts in 30 days in the rules of 24 October 2026; Adyen's page says 15), and requires written notice and at least 7 calendar days to pay by other means after a declined merchant-initiated authorization; Stripe Billing retries an invoice (Smart Retries, by default up to 8 attempts in 2 weeks, with retries suspended on listed hard decline codes until a new payment method appears); Adyen documents a retry feature for payments (Auto Rescue, default window one calendar month) and no invoice or subscription object.\n- **Know:** Where the public record stops: each company has described its retry model once (Stripe in a 2024 post, 'more than 500 attributes'; Adyen in a 2020 post, a contextual bandit with 'about 6% more orders than the baseline'), and neither publishes the current model, its inputs or the timing it would choose for a given decline; the customer figure Adyen publishes for Auto Rescue has no baseline.\n- **Believe:** A decline is information about what to do next, not the end of the attempt.\n- **Believe:** The debt for a billing period and the payment attempts against it are two records, and something has to own the first.\n- **Be able to:** Write a retry policy that separates declines that must never be retried, declines that are a matter of timing and declines that need a new credential, and that stays inside the network's limits.\n- **Be able to:** Say, for their own provider, which system holds 'still owed for this period' and what state the customer is in while it is owed.\n\n**Audience:** A software engineer or architect who is new to payments and has read Journey 1.\n\n**Already knows:**\n\n- APIs, queues, retries, idempotency as a general idea\n- Journey 1's step table and twelve steps\n- The mechanisms of Parts I to VIII by name, or can follow a link to them\n\n**Does not yet know:**\n\n- How those mechanisms hand over to each other on a renewal that is declined\n- Which system holds the debt on each provider\n\n**Acceptance criteria**\n\n| Id | Criterion | Check | Method | Severity |\n| --- | --- | --- | --- | --- |\n| AC-1 | Given a renewal job that retries every decline the same way, the reader separates the declines by what they call for and says what the job should do with each. *Probe:* A language-learning app renews 20,000 monthly card subscriptions on the 1st. Its job retries every declined card once a day for 30 days and emails 'your payment failed' after each failed attempt. This month's declines include 'insufficient funds', 'lost card' and 'expired card'. Using only this chapter: what is wrong with the job, and what should it do with each of the three? | `custom` | cold_reader | major |\n| AC-2 | The reader can say which system holds the debt for the period on each provider and what the integrator must build on each. *Probe:* One studio's memberships are charged through Stripe Billing subscriptions; another's are charged by the platform's own renewal job through Adyen. In both, a €49 renewal is declined on the 1st. Using only this chapter: in each case, which system knows that €49 is still owed for the month, what retries it, and what does the platform have to build itself? | `custom` | cold_reader | major |\n| AC-3 | Given the branch where no retry succeeds, the reader can say what state the membership, the debt and the member's access end in, and that the outcome is a setting or a decision, not something the payment record supplies. *Probe:* Suppose every retry of a €49 renewal fails through the end of the retry window. Using only this chapter: what must be decided about the membership, the amount owed and the member's access, and who or what makes each decision on Stripe Billing and on an Adyen integration? | `custom` | cold_reader | major |\n\n## Thesis\n\n**Question:** When Mila's €49 renewal is declined on 1 April 2027, who decides whether and when to try again, and which system holds the state of her membership until the money arrives?\n\n> **Claim:** A declined renewal is an open debt with a clock, not a failed payment. The decline code decides whether a retry is allowed at all, the card network caps how many, and the state of Mila's membership between the decline on 1 April and the successful retry on 4 April has to be held by the billing side, because no payment record contains it. Where that debt lives depends on the provider: Stripe Billing retries an invoice it owns, while on Adyen, Studio Noord's provider, the provider can retry a payment and Larkfield's renewal job owns the schedule, the membership state and the notice to Mila.\n\n**Disputed by:** The view that recovery is the provider's job: the renewal failed, the provider's retry feature (or a daily retry of the same charge) will collect it when it can, and the merchant needs only an 'unpaid' flag and a reminder email, not a record of a debt.\n\n**So what:** A team that accepts this classifies a decline before scheduling anything, keeps one record of the debt per billing period against which all attempts are counted, and gives the member a defined state while the debt is open. Larkfield saw what an undefined in-between state costs on 1 October 2026, when 7,900 renewals were delayed to the next day by a rate limit and dunning emails went to members who had done nothing wrong; Keel's K5 paces renewals over 18 hours and ties retries to decline codes.\n\n**How and why:** A merchant-initiated charge has no customer present, so nothing can be asked of Mila at the moment of decline: such payments fall outside strong customer authentication, with no challenge and no liability shift. What remains is the issuer's code. Visa's rules of 24 October 2026 sort codes into those a merchant must never resubmit and those it may reattempt, up to 20 times in 30 days (Adyen's page still says 15), charge fees for excess retries, and require written notice and at least 7 calendar days to pay by other means. Insufficient funds is a matter of timing; a reissued card is a credential problem that an account updater or a network token's lifecycle update solves and a retry does not. Stripe Billing, as documented in 2026, attaches retries to the invoice (by default up to 8 in 2 weeks, suspended on listed hard decline codes until a new payment method appears) and moves the subscription to past due and then to a configured end state. Adyen documents a payment-level retry feature, Auto Rescue, and no invoice or subscription object, so the scheduler and the debt are the integrator's. Neither company publishes the timing its retry model would choose for a given decline, so the walkthrough attributes the choice of 4 April to Larkfield's own schedule and to nothing inside a provider.\n\n**Supporting claims**\n\n- **C1** — A renewal with the customer absent replaces checkout, authentication and a first-time approval with a recorded debt, a flagged request and a decline code, and each step hands the next only a reference and its own result.\n- **C2** — The decline code decides whether a retry is allowed at all and the card network caps how many: Visa separates codes a merchant must never resubmit from codes it may reattempt up to 20 times in 30 days, and a credential problem is solved by an updater or a network token, not by a retry.\n- **C3** — Between the decline and the recovery the membership's state is held by a record of the period's debt on the billing side, against which every attempt is counted, because no payment record contains it.\n- **C4** — Where the debt lives depends on the provider: Stripe Billing retries an invoice it owns, while on Adyen the provider can retry a payment and the integrator owns the schedule, the membership state and the notice.\n- **C5** — When recovery fails, what the membership, the debt and the member's access become is a setting or a decision on the billing side, not something a payment record supplies.\n- **C6** — Neither company publishes how its retry timing is chosen beyond two example signals (Stripe) and the words 'smart logic' (Adyen), so the choice of the retry day in this walkthrough is Larkfield's own.\n\n## Role in the part\n\nFollows one renewal through decline, classification, notice, retry and recovery, and through the branch where it lapses, on Adyen with Larkfield's renewal job and on Stripe Billing; it shows the hand-off between the billing clock and the payment attempt, which Journey 1 did not have. Supports P9-2, P9-5 of part `part-9`.\n\n## Flow\n\n**Pattern:** `chronological` (also `comparison` in on-stripe-billing: the same steps read a second time with the debt on the provider's side; `large_to_small` in steps before charge, decide and recover: the whole path as one table before the three sections that walk it)\n\nA journey is read in the order the payment meets its steps: the scene on 1 April, the map of eleven steps, then the steps in three groups in date order. The Stripe Billing reading comes after the whole Adyen walk, because it re-reads rows the reader must already have seen once; putting it inline would interrupt every hand-off with a second vocabulary. The lapse branch comes last because it starts from the same steps and needs both providers' records to say how the debt ends; placed before the recovery it would describe an ending before the reader has seen what a kept debt looks like.\n\n## Introduction\n\n**Hook** (`puzzling_scenario`): On Thursday 1 April 2027 Larkfield's renewal job charges Mila Janssen's stored card €49.00 for her April membership at Studio Noord. Her bank refuses: not enough money in the account. Mila is not there; she does not see a screen, and no screen asks her anything. Three days later the money arrives. In between she walks into the studio and is let in. Which system decided that, and which decided to try again?\n\n**Bridge:** An engineer sees a declined charge as a failed request: log it, retry it on a timer, flag the account as unpaid until it goes through. → The decline is an instruction with a code, the retry is limited by the card network, and the member's state while the money is owed has to live in a record that no payment system keeps.\n\n**Thesis statement** (KEY POINTS bullets 1 and 3, and paragraph p02): A declined renewal is an open debt with a clock, not a failed payment: the decline code decides whether a retry is allowed, the card network caps how many, and the state of the membership in between has to be held by the billing side, which is Stripe's invoice on Stripe Billing and the merchant's own record on Adyen.\n\n**Roadmap** (IN THIS CHAPTER callout and paragraph p04):\n\n- Set the scene on 1 April 2027 and say what the same morning cost six months earlier. *Kept in:* scene.\n- Lay the renewal out as eleven steps in one table and one figure. *Kept in:* steps.\n- Walk the steps in three groups: the charge, the decision after the decline, the recovery on 4 April. *Kept in:* charge, decide, recover.\n- Read the same renewal on Stripe Billing and say where the public record stops. *Kept in:* on-stripe-billing.\n- Follow the branch where no retry succeeds and the membership lapses. *Kept in:* lapse.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p01 | context | At some hour on Thursday 1 April 2027 Mila's bank refuses a €49.00 charge that nobody is present to see, and the question of what happens next has no one at a checkout to answer it. | scenario: Mila's membership renewal: €49.00 monthly at Studio Noord, renewed on the 1st as a merchant-initiated card payment; on 1 April 2027 declined for insufficient funds; retried on 4 April and approved (ledger). |  |\n| p02 | claim | A declined renewal is an open debt with a clock, not a failed payment: the decline code decides whether a retry is allowed, the card network caps how many, and the membership's state in between is held on the billing side, in a different place on each provider. |  | `cause_effect`: The refusal that nobody saw. → The chapter's thesis: the decline is information, the debt stays open, and its holder differs by provider. |\n| p03 | context | Journey 1 followed a payment Mila started herself and that was approved the first time; this journey keeps the member and the stored card and removes both of those things, so a decline code, a schedule and a notice take the place of authentication and approval. | scenario: Journey 1 (journey-card-payment): Mila's €120.00 class pass of 9 March 2027, twelve steps, approved at 19:42 with Mila present. This journey: the €49.00 membership set up on 12 January 2027, charged on the 1st with Mila absent (ledger). | `contrast`: Journey 1's twelve steps on a payment that Mila started herself and that was approved the first time. → The same member and the same stored card with two things removed: Mila is not present when the charge is made, and the issuer says no. |\n| p04 | transition | The chapter sets the scene on 1 April, lays out the renewal as eleven steps, walks them in three groups (the charge, the decision after the decline, the recovery on 4 April), reads the same renewal on Stripe Billing, follows the branch where the money never comes, and ends with what to take away. |  | `sequence`: Where the journey sits. → The order of the sections. |\n\n## Sections\n\n### Setting the Scene at Larkfield: Thursday 1 April 2027\n\n**Controlling idea** (`context`, id `scene`): On 1 April 2027 Mila's renewal is one of hundreds of thousands that Larkfield's own renewal job sends, and six months earlier the same job had no defined state for a renewal that was owed and not yet paid.\n\n**Advances the thesis** (C1, C3): Shows the cost of an undefined in-between state before any step is walked, and poses the two questions the thesis answers.\n\n**Transition in:** `example`: The claim that a declined renewal is an open debt with a clock. → The day and the company on which the claim is walked.\n\n**Order of paragraphs** (`comparison`): The renewal of 1 April 2027 is set against the same job six months earlier, and the two questions come out of the difference; if the October case came first the reader would meet an incident before knowing whose renewal the chapter follows.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p05 | context | Mila's renewal belongs to the first-of-month wave that Larkfield's renewal job now spreads over 18 hours, and it is charged through Adyen because Studio Noord is on Adyen. | scenario: Ledger: the membership was set up on 12 January 2027 with a typed Visa debit card and a 3-D Secure challenge; about 940,000 renewals a month, 38% of them in the wave on the 1st; under K5 the job paces the wave over 18 hours; Studio Noord is on Adyen and its stored-card renewals stay with the provider that holds the card. |  |\n| p06 | cause_effect | Before Keel the same decline would have left Mila with nothing but an unpaid flag, and on 1 October 2026 that flag could not tell a declined card from a card nobody had charged yet. | case: The Renewal Wave of 1 October 2026: the job hit a provider rate limit, 7,900 renewals were delayed to the next day and dunning emails went to members who had done nothing wrong; before Keel the membership state was a paid/unpaid flag from the latest payment, with no record of the period's debt (ledger, additions of chapters 27 and 29). | `contrast`: The paced, recorded renewal of April 2027. → The same job six months earlier, with no record between 'due' and 'paid'. |\n| p07 | claim | Femke de Graaf reads the renewal as two questions: who decides whether and when to try again, and which system holds the membership until the money arrives. | scenario: Femke de Graaf, Head of Payments Engineering since January 2027, leads Keel; K5 ties retries to decline codes and the Keel period record holds the debt (ledger). | `cause_effect`: The October emails. → The two questions the incident leaves, which the walk answers. |\n\n### The Renewal in Eleven Steps\n\n**Controlling idea** (`description`, id `steps`): The renewal is eleven steps across four parties on two clocks, and each step hands the next a record that promises only what that step knows.\n\n**Advances the thesis** (C1): Gives the whole path at once, in the table Journey 1 introduced, so that each later section can lead with a hand-off and point to the chapter that owns the mechanism.\n\n**Transition in:** `elaboration`: Femke's two questions. → The complete path on which both are answered.\n\n**Order of paragraphs** (`prerequisite_order`): What differs from Journey 1 comes first because it tells the reader which rows of the table are new; the table comes before the figure because the figure draws the table's rows on a time axis and cannot be read without them.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p08 | comparison | Compared with Journey 1, the renewal has no checkout, no risk screen the member can see and no authentication, and it gains three steps that Journey 1 did not have: a classification, a held state and a notice. | reasoning: Journey 1's twelve steps (checkout, tokenization, risk scoring, authentication, authorization, capture, clearing, settlement, ledger entries, split, payout, reconciliation) set against this journey's eleven; the steps after an approval are Journey 1's and get one row here. |  |\n| p09 | description | The step table names, for each of the eleven steps, the party that acts, the record it produces, the promise that record makes and the failure that occurs where it is handed on. | table: Step table with the columns Step \\| Party or system \\| Message or record \\| Promise made \\| What can fail here → chapter. Rows: 1 period opens (period record open, €49.00); 2 attempt recorded (attempt row pending, key ending :2027-04:1); 3 request flagged and credential swapped (ContAuth, Subscription, network token); 4 issuer answers (Refused, reason 12, raw 51); 5 decline classified (Visa Category 2); 6 state held (record open, membership past_due with access); 7 member told (email); 8 second attempt (key ending :2027-04:2); 9 approval confirmed (Authorised, AUTHORISATION webhook); 10 debt closed (period record paid; €47.82 and €1.18 in the ledger); 11 money moves (Journey 1's later steps). | `elaboration`: The steps that are new. → All eleven in the table Journey 1 set up. |\n| p10 | explanation | Drawn over time, the renewal runs on two clocks: the debt for April is open for three days without a break, while the two payment attempts are events of a few seconds each. | figure: Sequence-style figure: lanes for the booking app, the payment service, the provider, the issuer and the member; attempt 1 on 1 April returning a decline, the email to the member, attempt 2 on 4 April returning an approval, with a bar for the open debt spanning the two dates. | `additional_support`: The table's rows. → The same rows on a time axis, where the gap between the attempts shows. |\n\n### From the Billing Clock to the Issuer: A Charge With Nobody Present\n\n**Controlling idea** (`process`, id `charge`): In steps 1 to 4 the billing clock hands a debt to the payment service, the payment service hands a flagged request to the provider, and the issuer hands back a refusal, each record carrying forward only a reference and its own result.\n\n**Advances the thesis** (C1): Walks the hand-offs that replace checkout and authentication, and shows that the refusal arrives with a code and nothing else.\n\n**Transition in:** `sequence`: The map of eleven steps. → The first four, from the clock to the refusal.\n\n**Order of paragraphs** (`chronological`): The steps in the order the renewal meets them on 1 April: the debt is recorded, the attempt is recorded, the request is flagged, the credential is swapped, the issuer answers. Each record is the input of the next, so no step can be explained before the one that hands to it.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p11 | process | The first hand-off is from the calendar to a record: before any charge is sent, the booking app writes that €49.00 is owed once for April 2027. | scenario: Keel period record (ledger, addition of chapter 27): one row per membership and billing period, written before the first attempt, with the amount due and a state of open, paid or void; chapter 29 adds uncollectible and one child row per attempt. |  |\n| p12 | process | The second hand-off turns the debt into a request that can be repeated safely: the payment service stores an attempt row and an idempotency key built from the membership, the period and the attempt number before it sends anything. | scenario: K1 (ledger, addition of chapter 18): keys of the form renewal:<membership id>:<billing period>:<attempt number>; the row is written with state pending before the first send; the Larkfield payment ID travels as Adyen's reference (addition of chapter 17). The Double Charge of 1 November 2026: 1,840 members charged twice after timeouts were retried under new keys. | `sequence`: The period record. → The attempt made against it, and what protects that attempt. |\n| p13 | explanation | The third hand-off tells the provider and the network that the merchant, not the cardholder, is asking, which removes the challenge and with it the liability shift. | fact: Adyen: a merchant-started charge on a stored token carries shopperInteraction ContAuth and a recurringProcessingModel such as Subscription. Stripe: an MIT is 'a transaction that you initiate without direct participation of your customer, based on a prior agreement with that customer authorizing you to store and use their credentials'; Stripe and the network classify it. Chapter 25: such payments fall outside strong customer authentication once the set-up was authenticated, with no challenge and no liability shift. | `sequence`: The stored attempt. → The label the request carries when it leaves Larkfield. |\n| p14 | explanation | On the way to the network Adyen swaps Larkfield's provider token for a network token, so the credential that reaches Mila's bank is the network's current one for her card. | fact: Adyen documentation: with tokens it manages, 'we automatically swap that for a network token'; 'if the shopper receives a new card because the old one expired or was lost, the network token remains the same.' Ledger (addition of chapter 23): Adyen has managed network tokens for Larkfield's stored cards since 2024 (illustration); Lotte Smit's renewal of 1 March 2027 was approved at the first attempt after her card was reissued. | `additional_support`: The flagged request. → The credential it carries by the time it reaches the network. |\n| p15 | description | The issuer's answer is a refusal with a code, and the provider passes it on as three separate facts: its own reason, the network's raw code and the retry rule that goes with the code. | fact: Ledger (addition of chapter 2): Visa response code 51 (Not sufficient funds), a Category 2 decline, reported by Adyen as refusal reason 12 'Not enough balance'. Adyen's refusal-reasons page lists reason 12; the raw response has to be enabled. | `cause_effect`: The request that reached the issuer. → What came back. |\n\n### The Decline as an Instruction: Classify, Hold the State, Tell the Member\n\n**Controlling idea** (`analysis`, id `decide`): In steps 5 to 7 the decline code decides whether a retry is allowed, the network's rule caps how many, Larkfield's schedule chooses the day, the period record holds Mila's membership meanwhile, and one written notice goes to her.\n\n**Advances the thesis** (C2, C3): Answers both of Femke's questions on the Adyen side: the code and the network decide whether, Larkfield's job decides when, and the billing record holds the state.\n\n**Transition in:** `cause_effect`: The refusal with code 51. → What Larkfield does with it before anything is sent again.\n\n**Order of paragraphs** (`prerequisite_order`): Whether a retry is allowed comes first, because the other steps depend on it; then the case where a retry cannot help; then who picks the day; then what the member is while she waits; then what she is told. The notice comes last because it reports the three decisions before it.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p16 | analysis | The code sorts the decline into one of three kinds (never retry, retry later, get a new credential), and Visa's rules attach a limit to the kinds that may be retried. | table: Three kinds of decline with what the job does: never (Visa Category 1, for example 41 lost card, 43 stolen card, 46 closed account: 'a Merchant must never resubmit an Authorization Request or Account Verification for the same Payment Credential'); timing (Category 2, for example 51 not sufficient funds: 'Reattempt permitted (up to 20 attempts in 30 days)'); credential (Category 3, for example 54 expired card: the same limit, after the data is corrected). Adyen's mapping page says 'up to 15 times in a 30-day period' and names an 'excessive retry fee'. 'Soft' and 'hard' decline are industry shorthand, not network terms. |  |\n| p17 | explanation | A decline that calls for a new credential is repaired by the network or by the member, not by a retry of the same details. | fact: Adyen's Real Time Account Updater: 'When you submit a payment that is refused, our Real Time Account Updater instantly checks for updated card details. If there is an update, we immediately retry the payment with the updated card details.' Stripe: it 'automatically attempts to update saved card details whenever a customer receives a new card', and 'It isn’t possible to identify cards that support automatic updates.' A network token stays valid through a reissue (chapter 23). | `contrast`: The decline that time can cure. → The decline that only a new credential can cure. |\n| p18 | explanation | Although a provider could run the schedule, the days of the next attempts (days 3, 7 and 12, inside a 14-day window) are chosen by Larkfield's own policy, so 4 April is Larkfield's choice and nothing inside a provider made it. | scenario: Larkfield's member-renewal collection policy (ledger, addition of chapter 29; illustrative): card soft decline, email on the first failure and retries on days 3, 7 and 12; the providers' scheduled retries (Smart Retries, Auto Rescue) are not used for member renewals; K5 ties the schedule to decline codes. | `sequence`: Whether a retry is allowed. → Who picks its day. |\n| p19 | claim | Between 1 and 4 April the only place that says what Mila is, is the period record: open, with one declined attempt, inside its retry window, which the booking app reads as past due with access. | scenario: Ledger (addition of chapter 27): a membership whose period record is open inside its retry window is past_due and keeps access; Mila can check in between 1 and 4 April 2027. The payment record store holds one row for the attempt, closed as declined (addition of chapter 8). | `cause_effect`: A retry scheduled three days out. → What the member is during those three days, and which record says so. |\n| p20 | explanation | Mila is told once, in writing, on the day of the decline, with the date of the next attempt and a way to pay otherwise, which is also what Visa's rule for a declined merchant-initiated charge asks for. | quotation: Visa Core Rules, stored-credential requirements: 'If an Authorization Request for a Merchant-initiated Transaction with a Stored Credential is declined, the Merchant must notify the Cardholder in writing and allow the Cardholder at least 7 calendar days to pay by other means.' Ledger (additions of chapters 2 and 29): Larkfield emails Mila the same day; a failure message is sent only for a declined attempt row on an open record. | `sequence`: The state held for the member. → What she is told about it. |\n\n### Sunday 4 April: A Second Attempt, Not a Retried Payment\n\n**Controlling idea** (`process`, id `recover`): In steps 8 to 11 a new payment with its own key is approved, a webhook confirms it, and the period record, not the payment of 1 April, becomes paid; the money then follows Journey 1's path.\n\n**Advances the thesis** (C3): Shows the recovery as a second payment closing the same debt, and the debt record as the one place where 'April is paid once' is enforced.\n\n**Transition in:** `time`: The schedule, the held state and the notice. → Day 3, when the schedule fires.\n\n**Order of paragraphs** (`chronological`): The attempt, its confirmation, the closing of the debt and where the money goes next, then the two ways the closing hand-off breaks; the failures come last because each is a failure of a step the reader must first have seen work.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p21 | explanation | The attempt of 4 April is a new business event with a new key, because under the old key Adyen would have answered with the refusal of 1 April without asking the bank again. | fact: Adyen: 'If the Adyen payments platform already processed the request, the response to the first attempt will be returned without duplication', and keys 'are valid for a period of 7 to 14 days after first submission.' Ledger (K1; additions of chapters 2 and 18): the first attempt's key ends in :2027-04:1, the second in :2027-04:2; chapter 18 reads Adyen's sentence as including a refusal. |  |\n| p22 | process | The approval reaches Larkfield twice, as a result code and as a webhook, and the payment record moves to paid on the webhook. | scenario: Ledger (addition of chapter 8): on Adyen with automatic capture a row becomes paid on the AUTHORISATION webhook with success true; paid means the provider has confirmed the capture, never settled. Adyen's Checkout API has no endpoint that returns a payment by its identifier (ruling 12), so the confirming record is the webhook and later the settlement report (K2). | `sequence`: The second request. → Its answer and the record that confirms it. |\n| p23 | explanation | The successful payment closes the debt for the period that began on 1 April: the period record becomes paid, the membership becomes active, the next renewal stays on 1 May, and the ledger gets €47.82 for the studio and €1.18 for Larkfield. | statistic: Ledger: Larkfield's fee on an online card payment is 1.9% + €0.25, so on €49.00 it is €1.18 and the studio receives €47.82 (the same figures as Lotte Smit's renewal, addition of chapter 23). K3: every movement is a ledger entry. The €49 collected on 4 April pays for the period that began on 1 April (journal-spec entry). | `cause_effect`: The confirmed payment. → Its effect on the debt, the membership and the books. |\n| p25 | explanation | From here the €49.00 follows Journey 1's rows for clearing, settlement, payout and reconciliation, and it stays open to a dispute until about 2 August 2027, with no liability shift to protect the studio. | scenario: Studio Noord's Adyen account pays out two business days after the sales day (ledger, addition of chapter 3), so a Sunday 4 April sale is in the payout of Tuesday 6 April (illustration). The basic card dispute window is about 120 days (4 April + 120 days = 2 August 2027; the author's arithmetic). Chapter 25's loss table: renewals are merchant-initiated and the studio carries a fraud dispute. | `sequence`: The debt closed and the ledger entries. → What happens to the money next, on a path the reader already knows. |\n| p24 | analysis | Two things can break this hand-off: the member pays through the link while the scheduled attempt is in flight, or the webhook never arrives. | reasoning: Chapter 29: the guard belongs on the debt record, which accepts one successful attempt and refunds a second. K2: a job sweeps everything still pending; on Adyen the sweep waits for the webhook and, failing that, the settlement report. | `contrast`: The recovery that worked, followed to the payout. → The two ways the closing hand-off fails. |\n\n### The Same Renewal on Stripe Billing: An Invoice the Provider Owns\n\n**Controlling idea** (`comparison`, id `on-stripe-billing`): On Stripe Billing the debt is an invoice Stripe holds and retries, while on Adyen the provider can retry a payment and the debt stays with the merchant; each company has one blog post on its retry model (2024, 2020) and neither documents the model now running.\n\n**Advances the thesis** (C4, C6): Reads the same eleven steps a second time with the debt on the provider's side, sets the three arrangements side by side, and marks where the public record ends.\n\n**Transition in:** `contrast`: The renewal on Adyen with Larkfield's own job, where every record of the debt is Larkfield's. → The same renewal where the provider holds the debt.\n\n**Order of paragraphs** (`comparison`): Stripe Billing's records for the decline, then its retries, then Adyen's own retry feature, so that all three arrangements have been met before the table sets them side by side; the limit of what either company publishes comes last because it applies to both provider-run schedules and would undercut the descriptions if it came first.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p26 | explanation | Had Mila's membership been a Stripe Billing subscription, the debt for April would have been an invoice in Stripe, and the decline would have left that invoice open and the subscription past due. | fact: Stripe: 'Stripe generates an invoice for every subscription billing period' (chapter 27); 'a failed renewal payment makes the subscription past_due'; a card error leaves the PaymentIntent requires_payment_method and the invoice open; the invoice.payment_failed event carries attempt_count and the invoice carries next_payment_attempt. Larkfield uses Stripe Billing for its own studio plans, not for member renewals (ledger). |  |\n| p27 | explanation | Stripe's retries run against the invoice, so a new card saved in the right place pays the same debt, and a listed hard decline suspends the retries until a new payment method appears. | quotation: Stripe: 'For new Stripe accounts, Stripe enables Smart Retries by default and configures it for up to 8 retries within 2 weeks.' Hard decline codes include lost_card, stolen_card, pickup_card and incorrect_number; 'Retries continue to be scheduled, and attempt_count continues to increment, but retries only execute after detecting a new payment method.' Failed-payment emails 'include a link to a page where the customer can update their payment method'. insufficient_funds is not on the hard-decline list. | `sequence`: The open invoice. → What Stripe then does with it. |\n| p29 | explanation | Adyen has a retry feature of its own, Auto Rescue, which retries a refused payment inside a window and reports by webhook against a reference the merchant supplies, so the merchant still holds the debt and must cancel the rescue when the debt is settled another way. | quotation: Adyen: Auto Rescue 'automatically retries refused or charged back shopper-not-present transactions such as subscription renewals' (n.d., accessed November 2026); at account level 'a rescue window of one calendar month is used', per payment 'between 1 and 48 days'; merchantOrderReference 'should represent a specific billing cycle or subscription'; retry.rescueReference can be used to cancel 'if, for example, the shopper provides you with a new payment details, or cancels their subscription'. | `contrast`: Stripe's retries of an invoice it holds. → Adyen's provider-run retry, which retries a payment. |\n| p28 | comparison | Set side by side, the three arrangements differ in who holds the debt, who schedules, what is retried and what the integrator must build. | table: Comparison table with columns: Question \\| Adyen with your own renewal job (Larkfield) \\| Adyen with Auto Rescue \\| Stripe Billing. Rows: what records that €49 is still owed; what the member's state is read from; who schedules the next attempt; what is retried; what ties an attempt to the period; who tells the member; what you build. | `conclusion_summary`: Larkfield's own job, Stripe Billing and Auto Rescue, each now described. → All three arrangements in one table. |\n| p30 | evidence | The public record stops at the timing: Stripe names two example signals, Adyen says 'smart logic' and 'optimal times', each has one blog post on its model (Stripe, 23 January 2024: 'more than 500 attributes'; Adyen, 3 December 2020: a contextual bandit, 'about 6% more orders than the baseline' in one experiment), and neither documents the model now running or a recovery rate with a stated basis. | quotation: Stripe's two example signals: 'The number of different devices that have presented a given payment method in the last N hours' and 'The best time to pay (payments made for debit cards in certain countries might be slightly more successful at 12:01 am in local time zones)'. Adyen: 'It uses smart logic to decide which payments can succeed when retried later, and performs these retries at optimal times' (n.d., accessed November 2026). Adyen's knowledge-hub guide of 16 June 2026 gives one customer's Auto Rescue recovery figure with no baseline (ruling 37); documentation pages are not dated from their front matter (ruling 30). | `contrast`: What each arrangement leaves to a provider's schedule. → What neither provider documents about that schedule. |\n\n### The Branch Where the Money Never Comes\n\n**Controlling idea** (`analysis`, id `lapse`): When every retry fails, the membership, the debt and the member's access each need an end, and each end is a rule on the billing side or a provider setting, because the last record a payment system holds is a declined attempt.\n\n**Advances the thesis** (C5): Follows the same debt to the end of its clock and shows that nothing in the payment records says how it ends.\n\n**Transition in:** `contrast`: The renewal that came back on day 3. → The same renewal when no attempt succeeds.\n\n**Order of paragraphs** (`chronological`): The failed attempts in date order to the end of the window, then the three decisions that the end forces, then how each is made on the two providers. The decisions cannot be named before the reader has seen the window run out, and the Stripe settings are read against the three decisions, not the other way round.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p31 | example | Replayed with every attempt refused, Mila's renewal is four attempts in thirteen days, a pause on day 14 and an ended membership on day 30. | table: Timeline under Larkfield's policy (ledger, addition of chapter 29; illustrative): 1 April attempt 1; 4 April attempt 2 (day 3); 8 April attempt 3 (day 7); 13 April attempt 4 (day 12); 15 April (day 14) membership paused, period record still open; 1 May (day 30) period record marked uncollectible, membership ended. Four attempts, against Visa's limit of 20 in 30 days. |  |\n| p32 | analysis | The end of the window forces three decisions (what the membership becomes, whether the €49.00 stays owed, and from which day Mila loses access), and on an Adyen integration all three are the platform's own rules in its own records. | reasoning: At the end of the branch the payment record store holds four attempt rows closed as declined; Adyen's documentation describes no invoice or subscription object (chapter 27). Larkfield's answers: paused on day 14, uncollectible and ended on day 30, access kept for 14 days. | `cause_effect`: The last failed attempt. → The three things that now have to be decided, and who decides them on Adyen. |\n| p33 | comparison | On Stripe Billing the same three decisions are account settings: the subscription is canceled, marked unpaid, left past due or paused, and the invoice stays open or is marked uncollectible. | quotation: Stripe: 'If recovery fails, the subscription transitions according to your settings', with the options cancel, mark as unpaid, leave past-due, pause; 'An invoice that Stripe marks uncollectible after ending payment retries remains outstanding'; 'Revoke access to your product when the subscription is unpaid'. Access is the integrator's code in every case. | `contrast`: Three rules in the platform's own records. → The same three as settings in the provider. |\n\n## Conclusion: What to Take Away\n\n**Synthesis:** Across the eleven steps and the lapse branch, every record a payment system produced was finished within seconds: a refusal, a refusal, an approval. What lasted for three days, or thirty, was the record of April's debt, and each hand-off worked because the next step read that record and not the last payment's result.\n\n**So what:** A team that treats a decline as a failed request builds a loop; a team that treats it as an open debt builds a record with a state, a clock and an end, classifies before it schedules, and can say for each provider who holds 'still owed'.\n\n**Callback:** The refusal of 1 April that nobody was present to see. The reader can now say who was present: the period record, which held Mila's membership while no payment record held anything.\n\n**Takeaway** (`course_of_action`): Classify the decline before scheduling anything; keep one record of the debt per billing period and count every attempt against it; give the member a defined state with a defined end; and name, per provider, the system that holds the debt.\n\n**Hand-off** to [Journey 3: One Payment, Three Parties, and a Refund After Payout](journey-platform-payment.html): `elaboration`: From this journey, the lesson that a payment's state can stay open after the first answer; from Journey 1, the pass of 9 March with its split and payout. → The third party in every Larkfield payment, seen from the platform's side: the split and the studio's balance, and then money that goes backward, an €84 refund a week after the payout.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p34 | synthesis (list) | Established: Visa's rules sort declines into never-resubmit and reattempt-within-a-limit and require written notice after a declined merchant-initiated charge; Stripe Billing retries an invoice it holds; Adyen documents a payment-level retry and no invoice or subscription object. |  |  |\n| p35 | synthesis (list) | Depends on context: who should schedule retries, how long the window should be, and whether the member keeps access while the debt is open. |  | `contrast`: What the rules and the documentation fix. → What changes with where the debt lives and what access costs. |\n| p36 | recommendation (list) | The author's synthesis: the renewal went wrong or right at the record between the billing clock and the payment attempt, so that record is the first thing I would build and the first I would review. |  | `conclusion_summary`: The settled and the conditional. → The author's own position. |\n| p37 | recommendation (list) | Six questions let a reader walk their own failed renewal through the same hand-offs. |  | `elaboration`: The author's position. → Questions that test a reader's own system against it. |\n| p38 | transition | This journey had two parties to the money and none of it went backward; the next takes Mila's class pass, adds the platform as a third party and reverses part of the payment after the studio has been paid. |  | `sequence`: A payment whose state stayed open after the first answer. → The next journey: three parties and a refund after payout. |\n\n## Non-goals\n\n- How authorization, response codes and validity windows work. See [The First Promise: Authorization](payment-authorization.html).\n- Approval-rate counting, provider optimization inside the call and how to test a retry schedule. See [Raising the Approval Rate: Retries, Tokens and Optimization](authorization-optimization.html).\n- Idempotency keys, retention windows and unknown outcomes. See [Exactly Once, Over a Network That Does Not Allow It: Idempotency and Retries](idempotency-and-retries.html).\n- Network tokens, token requestors, fees and portability. See [The Card Number's Replacement: Network Tokens and Credential Lifecycle](network-tokens.html).\n- The billing engine, proration, billing modes and who holds the invoice as a mechanism (ruling 6). See [Charging Again and Again: Subscriptions and the Billing Engine](subscriptions-and-billing-engines.html).\n- Invoice states, credit notes, direct debit dunning and cash application. See [From Invoice to Cash: Invoicing, Collections and Dunning](invoicing-collections-and-dunning.html).\n- Strong customer authentication and liability shift. See [Proving It Is You: 3-D Secure and Strong Customer Authentication](three-d-secure-and-sca.html).\n- Clearing, settlement, payout and reconciliation of the recovered payment. See [Journey 1: Mila's Class Pass, From Tap to Settled](journey-card-payment.html), [The Slow Truth: Capture, Clearing and Settlement](clearing-and-settlement.html).\n- Revenue recognition of the membership fee. See [Cash Is Not Revenue: Revenue Recognition and the Hand-off to Finance](billing-revenue-recognition.html).\n- A 'Stripe and Adyen: Where They Differ' section: journeys show both providers inline (style guide).\n\n## Modalities\n\nArticle only.\n\n## Open questions\n\n- Journey 1 (journey-card-payment) was not yet written when this page was drafted; references to its twelve steps and its table follow the journal spec and should be checked against the page once it exists.\n- Mastercard's rules for declined merchant-initiated charges were not readable (ruling 17); the notice rule and the reattempt limit are cited for Visa only.\n- Whether Adyen's idempotency layer replays a refusal as 'the response to the first attempt' is chapter 18's reading of the documentation, not a tested fact.\n\n## Decision log\n\n- **2026-11-17** — The Stripe side is shown as the same membership had it been a Stripe Billing subscription, in its own section after the Adyen walk, because Larkfield's member renewals run on its own job on both providers (ledger) and the journal spec's role names 'on Stripe Billing'. Rejected: A second full step table for Stripe; Using a studio's €89 plan as the Stripe example (a different payer and seller)\n- **2026-11-17** — The steps after the approval (capture, clearing, settlement, payout, reconciliation) get one row and one paragraph that point to Journey 1. Rejected: Repeating Journey 1's rows 6 to 12\n- **2026-11-17** — A short Questions to Ask list is kept in the conclusion, as in the chapters, because the intent's can_do items are review tasks. Rejected: Ending on the three tiers only\n- **2026-11-17** — The public-record limit (retry timing) is one paragraph at the end of the provider comparison, not a section. Rejected: A separate 'Where the evidence stops' section\n\n## Sources\n\n- **Internal**\n  - PLAN.md — The chapter contract for folder 43.\n  - journal-spec.json — Intent, acceptance criteria, thesis, role and transition, copied unchanged; the neighbours' entries.\n  - _research/scenario-ledger.md — Mila's renewal, K1, K2, K3, K5, the period record, the collection policy, fees.\n  - _research/consistency-issues.md — Rulings 6, 10, 12, 13, 15, 17, 19, 22.\n  - posts/02-authorization, 09-authorization-optimization, 18-idempotency-and-retries, 23-network-tokens, 27-subscriptions-and-billing-engines, 29-invoicing-collections-and-dunning (index.md) — The mechanisms this journey walks through and their provider facts.\n- **External**\n  - Visa Core Rules and Visa Product and Service Rules, 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf — Table 7-2 (decline categories, reattempt limit) and the stored-credential notice rule; re-read 17 November 2026.\n  - Stripe documentation, Automate payment retries, https://docs.stripe.com/billing/revenue-recovery/smart-retries (n.d., accessed November 2026) — Smart Retries default, hard decline codes, end states; re-fetched 17 November 2026.\n  - Stripe documentation, How subscriptions work, https://docs.stripe.com/billing/subscriptions/overview (n.d., accessed November 2026) — past_due, unpaid, uncollectible invoices; re-fetched 17 November 2026.\n  - Adyen documentation, Auto Rescue for card payments, https://docs.adyen.com/online-payments/auto-rescue/cards (n.d., accessed November 2026) — Auto Rescue enablement, window, references, cancellation; re-fetched 17 November 2026.\n  - Adyen documentation, Mapping to Visa system integrity fee categories, https://docs.adyen.com/development-resources/raw-acquirer-responses/visa-integrity-fees (n.d., accessed November 2026) — Adyen's '15 times' statement and the excessive retry fee.\n  - Adyen documentation, Real Time Account Updater, https://docs.adyen.com/online-payments/account-updater/real-time-account-updater (n.d., accessed November 2026) — The update and retry inside a refused payment.\n\n## Changelog\n\n- **2026-11-17** — Verification pass: 43 claims checked (32 confirmed, 9 corrected, 2 hedged, 0 unsupported and removed or relabeled, 0 unreachable; Mastercard's rules not re-fetched and not cited); every date taken from Adyen documentation front matter (“last modified” 2019, 2020, 2023, 2026) and the evidence-age flags built on them were removed under ruling 30, and the claim that neither provider publishes a recovery rate was corrected under ruling 37 (Adyen's one-customer Auto Rescue figure of 16 June 2026). Evidence and source fields updated to match; no unit added, dropped or reordered. Copied intent fields left for the author.\n- **2026-11-17** — Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes).\n- **2026-11-17** — After the flow rubric: Auto Rescue (p29) moved before the comparison table (p28); the payout and dispute-window paragraph (p25) moved before the failures (p24); p18 names the full schedule and the provider-run option; section flow patterns for scene and steps corrected; rationales say what would break.\n- **2026-11-17** — First version, written from PLAN.md, the journal spec, the ledger and the six chapters this journey walks through.\n- **2026-11-17** — Reconciliation after verification (parts-9-10): intent, thesis and role re-synced with the corrected journal-spec entry. No unit added, dropped, merged or reordered.\n- **2026-11-17** — Absence audit: statements of absence re-tested with a wide search (docs.adyen.com and help.adyen.com sitemaps, adyen.com, Orb documentation). Narrowed: 'Orb is not documented as part of Adyen's platform' (Orb's documentation has a page on Adyen as a payment gateway; Adyen's documentation has no page on Orb; ruling 39b). Holds: no invoice or subscription object in Adyen's documentation. One source added; units unchanged.\n- **2026-11-17** — Part VI audit applied: 'neither publishes a model or its inputs' narrowed in the key point and the provider-comparison paragraph to match chapter 29 (Stripe blog post on Smart Retries, 23 January 2024; Adyen post on Auto Rescue's contextual bandit, 3 December 2020, with evidence-age flag); what remains unpublished is the model now running and a recovery rate with a stated basis. Two sources reused from chapter 29. The locked sentences intent.know[…] and thesis supporting claim ('neither company publishes how its retry timing is chosen beyond two example signals … and the words smart logic') are now too strong and were reported, not edited.\n- **2026-11-17** — Journal-spec entry corrected after verification; intent, thesis and role re-synced ('neither company publishes how its retry timing is chosen bey' -> 'each company has described its retry model once (Stripe in a').\n- **2026-11-17** — Journal-spec entry corrected after verification; intent, thesis and role re-synced ('Neither company publishes how its retry timing is chosen, so' -> 'Neither company publishes the timing its retry model would c').\n- **2026-11-17** — Visual layer: 3 figures generated and inspected (article-illustrator).\n"}]}]}</script>
+<script>
+    (function () {
+        const data = JSON.parse(document.getElementById('data').textContent);
+        const root = document.getElementById('content');
+
+        const postId = (data.meta && data.meta.id) ? String(data.meta.id) : '';
+        const postStatusRaw = (data.meta && data.meta.status) ? String(data.meta.status) : '';
+        if (postId || postStatusRaw) {
+            const header = document.getElementById('post-header');
+            let sectionEl = header.querySelector('p.section');
+            if (!sectionEl) {
+                sectionEl = document.createElement('p');
+                sectionEl.className = 'section';
+                header.insertBefore(sectionEl, header.firstChild);
+            }
+            // Status pill goes first, then a " / " separator before the existing
+            // content (section name and/or id).
+            if (postStatusRaw) {
+                const parts = postStatusRaw.split(':');
+                const statusName = parts[0].trim();
+                const statusColor = (parts[1] || '').trim();
+                const wrap = document.createElement('span');
+                wrap.className = 'post-status';
+                const dot = document.createElement('span');
+                dot.className = 'status-dot';
+                if (statusColor) dot.style.background = statusColor;
+                wrap.appendChild(dot);
+                wrap.appendChild(document.createTextNode(statusName));
+                if (sectionEl.firstChild) {
+                    sectionEl.insertBefore(document.createTextNode(' • '), sectionEl.firstChild);
+                    sectionEl.insertBefore(wrap, sectionEl.firstChild);
+                } else {
+                    sectionEl.appendChild(wrap);
+                }
+            }
+            if (postId) {
+                if (sectionEl.firstChild) sectionEl.appendChild(document.createTextNode(' • '));
+                sectionEl.appendChild(document.createTextNode(postId));
+            }
+        }
+
+        const tagsHost = document.getElementById('tags');
+        (data.tags || []).forEach(function (t) {
+            const span = document.createElement('span');
+            span.className = 'tag';
+            span.textContent = t;
+            tagsHost.appendChild(span);
+        });
+
+        // Minimal markdown renderer. Supports: ATX headings, paragraphs, blockquotes,
+        // unordered/ordered lists, fenced code, inline code, bold/italic/strikethrough, links, images, hr.
+        // Sufficient for the posts in this repo; replace with a fuller parser if needed.
+        function renderMarkdown(src) {
+            const lines = src.replace(/\r\n/g, '\n').split('\n');
+            const out = [];
+            let i = 0;
+
+            const bullet = /^(\s*)([-*])\s+(.*)$/;
+            const ordered = /^(\s*)(\d+)\.\s+(.*)$/;
+            const tableRow = /^\s*\|(.+)\|\s*$/;
+            const tableSep = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+
+            function splitRow(s) {
+                let t = s.trim();
+                if (t.startsWith('|')) t = t.slice(1);
+                if (t.endsWith('|')) t = t.slice(0, -1);
+                return t.split('|').map(c => c.trim());
+            }
+
+            function inline(s) {
+                // Posts are trusted content, so raw HTML passes through unescaped
+                // (some posts embed inline <blockquote>, <div>, etc.).
+                // Stray ampersands still get fixed up.
+                s = s.replace(/&(?![a-zA-Z]+;|#\d+;)/g, '&amp;');
+                s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<a class="image-link" href="$2" target="_blank" rel="noopener noreferrer"><img alt="$1" src="$2"></a>');
+                s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+                s = s.replace(/`([^`]+)`/g, function (_, c) {
+                    return '<code>' + c.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
+                });
+                // Bold/italic, including nested combinations: ***x***,
+                // **a *b*** / ***a* b** (shared delimiters), and **a *b* c**.
+                s = s.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+                s = s.replace(/\*\*([^*\n]+)\*([^*\n]+)\*\*\*/g, '<strong>$1<em>$2</em></strong>');
+                s = s.replace(/\*\*\*([^*\n]+)\*([^*\n]+)\*\*/g, '<strong><em>$1</em>$2</strong>');
+                s = s.replace(/\*\*((?:[^*\n]|\*(?!\*)[^*\n]+\*(?!\*))+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+                s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+                return s;
+            }
+
+            while (i < lines.length) {
+                const line = lines[i];
+                if (!line.trim()) {
+                    i++;
+                    continue;
+                }
+
+                const fence = line.match(/^```(\w*)\s*$/);
+                if (fence) {
+                    i++;
+                    const buf = [];
+                    while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+                        buf.push(lines[i]);
+                        i++;
+                    }
+                    i++;
+                    const escaped = buf.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const cls = fence[1] ? ' class="lang-' + fence[1] + '"' : '';
+                    out.push('<pre><code' + cls + '>' + escaped + '</code></pre>');
+                    continue;
+                }
+
+                const h = line.match(/^(#{1,6})\s+(.*)$/);
+                if (h) {
+                    out.push('<h' + h[1].length + '>' + inline(h[2]) + '</h' + h[1].length + '>');
+                    i++;
+                    continue;
+                }
+
+                if (/^\s*(?:-\s*){3,}\s*$/.test(line) || /^\s*\*{3,}\s*$/.test(line)) {
+                    out.push('<hr>');
+                    i++;
+                    continue;
+                }
+
+                if (/^>\s?/.test(line)) {
+                    const buf = [];
+                    while (i < lines.length && /^>\s?/.test(lines[i])) {
+                        buf.push(lines[i].replace(/^>\s?/, ''));
+                        i++;
+                    }
+                    out.push('<blockquote>' + renderMarkdown(buf.join('\n')) + '</blockquote>');
+                    continue;
+                }
+
+                if (tableRow.test(line) && i + 1 < lines.length && tableSep.test(lines[i + 1])) {
+                    const headers = splitRow(line);
+                    const aligns = splitRow(lines[i + 1]).map(function (c) {
+                        c = c.trim();
+                        const left = c.startsWith(':'), right = c.endsWith(':');
+                        return left && right ? 'center' : right ? 'num' : '';
+                    });
+                    const cellOpen = function (tag, idx) {
+                        return aligns[idx] ? '<' + tag + ' class="' + aligns[idx] + '">' : '<' + tag + '>';
+                    };
+                    i += 2;
+                    const rows = [];
+                    while (i < lines.length && tableRow.test(lines[i])) {
+                        rows.push(splitRow(lines[i]));
+                        i++;
+                    }
+                    let html = '<div class="table-wrap"><table><thead><tr>';
+                    headers.forEach((h, idx) => {
+                        html += cellOpen('th', idx) + inline(h) + '</th>';
+                    });
+                    html += '</tr></thead><tbody>';
+                    rows.forEach(r => {
+                        html += '<tr>';
+                        r.forEach((c, idx) => {
+                            html += cellOpen('td', idx) + inline(c) + '</td>';
+                        });
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                    out.push(html);
+                    continue;
+                }
+
+                if (bullet.test(line) || ordered.test(line)) {
+                    // Indent of the first bullet defines this list's base level.
+                    // Deeper-indented bullets become nested lists (rendered by
+                    // recursing into renderMarkdown). Same-or-less indent at a
+                    // bullet starts a sibling item (or ends the list).
+                    const firstMatch = line.match(bullet) || line.match(ordered);
+                    const baseIndent = firstMatch[1].length;
+                    const isOrdered = ordered.test(line);
+                    const items = [];
+                    let hasTask = false;
+                    while (i < lines.length) {
+                        const cur = lines[i];
+                        if (!cur.trim()) {
+                            // blank line breaks the list (matches CommonMark-ish behaviour)
+                            i++;
+                            break;
+                        }
+                        const mBul = cur.match(bullet);
+                        const mOrd = cur.match(ordered);
+                        const m = mBul || mOrd;
+                        if (!m) break;
+                        if (m[1].length < baseIndent) break;
+                        if (m[1].length > baseIndent) break; // shouldn't happen at top of loop
+                        // Same-type check: switching between -/* and 1. closes the list
+                        if (isOrdered !== !!mOrd) break;
+
+                        const itemBuf = [m[3]];
+                        const nestedBuf = [];
+                        i++;
+                        while (i < lines.length) {
+                            const nxt = lines[i];
+                            if (!nxt.trim()) break;
+                            const nBul = nxt.match(bullet);
+                            const nOrd = nxt.match(ordered);
+                            const nm = nBul || nOrd;
+                            if (nm) {
+                                if (nm[1].length > baseIndent) {
+                                    // nested list line — dedent and stash
+                                    nestedBuf.push(nxt.slice(baseIndent + 2));
+                                    i++;
+                                    continue;
+                                }
+                                // sibling or end of list
+                                break;
+                            }
+                            // Plain continuation text
+                            if (nestedBuf.length) {
+                                // continuation inside the nested block
+                                nestedBuf.push(nxt.slice(baseIndent + 2));
+                            } else {
+                                itemBuf.push(nxt.trim());
+                            }
+                            i++;
+                        }
+
+                        // GitHub-style task items: "- [ ] text" / "- [x] text"
+                        // render as (clickable, unpersisted) checkboxes.
+                        const itemText = itemBuf.join('\n');
+                        const task = !isOrdered && itemText.match(/^\[( |x|X)\]\s+/);
+                        let liHtml = inline(task ? itemText.slice(task[0].length) : itemText);
+                        if (task) {
+                            hasTask = true;
+                            liHtml = '<input type="checkbox"' + (task[1] === ' ' ? '' : ' checked') + '>' + liHtml;
+                        }
+                        if (nestedBuf.length) {
+                            liHtml += renderMarkdown(nestedBuf.join('\n'));
+                        }
+                        items.push(task ? '<li class="task">' + liHtml + '</li>' : '<li>' + liHtml + '</li>');
+                    }
+                    out.push((isOrdered ? '<ol>' : (hasTask ? '<ul class="task-list">' : '<ul>')) + items.join('') + (isOrdered ? '</ol>' : '</ul>'));
+                    continue;
+                }
+
+                const buf = [line];
+                i++;
+                while (i < lines.length && lines[i].trim() && !/^#{1,6}\s/.test(lines[i]) && !/^>\s?/.test(lines[i]) && !bullet.test(lines[i]) && !ordered.test(lines[i]) && !/^```/.test(lines[i]) && !tableRow.test(lines[i])) {
+                    buf.push(lines[i]);
+                    i++;
+                }
+                out.push('<p>' + inline(buf.join(' ')) + '</p>');
+            }
+            return out.join('\n');
+        }
+
+        // Block dispatcher. New block types plug in here.
+        const renderers = {
+            markdown: function (block) {
+                const div = document.createElement('div');
+                div.innerHTML = renderMarkdown(block.content);
+                return div;
+            },
+            mermaid: function (block) {
+                // Mermaid scans elements with class "mermaid" whose textContent
+                // is the diagram source. We collect these nodes and run
+                // mermaid.run() once after all blocks are in the DOM.
+                const div = document.createElement('div');
+                div.className = 'mermaid';
+                div.textContent = block.content;
+                return div;
+            },
+            'force-graph': function (block) {
+                // build.py emits parsed JSON: {nodes:[{id,size}], links:[{source,target}]}.
+                // We instantiate force-graph after the container is in the DOM
+                // so it can measure its own width.
+                const div = document.createElement('div');
+                div.className = 'force-graph';
+                const data = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.ForceGraph) return;
+                    const maxSize = data.nodes.reduce((m, n) => Math.max(m, n.size || 1), 1);
+                    window.ForceGraph()(div)
+                        .graphData(data)
+                        .width(div.clientWidth)
+                        .height(div.clientHeight)
+                        .nodeRelSize(4)
+                        .nodeVal(n => Math.max(20 * (n.size || 1) / maxSize, 0.001))
+                        .nodeLabel(n => n.id + ' (' + (n.size || 1) + ')')
+                        .nodeColor(() => 'rgba(135, 206, 235, 0.7)')
+                        .linkColor(() => 'rgba(60, 60, 60, 0.4)')
+                        .linkDirectionalArrowLength(4)
+                        .linkDirectionalArrowRelPos(1)
+                        .linkWidth(1);
+                });
+                return div;
+            },
+            'bubble-chart': function (block) {
+                // build.py emits {nodes:[{name,size}]}. Renders a D3 circle-pack
+                // SVG (same shape as the obren.io reference, just inline).
+                const wrap = document.createElement('div');
+                wrap.className = 'bubble-chart';
+                const payload = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.d3) return;
+                    const diameter = 480;
+                    const fill = '#c0deed';
+                    const textColor = '#111111';
+                    const fontSize = 12;
+
+                    const svg = window.d3.select(wrap).append('svg')
+                        .attr('viewBox', '0 0 ' + diameter + ' ' + diameter)
+                        .attr('width', diameter)
+                        .attr('height', diameter);
+
+                    const root = window.d3.hierarchy({children: payload.nodes})
+                        .sum(d => d.size || 0)
+                        .sort((a, b) => b.value - a.value);
+
+                    window.d3.pack().size([diameter, diameter]).padding(2)(root);
+
+                    const node = svg.selectAll('g')
+                        .data(root.leaves())
+                        .enter().append('g')
+                        .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+
+                    node.append('title').text(d => d.data.name + ': ' + d.value);
+                    node.append('circle').attr('r', d => d.r).style('fill', fill);
+                    node.append('text')
+                        .attr('dy', '.3em')
+                        .style('text-anchor', 'middle')
+                        .style('fill', textColor)
+                        .style('font-size', fontSize + 'px')
+                        .text(d => d.data.name.substring(0, Math.max(0, Math.floor(d.r / 3))));
+                });
+                return wrap;
+            }
+        };
+
+        // Render one modality's blocks into a host element. Mermaid runs
+        // scoped to just the nodes created here, so lazily rendered tabs get
+        // their diagrams on first activation.
+        let mermaidInitialized = false;
+        function renderBlocksInto(blocks, host) {
+            const mermaidNodes = [];
+            blocks.forEach(function (block) {
+                const r = renderers[block.type];
+                if (!r) {
+                    const pre = document.createElement('pre');
+                    pre.textContent = '[unknown block type: ' + block.type + ']';
+                    host.appendChild(pre);
+                    return;
+                }
+                const node = r(block);
+                if (node instanceof Node) {
+                    host.appendChild(node);
+                    if (block.type === 'mermaid') mermaidNodes.push(node);
+                }
+            });
+            if (mermaidNodes.length && window.mermaid) {
+                if (!mermaidInitialized) {
+                    window.mermaid.initialize({startOnLoad: false, theme: 'default'});
+                    mermaidInitialized = true;
+                }
+                window.mermaid.run({nodes: mermaidNodes});
+            }
+            markScrollableTables(host);
+        }
+
+        // A table wider than its wrapper scrolls sideways. Mark those wrappers
+        // so the CSS can show a cue, and make them focusable so keyboard users
+        // can reach and scroll them. Hidden panes measure 0 and are re-marked
+        // when activated or when the window is resized.
+        function markScrollableTables(host) {
+            host.querySelectorAll('.table-wrap').forEach(function (wrap) {
+                const scrolls = wrap.scrollWidth > wrap.clientWidth + 1;
+                wrap.classList.toggle('is-scrollable', scrolls);
+                if (scrolls) {
+                    wrap.setAttribute('tabindex', '0');
+                    wrap.setAttribute('role', 'region');
+                    wrap.setAttribute('aria-label', 'Table that scrolls sideways');
+                } else {
+                    wrap.removeAttribute('tabindex');
+                    wrap.removeAttribute('role');
+                    wrap.removeAttribute('aria-label');
+                }
+            });
+        }
+
+        // Modality tabs. One <article class="pane"> per modality; panes are
+        // rendered lazily on first activation (force-graph / D3 / mermaid
+        // need a visible, measurable container). With a single modality the
+        // tab bar stays hidden and the page looks exactly like before.
+        const mods = data.modalities;
+        const tabBar = document.getElementById('modality-tabs');
+        const panes = {};
+        const tabButtons = {};
+        const renderedPanes = {};
+
+        // With several modalities each pane is a tabpanel labelled by its
+        // tab (W3C APG tabs pattern); tabindex=0 lets keyboard users move
+        // from the tab list straight into the active content.
+        mods.forEach(function (m) {
+            const pane = document.createElement('article');
+            pane.className = 'pane';
+            pane.dataset.key = m.key;
+            pane.hidden = true;
+            if (mods.length > 1) {
+                pane.id = 'pane-' + m.key;
+                pane.setAttribute('role', 'tabpanel');
+                pane.setAttribute('aria-labelledby', 'tab-' + m.key);
+                pane.setAttribute('tabindex', '0');
+            }
+            root.appendChild(pane);
+            panes[m.key] = pane;
+        });
+
+        const defaultKey = mods.some(m => m.key === 'index') ? 'index' : mods[0].key;
+
+        function activate(key, updateHash) {
+            mods.forEach(function (m) {
+                const isActive = m.key === key;
+                panes[m.key].hidden = !isActive;
+                if (tabButtons[m.key]) {
+                    tabButtons[m.key].classList.toggle('active', isActive);
+                    tabButtons[m.key].setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    // Roving tabindex: only the selected tab is in the Tab
+                    // order; the arrow keys move between tabs.
+                    tabButtons[m.key].setAttribute('tabindex', isActive ? '0' : '-1');
+                }
+            });
+            // Unhide first, then render: the chart libraries measure widths.
+            if (!renderedPanes[key]) {
+                renderBlocksInto(mods.find(m => m.key === key).blocks, panes[key]);
+                renderedPanes[key] = true;
+            } else {
+                markScrollableTables(panes[key]);
+            }
+            if (updateHash) {
+                history.replaceState(null, '',
+                    key === defaultKey ? location.pathname + location.search : '#' + key);
+            }
+        }
+
+        if (mods.length > 1) {
+            mods.forEach(function (m) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = m.label;
+                btn.id = 'tab-' + m.key;
+                btn.dataset.key = m.key;
+                btn.setAttribute('role', 'tab');
+                btn.setAttribute('aria-controls', 'pane-' + m.key);
+                btn.addEventListener('click', function () { activate(m.key, true); });
+                tabBar.appendChild(btn);
+                tabButtons[m.key] = btn;
+            });
+            // Keyboard support per the W3C APG tabs pattern (automatic
+            // activation): Left/Right move between tabs and wrap, Home/End
+            // jump to the first/last tab, and the focused tab is selected.
+            tabBar.addEventListener('keydown', function (ev) {
+                const keys = mods.map(function (m) { return m.key; });
+                const focused = document.activeElement;
+                const current = focused && focused.dataset ? keys.indexOf(focused.dataset.key) : -1;
+                if (current < 0) return;
+                let next = null;
+                if (ev.key === 'ArrowRight') next = (current + 1) % keys.length;
+                else if (ev.key === 'ArrowLeft') next = (current - 1 + keys.length) % keys.length;
+                else if (ev.key === 'Home') next = 0;
+                else if (ev.key === 'End') next = keys.length - 1;
+                if (next === null) return;
+                ev.preventDefault();
+                activate(keys[next], true);
+                tabButtons[keys[next]].focus();
+            });
+            tabBar.hidden = false;
+        }
+
+        // The hash selects a tab only when it matches a modality key, so
+        // existing anchors keep working.
+        const initialHash = location.hash.slice(1);
+        activate(mods.some(m => m.key === initialHash) ? initialHash : defaultKey, false);
+        window.addEventListener('hashchange', function () {
+            const k = location.hash.slice(1);
+            if (mods.some(m => m.key === k)) activate(k, false);
+        });
+        window.addEventListener('resize', function () { markScrollableTables(root); });
+    })();
+</script>
+</body>
+</html>

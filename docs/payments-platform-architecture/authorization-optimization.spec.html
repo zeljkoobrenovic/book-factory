@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Spec: Raising the Approval Rate: Retries, Tokens and Optimization</title>
+    <meta name="description" content="Why are payments from genuine cardholders with money in the account declined, and what do providers do about it? Each issuer decides alone and mostly gives no reason, and Stripe and Adyen now reformat, retry and block inside the authorization call, so the approval rate is partly their product and its published uplift has to be measured on your own traffic.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SETTLED: Architecting Payments and Revenue Infrastructure">
+    <meta property="og:title" content="Spec: Raising the Approval Rate: Retries, Tokens and Optimization">
+    <meta property="og:description" content="Why are payments from genuine cardholders with money in the account declined, and what do providers do about it? Each issuer decides alone and mostly gives no reason, and Stripe and Adyen now reformat, retry and block inside the authorization call, so the approval rate is partly their product and its published uplift has to be measured on your own traffic.">
+    <meta property="og:url" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/authorization-optimization.spec.html">
+    <meta property="og:image" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/assets/images/09-authorization-optimization/logo.jpeg">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="site.css">
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-129891352-1"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+        dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'UA-129891352-1');
+</script>
+    <style>
+        body {
+            line-height: 1.65;
+        }
+
+        main {
+            padding-top: 32px;
+        }
+
+        nav.post-nav {
+            font-size: 14px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: baseline;
+            flex-wrap: wrap;
+        }
+
+        nav.post-nav a {
+            color: var(--muted);
+            text-decoration: none;
+        }
+
+        nav.post-nav a:hover {
+            color: var(--accent);
+        }
+
+        nav.post-nav .nav-right {
+            margin-left: auto;
+            display: inline-flex;
+            gap: 4px;
+            align-items: baseline;
+        }
+
+        nav.post-nav .nav-sep {
+            color: var(--muted);
+        }
+
+        footer nav.post-nav {
+            margin-top: 24px;
+            margin-bottom: 0;
+        }
+
+        header.post {
+            margin-bottom: 32px;
+        }
+
+        header.post .section {
+            color: var(--muted);
+            font-size: 13px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin: 0 0 -6px;
+        }
+
+        header.post .section a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        header.post .section a:hover {
+            color: var(--accent);
+        }
+
+        header.post .section .post-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        header.post .section .post-status .status-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        header.post .logo {
+            display: block;
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            border: 1px solid lightgrey;
+
+        }
+
+        header.post .logo-credit {
+            color: var(--muted);
+            font-size: 12px;
+            margin: -4px 0 24px;
+            text-align: right;
+        }
+
+        header.post h1 {
+            font-size: 52px;
+            line-height: 1.2;
+            margin: 0 0 2px;
+            padding: 0;
+            letter-spacing: -0.01em;
+            font-weight: normal;
+        }
+
+        header.post .byline {
+            color: var(--muted);
+            font-size: 15px;
+            margin: 0;
+        }
+
+        header.post .byline .spec-link {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        header.post .byline .spec-link:hover {
+            text-decoration: underline;
+        }
+
+        header.post .byline .spec-link-drifted {
+            color: #b8650f;
+        }
+
+        header.post .byline .spec-link-superseded {
+            color: var(--muted);
+        }
+
+        header.post .ai-credit {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 4px 0 0;
+        }
+
+        header.post .ai-credit a {
+            color: inherit;
+        }
+
+        header.post .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 10px 0 10px;
+        }
+
+        header.post .tags .tag {
+            font-size: 14px;
+            padding: 1px 8px;
+            border: 1px solid deepskyblue;
+            color: blue;
+            border-radius: 999px;
+            background-color: var(--tag-bg);
+        }
+
+        nav.modality-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--rule);
+            margin: 0 0 28px;
+            flex-wrap: wrap;
+        }
+
+        nav.modality-tabs button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font: inherit;
+            font-size: 14px;
+            color: var(--muted);
+            padding: 8px 14px;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            letter-spacing: 0.02em;
+        }
+
+        nav.modality-tabs button:hover {
+            color: var(--accent);
+        }
+
+        nav.modality-tabs button.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        #content .pane[hidden] {
+            display: none;
+        }
+
+        #content .pane:focus {
+            outline: none;
+        }
+
+        #content .pane:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 6px;
+        }
+
+        article h2 {
+            font-size: 26px;
+            margin: 40px 0 12px;
+            letter-spacing: -0.01em;
+        }
+
+        article h3 {
+            font-size: 20px;
+            margin: 28px 0 8px;
+        }
+
+        article h4 {
+            font-size: 17px;
+            margin: 20px 0 6px;
+        }
+
+        article p {
+            margin: 0 0 16px;
+        }
+
+        article a {
+            color: var(--accent);
+        }
+
+        article a.image-link {
+            display: inline-block;
+            line-height: 0;
+        }
+
+        article img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        article a.image-link img {
+            display: block;
+        }
+
+        article ul, article ol {
+            padding-left: 24px;
+            margin: 0 0 16px;
+        }
+
+        article li {
+            margin-bottom: 6px;
+        }
+
+        article ul.task-list {
+            list-style: none;
+            padding-left: 4px;
+        }
+
+        article ul.task-list li.task > input[type="checkbox"] {
+            margin-right: 8px;
+            accent-color: var(--accent);
+        }
+
+        article hr {
+            border: none;
+            border-top: 1px solid var(--rule);
+            margin: 32px 0;
+        }
+
+        article blockquote {
+            margin: 16px 0;
+            padding: 12px 18px;
+            background: var(--quote-bg);
+            border-left: 3px solid var(--accent);
+            color: #333;
+        }
+
+        article blockquote p:last-child {
+            margin-bottom: 0;
+        }
+
+        article code {
+            background: var(--code-bg);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 0.92em;
+        }
+
+        article pre {
+            background: var(--code-bg);
+            padding: 14px 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        article pre code {
+            background: none;
+            padding: 0;
+        }
+
+        article .table-wrap {
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+
+        article table {
+            border-collapse: collapse;
+            margin: 16px 0;
+            width: 100%;
+            font-size: 15px;
+        }
+
+        article .table-wrap table {
+            margin: 0;
+        }
+
+        /* Wide tables scroll on narrow screens instead of crushing their columns.
+           A table wrapped in <div class="table-compact"> opts out: it has few,
+           short columns and wraps its cells to fit the screen instead. */
+        @media (max-width: 640px) {
+            article .table-wrap table {
+                min-width: 560px;
+            }
+            article .table-compact .table-wrap table {
+                min-width: 0;
+            }
+        }
+
+        /* Tables that actually overflow get a visible cue and keyboard focus
+           (markScrollableTables() sets the class and attributes). */
+        article .table-wrap.is-scrollable::before {
+            content: "Scroll sideways to see the whole table";
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        article .table-wrap.is-scrollable:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        article th, article td {
+            border: 1px solid var(--rule);
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        article th {
+            background: var(--code-bg);
+            font-weight: 600;
+        }
+
+        /* GFM column alignment from the separator row. Right-aligned columns
+           hold numbers; their cells never wrap, so a sign, a currency symbol
+           and its amount stay on one line while label columns still wrap. */
+        article th.num, article td.num {
+            text-align: right;
+        }
+
+        article td.num {
+            white-space: nowrap;
+        }
+
+        article th.center, article td.center {
+            text-align: center;
+        }
+
+        article .mermaid {
+            text-align: center;
+            margin: 24px 0;
+        }
+
+        article .force-graph {
+            margin: 24px 0;
+            border: 1px solid var(--rule);
+            border-radius: 6px;
+            background: #fff;
+            height: 480px;
+            overflow: hidden;
+        }
+
+        article .bubble-chart {
+            margin: 24px 0;
+            text-align: center;
+        }
+
+        article .bubble-chart svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <nav class="post-nav"><a class="nav-back" href="authorization-optimization.html">← Raising the Approval Rate: Retries, Tokens and Optimization</a><span class="nav-right"></span></nav>
+    <header class="post" id="post-header">
+        <p class="section"><span>SPEC</span> • <span class="post-status"><span class="status-dot" style="background:green"></span>accepted</span> • <span>revised 2026-11-17</span></p>
+        <h1>Spec: Raising the Approval Rate: Retries, Tokens and Optimization</h1>
+        <p class="byline"></p>
+        
+        <div class="tags" id="tags"></div>
+        
+    </header>
+    <nav class="modality-tabs" id="modality-tabs" hidden role="tablist" aria-label="Reading formats"></nav>
+    <div id="content"></div>
+    <footer>
+        <nav class="post-nav"><a class="nav-back" href="authorization-optimization.html">← Raising the Approval Rate: Retries, Tokens and Optimization</a><span class="nav-right"></span></nav>
+    </footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/force-graph"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script id="data" type="application/json">{"meta": {}, "tags": [], "modalities": [{"key": "spec", "label": "Spec", "meta": {}, "blocks": [{"type": "markdown", "content": "## Intent\n\n**After reading, the reader should:**\n\n- **Know:** Who can stop a payment (the issuer, the provider before the network, an invalid request) and why most issuer declines carry no usable reason.\n- **Know:** The difference between authorization rate, payment success rate and checkout conversion, and between counting per attempt and per purchase.\n- **Know:** The levers that move approvals (local acquiring, network tokens, account updater, authentication choices, message formatting, retries within network limits, timing) and what Stripe's Authorization Boost and Adaptive Acceptance and Adyen's Uplift are documented to do, with their dates and published claims.\n- **Believe:** One API call can now stand for several network attempts, or for none, because the provider decides inside the call.\n- **Believe:** A published uplift figure is a vendor estimate on an unstated cohort and baseline until the merchant measures it on its own traffic with a randomized holdout.\n- **Be able to:** State an approval metric with its numerator, denominator, cohort and counting rule before comparing two periods or two providers.\n- **Be able to:** Design a test of an optimization feature with a holdout and guardrails for fraud, fees and blocked payments.\n\n**Acceptance criteria**\n\n| Id | Criterion | Check | Method | Severity |\n| --- | --- | --- | --- | --- |\n| AC-1 | Given a reported improvement, the reader identifies what is missing before the number can be trusted. *Probe:* Your provider's account manager reports: 'After we enabled our optimization suite in March, your approval rate rose from 91.2% to 93.0%.' Using only this chapter, name four things you need to know before accepting that the suite caused a 1.8-point gain. | `custom` | cold_reader | major |\n| AC-2 | Given an outcome that never reached the issuer, the reader classifies it correctly and says how it affects the metrics. *Probe:* A payment comes back as 'blocked: low probability of authorization, not sent to network'. Is this an issuer decline? What does it do to your authorization rate and to your count of lost sales, according to this chapter? | `custom` | cold_reader | major |\n| AC-3 | Every uplift figure from Stripe or Adyen is quoted with its wording, source and date and is labeled a vendor claim; the chapter states that the two companies' figures use different metrics and cannot be compared. | `custom` | rubric | blocker |\n\n## Thesis\n\n**Question:** Why are payments from genuine cardholders with funds available declined, and what do providers do about it?\n\n> **Claim:** Payments from genuine cardholders with funds available are declined because each issuer decides alone, by its own reading of the authorization message, and usually returns no reason the merchant can act on; providers respond by acting inside the authorization call, where they reformat the message, swap the card number for a network token, retry, switch network or block the payment before it is sent. The approval rate is therefore partly the provider's product, and the uplift Stripe and Adyen each publish for it (Stripe: an acceptance rate 3.8% higher on average, stated in 2025; Adyen: payment conversion up to 6% higher in a pilot reported in January 2025) rests on different metrics, cohorts and baselines, so the two figures can be neither compared nor checked from public data.\n\n**Disputed by:** The view that a decline is the issuer's verdict on the cardholder, so the provider is a neutral pipe, the approval rate would be the same anywhere, and optimization products are packaging around a number nobody controls; or the opposite view, that a vendor's published uplift is what a merchant should expect to gain.\n\n**So what:** The merchant's system has to tolerate one call that produced several network attempts, a 'blocked' result that never reached a bank, and a credential or network other than the one it asked for. And the merchant, not the vendor, has to measure: fix the metric and denominator, hold out randomized traffic, wait for retries to finish, and watch fraud, fees and blocked payments in the same test.\n\n**How and why:** Stripe's guide describes issuers combining the fields of the authorization message each in their own way and classing most refusals as generic. Against that, both providers document actions the merchant did not request: Stripe's Adaptive Acceptance reformats and retries within the original request and, for accounts on interchange-plus pricing, blocks payments unlikely to succeed; Adyen's Uplift (January 2025) routes, adjusts messaging, retries and can block excessive retries. Both describe machine-learned models (Stripe a deep network replacing gradient-boosted trees, February 2025; Adyen several models coordinated by reinforcement learning with a 20-millisecond median budget each, January 2025) beside settings the merchant controls. On measurement, Stripe documents a modeled per-payment estimate and previewed a 30-day randomized test in April 2026; Adyen describes a control group that still receives a 'market baseline'. Neither publishes features, labels, per-issuer results, the cost of wrongly blocked payments or an audited lift, Visa's reattempt limit is confirmed from its rules of 24 October 2026 (20 in 30 days) while Mastercard's is known only from secondary sources, so the chapter argues from the documented behavior and says where the numbers are vendor claims.\n\n**Supporting claims**\n\n- **C1** — A payment can fail at the issuer, at the provider before the network or as an invalid request, and an issuer decline is one bank's private reading of the authorization message, returned mostly without a reason the merchant can act on.\n- **C2** — An approval rate has no meaning until its numerator, denominator, cohort and counting rule (per attempt or per purchase) are stated, because the same payments yield rates more than ten points apart.\n- **C3** — The levers that move approvals change what the issuer sees (credential, acquirer, message, authentication) or when it is asked, and retries are capped by network rules that all of a merchant's attempts share.\n- **C4** — Stripe and Adyen now pull those levers themselves inside the authorization call, so one API call can stand for several network attempts or none, decided by machine-learned models beside a few merchant settings.\n- **C5** — The uplift figures the two companies publish are vendor estimates on different metrics, cohorts and baselines; only a randomized holdout on the merchant's own traffic, with guardrails for fraud, fees and blocked payments, measures the effect.\n- **C6** — Because the provider acts inside the call, the merchant's retry schedule, payment record and stored-card data must be designed around it, or the two will double-count, misread outcomes and overspend the retry allowance.\n\n## Role in the part\n\nShows the provider as an actor inside the authorization, which makes the approval rate a property of the provider's stack and gives the routing chapter the metric it compares providers on. Supports P2-4 of part `part-2`.\n\n## Flow\n\n**Pattern:** `problem_solution` (also `prerequisite_order` in who-says-no, counting, levers, inside-the-call: each supplies the terms the next one uses (attempt and blocked payment, then the rates, then the levers, then the provider pulling them); `comparison` in designs and where-they-differ)\n\nThe reader meets two rates that disagree by 13.5 points before any term is defined, so the vocabulary arrives as the answer to a problem already felt. Who can say no comes first because the rates are defined by which failures they count; counting comes before the levers because a lever is judged by the rate it moves; the levers come before the providers' products because those products are the levers pulled automatically. Only when the reader knows what the provider does inside the call can a published uplift be read critically, and only after that do the design choice and the two-company comparison have their criteria. Larkfield's recount and test apply everything, and the failures close the body because each is a way the earlier advice is not followed. Opening with the products would present features with no metric to judge them by; putting measurement before the in-call actions would ask the reader to test something not yet described.\n\n## Introduction\n\n**Hook** (`puzzling_scenario`): A member's card is valid, the account has money in it and the member wants to pay. The bank still answers no, with a two-digit code, 05, that means only 'do not honor'. Nothing in the merchant's systems is wrong, and the same card was approved last month.\n\n**Bridge:** An engineer reads a declined payment as an error response: the request was fine, the remote system said no, and the reason should be in the body. → Here the remote system is one of thousands of banks, each deciding alone and mostly without giving a reason, and between the merchant and that bank sits a provider that changes the request, repeats it or withholds it. That turns 'why was it declined?' into 'who decided, on what message, and who is counting?'\n\n**Thesis statement** (KEY POINTS bullets 1 and 3, and paragraph p02): A decline is one issuer's reading of one message, usually returned without a reason, and the provider now acts inside the authorization call to change that reading. The approval rate is therefore partly the provider's product, and the uplift figures Stripe and Adyen publish for it cannot be compared with each other or checked from public data.\n\n**Roadmap** (IN THIS CHAPTER callout and paragraph p04):\n\n- Start from two approval rates at Larkfield that cannot both describe the same month, and come back to them with one basis and one test. *Kept in:* scene, in-practice.\n- Say who can stop a payment and what the merchant is told. *Kept in:* who-says-no.\n- Define the rates and the two ways of counting them. *Kept in:* counting.\n- Go through the levers that move approvals, with the network limits on retries. *Kept in:* levers.\n- Describe what Stripe and Adyen document that they do inside the call, and compare the two. *Kept in:* inside-the-call, where-they-differ.\n- Read the published uplift figures and show how to measure your own. *Kept in:* uplift-claims.\n- Compare three ways to divide retry decisions between merchant and provider. *Kept in:* designs.\n- Show how optimization fails and how each failure is detected. *Kept in:* when-it-goes-wrong.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p01 | context | A genuine cardholder with money in the account is declined with a code that says only 'do not honor', and for a subscription business each such decline can end a membership nobody chose to end. | quotation: \"some banks classify nearly all declines as 'Do not honor.'\" |  |\n| p02 | claim | The decline is one issuer's private reading of one authorization message, and because providers now reformat, re-credential, retry, reroute or block inside the call, the approval rate is partly the provider's product and its published uplift cannot be compared or checked from outside. |  | `cause_effect`: The decline that carries no reason. → Why it happens and who has started acting on it: the chapter's thesis. |\n| p03 | context | On the journey of Mila's class pass this chapter sits between the authorization request and the issuer's answer at 19:42, and it follows her April membership renewal, which is declined once and approved three days later. | scenario: Mila's class pass (9 March 2027, 19:42, approved) and her €49.00 renewal declined on 1 April 2027 and approved on 4 April (ledger). | `place`: The authorization call in which the provider acts. → Where that call sits in the book's recurring payment. |\n| p04 | transition | The chapter moves from Larkfield's two approval rates to who can say no, how approvals are counted, which levers move them, what Stripe and Adyen do inside the call, how to read and measure an uplift figure, three ways to own retries, the comparison of the two companies, Larkfield's recount and test, and the failures. |  | `sequence`: The chapter's place on the payment's journey. → The order of its sections. |\n\n## Sections\n\n### Setting the Scene at Larkfield: Two Approval Rates for One Month\n\n**Controlling idea** (`example`, id `scene`): Larkfield holds two approval rates for the same month that differ by 13.5 points, and the difference comes from what each one counts before it says anything about either provider.\n\n**Advances the thesis** (C2): Poses the measurement problem with numbers before the vocabulary to resolve it exists.\n\n**Transition in:** `example`: The introduction's claim that an approval rate is partly the provider's product. → One company that is about to compare two providers on that rate.\n\n**Order of paragraphs** (`chronological`): The meeting, then what Femke finds behind the two numbers, then the questions she writes down; the questions are the chapter's sections, so they must come last.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p05 | context | In January 2027 Daniel Osei shows Femke de Graaf two figures for December's card renewals, 82.0% on Stripe and 95.5% on Adyen, and asks whether card renewals should move to Adyen. | scenario: Illustrative Larkfield figures: 82.0% (Stripe) and 95.5% (Adyen) for card renewals in December 2026; decision K8 lets the payment service move a studio's online card payments to the other provider. |  |\n| p06 | analysis | The two figures come from two queries written years apart, one dividing by every attempt and the other by renewals, over two providers that serve different countries. | fact: Stripe carries the United Kingdom, the United States, Belgium and studios onboarded before 2024; Adyen carries Dutch and German studios onboarded or migrated since 2024 (ledger). | `contrast`: Two rates that look like a verdict on two providers. → What each rate was computed from. |\n| p07 | claim | Before any payment moves, four questions have to be answered: who said no, what is being counted, what could change the answer, and who is already changing it. |  | `cause_effect`: Two numbers that cannot be compared as they stand. → The questions that make them comparable, which are the chapter's sections. |\n\n### Who Says No: The Issuer, the Provider or the Request\n\n**Controlling idea** (`explanation`, id `who-says-no`): A payment can fail in three places, only one of which is the issuer, and an issuer's refusal is a private judgement returned in codes that are mostly generic.\n\n**Advances the thesis** (C1): Separates the issuer's decision from the provider's and establishes that the decline carries little the merchant can act on.\n\n**Transition in:** `elaboration`: Femke's first question: who said no? → The three places a payment can fail and what comes back from each.\n\n**Order of paragraphs** (`large_to_small`): From the three places a payment can stop, to the issuer's decision, to the code it returns, to the retry meaning of that code, to the fields each provider exposes; each step narrows onto what the merchant's code will read.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p08 | definition | A payment fails in one of three places: the issuer declines it, the provider blocks it before it reaches the network, or the request itself is invalid. | quotation: \"There are three reasons why a payment might fail\": issuer declines, blocked payments, invalid API calls; \"When Stripe blocks a payment, it doesn't obtain authorization from the card issuer.\"; figure: Figure: a payment's path from merchant through provider and network to issuer, with three exits labeled invalid, blocked and declined. |  |\n| p09 | explanation | The issuer decides alone, by its own automated reading of the fields of the authorization message, and banks read the same fields differently. | quotation: \"there are 128 fields in the ISO 8583 message, and each issuing bank can choose how to interpret and combine them\"; quotation: \"their automated systems and models decide whether to authorize it. These tools analyze signals such as spending habits, account balance, and card data (expiration date, address information, and CVC)\" | `elaboration`: The issuer decline, the first of the three failures. → How the issuer reaches it. |\n| p10 | evidence | Most issuer declines arrive as a generic code, so the merchant usually cannot learn the reason from the response. | quotation: \"Card issuers categorize most declines as generic (generic_decline), making the exact decline reason unclear.\" \"For privacy and security reasons, card issuers discuss the specifics of a decline only with their cardholders.\"; fact: Adyen's refusal reason 27, 'Declined Non Generic', 'maps all those response codes that cannot be reliably mapped', and Adyen warns: \"do not expose the details of the refusal reason to shoppers\". | `cause_effect`: A decision made privately by each bank's models. → What little of it is returned. |\n| p11 | definition | 'Soft decline' and 'hard decline' are industry shorthand for whether a refusal may be retried; the network vocabulary behind them is Visa's four categories of decline code and Mastercard's advice codes. | table: Table of Visa's four categories (1 issuer will never approve; 2 issuer cannot approve at this time; 3 data quality; 4 generic), example codes (04, 14, 41, 43, 46 / 51, 59, 61, 91 / 54, N7, 1A / all others, including 05), and the reattempt rule for each.; fact: Mastercard's Merchant Advice Code, as rendered in Adyen's documentation: '03 : Do not try again', '24 : Retry after 1 hour' through '30 : Retry after 10 days'; 'Not all Mastercard issuers return the MAC.' | `additional_support`: Codes that are mostly generic. → The one thing a code does reliably tell the merchant: whether it may try again. |\n| p12 | comparison | Stripe and Adyen each return three layers for a refused card payment: their own normalized reason, the network's raw code, and advice on retrying. | table: Table: layer by provider. Stripe: decline code such as insufficient_funds or generic_decline; network_decline_code and network_advice_code; advice_code with do_not_try_again, try_again_later, confirm_card_data. Adyen: resultCode Refused with refusalReason and refusalReasonCode; refusalReasonRaw and refusalCodeRaw once enabled, the code only for Visa and Mastercard on Adyen's own acquiring; merchantAdviceCode for Mastercard and a published mapping of raw codes to Visa's categories. | `example`: The network categories and advice codes. → Where each provider puts them in its response. |\n\n### Counting Approvals: Three Rates and Two Counting Rules\n\n**Controlling idea** (`definition`, id `counting`): An approval rate means nothing until its numerator, denominator, cohort and counting rule are stated, because the same month of payments yields rates more than ten points apart.\n\n**Advances the thesis** (C2): Defines authorization rate against payment success rate and conversion, and per-attempt against per-purchase counting, with the arithmetic that separates them.\n\n**Transition in:** `sequence`: Three places a payment can stop and the attempts a retry adds. → The rates that result from choosing which of those to count.\n\n**Order of paragraphs** (`prerequisite_order`): The three rates must be defined before the counting rule that applies to each; the effect of blocked payments needs both; the instruction to state all four parts comes last because it is what the three paragraphs before it justify.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p13 | definition | The authorization rate counts only attempts that reached the network, the payment success rate counts everything submitted to the provider, and checkout conversion counts from the moment the customer starts to pay. | quotation: Authorization rate: \"we divide the number of payments authorized by the card issuer by the number of unique payment attempts submitted to the card network for authorization. We exclude invalid API calls, payments that fail 3D Secure authentication, and blocked payments in the denominator\"; payment success rate divides by \"unique payment attempts submitted through Stripe\".; statistic: Stripe's worked example: 103,000 requests, 3,000 invalid, 1,000 failed authentication, 1,000 blocked, 93,000 authorized: payment success rate 93% (93,000 / 100,000), authorization rate 94.9% (93,000 / 98,000). |  |\n| p14 | explanation | Each rate can be counted per attempt or per purchase, and once a declined payment is retried the two counts move far apart. | quotation: \"The raw rate includes all payment attempts (including retries) to make the same purchase.\" \"The deduplicated rate groups the retried payment attempts together and calculates the acceptance rate based on the final outcome.\" One purchase with two failures and a success: raw 33.3%, deduplicated 100%.; table: Illustrative Larkfield table, one month of card renewals on Adyen: 210,000 renewals; 191,100 approved at the first attempt; 33,600 retry attempts; 200,550 renewals finally paid. Per attempt 82.3% (200,550 / 243,600); first attempt 91.0%; per renewal 95.5%.; figure: Figure: one pile of payments measured by three rulers that read 82.3%, 91.0% and 95.5%. | `additional_support`: Two rates that differ by their denominator. → A second choice, per attempt or per purchase, that multiplies the readings. |\n| p15 | cause_effect | A blocked payment, one the provider stops before the network because it expects a refusal or a penalty fee, leaves the authorization-rate denominator, so that rate can rise while not one more sale is made. | reasoning: From Stripe's example: block 1,000 more payments that would have been declined and the authorization rate becomes 93,000 / 97,000 = 95.9% while the payment success rate stays 93%; if 50 of the 1,000 would have been approved, 50 sales are lost and the authorization rate still rises.; fact: A payment blocked by Adaptive Acceptance returns type 'blocked', network_status 'not_sent_to_network', reason 'low_probability_of_authorization'. | `cause_effect`: Denominators that exclude blocked payments. → What happens to each rate when the provider blocks more. |\n| p16 | recommendation | State every approval rate with its numerator, denominator, cohort and counting rule, and compute it from your own record of attempts and purchases, because Adyen's one published formula (payment conversion rate: authorized over initiated transactions) does not say what counts as initiated and it gives none for authorization rate. | fact: Adyen's documentation and press use 'authorization rate' and 'payment conversion'; its glossary defines the payment conversion rate as authorized transactions divided by initiated transactions, and a July 2026 knowledge-hub article says Adyen reports acceptance rate on a gross basis; no formula for authorization rate and no definition of 'initiated' was found. | `conclusion_summary`: Three rates, two counting rules and the effect of blocking. → The rule for stating a rate and where to compute it. |\n\n### What Moves the Rate: Credentials, Message, Route, Retries and Timing\n\n**Controlling idea** (`explanation`, id `levers`): Every lever that raises approvals changes what the issuer sees or when it is asked, and the retry levers are bounded by network rules that all of a merchant's attempts share.\n\n**Advances the thesis** (C3): Lays out the levers and their limits before the next section shows the providers pulling them.\n\n**Transition in:** `cause_effect`: A rate that is now defined. → What can change it.\n\n**Order of paragraphs** (`chronological`): The levers are taken in the order they act on one payment: the stored credential before the request exists, the request as it is sent, the retry after a refusal, the scheduled attempt days later. The reader can then place each provider feature of the next section on that timeline.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p17 | claim | The levers fall into four moments: before the request exists, as it is sent, straight after a refusal, and days later. | table: Table of levers by moment: account updater and network tokens (stored credential); local acquiring, message formatting and data, authentication choice (as sent); in-call retry with changed fields, credential or network (after a refusal); scheduled retry and timing (days later); with what each changes for the issuer and who decides. |  |\n| p18 | definition | An account updater is a card-network service that gives the provider a replaced card's new number or expiry date, so a stored card keeps working after the bank reissues it. | fact: Stripe: \"automatically attempts to update saved card details whenever a customer receives a new card\", \"widely supported in the United States\", \"International support varies from country to country\", announced through the payment_method.automatically_updated event; real-time updates announced 23 February 2023.; quotation: Adyen Real Time Account Updater: \"When you submit a payment that is refused, our Real Time Account Updater instantly checks for updated card details. If there is an update, we immediately retry the payment with the updated card details. This all happens while the payment is being processed, and appears as a single transaction.\" | `example`: The first moment: the stored credential. → The service that keeps a stored card number current. |\n| p19 | explanation | A network token, a card-network stand-in for the card number that stays valid when the card is reissued, is used by both providers as a per-payment choice next to the real number, and neither publishes what it adds on its own. | quotation: Stripe: \"We maintain PAN redundancy to retry failed network token transactions on the underlying PAN\"; Adyen: \"the AI in Uplift can choose to tokenize, use a token, or swap a token for a PAN based on global optimization targets\".; fact: Adyen: \"Network tokenization is only applicable for payments acquired by Adyen.\" Neither company publishes an approval gain from tokens isolated from its other features. | `similarity`: A service that keeps the card number current. → A second credential that does not need updating, and how the providers use it. |\n| p20 | explanation | Three levers change the request as it is sent: which entity acquires it, how its data fields are filled, and whether the cardholder is authenticated. | quotation: Stripe: \"banks are often more likely to approve domestic payments\"; its guide's example of testing postcode formats per issuer; Adyen Smart Payment Messaging: \"Adyen optimizes issuer messaging (for example, CVC and AVS fields) to increase authorization rates on low-risk transactions\".; fact: Adyen's Authentication Engine \"helps decide when to offer strong customer authentication, which exemptions to ask for, and when to request the frictionless or the challenge flow based on issuer preference\"; Stripe excludes payments that fail 3-D Secure from the authorization-rate denominator. | `sequence`: Levers on the stored credential. → Levers on the request itself. |\n| p21 | evidence | After a refusal the lever is the retry, and the networks cap it: Visa's rules allow up to 20 reattempts in 30 days for categories 2 to 4 and none for category 1. | quotation: Visa Table 7-2: Category 1, \"a Merchant must never resubmit an Authorization Request or Account Verification for the same Payment Credential\"; Categories 2, 3 and 4, \"Reattempt permitted (up to 20 attempts in 30 days)\".; fact: Adyen's mapping page still says \"up to 15 times in a 30-day period\" (accessed November 2026); Stripe \"recommends a maximum of eight retries\" and warns that issuers \"might see creating additional retries as potential fraud\"; Mastercard's thresholds (10 in 24 hours, 35 in 30 days) are known here only from an acquirer's guidance of May 2026. | `sequence`: Levers applied before the issuer answers. → The lever applied after it refuses, and its limit. |\n| p22 | definition | A retry policy says which refusals are retried, how many times and when, and for recurring payments the when is spread over days inside a count and a window the merchant sets. | fact: Stripe Smart Retries (part of Billing): default for new accounts up to 8 retries within 2 weeks; signals include 'The best time to pay (payments made for debit cards in certain countries might be slightly more successful at 12:01 am in local time zones)'; hard decline codes are not retried.; fact: Adyen Auto Rescue: retries refused shopper-not-present payments 'at optimal times' within a rescue window of 1 to 48 days, enabled per transaction or per merchant account; the response carries retry.rescueScheduled. Each company has one post on its retry model (owner: invoicing-collections-and-dunning): Stripe blog, 23 January 2024, 'more than 500 attributes'; Adyen knowledge hub, 3 December 2020, a contextual bandit that in one experiment converted 'about 6% more orders than the baseline'. | `time`: Retries within the limit. → Retries placed days later, on a schedule. |\n\n### Inside the Call: What Stripe and Adyen Do Without Being Asked\n\n**Controlling idea** (`evidence`, id `inside-the-call`): Both providers now pull the levers themselves inside the authorization call, so one API call can stand for several network attempts or none, decided by machine-learned models beside a few settings the merchant controls.\n\n**Advances the thesis** (C4): Documents, with dates, the actions each provider takes unasked and what each has published about the models that take them.\n\n**Transition in:** `contrast`: Levers described as things a merchant could pull. → The provider pulling them inside the call, unasked.\n\n**Order of paragraphs** (`assertion_evidence_reasoning`): Each company's documented actions come first as evidence; the consequence for the merchant's record follows from both; only then does the chapter turn to what decides those actions (models) and what is left to the merchant (settings). Putting the models first would explain a behavior the reader has not yet seen.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p23 | evidence | Stripe documents that Adaptive Acceptance reformats a request before sending it or after a decline, retries declined payments in real time, can retry a US debit card on another network, and, for accounts that pay network costs directly, blocks payments unlikely to succeed. | quotation: \"Adaptive Acceptance uses AI to reformat payment requests based on card issuers' preferences. Stripe can make these changes before sending a payment or after a payment is declined.\" \"Decline prevention: Stripe blocks a payment from reaching the card network that was unlikely to succeed, avoiding additional scheme fees for the payment.\"; quotation: Retries happen \"in real time—without the end customer ever seeing the initial decline\" (12 February 2025); Authorization Boost bundles Adaptive Acceptance, card account updater and network tokens (product page, accessed November 2026). |  |\n| p24 | evidence | Adyen documents the same kinds of action under Uplift, launched in January 2025: routing among its own routes, adjusted issuer messaging on by default, in-call retries and an opt-in block on excessive retries. | fact: Uplift's Optimize module: Intelligent Payment Routing ('off by default', needs 'at least two available routes'), Smart Payment Messaging ('enabled by default', level adjustable), Auto Rescue; the Excessive Retry Prevention Service 'is opt-in, not priced, and in maintenance mode' and 'may have a negative impact on authorization rates'.; quotation: Adyen product page: \"Auto Retries intelligently retries declined transactions by adapting the route, messaging, authentication, and tokenization to maximize the chance of success – in milliseconds.\" | `similarity`: Stripe's actions inside the call. → Adyen's, with their defaults. |\n| p25 | cause_effect | Because of these actions one API call can produce several network attempts, a different credential or network than requested, or no attempt at all, while the merchant receives one result. | fact: Adyen: the updater's retry 'appears as a single transaction'; Stripe: a blocked payment's outcome reads network_status 'not_sent_to_network'; Stripe may 'reattempt a declined payment on an alternative card network'.; figure: Figure: one request entering a provider, three attempts leaving it toward the issuer (declined, reformatted, approved), one response returning to the merchant. | `cause_effect`: The two providers' documented actions. → What they do to the meaning of one API call. |\n| p26 | comparison | Both companies say machine-learned models take these decisions; Stripe has published the model family and its results, Adyen the system around the models and its latency budget. | quotation: Stripe, 12 February 2025: \"Our previous approach, based on a gradient-boosted tree model (XGBoost)... We transitioned to a TabTransformer-based deep neural network, which we call TabTransformer+\"; \"We can now train and deploy new versions of our Adaptive Acceptance model multiple times per week.\"; quotation: Adyen, 17 January 2025: models \"optimized globally through Reinforcement Learning\"; \"SLA for transaction processing: 1 second including acquirer communications which consumes around 600 ms\"; each transaction \"touched between 2 and 5 different AI endpoints\" with \"an allocated latency of 20 ms (median)\". | `elaboration`: Decisions taken inside the call. → What each company has published about what takes them. |\n| p27 | analysis | What remains rule-based is the envelope the merchant sets (retry counts and windows, a routing objective, a messaging level, its own risk rules), while the per-payment decision inside it belongs to a model the merchant cannot inspect. | fact: Stripe: Smart Retries policy of a retry count within 1 week to 2 months; Adyen: routing objective for US and Australia (balance, cost or conversion), messaging optimization level, rescue window, custom risk rules as a premium feature.; reasoning: Labeled inference: with about 600 ms of a one-second target spent on the acquirer leg and 20 ms per model call, the decision has to be made by small models in the payment path, which is a reason neither company exposes per-payment control. | `contrast`: Models that decide per payment. → The small set of things the merchant still sets by rule. |\n\n### Reading an Uplift Figure, and Measuring Your Own\n\n**Controlling idea** (`analysis`, id `uplift-claims`): The uplift each company publishes is a vendor estimate on its own metric, cohort and baseline, and the only figure a merchant can trust is one measured on its own traffic with a randomized holdout and guardrails.\n\n**Advances the thesis** (C5): Quotes each published figure with wording and date, shows why they cannot be compared or checked, and gives the measurement that can.\n\n**Transition in:** `cause_effect`: A provider that changes the outcome of the call. → The size of that change, as claimed and as measurable.\n\n**Order of paragraphs** (`problem_solution`): The claims and what is missing from them come first, then the vendors' own measurement methods from weakest (a modeled estimate) to strongest (a randomized test), then the author's rules, which borrow from the strongest. The limits of the public record close the section because they qualify everything before them.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p28 | evidence | Stripe and Adyen each publish a headline uplift, in words that name different metrics: an 'acceptance rate' 3.8% higher on average, and a 'payment conversion rate' up to 6% higher in a pilot. | table: Table of claims with exact wording, source and date. Stripe: \"can increase their acceptance rate by 3.8% on average, with some seeing up to 7%\" (15 May 2025); \"helping increase acceptance rates by an average of 3.8% and lower processing costs by up to 3.3%\" (29 April 2026); \"recovering a record-high $6 billion in falsely declined transactions\" in 2024 (12 February 2025). Adyen: \"increase payment conversion rates by up to 6% compared to legacy implementations\", \"Piloted by 60 enterprise businesses\" (9 January 2025), footnoted \"Based on the average conversion improvement of merchants that participated in the pilot and used all modules\" (January 2025); \"reduced payment cost by up to 5% for pilot customers in the U.S.\" |  |\n| p29 | analysis | The two figures cannot be compared, and neither can be checked, because neither states its formula, cohort or baseline. | reasoning: Stripe's 'acceptance rate' is not defined where the 3.8% is stated (relative or percentage points, raw or deduplicated, which merchants); Adyen's 6% is 'up to' in the headline and an 'average' in the footnote, against 'legacy implementations', for pilot merchants using all five modules, including checkout and risk features.; quotation: \"Stripe doesn't guarantee any outcomes for your use of Authorization Boost features. The optimization calculations we provide are estimates.\" | `contrast`: Two figures that look alike. → Why they measure different things and cannot be verified. |\n| p30 | explanation | The figure in Stripe's dashboard is a modeled estimate per payment of what would have happened without the feature, not a measured difference. | quotation: \"For each payment, Stripe assesses the likelihood that optimizations contributed to its success, given that some payments might have otherwise still been approved.\" Example: 100 payments of 50 USD at a 20% likelihood give 1,000 USD recovered; the comparison chart \"shows the raw rate, rather than the deduplicated rate\". | `elaboration`: Figures with no stated baseline. → How one vendor estimates the baseline for a single merchant. |\n| p31 | evidence | Both companies describe randomized measurement, and each says what its control group still receives. | fact: Stripe's A/B test (previewed 29 April 2026; still behind a preview sign-up in November 2026): eligible volume randomized into two equal groups for 30 days, results after 37 days to let retries finish, deduplicated payment success rate, significance at 5%; the control keeps the merchant's existing optimizations, and the card account updater runs in both groups because Stripe 'can't apply card credential updates selectively'.; quotation: Adyen: \"Note that we still act on the control group as we define baseline as a 'market baseline'\": \"blocking cards that we know are stolen, SCA (Strong Customer Authentication) exemption, forcing a network token, and retrying with a challenge if the authentication fails. This results in a lower, but more honest uplift calculation\".; fact: Adyen's experiments run on live transactions, and 'You can only start optimization experiments following a recommendation.' | `contrast`: An estimate modeled per payment. → Measurement by randomized groups, as each company documents it. |\n| p32 | recommendation (list) | Six rules, the author's, turn a claimed uplift into a measured one: fix the metric, fix the cohort, randomize a holdout, wait for retries, watch guardrails in the same test, and know what the control group receives. | reasoning: Before-and-after comparisons confound the feature with season, card mix and issuer behavior; the guardrails are fraud and dispute rate, network fees, blocked-payment count and latency; a rule of thumb for size is about 16 × p(1−p)/d² payments per group to detect a difference d at a rate p. | `conclusion_summary`: The vendors' own randomized designs. → The rules a merchant applies to any optimization feature. |\n| p33 | analysis | The public record stops short of what would let anyone verify either company's figure: features, labels, per-issuer results, the share of blocked payments that would have been approved, recovery rates across merchants for scheduled retries and any audited lift. | fact: Not found in any source read for this chapter: a definition of 'false decline' behind Stripe's $6 billion; an authorization result from Stripe's Payments Foundation Model; the denominator of Adyen's 'payment conversion'; any figure after Adyen's pilot of 60; Uplift pricing; Mastercard's retry thresholds in a Mastercard document. | `emphasis`: Rules for measuring on one's own traffic. → Why they are needed: what neither company publishes. |\n\n### Three Ways to Own the Retry, and What Each Costs\n\n**Controlling idea** (`comparison`, id `designs`): A merchant can leave every decision to the provider, add its own measurement on top, or build its own retry logic from raw codes; the provider should act inside the call and exactly one scheduler should act across days.\n\n**Advances the thesis** (C6): Turns the provider's role inside the call into a design decision about who schedules attempts across days.\n\n**Transition in:** `cause_effect`: A provider that acts inside the call and figures that must be measured locally. → The designs open to the merchant.\n\n**Order of paragraphs** (`comparison`): One unit: the three designs are set side by side in a table and the recommendation follows from the table's columns. It stands after the measurement section because the middle design is defined by that measurement, and before the two-company comparison because it is a choice the merchant makes on either provider.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p34 | recommendation | Of the three ways to divide retry decisions, the rule I use is to let the provider act inside the call, own the schedule across days only if you run your own billing, and never let two schedulers retry the same payment. | table: Trade-off table: provider decides everything (defaults on); provider decides, merchant measures (holdout, own attempt record); merchant schedules its own retries from raw codes and advice codes. Columns: who decides the next attempt, what you build, what you can see, when it is right, main risk.; reasoning: Only the provider has the issuer-level data and the milliseconds; Adyen documents its code mapping for merchants who 'have built your own retry logic', which shows it expects some to; a merchant on a provider's billing product already has a scheduler. |  |\n\n### Stripe and Adyen: Where They Differ\n\n**Controlling idea** (`comparison`, id `where-they-differ`): The two companies document the same kinds of action and differ in defaults, in what the merchant can configure, in what they publish about their models and in how a merchant can measure the result.\n\n**Advances the thesis** (C4, C5): Sets the documented facts of the two previous evidence sections side by side and reads them as inference.\n\n**Transition in:** `conclusion_summary`: Actions, models, claims and designs described company by company. → The same facts in one table, with the author's reading.\n\n**Order of paragraphs** (`comparison`): The table comes first and carries the facts in cells, without retelling the two evidence sections; the reading follows because it is advice drawn from the rows. The section comes after the designs so the reader can see which design each company's defaults lean toward, and before Larkfield's worked case, which uses both providers.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p36 | comparison | Seven aspects separate the two in the public record, from metric definitions to how a merchant can test. | table: Where They Differ table, seven rows: metric definitions; in-call reformatting and retries; blocking before the network; scheduled retries; published model detail; headline claim; how a merchant can measure. Every Stripe and Adyen cell is a fact cited earlier in the chapter or 'Not public'; the last column is the author's inference. |  |\n| p37 | recommendation | On Stripe an integrator should read the outcome of every attempt and use the documented rate definitions; on Adyen it should enable raw responses, check each Uplift default and build its own rate from attempts. | reasoning: Follows from the table: Stripe defines its rates and exposes blocked outcomes on the charge; Adyen exposes raw codes only once enabled, turns messaging optimization on by default and publishes one rate formula whose denominator ('initiated transactions') is undefined. | `cause_effect`: The documented differences. → What an integrator does differently on each. |\n\n### In Practice at Larkfield: One Basis, Then One Test\n\n**Controlling idea** (`example`, id `in-practice`): Recounted on one basis, Larkfield's 13.5-point gap between providers shrinks to under one point that the data cannot attribute, and the next step is a randomized test of something Larkfield controls.\n\n**Advances the thesis** (C2, C5): Applies the counting rules and the measurement rules to the scene's two numbers.\n\n**Transition in:** `example`: The comparison of the two providers and the rules for measuring. → Both applied to Larkfield's two rates.\n\n**Order of paragraphs** (`small_to_large`): The recount of the two aggregate rates comes first because it answers the scene; one renewal then shows how a single payment lands in each count; the test plan comes last because it is designed from what the first two reveal.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p38 | evidence | Counted the same way, December's card renewals were approved at the first attempt 90.2% of the time on Stripe and 91.0% on Adyen, and paid in the end 95.1% and 95.5% of the time. | table: Illustrative table, December 2026 card renewals. Stripe: 330,000 renewals, 297,660 approved at first attempt (90.2%), 52,800 retry attempts, 313,830 paid (95.1% per renewal; 82.0% per attempt). Adyen: 210,000 renewals, 191,100 at first attempt (91.0%), 33,600 retry attempts, 200,550 paid (95.5% per renewal; 82.3% per attempt).; reasoning: The remaining gap compares British, American and Belgian cards with Dutch and German ones; the 1,140 Dutch and German studios still on Stripe give a closer comparison, though not a randomized one. |  |\n| p39 | example | Mila's April renewal shows how one payment lands in each count: declined on 1 April for insufficient funds, approved on 4 April, it is two attempts and one paid renewal. | scenario: Mila's €49.00 renewal: declined 1 April 2027 (insufficient funds, Visa code 51, category 2), retried 4 April and approved; under K1 each scheduled attempt has its own idempotency key; under K5 the retry date follows from the decline code. | `example`: Aggregate rates on one basis. → One renewal inside them. |\n| p40 | process | Femke's first test randomizes what Larkfield controls, its own retry schedule for card renewals, by membership, with the metric, sample size, waiting period and guardrails fixed in advance. | table: Test plan: unit of randomization (membership id); cohort (card renewals at Dutch and German studios on Adyen); metric (renewals paid within 14 days, per renewal); size (about 27,500 per group to detect 0.5 points at 95.5%); duration (one month plus 14 days); guardrails (attempts per renewal, disputes, provider fees per paid renewal, blocked payments); control (the current schedule). | `sequence`: What the recount cannot say. → The test that can. |\n\n### When It Goes Wrong\n\n**Controlling idea** (`analysis`, id `when-it-goes-wrong`): Optimization fails in three ways a merchant can detect: two schedulers spending one retry budget, a provider outcome misread by the merchant's own systems, and a rate that improves while sales, fraud or fees get worse.\n\n**Advances the thesis** (C6): Shows what happens when the merchant's systems are not designed for a provider that acts inside the call.\n\n**Transition in:** `contrast`: A test that goes to plan. → The ways optimization goes wrong in production, and how each is noticed.\n\n**Order of paragraphs** (`grouping`): Three failures, ordered from the one a merchant causes alone (two schedulers), to one caused at the boundary (misread outcomes), to one that originates with the provider (a regression behind a better-looking rate); detection gets harder in the same order.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p41 | cause_effect | When the merchant's retry job and the provider's automatic retries both act on one payment, they spend the same network retry allowance and can turn a recoverable decline into penalty fees. | fact: Visa counts reattempts per payment credential; Adyen's Auto Rescue and Stripe's Smart Retries each schedule attempts of their own; Adyen's refusal reason 46 is 'Transaction blocked by Adyen to prevent excessive retry fees'. |  |\n| p42 | cause_effect | When the merchant's code treats every failure as an issuer decline and every stored card as unchanged, it tells customers to call a bank that never saw the payment and shows them a card number that has been replaced. | fact: Stripe: outcome type 'blocked' with network_status 'not_sent_to_network'; the payment_method.automatically_updated event carries 'the card's new expiration date and last four digits'. | `similarity`: A failure from two systems acting. → A failure from one system not reading what the other did. |\n| p43 | cause_effect | A provider-side change can raise the authorization rate while paid purchases, fraud or fees get worse, and only a standing holdout and guardrail metrics reveal it. | fact: Adyen says its retry-prevention service 'may have a negative impact on authorization rates'; Stripe's product page describes declining charges 'most likely to be rejected, while balancing impact to your auth rates'; Stripe retrains its model 'multiple times per week'. | `contrast`: Failures in the merchant's own systems. → A failure that starts with the provider and hides behind an improved rate. |\n\n## Conclusion: What to Take Away\n\n**Synthesis:** Who says no, how approvals are counted, which levers exist and who pulls them are one fact seen four ways: the answer to an authorization request is produced jointly by an issuer the merchant cannot see and a provider that edits the question. A rate is then a statement about that joint system under one counting rule, and a claimed uplift is a statement about a change to it that only a randomized comparison on the merchant's own payments can size.\n\n**So what:** A team that reads its approval rate as a fact about its customers will move payments, buy features and email members on numbers that measure something else. A team that fixes the metric, stores every attempt with the provider's own outcome and keeps a holdout can tell a lost sale from a blocked one and a real gain from a reclassification.\n\n**Callback:** The opening decline: a genuine cardholder with funds, refused with code 05, 'do not honor'. The reader can now say that the code is one bank's generic answer to one version of the message; that the provider may already have reformatted, retried or withheld it; and that whether such declines are becoming rarer is a question about a defined rate, not about the cardholder.\n\n**Takeaway** (`course_of_action`): Write down your approval metric with numerator, denominator, cohort and counting rule; store each attempt with the provider's raw outcome; let the provider act inside the call and keep one scheduler across days; test every optimization against a randomized holdout with guardrails. Eight questions for a provider or a design review follow.\n\n**Hand-off** to [More Than One Provider: Routing and Orchestration](payment-routing-and-orchestration.html): `problem_solution`: Every lever of this chapter sits inside one provider, whose decisions the merchant cannot inspect and whose outage stops every payment. → The proposed remedy, a second provider and a layer that routes between them, with what it unifies, what it leaves per provider and when a simple switch is enough.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p44 | synthesis (list) | Established: a payment can fail at the issuer, at the provider or as an invalid request; most issuer declines are generic; networks limit retries by decline category; and both providers document acting inside the call. |  |  |\n| p45 | synthesis (list) | Depends on context: which rate to manage, whether to accept pre-network blocking, who schedules retries across days, and whether a test is feasible at your volume. |  | `contrast`: What the field agrees on. → What changes with the merchant's pricing, billing setup and volume. |\n| p46 | recommendation (list) | The author's synthesis: the approval rate is a joint product of issuer and provider, so treat the provider's actions as a dependency to record and test, and treat every published uplift as a hypothesis about your own traffic. |  | `contrast`: What is established and what depends on context. → The author's own position, labeled as such. |\n| p47 | recommendation (list) | Eight questions let the reader test an approval figure or an optimization product in a design review or a provider evaluation. |  | `cause_effect`: The take-aways. → Questions that apply them. |\n| p48 | transition | Every lever in this chapter sits inside one provider, whose decisions the merchant cannot inspect and whose outage stops every payment, which is the case for a second provider that the next chapter weighs. |  | `problem_solution`: A single provider acting inside the call. → The proposal to add a second provider and route between them. |\n\n## Non-goals\n\n- The authorization message path, holds and validity windows, stand-in processing. See [The First Promise: Authorization](payment-authorization.html).\n- Which entity acquires in which country and how local acquiring is arranged. See [Plugging Into the Networks: Acquiring, Licences and Connectivity](acquiring-and-network-connectivity.html).\n- How network tokens are provisioned, cryptograms, token portability. See [The Card Number's Replacement: Network Tokens and Credential Lifecycle](network-tokens.html), [Never Touch the Card: Tokenization, Vaults and PCI Scope](tokenization-vaulting-and-pci.html).\n- Fraud models, risk rules and card testing. See [Deciding in Milliseconds: Fraud and Risk Systems](payment-fraud-and-risk.html).\n- 3-D Secure flows, exemptions and liability shift. See [Proving It Is You: 3-D Secure and Strong Customer Authentication](three-d-secure-and-sca.html).\n- Dunning as a billing process: customer communication, grace periods, invoice states. See [From Invoice to Cash: Invoicing, Collections and Dunning](invoicing-collections-and-dunning.html), [Journey 2: A Membership Renewal That Fails, and Comes Back](journey-failed-renewal.html).\n- Routing among acquirers, networks or providers, least-cost debit routing, failover. See [More Than One Provider: Routing and Orchestration](payment-routing-and-orchestration.html).\n- Idempotency keys and what to do when an outcome is unknown. See [Exactly Once, Over a Network That Does Not Allow It: Idempotency and Retries](idempotency-and-retries.html).\n\n## Modalities\n\nArticle only.\n\n## Open questions\n\n- Ruling 19 of the consistency file records the Visa limit. The journal spec's how_why says the current network retry limits could not be confirmed from primary network documents. Visa's limit was confirmed for this chapter in the Visa Core Rules of 24 October 2026 (Table 7-2: 20 attempts in 30 days); Mastercard's was not. The article says so, and the journal-spec sentence now says the same.\n- Larkfield's December 2026 renewal counts per provider (330,000 card renewals on Stripe, 210,000 on Adyen) are labeled assumptions in the article and appended to the ledger; journey-failed-renewal and invoicing-collections-and-dunning may reuse them.\n- Whether a retry through a second acquirer counts against the same network allowance is not stated in any source read; payment-routing-and-orchestration inherits the question.\n\n## Decision log\n\n- **2026-11-17** — Ten body sections instead of the typical six to nine: the style guide's required elements (scene, designs with a trade-off table, Where They Differ, In Practice, When It Goes Wrong) plus the four the contract owns (who declines, the metric, the levers, the products and their measurement) do not merge without putting two controlling ideas in one section. Sections are kept short instead. Rejected: Folding the three designs into the levers section; Folding measurement into the products section\n- **2026-11-17** — Larkfield's test randomizes its own retry schedule, not a provider feature, because Adyen documents that optimization experiments can only be started following a recommendation and it is not documented whether Stripe's Authorization Boost test applies to a platform's connected accounts. Rejected: A Larkfield test of Adyen Uplift's Optimize module; A Larkfield run of Stripe's Authorization Boost A/B test\n- **2026-11-17** — Visa's retry limit is stated as 20 in 30 days from the Visa rules of 24 October 2026, with Adyen's '15' reported as what its documentation says; the research brief's advice to write '15 or 20' was superseded by reading the rule text. Rejected: Stating the limit as '15 or 20 depending on the source'\n- **2026-11-17** — After the flow rubric (sound with notes): the two design paragraphs were merged into one unit; the blocked payment is defined again where the rates first depend on it; the retry-policy paragraph stays at the level of the lever; sections 7 and 8 received a declared order. The note to cut the roadmap paragraph was not applied: the style guide requires it.\n- **2026-11-17** — Three figures (where a payment can stop; one call, several attempts; three readings of one month) to stay within the length limit. Rejected: A fourth figure of the holdout test\n\n## Sources\n\n- **Internal**\n  - PLAN.md — The chapter contract: question, scope, owned terms (authorization rate, soft decline, retry policy, account updater), Larkfield thread.\n  - journal-spec.json — Intent, acceptance criteria, thesis and role, copied unchanged; the previous and next chapters' transitions.\n  - _research/brief-optimization-routing-orchestration.md — Parts 1 to 6: decline types, metric definitions, retry rules, levers, Stripe's and Adyen's products, published machine learning, claims and measurement; open questions.\n  - _research/brief-card-lifecycle-and-networks.md — Section 2.2: Visa Table 7-2 from the rules of 24 October 2026, Mastercard advice codes as rendered by Adyen, the two providers' decline fields.\n  - _research/scenario-ledger.md — Mila's renewal, the provider split, renewal volumes, decisions K1, K5 and K8.\n  - _research/consistency-issues.md — Rulings 8 (gloss network token and risk block), 13 (idempotency key and scheduled retries), 15 (soft and hard decline are not network terms), 17 (Mastercard rules cited through providers).\n- **External**\n  - Stripe documentation: Declines; Card declines; Acceptance analytics; Payments optimization; A/B testing Authorization Boost; Smart Retries; Cards (n.d., accessed November 2026) — Failure types, codes, rate definitions, Adaptive Acceptance actions, attribution method, test design; re-fetched 17 November 2026.\n  - Stripe blog, 12 February 2025, 15 May 2025 and 29 April 2026; Stripe guide 'Optimizing authorization rates' and product page 'Authorization Boost' (n.d., accessed November 2026) — Model change, headline claims, ISO 8583 description; re-fetched 17 November 2026.\n  - Adyen documentation: Adyen Uplift; Enable Adyen Uplift; Uplift experiments; Visa system integrity fee mapping; Raw acquirer responses; Refusal reasons; Real Time Account Updater; Auto Rescue; Network tokenization (n.d., accessed November 2026) — Modules, defaults, retry mapping, refusal fields, updater and rescue behavior; re-fetched 17 November 2026.\n  - Adyen press release 'Introducing Adyen Uplift', 9 January 2025; Andreu Mora, 'The AI behind Uplift', 17 January 2025 — Launch claims and pilot; models, latency budget and control group; re-fetched 17 November 2026.\n  - Visa Core Rules and Visa Product and Service Rules, 24 October 2026 — Section 7.3.6.3 and Table 7-2: decline categories and reattempt limits; downloaded and read 17 November 2026.\n\n## Changelog\n\n- **2026-11-17** — Verification pass: 96 claims checked (82 confirmed, 3 corrected, 5 hedged, 0 unsupported and removed or relabeled, 1 unreachable; 5 not documented or not checked exhaustively); the sentence that Adyen had published no figure since its pilot was corrected (a press release of 22 September 2026 gives single-customer figures), and the Stripe guide quotation now reads 'Do not honor.' as the page does.\n- **2026-11-17** — Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes).\n- **2026-11-17** — First version, written from PLAN.md, the journal spec and the optimization and card-lifecycle research briefs.\n- **2026-11-17** — Journal-spec entry corrected after verification; intent, thesis and role re-synced ('and the current network retry limits could not be confirmed ' -> 'Visa's reattempt limit is confirmed from its rules of 24 Oct').\n- **2026-11-17** — Reconciliation after verification: journal-spec entry and spec body brought into line with the verified page and consistency rulings (ruling 37b; stale open question closed). No unit added, dropped, merged or reordered.\n- **2026-11-17** — Absence audit: 6 statements of absence re-tested with a wide search (2 overturned, 0 narrowed, 4 hold; table in _research/absence-audit/09-authorization-optimization.md). Overturned: Adyen's glossary gives a formula for the payment conversion rate (authorized over initiated transactions) and a 2026 article says it reports on a gross basis; Adyen's press release of 11 February 2026 gives a figure across 6,500+ businesses (1.19% above 'industry baselines'). p-unit controlling idea and evidence on Adyen's formula updated.\n- **2026-11-24** — Sweep of rulings 46-48: the retry-policy paragraph now names the one post each company has published on its retry model (Stripe 23 January 2024; Adyen 3 December 2020), following chapter 29 (ruling 46a); two Sources entries copied. No unit added or dropped.\n- **2026-11-17** — Visual layer: 3 figures generated and inspected (article-illustrator).\n"}]}]}</script>
+<script>
+    (function () {
+        const data = JSON.parse(document.getElementById('data').textContent);
+        const root = document.getElementById('content');
+
+        const postId = (data.meta && data.meta.id) ? String(data.meta.id) : '';
+        const postStatusRaw = (data.meta && data.meta.status) ? String(data.meta.status) : '';
+        if (postId || postStatusRaw) {
+            const header = document.getElementById('post-header');
+            let sectionEl = header.querySelector('p.section');
+            if (!sectionEl) {
+                sectionEl = document.createElement('p');
+                sectionEl.className = 'section';
+                header.insertBefore(sectionEl, header.firstChild);
+            }
+            // Status pill goes first, then a " / " separator before the existing
+            // content (section name and/or id).
+            if (postStatusRaw) {
+                const parts = postStatusRaw.split(':');
+                const statusName = parts[0].trim();
+                const statusColor = (parts[1] || '').trim();
+                const wrap = document.createElement('span');
+                wrap.className = 'post-status';
+                const dot = document.createElement('span');
+                dot.className = 'status-dot';
+                if (statusColor) dot.style.background = statusColor;
+                wrap.appendChild(dot);
+                wrap.appendChild(document.createTextNode(statusName));
+                if (sectionEl.firstChild) {
+                    sectionEl.insertBefore(document.createTextNode(' • '), sectionEl.firstChild);
+                    sectionEl.insertBefore(wrap, sectionEl.firstChild);
+                } else {
+                    sectionEl.appendChild(wrap);
+                }
+            }
+            if (postId) {
+                if (sectionEl.firstChild) sectionEl.appendChild(document.createTextNode(' • '));
+                sectionEl.appendChild(document.createTextNode(postId));
+            }
+        }
+
+        const tagsHost = document.getElementById('tags');
+        (data.tags || []).forEach(function (t) {
+            const span = document.createElement('span');
+            span.className = 'tag';
+            span.textContent = t;
+            tagsHost.appendChild(span);
+        });
+
+        // Minimal markdown renderer. Supports: ATX headings, paragraphs, blockquotes,
+        // unordered/ordered lists, fenced code, inline code, bold/italic/strikethrough, links, images, hr.
+        // Sufficient for the posts in this repo; replace with a fuller parser if needed.
+        function renderMarkdown(src) {
+            const lines = src.replace(/\r\n/g, '\n').split('\n');
+            const out = [];
+            let i = 0;
+
+            const bullet = /^(\s*)([-*])\s+(.*)$/;
+            const ordered = /^(\s*)(\d+)\.\s+(.*)$/;
+            const tableRow = /^\s*\|(.+)\|\s*$/;
+            const tableSep = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+
+            function splitRow(s) {
+                let t = s.trim();
+                if (t.startsWith('|')) t = t.slice(1);
+                if (t.endsWith('|')) t = t.slice(0, -1);
+                return t.split('|').map(c => c.trim());
+            }
+
+            function inline(s) {
+                // Posts are trusted content, so raw HTML passes through unescaped
+                // (some posts embed inline <blockquote>, <div>, etc.).
+                // Stray ampersands still get fixed up.
+                s = s.replace(/&(?![a-zA-Z]+;|#\d+;)/g, '&amp;');
+                s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<a class="image-link" href="$2" target="_blank" rel="noopener noreferrer"><img alt="$1" src="$2"></a>');
+                s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+                s = s.replace(/`([^`]+)`/g, function (_, c) {
+                    return '<code>' + c.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
+                });
+                // Bold/italic, including nested combinations: ***x***,
+                // **a *b*** / ***a* b** (shared delimiters), and **a *b* c**.
+                s = s.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+                s = s.replace(/\*\*([^*\n]+)\*([^*\n]+)\*\*\*/g, '<strong>$1<em>$2</em></strong>');
+                s = s.replace(/\*\*\*([^*\n]+)\*([^*\n]+)\*\*/g, '<strong><em>$1</em>$2</strong>');
+                s = s.replace(/\*\*((?:[^*\n]|\*(?!\*)[^*\n]+\*(?!\*))+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+                s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+                return s;
+            }
+
+            while (i < lines.length) {
+                const line = lines[i];
+                if (!line.trim()) {
+                    i++;
+                    continue;
+                }
+
+                const fence = line.match(/^```(\w*)\s*$/);
+                if (fence) {
+                    i++;
+                    const buf = [];
+                    while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+                        buf.push(lines[i]);
+                        i++;
+                    }
+                    i++;
+                    const escaped = buf.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const cls = fence[1] ? ' class="lang-' + fence[1] + '"' : '';
+                    out.push('<pre><code' + cls + '>' + escaped + '</code></pre>');
+                    continue;
+                }
+
+                const h = line.match(/^(#{1,6})\s+(.*)$/);
+                if (h) {
+                    out.push('<h' + h[1].length + '>' + inline(h[2]) + '</h' + h[1].length + '>');
+                    i++;
+                    continue;
+                }
+
+                if (/^\s*(?:-\s*){3,}\s*$/.test(line) || /^\s*\*{3,}\s*$/.test(line)) {
+                    out.push('<hr>');
+                    i++;
+                    continue;
+                }
+
+                if (/^>\s?/.test(line)) {
+                    const buf = [];
+                    while (i < lines.length && /^>\s?/.test(lines[i])) {
+                        buf.push(lines[i].replace(/^>\s?/, ''));
+                        i++;
+                    }
+                    out.push('<blockquote>' + renderMarkdown(buf.join('\n')) + '</blockquote>');
+                    continue;
+                }
+
+                if (tableRow.test(line) && i + 1 < lines.length && tableSep.test(lines[i + 1])) {
+                    const headers = splitRow(line);
+                    const aligns = splitRow(lines[i + 1]).map(function (c) {
+                        c = c.trim();
+                        const left = c.startsWith(':'), right = c.endsWith(':');
+                        return left && right ? 'center' : right ? 'num' : '';
+                    });
+                    const cellOpen = function (tag, idx) {
+                        return aligns[idx] ? '<' + tag + ' class="' + aligns[idx] + '">' : '<' + tag + '>';
+                    };
+                    i += 2;
+                    const rows = [];
+                    while (i < lines.length && tableRow.test(lines[i])) {
+                        rows.push(splitRow(lines[i]));
+                        i++;
+                    }
+                    let html = '<div class="table-wrap"><table><thead><tr>';
+                    headers.forEach((h, idx) => {
+                        html += cellOpen('th', idx) + inline(h) + '</th>';
+                    });
+                    html += '</tr></thead><tbody>';
+                    rows.forEach(r => {
+                        html += '<tr>';
+                        r.forEach((c, idx) => {
+                            html += cellOpen('td', idx) + inline(c) + '</td>';
+                        });
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                    out.push(html);
+                    continue;
+                }
+
+                if (bullet.test(line) || ordered.test(line)) {
+                    // Indent of the first bullet defines this list's base level.
+                    // Deeper-indented bullets become nested lists (rendered by
+                    // recursing into renderMarkdown). Same-or-less indent at a
+                    // bullet starts a sibling item (or ends the list).
+                    const firstMatch = line.match(bullet) || line.match(ordered);
+                    const baseIndent = firstMatch[1].length;
+                    const isOrdered = ordered.test(line);
+                    const items = [];
+                    let hasTask = false;
+                    while (i < lines.length) {
+                        const cur = lines[i];
+                        if (!cur.trim()) {
+                            // blank line breaks the list (matches CommonMark-ish behaviour)
+                            i++;
+                            break;
+                        }
+                        const mBul = cur.match(bullet);
+                        const mOrd = cur.match(ordered);
+                        const m = mBul || mOrd;
+                        if (!m) break;
+                        if (m[1].length < baseIndent) break;
+                        if (m[1].length > baseIndent) break; // shouldn't happen at top of loop
+                        // Same-type check: switching between -/* and 1. closes the list
+                        if (isOrdered !== !!mOrd) break;
+
+                        const itemBuf = [m[3]];
+                        const nestedBuf = [];
+                        i++;
+                        while (i < lines.length) {
+                            const nxt = lines[i];
+                            if (!nxt.trim()) break;
+                            const nBul = nxt.match(bullet);
+                            const nOrd = nxt.match(ordered);
+                            const nm = nBul || nOrd;
+                            if (nm) {
+                                if (nm[1].length > baseIndent) {
+                                    // nested list line — dedent and stash
+                                    nestedBuf.push(nxt.slice(baseIndent + 2));
+                                    i++;
+                                    continue;
+                                }
+                                // sibling or end of list
+                                break;
+                            }
+                            // Plain continuation text
+                            if (nestedBuf.length) {
+                                // continuation inside the nested block
+                                nestedBuf.push(nxt.slice(baseIndent + 2));
+                            } else {
+                                itemBuf.push(nxt.trim());
+                            }
+                            i++;
+                        }
+
+                        // GitHub-style task items: "- [ ] text" / "- [x] text"
+                        // render as (clickable, unpersisted) checkboxes.
+                        const itemText = itemBuf.join('\n');
+                        const task = !isOrdered && itemText.match(/^\[( |x|X)\]\s+/);
+                        let liHtml = inline(task ? itemText.slice(task[0].length) : itemText);
+                        if (task) {
+                            hasTask = true;
+                            liHtml = '<input type="checkbox"' + (task[1] === ' ' ? '' : ' checked') + '>' + liHtml;
+                        }
+                        if (nestedBuf.length) {
+                            liHtml += renderMarkdown(nestedBuf.join('\n'));
+                        }
+                        items.push(task ? '<li class="task">' + liHtml + '</li>' : '<li>' + liHtml + '</li>');
+                    }
+                    out.push((isOrdered ? '<ol>' : (hasTask ? '<ul class="task-list">' : '<ul>')) + items.join('') + (isOrdered ? '</ol>' : '</ul>'));
+                    continue;
+                }
+
+                const buf = [line];
+                i++;
+                while (i < lines.length && lines[i].trim() && !/^#{1,6}\s/.test(lines[i]) && !/^>\s?/.test(lines[i]) && !bullet.test(lines[i]) && !ordered.test(lines[i]) && !/^```/.test(lines[i]) && !tableRow.test(lines[i])) {
+                    buf.push(lines[i]);
+                    i++;
+                }
+                out.push('<p>' + inline(buf.join(' ')) + '</p>');
+            }
+            return out.join('\n');
+        }
+
+        // Block dispatcher. New block types plug in here.
+        const renderers = {
+            markdown: function (block) {
+                const div = document.createElement('div');
+                div.innerHTML = renderMarkdown(block.content);
+                return div;
+            },
+            mermaid: function (block) {
+                // Mermaid scans elements with class "mermaid" whose textContent
+                // is the diagram source. We collect these nodes and run
+                // mermaid.run() once after all blocks are in the DOM.
+                const div = document.createElement('div');
+                div.className = 'mermaid';
+                div.textContent = block.content;
+                return div;
+            },
+            'force-graph': function (block) {
+                // build.py emits parsed JSON: {nodes:[{id,size}], links:[{source,target}]}.
+                // We instantiate force-graph after the container is in the DOM
+                // so it can measure its own width.
+                const div = document.createElement('div');
+                div.className = 'force-graph';
+                const data = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.ForceGraph) return;
+                    const maxSize = data.nodes.reduce((m, n) => Math.max(m, n.size || 1), 1);
+                    window.ForceGraph()(div)
+                        .graphData(data)
+                        .width(div.clientWidth)
+                        .height(div.clientHeight)
+                        .nodeRelSize(4)
+                        .nodeVal(n => Math.max(20 * (n.size || 1) / maxSize, 0.001))
+                        .nodeLabel(n => n.id + ' (' + (n.size || 1) + ')')
+                        .nodeColor(() => 'rgba(135, 206, 235, 0.7)')
+                        .linkColor(() => 'rgba(60, 60, 60, 0.4)')
+                        .linkDirectionalArrowLength(4)
+                        .linkDirectionalArrowRelPos(1)
+                        .linkWidth(1);
+                });
+                return div;
+            },
+            'bubble-chart': function (block) {
+                // build.py emits {nodes:[{name,size}]}. Renders a D3 circle-pack
+                // SVG (same shape as the obren.io reference, just inline).
+                const wrap = document.createElement('div');
+                wrap.className = 'bubble-chart';
+                const payload = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.d3) return;
+                    const diameter = 480;
+                    const fill = '#c0deed';
+                    const textColor = '#111111';
+                    const fontSize = 12;
+
+                    const svg = window.d3.select(wrap).append('svg')
+                        .attr('viewBox', '0 0 ' + diameter + ' ' + diameter)
+                        .attr('width', diameter)
+                        .attr('height', diameter);
+
+                    const root = window.d3.hierarchy({children: payload.nodes})
+                        .sum(d => d.size || 0)
+                        .sort((a, b) => b.value - a.value);
+
+                    window.d3.pack().size([diameter, diameter]).padding(2)(root);
+
+                    const node = svg.selectAll('g')
+                        .data(root.leaves())
+                        .enter().append('g')
+                        .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+
+                    node.append('title').text(d => d.data.name + ': ' + d.value);
+                    node.append('circle').attr('r', d => d.r).style('fill', fill);
+                    node.append('text')
+                        .attr('dy', '.3em')
+                        .style('text-anchor', 'middle')
+                        .style('fill', textColor)
+                        .style('font-size', fontSize + 'px')
+                        .text(d => d.data.name.substring(0, Math.max(0, Math.floor(d.r / 3))));
+                });
+                return wrap;
+            }
+        };
+
+        // Render one modality's blocks into a host element. Mermaid runs
+        // scoped to just the nodes created here, so lazily rendered tabs get
+        // their diagrams on first activation.
+        let mermaidInitialized = false;
+        function renderBlocksInto(blocks, host) {
+            const mermaidNodes = [];
+            blocks.forEach(function (block) {
+                const r = renderers[block.type];
+                if (!r) {
+                    const pre = document.createElement('pre');
+                    pre.textContent = '[unknown block type: ' + block.type + ']';
+                    host.appendChild(pre);
+                    return;
+                }
+                const node = r(block);
+                if (node instanceof Node) {
+                    host.appendChild(node);
+                    if (block.type === 'mermaid') mermaidNodes.push(node);
+                }
+            });
+            if (mermaidNodes.length && window.mermaid) {
+                if (!mermaidInitialized) {
+                    window.mermaid.initialize({startOnLoad: false, theme: 'default'});
+                    mermaidInitialized = true;
+                }
+                window.mermaid.run({nodes: mermaidNodes});
+            }
+            markScrollableTables(host);
+        }
+
+        // A table wider than its wrapper scrolls sideways. Mark those wrappers
+        // so the CSS can show a cue, and make them focusable so keyboard users
+        // can reach and scroll them. Hidden panes measure 0 and are re-marked
+        // when activated or when the window is resized.
+        function markScrollableTables(host) {
+            host.querySelectorAll('.table-wrap').forEach(function (wrap) {
+                const scrolls = wrap.scrollWidth > wrap.clientWidth + 1;
+                wrap.classList.toggle('is-scrollable', scrolls);
+                if (scrolls) {
+                    wrap.setAttribute('tabindex', '0');
+                    wrap.setAttribute('role', 'region');
+                    wrap.setAttribute('aria-label', 'Table that scrolls sideways');
+                } else {
+                    wrap.removeAttribute('tabindex');
+                    wrap.removeAttribute('role');
+                    wrap.removeAttribute('aria-label');
+                }
+            });
+        }
+
+        // Modality tabs. One <article class="pane"> per modality; panes are
+        // rendered lazily on first activation (force-graph / D3 / mermaid
+        // need a visible, measurable container). With a single modality the
+        // tab bar stays hidden and the page looks exactly like before.
+        const mods = data.modalities;
+        const tabBar = document.getElementById('modality-tabs');
+        const panes = {};
+        const tabButtons = {};
+        const renderedPanes = {};
+
+        // With several modalities each pane is a tabpanel labelled by its
+        // tab (W3C APG tabs pattern); tabindex=0 lets keyboard users move
+        // from the tab list straight into the active content.
+        mods.forEach(function (m) {
+            const pane = document.createElement('article');
+            pane.className = 'pane';
+            pane.dataset.key = m.key;
+            pane.hidden = true;
+            if (mods.length > 1) {
+                pane.id = 'pane-' + m.key;
+                pane.setAttribute('role', 'tabpanel');
+                pane.setAttribute('aria-labelledby', 'tab-' + m.key);
+                pane.setAttribute('tabindex', '0');
+            }
+            root.appendChild(pane);
+            panes[m.key] = pane;
+        });
+
+        const defaultKey = mods.some(m => m.key === 'index') ? 'index' : mods[0].key;
+
+        function activate(key, updateHash) {
+            mods.forEach(function (m) {
+                const isActive = m.key === key;
+                panes[m.key].hidden = !isActive;
+                if (tabButtons[m.key]) {
+                    tabButtons[m.key].classList.toggle('active', isActive);
+                    tabButtons[m.key].setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    // Roving tabindex: only the selected tab is in the Tab
+                    // order; the arrow keys move between tabs.
+                    tabButtons[m.key].setAttribute('tabindex', isActive ? '0' : '-1');
+                }
+            });
+            // Unhide first, then render: the chart libraries measure widths.
+            if (!renderedPanes[key]) {
+                renderBlocksInto(mods.find(m => m.key === key).blocks, panes[key]);
+                renderedPanes[key] = true;
+            } else {
+                markScrollableTables(panes[key]);
+            }
+            if (updateHash) {
+                history.replaceState(null, '',
+                    key === defaultKey ? location.pathname + location.search : '#' + key);
+            }
+        }
+
+        if (mods.length > 1) {
+            mods.forEach(function (m) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = m.label;
+                btn.id = 'tab-' + m.key;
+                btn.dataset.key = m.key;
+                btn.setAttribute('role', 'tab');
+                btn.setAttribute('aria-controls', 'pane-' + m.key);
+                btn.addEventListener('click', function () { activate(m.key, true); });
+                tabBar.appendChild(btn);
+                tabButtons[m.key] = btn;
+            });
+            // Keyboard support per the W3C APG tabs pattern (automatic
+            // activation): Left/Right move between tabs and wrap, Home/End
+            // jump to the first/last tab, and the focused tab is selected.
+            tabBar.addEventListener('keydown', function (ev) {
+                const keys = mods.map(function (m) { return m.key; });
+                const focused = document.activeElement;
+                const current = focused && focused.dataset ? keys.indexOf(focused.dataset.key) : -1;
+                if (current < 0) return;
+                let next = null;
+                if (ev.key === 'ArrowRight') next = (current + 1) % keys.length;
+                else if (ev.key === 'ArrowLeft') next = (current - 1 + keys.length) % keys.length;
+                else if (ev.key === 'Home') next = 0;
+                else if (ev.key === 'End') next = keys.length - 1;
+                if (next === null) return;
+                ev.preventDefault();
+                activate(keys[next], true);
+                tabButtons[keys[next]].focus();
+            });
+            tabBar.hidden = false;
+        }
+
+        // The hash selects a tab only when it matches a modality key, so
+        // existing anchors keep working.
+        const initialHash = location.hash.slice(1);
+        activate(mods.some(m => m.key === initialHash) ? initialHash : defaultKey, false);
+        window.addEventListener('hashchange', function () {
+            const k = location.hash.slice(1);
+            if (mods.some(m => m.key === k)) activate(k, false);
+        });
+        window.addEventListener('resize', function () { markScrollableTables(root); });
+    })();
+</script>
+</body>
+</html>

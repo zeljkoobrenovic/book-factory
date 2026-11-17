@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Spec: Changing the Engine in Flight: Deploys, Migrations and Incidents</title>
+    <meta name="description" content="How do you ship changes many times a day to a system that moves money? You let each change reach a small, bounded share of live traffic, withdraw it automatically when its metrics deviate, and test the way back; and because one percent of traffic is still real payments, you call the change finished only when the records agree after it.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SETTLED: Architecting Payments and Revenue Infrastructure">
+    <meta property="og:title" content="Spec: Changing the Engine in Flight: Deploys, Migrations and Incidents">
+    <meta property="og:description" content="How do you ship changes many times a day to a system that moves money? You let each change reach a small, bounded share of live traffic, withdraw it automatically when its metrics deviate, and test the way back; and because one percent of traffic is still real payments, you call the change finished only when the records agree after it.">
+    <meta property="og:url" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/payment-safe-change.spec.html">
+    <meta property="og:image" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/assets/images/41-safe-change/logo.jpeg">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="site.css">
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-129891352-1"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+        dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'UA-129891352-1');
+</script>
+    <style>
+        body {
+            line-height: 1.65;
+        }
+
+        main {
+            padding-top: 32px;
+        }
+
+        nav.post-nav {
+            font-size: 14px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: baseline;
+            flex-wrap: wrap;
+        }
+
+        nav.post-nav a {
+            color: var(--muted);
+            text-decoration: none;
+        }
+
+        nav.post-nav a:hover {
+            color: var(--accent);
+        }
+
+        nav.post-nav .nav-right {
+            margin-left: auto;
+            display: inline-flex;
+            gap: 4px;
+            align-items: baseline;
+        }
+
+        nav.post-nav .nav-sep {
+            color: var(--muted);
+        }
+
+        footer nav.post-nav {
+            margin-top: 24px;
+            margin-bottom: 0;
+        }
+
+        header.post {
+            margin-bottom: 32px;
+        }
+
+        header.post .section {
+            color: var(--muted);
+            font-size: 13px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin: 0 0 -6px;
+        }
+
+        header.post .section a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        header.post .section a:hover {
+            color: var(--accent);
+        }
+
+        header.post .section .post-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        header.post .section .post-status .status-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        header.post .logo {
+            display: block;
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            border: 1px solid lightgrey;
+
+        }
+
+        header.post .logo-credit {
+            color: var(--muted);
+            font-size: 12px;
+            margin: -4px 0 24px;
+            text-align: right;
+        }
+
+        header.post h1 {
+            font-size: 52px;
+            line-height: 1.2;
+            margin: 0 0 2px;
+            padding: 0;
+            letter-spacing: -0.01em;
+            font-weight: normal;
+        }
+
+        header.post .byline {
+            color: var(--muted);
+            font-size: 15px;
+            margin: 0;
+        }
+
+        header.post .byline .spec-link {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        header.post .byline .spec-link:hover {
+            text-decoration: underline;
+        }
+
+        header.post .byline .spec-link-drifted {
+            color: #b8650f;
+        }
+
+        header.post .byline .spec-link-superseded {
+            color: var(--muted);
+        }
+
+        header.post .ai-credit {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 4px 0 0;
+        }
+
+        header.post .ai-credit a {
+            color: inherit;
+        }
+
+        header.post .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 10px 0 10px;
+        }
+
+        header.post .tags .tag {
+            font-size: 14px;
+            padding: 1px 8px;
+            border: 1px solid deepskyblue;
+            color: blue;
+            border-radius: 999px;
+            background-color: var(--tag-bg);
+        }
+
+        nav.modality-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--rule);
+            margin: 0 0 28px;
+            flex-wrap: wrap;
+        }
+
+        nav.modality-tabs button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font: inherit;
+            font-size: 14px;
+            color: var(--muted);
+            padding: 8px 14px;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            letter-spacing: 0.02em;
+        }
+
+        nav.modality-tabs button:hover {
+            color: var(--accent);
+        }
+
+        nav.modality-tabs button.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        #content .pane[hidden] {
+            display: none;
+        }
+
+        #content .pane:focus {
+            outline: none;
+        }
+
+        #content .pane:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 6px;
+        }
+
+        article h2 {
+            font-size: 26px;
+            margin: 40px 0 12px;
+            letter-spacing: -0.01em;
+        }
+
+        article h3 {
+            font-size: 20px;
+            margin: 28px 0 8px;
+        }
+
+        article h4 {
+            font-size: 17px;
+            margin: 20px 0 6px;
+        }
+
+        article p {
+            margin: 0 0 16px;
+        }
+
+        article a {
+            color: var(--accent);
+        }
+
+        article a.image-link {
+            display: inline-block;
+            line-height: 0;
+        }
+
+        article img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        article a.image-link img {
+            display: block;
+        }
+
+        article ul, article ol {
+            padding-left: 24px;
+            margin: 0 0 16px;
+        }
+
+        article li {
+            margin-bottom: 6px;
+        }
+
+        article ul.task-list {
+            list-style: none;
+            padding-left: 4px;
+        }
+
+        article ul.task-list li.task > input[type="checkbox"] {
+            margin-right: 8px;
+            accent-color: var(--accent);
+        }
+
+        article hr {
+            border: none;
+            border-top: 1px solid var(--rule);
+            margin: 32px 0;
+        }
+
+        article blockquote {
+            margin: 16px 0;
+            padding: 12px 18px;
+            background: var(--quote-bg);
+            border-left: 3px solid var(--accent);
+            color: #333;
+        }
+
+        article blockquote p:last-child {
+            margin-bottom: 0;
+        }
+
+        article code {
+            background: var(--code-bg);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 0.92em;
+        }
+
+        article pre {
+            background: var(--code-bg);
+            padding: 14px 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        article pre code {
+            background: none;
+            padding: 0;
+        }
+
+        article .table-wrap {
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+
+        article table {
+            border-collapse: collapse;
+            margin: 16px 0;
+            width: 100%;
+            font-size: 15px;
+        }
+
+        article .table-wrap table {
+            margin: 0;
+        }
+
+        /* Wide tables scroll on narrow screens instead of crushing their columns.
+           A table wrapped in <div class="table-compact"> opts out: it has few,
+           short columns and wraps its cells to fit the screen instead. */
+        @media (max-width: 640px) {
+            article .table-wrap table {
+                min-width: 560px;
+            }
+            article .table-compact .table-wrap table {
+                min-width: 0;
+            }
+        }
+
+        /* Tables that actually overflow get a visible cue and keyboard focus
+           (markScrollableTables() sets the class and attributes). */
+        article .table-wrap.is-scrollable::before {
+            content: "Scroll sideways to see the whole table";
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        article .table-wrap.is-scrollable:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        article th, article td {
+            border: 1px solid var(--rule);
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        article th {
+            background: var(--code-bg);
+            font-weight: 600;
+        }
+
+        /* GFM column alignment from the separator row. Right-aligned columns
+           hold numbers; their cells never wrap, so a sign, a currency symbol
+           and its amount stay on one line while label columns still wrap. */
+        article th.num, article td.num {
+            text-align: right;
+        }
+
+        article td.num {
+            white-space: nowrap;
+        }
+
+        article th.center, article td.center {
+            text-align: center;
+        }
+
+        article .mermaid {
+            text-align: center;
+            margin: 24px 0;
+        }
+
+        article .force-graph {
+            margin: 24px 0;
+            border: 1px solid var(--rule);
+            border-radius: 6px;
+            background: #fff;
+            height: 480px;
+            overflow: hidden;
+        }
+
+        article .bubble-chart {
+            margin: 24px 0;
+            text-align: center;
+        }
+
+        article .bubble-chart svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <nav class="post-nav"><a class="nav-back" href="payment-safe-change.html">← Changing the Engine in Flight: Deploys, Migrations and Incidents</a><span class="nav-right"></span></nav>
+    <header class="post" id="post-header">
+        <p class="section"><span>SPEC</span> • <span class="post-status"><span class="status-dot" style="background:green"></span>accepted</span> • <span>revised 2026-11-17</span></p>
+        <h1>Spec: Changing the Engine in Flight: Deploys, Migrations and Incidents</h1>
+        <p class="byline"></p>
+        
+        <div class="tags" id="tags"></div>
+        
+    </header>
+    <nav class="modality-tabs" id="modality-tabs" hidden role="tablist" aria-label="Reading formats"></nav>
+    <div id="content"></div>
+    <footer>
+        <nav class="post-nav"><a class="nav-back" href="payment-safe-change.html">← Changing the Engine in Flight: Deploys, Migrations and Incidents</a><span class="nav-right"></span></nav>
+    </footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/force-graph"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script id="data" type="application/json">{"meta": {}, "tags": [], "modalities": [{"key": "spec", "label": "Spec", "meta": {}, "blocks": [{"type": "markdown", "content": "## Intent\n\n**After reading, the reader should:**\n\n- **Know:** The terms progressive rollout, feature flag, dark launch, zero-downtime migration and postmortem.\n- **Know:** What Stripe's 2023 annual letter (published March 2024) says about its deployment pipeline, and what happened on 8 February 2024 when a change reached 1% of its critical traffic.\n- **Know:** What Adyen has published about release practice (2018, 2021, and current documentation that says releases are applied continuously and frozen around named peak days) and database change without downtime (2018 to 2025), and that Adyen's Infrastructure page says it publishes new releases of its core system every week, while no figure comparable to Stripe's deploy count is public for it.\n- **Know:** The engineering-culture facts each company has stated that bear on change: one dominant language and a monorepo at both, software built in-house or on open source at both, cloud rented at Stripe and hardware owned at Adyen.\n- **Believe:** On a money path, frequent small reversible changes are safer than rare large ones, and one percent of traffic is still real payments.\n- **Believe:** A deployment or migration is finished when the records agree afterwards, not when the rollout reaches 100%.\n- **Be able to:** Plan a change to a money path as stages with a bounded share of traffic, a signal that withdraws it and a way back at each stage.\n- **Be able to:** Plan a table or version migration with dual writing, comparison and a reconciliation check before the old path is removed.\n- **Be able to:** After a withdrawn rollout, find the payments it touched and prove their state.\n\n**Audience:** A software engineer or architect who deploys, or is about to deploy, changes to a system that calls a payment provider, and who knows continuous delivery in general.\n\n**Already knows:**\n\n- Continuous integration, canary releases, feature flags, blue-green deployment and schema migrations as general engineering.\n- Idempotency keys and the unknown outcome (idempotency-and-retries), the webhook receiver's contract (payment-webhooks-and-events), the ledger and reconciliation (payment-ledgers, payment-reconciliation-and-reporting) and the Version Cliff (payment-api-versioning).\n- The four earlier chapters of Part VIII and the incidents they cite; Larkfield and the Keel decisions (meet-larkfield).\n\n**Does not yet know:**\n\n- What Stripe and Adyen have each published, with dates, about deployment, migration and incident practice, and where that record stops.\n- Why a rollout's own metrics cannot close a change on a money path.\n\n**Acceptance criteria**\n\n| Id | Criterion | Check | Method | Severity |\n| --- | --- | --- | --- | --- |\n| AC-1 | Given a rollout that was withdrawn automatically, the reader says the work is not finished and names what remains. *Probe:* A change to your payment service went to 1% of live traffic for ten minutes, error rates rose, and the rollout was withdrawn automatically. Your manager says the system worked and nothing more is needed. Using this chapter, what is still to do? | `custom` | cold_reader | major |\n| AC-2 | Given a migration the chapter does not contain, the reader orders its steps so that each can be reversed and says when the old path may be removed. *Probe:* Your team must move from one version of a provider's API to another that renames a field your finance export reads, with no downtime and no wrong reports. Put the steps in order and say when the old code may be deleted. | `custom` | cold_reader | major |\n| AC-3 | The chapter does not compare the two companies' deployment frequency and says why the public record cannot support that comparison; it presents reconciliation after a change as the author's recommendation, and states that neither company has published such a gate. | `custom` | rubric | blocker |\n| AC-4 | As the page that carries the part's closing, the conclusion returns to the two Larkfield first-of-month runs and states what the five chapters show together that none shows alone. | `conclusion_calls_back_to_introduction` | rubric | major |\n\n## Thesis\n\n**Question:** How do you ship changes many times a day to a system that moves money?\n\n> **Claim:** A money path can take hundreds of changes a day when each one is first exposed to a bounded share of live traffic, is withdrawn automatically when its metrics deviate, and has a way back that has itself been tested; because even a change limited to 1% of traffic fails real payments, the author's rule is that a change is finished only when the records agree after it.\n\n**Disputed by:** The view that systems that move money should change rarely: release windows, freezes before busy periods and manual sign-off are safer than hundreds of deployments a day.\n\n**So what:** The reader stops defending their payment system by pinning versions and avoiding change, which is how Larkfield reached the Version Cliff, and instead schedules small staged changes with a comparison step and a reconciliation after each, as K7 does.\n\n**How and why:** Stripe's 2023 annual letter (published March 2024) describes about 400 deployments a day to one core API service, each rolled out to test-mode traffic first and then to rising shares of live traffic, inspected against 55,000 metrics and withdrawn automatically. The same letter reports the limit: on 8 February 2024 an erroneous change reached 1% of critical traffic and payments failed. Its 2019 root-cause analysis shows a rollback causing the second outage of the day, which is why the way back has to be tested too; its 2017 and 2024 migration accounts keep both paths writable until a comparison passes. Adyen's 2018 account describes development on one main line, release branches, and features switched on one by one and then tried on a small share of traffic. So the documented difference is that Stripe describes gating the deployed code by traffic share (2024) and Adyen gating the feature (2018); each may do both; Adyen states a weekly release of its core system and no deploy count, so frequency cannot be compared number for number. Neither company has published a check of money correctness tied to a deployment; the last clause of the claim is the author's recommendation, drawn from the book's own test for a single payment.\n\n**Supporting claims**\n\n- **S1** — Exposure can be bounded: Stripe's 2023 annual letter describes each change reaching test-mode traffic, one machine and then rising shares of live traffic, withdrawn automatically when metrics deviate, and Adyen's 2018 account separates deploying code from activating a feature.\n- **S2** — Bounded exposure still fails real payments, and the way back is a change that can fail too: on 8 February 2024 a change at 1% of Stripe's critical traffic failed payments, and on 10 July 2019 a revert caused Stripe's second outage of the day.\n- **S3** — A change to stored data is made reversible by keeping the old and the new path both working until a comparison passes, as Stripe described in 2017 and 2024 and as Adyen's database posts of 2018 to 2025 show from the database side.\n- **S4** — The public record supports a comparison of what each company gates and of a few engineering-culture facts, and does not support a comparison of deployment frequency or a claim that either ties a check of money correctness to a deployment.\n- **S5** — Error metrics cannot see a change that writes wrong records without failing a request, so the author's rule is that a change to a money path is finished only when the records agree after it.\n\n## Role in the part\n\nNames change as the cause behind the incidents the part has cited and gives the reader the staged, reversible, reconciled change as the practice; carries the part's closing. Supports P8-5 of part `part-8`.\n\n## Flow\n\n**Pattern:** `problem_solution` (also `prerequisite_order` in rollout, migrations, designs: code change before data change, mechanisms before the comparison of designs; `comparison` in incidents-and-culture and where-they-differ)\n\nThe Larkfield deploy comes first because it poses four questions (exposure, withdrawal, way back, records), and the body answers them in that order. The cost of a bad change precedes the mechanisms because its third kind of damage, a wrong record with no error, is what none of the mechanisms catches; without it the last rule would look like an afterthought. Rollout precedes migrations because a migration is a rollout whose effects cannot be withdrawn by routing, so it needs the rollout vocabulary. The four designs come after both because the table compares mechanisms the reader has now seen documented, and it is where the fourth answer, a reconciliation after the change, is named as the step none of the designs supplies. Incident and culture facts follow the designs and precede the comparison because the comparison table cites them; placed before the designs they would separate the mechanisms from the table that sorts them. Larkfield's upgrade comes after the comparison because it opens with what a small team should take from the providers and then applies all four answers; moved earlier it would use dark launch and reconciliation before they are defined. The withdrawn rollout comes last because it is the failure of the plan the upgrade section has just laid out.\n\n## Introduction\n\n**Hook** (`intriguing_example`): On 8 February 2024, between 21:46 and 21:52 UTC, a change at Stripe reached 1% of what the company calls its critical tier of traffic. The staged pipeline had kept it from the other 99%. In those six minutes the three most affected users had 39, 15 and 12 payments fail.\n\n**Bridge:** An engineer protects a system that must not break by changing it rarely: release windows, a freeze before the busy season, a pinned dependency nobody touches. → A payment system has no quiet hour and no freeze that fits around its peaks, and Larkfield's Version Cliff shows where avoiding change leads; the question becomes how to make each change small, bounded and reversible, and how to know it is done.\n\n**Thesis statement** (KEY POINTS bullets 1 and 3 and paragraph p03): A money path can take hundreds of changes a day when each one is first exposed to a bounded share of live traffic, is withdrawn automatically when its metrics deviate, and has a way back that has itself been tested; because even a change limited to 1% of traffic fails real payments, the author's rule is that a change is finished only when the records agree after it.\n\n**Roadmap** (IN THIS CHAPTER callout and paragraph p05):\n\n- Start from Larkfield's March 2026 upgrade read as a change, and the four questions it could not answer. *Kept in:* scene.\n- Say why a money path cannot stop changing and which three kinds of damage a bad change does. *Kept in:* problem.\n- Explain progressive rollout from Stripe's 2023 letter, its limit on 8 February 2024, Adyen's 2018 account and the 2019 rollback. *Kept in:* rollout.\n- Explain migrations that keep two paths alive until a comparison passes, with Stripe's and Adyen's published cases. *Kept in:* migrations.\n- Compare four ways to limit a change. *Kept in:* designs.\n- Report what each company has shown in public about incidents and about engineering choices that shape change. *Kept in:* incidents-and-culture.\n- Set the two providers side by side. *Kept in:* where-they-differ.\n- Walk Larkfield's May 2027 upgrade as a staged change and recover from a withdrawn rollout. *Kept in:* in-practice, when-it-goes-wrong.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p01 | context | Chapter 40 left a system that cannot be stopped for its peaks, and the incidents on record show what threatens it: on 8 February 2024 a change at Stripe got no further than 1% of critical traffic, and payments still failed for six minutes. | case: Stripe 2023 annual letter (published 2024-03-13): 'the most significant recent issue which happened on February 8, 2024 between 21:46 and 21:52 UTC'; 'the three most impacted users had 39, 15, and 12 payments fail'; 'an erroneous change rolled out all the way to 1% of the critical tier of traffic'.; case: Adyen, 'Partitioning an environment, not individual tables' (2025-09-16): the near miss before a December season was set off by 'automatically adding one more partition to an already partitioned table'. |  |\n| p02 | counterargument | The usual defense of a system that must not break is to change it rarely, and Larkfield, the fictional platform this book follows, shows where that leads: an integration nobody touched for three years crossed all of its postponed changes in one deploy. | scenario: Ledger: the Version Cliff, March 2026: the billing integration was pinned to a three-year-old API version; a forced SDK upgrade moved it across a breaking release; subscription revenue reports were wrong for 6 days. | `contrast`: The six minutes in which a small, bounded change failed payments. → The opposite instinct, changing rarely, and its cost at Larkfield. |\n| p03 | claim | A money path can take hundreds of changes a day when each is first exposed to a bounded share of live traffic, is withdrawn automatically when its metrics deviate and has a tested way back; because 1% of traffic is still real payments, the author's rule is that a change is finished only when the records agree after it. |  | `problem_solution`: Two ways to be hurt by change: a bounded one that still failed payments and an avoided one that arrived all at once. → The thesis: bounded, withdrawable, reversible change, and reconciliation as the test that it is done. |\n| p04 | context | This chapter is off the path of Mila's class pass and bears on every step of it: her request at 19:42 was handled by whichever build of each system was live that minute, at Larkfield and at Adyen. | scenario: Mila's €120.00 ten-class pass at Studio Noord (on Adyen), Tuesday 9 March 2027 at 19:42. | `place`: The chapter's claim. → Its position relative to the recurring payment. |\n| p05 | transition | The chapter goes from Larkfield's upgrade through the cost of a bad change, progressive rollout, migrations, the four designs and what each company has published on incidents and engineering choices, to the comparison, Larkfield's May 2027 upgrade and the recovery from a withdrawn rollout. |  | `sequence`: Where the chapter sits. → The order of its sections. |\n\n## Sections\n\n### Setting the Scene at Larkfield: An Upgrade That Was Finished When It Deployed\n\n**Controlling idea** (`example`, id `scene`): Read as a change and not as a versioning problem, Larkfield's March 2026 upgrade reached all traffic in one step, had no signal that could withdraw it, no rehearsed way back and no check of the records, and was called finished at deploy.\n\n**Advances the thesis** (S5): Poses the chapter's four questions through an incident in which no request failed, so that error metrics alone are shown to be insufficient before any mechanism is named.\n\n**Transition in:** `example`: The introduction's Version Cliff. → The same incident examined as a deployment.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p06 | context | The March 2026 library upgrade, the incident Larkfield calls the Version Cliff, went to every request of the billing integration in one deploy, raised no error and fired no alert, and was found six days later by finance, not by engineering. | scenario: Ledger and the chapter 19 addition: the upgraded library carried 2026-02-25.clover; the finance export read the Invoice object's subscription field, removed in 2025-03-31.basil; the export raised no error and filed invoices as one-off sales; reports wrong for 6 days. Priya Raman, Finance Controller, owns the close. |  |\n| p07 | analysis | Femke de Graaf's 2027 review asked four questions of that deploy, and it had an answer to none: what share of traffic it reached first, which signal would have withdrawn it, what the way back was and whether it had been tried, and which check showed afterwards that the records were right. | scenario: Femke de Graaf leads Keel; K7: versions are upgraded on a calendar, tested against recorded traffic (ledger). | `cause_effect`: What the deploy did. → The four questions the review asked, which the chapter answers in order. |\n\n### Why a Money Path Cannot Stop Changing, and What a Bad Change Costs\n\n**Controlling idea** (`explanation`, id `problem`): Change is the usual trigger of payment outages and cannot be avoided by changing rarely; a bad change does three kinds of damage (failed payments, unknown outcomes, wrong records), and only the first shows on an error graph.\n\n**Advances the thesis** (S2, S5): Establishes change as the cause behind the part's incidents, refutes the freeze as a defense and names the damage that the rest of the chapter bounds.\n\n**Transition in:** `elaboration`: Femke's four questions. → Why they matter more on a money path than elsewhere.\n\n**Order of paragraphs** (`problem_solution`): The cause comes first, then the tempting defense and why it fails, then the damage sorted by how visible it is, because the third kind of damage is the reason for the chapter's last rule.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p08 | evidence | The incidents this part has cited were set off by changes: Stripe's 2023 letter says so in general, and its 2019 and 2024 incidents and Adyen's partition near miss are each a change that went wrong. | quotation: Stripe 2023 annual letter (published 2024-03-13): 'many outages at internet companies are in some way triggered by a change gone wrong'.; case: Stripe RCA of 10 July 2019: 'two different database bugs and a configuration change interacted in an unforeseen way'; the database minor version had been installed three months earlier. Adyen (2025-09-16): incident number 2016, an automatically added partition before December. |  |\n| p09 | refutation | Changing rarely, through release windows (fixed times at which changes may go out) and freezes (periods in which none may), does not remove the risk: a payment system has no quiet hour in which to change, both companies describe changing live systems without maintenance windows, and a rarer release is also a larger one. | quotation: Stripe (2017, evidence age 9 years): 'We perform all infrastructure upgrades online, rather than relying on planned maintenance windows.' Adyen (2024-01-19, 'Maintenance under pressure'): 'Our tables are being used 24/7, so there is no such thing as \"outside office hours.\"' Adyen (2018, evidence age 8 years): a large group committing code 'brings an element of risk to each deployment as all of this new functionality is activated at once'; live deployment likened to 'changing the wheels on a moving car'. Stripe Sessions talk (2024-04-25): 'today's Sessions, there's no code freeze', said of the conference day.; reasoning: A release that carries a month of changes makes the cause of a failure hard to find and the rollback take the other changes with it. | `contrast`: Change as the trigger. → The defense of changing rarely, and why it does not hold. |\n| p10 | definition | A bad change on a money path does three kinds of damage: payments that fail, payments left with an unknown outcome when the code handling them is withdrawn mid-request, and records that are written wrong without any request failing; error metrics see only the first. | reasoning: A failed payment returns an error and is counted. A request in flight when an instance is withdrawn may have reached the provider without its answer being stored (the unknown outcome of [Exactly Once, Over a Network That Does Not Allow It: Idempotency and Retries](idempotency-and-retries.html)). A wrong record, as in the Version Cliff, returns success.; figure: Conceptual figure: an aircraft in flight with four engines, a mechanic swapping one small part on one engine while the others run; a gauge panel watches the engines and a ledger book on board is out of the gauges' view. | `cause_effect`: Change that cannot be avoided. → What a bad change costs, sorted by what monitoring can see. |\n\n### Progressive Rollout: Bounding How Much Traffic a Mistake Reaches\n\n**Controlling idea** (`explanation`, id `rollout`): A progressive rollout bounds a mistake by exposing each change to a rising share of live traffic and withdrawing it on deviating metrics; Stripe described this in 2024 and Adyen described gating features in 2018, and Stripe's own incidents show the two limits: 1% is real payments, and the way back can fail.\n\n**Advances the thesis** (S1, S2, S4): Gives the documented mechanism at each company with dates, then its two documented limits, then where the record stops.\n\n**Transition in:** `problem_solution`: The three kinds of damage. → The mechanism that bounds the first two.\n\n**Order of paragraphs** (`assertion_evidence_reasoning`): Terms first, then Stripe's account because it is the fuller and newer one, then its limit from the same source, then Adyen's older account and where the record stops, then the rollback, which presupposes the reader knows what is being rolled back.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p11 | definition | A progressive rollout releases a change to a small share of live traffic and widens the share only while metrics stay healthy, and a feature flag separates deploying code from switching its behavior on; each stage catches something the one before cannot. | table: Stages: automated tests; pre-production with synthetic traffic; test-mode traffic; one machine; rising shares of live traffic; full traffic. Columns: who is exposed; what it can catch; what it cannot. The author's analysis, using the stages Stripe's 2023 letter names. |  |\n| p12 | evidence | Stripe's 2023 annual letter, published in March 2024, describes about 400 deployments a day to one core API service, each tested, tried in pre-production (including whether it can be undone), sent to test-mode traffic and one machine, then to 0.5%, 1%, 5% and 20% of live traffic, watched on 55,000 metrics and withdrawn automatically. | quotation: Stripe 2023 annual letter: 'approximately 400 times in a typical day'; 'a battery of around 1.4 million tests'; pre-production is 'a mock production environment with synthetic API traffic' where 'we check that the change can not only be safely rolled out to production, but also that it can be safely undone if required'; 'a single production machine with a small sliver of traffic, before gradually advancing to 0.5%, then 1%, then 5%, then 20%, and so on'; 'We roll all changes out to test-mode API traffic before hitting live-mode traffic'; 'Each progressive rollout is inspected against 55,000 different metrics. If at any moment the system detects anomalous telemetry, the machines running the new code are automatically withdrawn from the pool and traffic is redirected to machines running an older, known-good version.'; figure: Structure figure: a pipeline left to right of tests, a rehearsal environment, a test-traffic lane, one machine, then widening lanes labeled 0.5%, 1%, 5%, 20%, a monitor above and a return arrow labeled Withdraw. | `example`: The stages in general. → The one public account of them at Stripe. |\n| p13 | analysis | The same letter gives the limit of the mechanism: on 8 February 2024 an erroneous change got as far as 1% of the critical tier, and in those six minutes payments failed, so a stage bounds the damage and does not remove it; the letter does not say what stopped the change. | case: Stripe 2023 annual letter: 8 February 2024, 21:46 to 21:52 UTC; 'an erroneous change rolled out all the way to 1% of the critical tier of traffic'; 'the three most impacted users had 39, 15, and 12 payments fail'; 'multiple problems had to coincide for users to be impacted'. No separate root-cause analysis was found; 'critical tier' is not defined in the letter. | `contrast`: The pipeline as designed. → What it let through on one evening. |\n| p14 | evidence | Adyen's 2018 account describes a different gate: everyone develops on one main line, a release branch is stabilized and pushed to production, and features are then switched on one by one and tried on a small share of traffic; Adyen states weekly releases of its core system, a different unit from Stripe's deployments to one service, so the two companies' frequencies cannot be compared. | quotation: Adyen (2018-01-03, evidence age 8 years): 'everybody develops on the main line'; 'When we want to do a new release, we create a new branch, which we stabilize, and once it gets pushed to production, the old branch is terminated'; 'a centralized and systematic approach to the separation of code deployment and activation'; 'we toggle features one-by-one on production, and then canary them'. Adyen (2021-02-24, evidence age 5 years), one team: 'Our team has weekly release cycles'. Adyen infrastructure page (n.d., accessed November 2026): 'we publish new releases of our core system every week'. No newer platform-wide description of the release model was found. | `contrast`: Stripe gating the deployed code by traffic share. → Adyen gating the feature, and where its public record stops. |\n| p15 | analysis | A rollback is itself a change and can fail: Stripe's 2019 root-cause analysis reports that the revert made during the first outage of 10 July caused the second, which is why the 2023 letter's pre-production stage checks that a change can be undone. | case: Stripe RCA (2019-07, evidence age 7 years): API severely degraded 16:35 to 17:02 UTC and 21:14 to 22:47 UTC; 'our revert to a known stable version interacted poorly with a recently-introduced configuration change to the production shards'; remediation includes 'further procedures and tooling to increase the safety with which operators can make rapid configuration changes during incident response'. Stripe's 2024 post describes its database platform five years later. | `additional_support`: Withdrawal as the safety of a rollout. → The documented case in which the withdrawal was the failure. |\n\n### Migrations Without Downtime: Two Paths Until a Comparison Passes\n\n**Controlling idea** (`explanation`, id `migrations`): Stored data cannot be rolled back by redeploying code, so a migration is made safe by keeping the old and the new path both working and comparing them before the old one is removed; Stripe has published this at the application level (2017) and the storage level (2024), Adyen at the database level (2018 to 2025).\n\n**Advances the thesis** (S3, S4): Extends bounded, reversible change from code to data with each company's dated cases, and says which kind of migration Adyen has not described.\n\n**Transition in:** `contrast`: Code, which can be withdrawn by routing traffic back to the old version. → Data, which the old version must still be able to read after the new one has written it.\n\n**Order of paragraphs** (`prerequisite_order`): The reason data differs from code comes first; the 2017 pattern is the simplest statement of two paths and a comparison; the 2024 case shows the same shape one level down; dark launch generalizes the comparison step; Adyen's cases come last because they are database-level and need the vocabulary built before them.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p16 | definition | A zero-downtime migration changes a schema or moves data while requests continue, and it is harder than a code rollout because data written by the new code remains after the code is withdrawn. | reasoning: Routing traffic back to old machines undoes a code change; it does not undo rows the new code wrote in a shape the old code cannot read. A reversible migration therefore keeps every intermediate state readable by both versions. |  |\n| p17 | process | Stripe's 2017 account gives the pattern in four steps (write to both stores, move the reads, move the writes, remove the old data) and compares the two read paths in production before trusting the new one. | quotation: Stripe (2017-02-02, evidence age 9 years; whether the same tooling is used today is not public): the '4 step dual writing pattern': 'Dual writing to the existing and new tables to keep them in sync', 'Changing all read paths in our codebase to read from the new table', 'Changing all write paths in our codebase to only write to the new table', 'Removing old data that relies on the outdated data model'; the example moved 'hundreds of millions of Subscriptions objects'; reads verified with GitHub's Scientist, 'alerting you if two expressions ever yield different results in production'.; figure: Structure figure in four panels: an application and two stores, old and new; panel 1 writes to both, panel 2 reads move to the new store with a compare symbol between the stores, panel 3 writes go only to the new store, panel 4 the old store is removed. | `problem_solution`: The constraint on data changes. → The published pattern that meets it. |\n| p18 | evidence | Stripe's 2024 account of moving data between database shards has the same shape one level down: changes are replicated in both directions so that traffic can be sent back, a snapshot comparison precedes the switch, and the switch takes under two seconds and is absorbed by retries. | quotation: Stripe (2024-06-06): mutations 'get replicated bidirectionally'; 'We made this design choice to provide the flexibility to revert traffic to the source shards if any issues emerge'; 'a comprehensive check for data completeness and correctness by comparing point-in-time snapshots'; 'The entire traffic switch protocol takes less than two seconds to execute, and all failed reads and writes directed to the source shard succeed on retries.' | `similarity`: Dual writing at the application level. → The same shape at the storage level, in a current source. |\n| p19 | definition | A dark launch runs the new code on real traffic without letting its result reach the customer, which generalizes the comparison step; on a money path the shadow may read and compute, and it may not send a second instruction to move money. | quotation: Stripe (2017-03-30, evidence age 9 years): 'Dark launch each rate limiter to watch the traffic they would block.' The Scientist experiment of the 2017 migration post is a dark read.; reasoning: A shadow copy of a 'create payment' call that reached a provider would charge the customer again; shadowing on a money path is therefore done against recorded traffic or in the provider's test environment, or stops before the provider call. Industry practice and the author's judgement, not a documented practice of either company. | `elaboration`: The comparison inside a migration. → The comparison as a technique of its own, and its limit where money moves. |\n| p20 | evidence | Adyen's published cases of change without downtime are at the database level: a 2018 major-version upgrade behind a queue that kept accepting payments, a 2024 rule that maintenance may not lock a table for more than a few seconds, and a 2025 account of a partition change that nearly failed a critical database before a December season; no Adyen account of an application-level migration pattern was found. | quotation: Adyen (2018-03-14, evidence age 8 years): 'we can stop traffic to our PostgreSQL databases, queue the transactions, and run a PostgreSQL update without affecting payments acceptance'. Adyen (2024-01-19): 'In most cases, it is not possible to lock the table for more than a few seconds.' Adyen (2025-09-16): 'automatically adding one more partition to an already partitioned table would bring one of our most critical databases to its knees'; 'We partitioned individual tables, not the environment.' | `contrast`: Stripe's application-level and storage-level accounts. → Adyen's database-level accounts, and the kind it has not published. |\n\n### Four Ways to Limit a Change, and What Each Costs\n\n**Controlling idea** (`comparison`, id `designs`): Release windows, rollout by traffic share, flag-gated activation and dark launch each bound a different thing and miss the same thing, a record that is wrong without an error, which only a reconciliation after the change detects.\n\n**Advances the thesis** (S1, S5): Turns the documented mechanisms into designs a reader can choose between, shows that none of the four closes a change by itself and names reconciliation as the step that does.\n\n**Transition in:** `conclusion_summary`: The mechanisms as each company described them. → The same mechanisms as four designs with their costs.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p21 | comparison | The four designs differ in what they bound (when a change happens, how much traffic it reaches, which behavior is on, whether the result counts) and none of them detects a record that is wrong without an error; that takes a fifth step after the change, a reconciliation that compares the system's records with the provider's and with the ledger. | table: Rows: release window or freeze; rollout by traffic share; flag-gated activation; dark launch against recorded or live traffic. Columns: what it bounds; what it cannot catch; what it costs; when it is the right choice. The author's analysis. |  |\n\n### Incidents, Postmortems and the Engineering Choices Behind Them\n\n**Controlling idea** (`evidence`, id `incidents-and-culture`): What each company has shown in public about incidents is small (two root-cause analyses (an outage in 2019, a data exposure at a vendor in 2020) and one paragraph at Stripe, one incident update and a follow-up at Adyen), and the engineering-culture facts each has stated are similar for software and opposite for hardware.\n\n**Advances the thesis** (S4): Completes the documented record the comparison table draws on: postmortems, language and repository, build or buy, hosting.\n\n**Transition in:** `sequence`: How a change is bounded. → What each company does and publishes when one gets through, and the engineering choices that shape its changes.\n\n**Order of paragraphs** (`grouping`): Incident practice first because it follows from the failures just discussed; then the two culture facts, language and repository before build-or-buy, because the second explains the hosting difference the comparison ends on.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p23 | evidence | A postmortem is a written account of what failed, why and what will change, and public ones are rare at both companies: Stripe has published two root-cause analyses (an outage in 2019, a data exposure at a vendor in 2020) and one paragraph (2024), Adyen one incident update and a follow-up, both about a denial-of-service attack in April 2025, with the detailed review promised to customers only. | fact: Stripe: the RCA of 10 July 2019; the paragraph on 8 February 2024 in the 2023 letter; Sessions talk (2024-04-25): 'Incident reviews are not done by some central SRE team. They're done by the service-owning engineering team'; 2023 letter: 'we inspect every incident manually', 'On average, 520 calls per day go out to our staff'. Adyen (2025-04-21), on the DDoS attack of 21 April 2025: 'A detailed post-incident review, including root cause analysis and long term prevention measures, will be made available to our customers'; follow-up 'Strengthening our platform resilience' (2025-10-31). |  |\n| p24 | evidence | Both companies have stated that most of their code is in one language and one large repository (Ruby at Stripe, Java at Adyen), and both have published test selection as the price of keeping that workable. | fact: Stripe (2026-04-09): 'our monorepo is the order of 50 million lines of Ruby code', 'roughly 100,000 Ruby test files and approximately 1.2 million test units'; Go proxies (2024, 2026) beside it. Adyen (2021-07-28, evidence age 5 years): 'a single platform, in a single repository (monorepo), almost exclusively written in Java'; (2026-08-23): 'Our monorepo alone runs to hundreds of thousands of files, and it's far from the only one'; 'Test selection at Adyen' (2024-09-23). | `sequence`: Who reviews an incident. → The shared code base those teams change. |\n| p25 | comparison | On software both companies build in-house or on open source where the core flow is concerned, and on hardware they chose opposite: Stripe rents cloud capacity from Amazon Web Services and Adyen runs its own infrastructure in data centers. | quotation: Adyen (2021, evidence age 5 years): for core flows 'we never choose a proprietary solution because we want to have full control'; 'We manage our own infrastructure in several data centers around the world'; (2023-10-30) 'At Adyen, we use open-source software or we build in-house'; H1 2026 results (2026-08-13): 'The majority of our CapEx is invested in data centers.' Stripe (2026-08-26), on replacing Envoy with its own proxy: 'It's a little counterintuitive that building something in-house would be more reliable than operating a battle-tested open-source project'; (2023-01-23, evidence age 3 years) 'Stripe has long relied on AWS to provide the core compute infrastructure on which Stripe is built.' | `additional_support`: One language and one repository. → What each builds, adopts and rents. |\n\n### Stripe and Adyen: Where They Differ\n\n**Controlling idea** (`comparison`, id `where-they-differ`): The documented difference is what each company describes gating (deployed code by traffic share at Stripe in 2024, features at Adyen in 2018) and who owns the hardware; frequency cannot be compared, and neither has published a check of money correctness tied to a deployment.\n\n**Advances the thesis** (S4, S5): The required comparison: documented facts per aspect, 'Not public' where they stop, the reading marked as inference, and the statement AC-3 requires.\n\n**Transition in:** `conclusion_summary`: Rollout, migration, incident and culture facts as each company published them. → The two set side by side.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p26 | comparison | Aspect by aspect the two companies are documented to different depths and dates, which rules out a comparison of deployment frequency and leaves one row, a check of money correctness tied to a deployment, empty for both. | table: Rows: deployment frequency; what is gated; data change without downtime; public incident accounts; language and repository; software and hardware; check of money correctness tied to a deployment. Columns: Stripe, Adyen, what the difference suggests (the author's inference). |  |\n| p27 | recommendation | With either provider the integrator cannot see or schedule the provider's changes, so it measures payment success on its own side, asks under contract for incident reviews, and treats reconciliation after its own changes as its own job, since neither company documents doing it for a deployment. |  | `cause_effect`: The differences and the empty row. → What an integrator does on each, and the statement that reconciliation after change is the author's recommendation. |\n\n### In Practice at Larkfield: The May 2027 Upgrade as a Staged Change\n\n**Controlling idea** (`example`, id `in-practice`): A team of Larkfield's size takes the stages and the comparison, not the provider's scale, and under K7 its May 2027 Stripe upgrade answers Femke's four questions: a dark run against recorded traffic that compares the finance export, a first stage of 62 studios behind a flag, a way back tried before the first stage, and a close only after a month's reports reconcile.\n\n**Advances the thesis** (S1, S3, S5): Works the practice with ledger numbers at a scale a reader's team has, and shows the step that would have caught the Version Cliff in a day.\n\n**Transition in:** `example`: The recommendation that reconciliation after a change is the integrator's job. → What a small team takes from the providers, and one upgrade at Larkfield carried out that way.\n\n**Order of paragraphs** (`chronological`): The steps are told in the order they are carried out, because each one licenses the next and the old path may be removed only after the last.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p22 | recommendation | For a team of Larkfield's size the transferable parts are a first stage small enough to count by hand, one signal that withdraws, a way back that has been tried and a comparison of records; a provider's 55,000 metrics and 400 deployments a day answer a scale it does not have. | fact: Ledger: Larkfield's payments team has 11 engineers. Stripe 2023 letter: 55,000 metrics, about 400 deployments a day to one core API service. |  |\n| p28 | process | The upgrade starts dark: recorded requests are replayed at the new version in a Stripe sandbox and the finance export is built from both sets of responses for one closed month and compared line by line, which is the step that would have shown the Version Cliff's missing field in a day. | scenario: Ledger K7 and the chapter 19 addition: one planned upgrade per provider per half-year, tested against recorded traffic; Tom Hendriks runs the upgrades, Stripe in May and November. New here: the comparison includes the finance export built from April 2027's recorded responses in both shapes, and it must agree in invoice count and in total. Studio subscriptions are €24.5M a year (ledger), about €2.04M a month. | `example`: The four parts a small team should take. → The first of them at Larkfield: the comparison, run dark. |\n| p29 | process | The live change is staged by studio: the pull request adds the new version beside the old and a flag chooses per studio, first for 62 of the 6,200 studios the integration bills (1%), then 10%, 50% and all, with the flag switched off and on once in the sandbox before the first stage. | statistic: Ledger: 6,200 studios, all billed for their Larkfield subscription through Stripe Billing whichever provider carries their members' payments; 1% is 62 studios. Stage sizes and the one-day pause between stages are Larkfield's settings (assumptions). The withdrawal signals are the error rate of Stripe calls for flagged studios and any difference in the nightly comparison of their export lines.; fact: Stripe documentation as cited in [Changing the API Without Breaking a Million Integrations: Versioning](payment-api-versioning.html): dynamically typed SDKs accept an explicit version per request. | `sequence`: The dark comparison passing. → The staged exposure and its way back. |\n| p30 | recommendation | The change stays open after the flag reaches every studio: it is closed, and the old version and the flag are deleted, only when the reconciliation job (run when each provider's reports are ready) has shown no new open item from the change and the May close ties the finance export to Stripe's own report. | scenario: Ledger K3 and the chapter 15 addition: the reconciliation job, run when each provider's reports are ready, covers both providers; unmatched amounts are open items with an owner; Priya Raman owns the close. New here: under Keel a change to a money path has an owner and stays open until a named reconciliation passes.; figure: Conceptual figure: a running track with a dashed line labeled 100% that a runner has passed, and the real finish line further on, beside a balance scale with two stacks of documents level, labeled Records agree. | `sequence`: The flag at every studio. → What still has to happen before the change is done. |\n\n### When It Goes Wrong: After a Rollout Is Withdrawn\n\n**Controlling idea** (`process`, id `when-it-goes-wrong`): A withdrawn rollout is an incident still open: the payments the new code handled must be found, each compared with the provider's record and the ledger, and repaired, and the way back and the leftover flags are failure modes of their own.\n\n**Advances the thesis** (S2, S5): Applies the rule to the case the probe of AC-1 poses and gives the detection and recovery steps.\n\n**Transition in:** `contrast`: The upgrade that went to plan. → The rollout that is withdrawn, and what remains to do.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p31 | analysis | Ten minutes at 1% is a small number of real payments at Larkfield, about 5 on an ordinary evening and about 90 during the paced renewal run, and each is in one of three states: failed, unknown or recorded wrong. | statistic: Author's arithmetic from the ledger: 27.6 million online payments a year is about 52.5 a minute, 525 in ten minutes, about 5 at 1%; during the paced renewal run, at the K5 bucket settings of 10 requests a second on Stripe and 5 on Adyen (chapter 21 and 40 additions; assumptions), 15 a second is 9,000 in ten minutes, about 90 at 1%. |  |\n| p32 | process | Recovery has four steps: list the payments the withdrawn build handled, confirm each against the provider's own record, compare each with the ledger, and repair the differences before the change is closed. | scenario: New here: under Keel the payment record store writes the identifier of the build and the flag state on every attempt row, so the list is one query. K2 (ledger, ruling 12): on Stripe the PaymentIntent is re-read; on Adyen, whose Checkout API has no endpoint that returns a payment by its identifier, the confirming record is the webhook and then the settlement report. K1: a resend of an attempt reuses its stored idempotency key. K3: every movement has a ledger entry. | `problem_solution`: The three states a touched payment can be in. → The steps that settle each one. |\n| p33 | analysis | Three further failures belong to the mechanisms themselves: a way back that was never tried, a data change the old code cannot read, and flags left in place after the change is done. | case: Stripe RCA (2019): the revert caused the second outage. Stripe (2017): the four-step pattern keeps both stores in sync until reads have moved. Adyen (2018): 'By maintaining ownership over toggling, we automate the process of alerting our developers about cleaning up old code paths'. | `additional_support`: Recovery after a withdrawal. → Failures of the way back, of data changes and of flags. |\n\n## Conclusion: What to Take Away\n\n**Synthesis:** Read together, the five chapters show one asymmetry. What the two providers have documented is what they let give way: lagging books, a write pause of seconds, features cut in one country, a per-account limit, a rollout withdrawn at one percent. What neither has documented (the topology and timing of a failover, cells, which data is replicated synchronously) is the part a merchant cannot verify. A merchant's own reliability therefore rests on three things it can check: the contract, the documented limits, and its own measurement and reconciliation.\n\n**So what:** The reader plans against the provider's contractual commitment and documented limits, measures payment success on their own side, and treats every outage, peak and deployment as finished only when the records agree, which is the same test the book applies to a single payment.\n\n**Callback:** The six minutes of 8 February 2024 from the opening and, for the part, the two Larkfield first-of-month runs of the part opening. The two first-of-month runs from the part opening: 7,900 renewals a day late in October 2026, 1,840 members charged twice in November 2026. Keel's K5 accepts lateness on purpose by pacing renewals over 18 hours, and K1 removes the wrong outcome by deriving the key from the membership, the billing period and the number of the scheduled attempt.\n\n**Takeaway** (`course_of_action`): For each path in your system that moves money, write one line: when the provider is slow, at peak, and during a deploy, what gives way, and which check proves afterwards that the record did not.\n\n**Hand-off** to [Part IX — JOURNEYS: One Payment, End to End](part-9.html): `example`: The mechanisms of Parts I to VIII, each taught in its own chapter, ending with Part VIII's rule that a money path must be correct before it is available and that a change is verified by reconciliation. → Four single payments followed through all of those mechanisms at once, in the order the payment meets them, to show what passes between them.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p34 | synthesis (list) | Established: staged rollout with automatic withdrawal is documented at Stripe (2024) and feature gating at Adyen (2018), a bounded rollout still failed payments on 8 February 2024, a rollback caused an outage in 2019, and dual writing with comparison is the published migration pattern. |  |  |\n| p35 | synthesis (list) | Depends on context: how many stages, whether to gate by traffic share or by feature, how long to keep the old path, and whether to freeze before a peak depend on traffic volume, on whether the change touches stored data and on the reporting period. |  | `contrast`: What is settled. → What changes with the situation. |\n| p36 | recommendation (list) | The author's synthesis: a change to a money path is finished when the records agree, not when the rollout reaches 100%; neither company has published such a gate, and the rule is the book's test for a single payment applied to a deployment. |  | `contrast`: What is established and what depends. → The author's own position. |\n| p37 | synthesis | Across Part VIII each chapter named what gives way so that the record does not: what the two providers have documented is what they let give way, what neither has documented is what a merchant cannot verify, and Larkfield's two first-of-month runs of 2026, one late and one wrong, show why its Keel decisions on pacing and on idempotency keys choose late on purpose. | scenario: Ledger: 1 October 2026, 7,900 renewals delayed to the next day; 1 November 2026, 1,840 members charged twice, €71,300 refunded, 212 disputes; K5 paces renewals over 18 hours; K1 derives the key from the business event.; fact: Established in chapters 37 to 41 and pointed to here, not re-argued: lagging books (Adyen 2021), a write pause under two seconds (Stripe 2024), features cut in one country (Stripe, India page updated 2023), a per-account limit (Stripe documentation, accessed November 2026), a rollout withdrawn at 1% (Stripe 2024); the topology and timing of a failover, cells and which data is replicated synchronously not public for either (Adyen names regions and states that its load balancers fail over between data centers). | `conclusion_summary`: This chapter's take-aways. → The part's closing: the asymmetry between what is documented and what is not, the two Larkfield months and the one-line exercise. |\n| p38 | recommendation (list) | Nine questions let the reader test how a team or a provider changes a system that moves money. |  | `cause_effect`: The closing argument. → Questions that apply it. |\n| p39 | transition | Parts II to VIII taught the mechanisms one chapter at a time, ending with the rule that a change is verified by reconciliation; Part IX follows four single payments through all of them at once to show what passes between them. |  | `example`: The mechanisms and Part VIII's rule. → Four payments followed through all of them. |\n\n## Non-goals\n\n- How API versions are pinned, released and retired, and the detail of the Version Cliff. See [Changing the API Without Breaking a Million Integrations: Versioning](payment-api-versioning.html).\n- Availability targets, failure isolation, graceful degradation and what status pages show. See [Down Is Not an Option: Reliability and Availability](payment-reliability-and-availability.html).\n- Sharding, the Data Movement Platform in detail, accounting clusters and the outbox. See [Never Lose a Cent: Data Stores and Consistency](payment-data-stores-and-consistency.html).\n- Hosting, regions and data residency beyond the one-sentence culture fact. See [Where the Data Lives: Multi-Region Operation and Data Residency](payment-multi-region-and-data-residency.html).\n- Load testing, capacity and pacing a peak. See [The Biggest Day: Peak Load and Capacity](payment-peak-load.html).\n- How reconciliation works and what the reports contain. See [Proving the Money: Reconciliation Inside the Provider and Out](payment-reconciliation-and-reporting.html).\n- Adyen's 2026 acquisitions and what they change about building in-house. See [Case: Adyen, the Single Platform With a Banking Licence](case-adyen.html).\n- Chaos testing and game days as a subject of their own. See [Down Is Not an Option: Reliability and Availability](payment-reliability-and-availability.html).\n- Continuous-delivery tooling in general (build systems, deployment orchestrators), which the reader knows.\n\n## Modalities\n\nArticle only.\n\n## Open questions\n\n- Adyen states weekly releases of its core system (infrastructure page, n.d.); whether the 2018 release-branch model still holds is not public; the chapter says so and compares nothing.\n- Whether Stripe still uses the 2017 dual-writing tooling (Scientist) is not public.\n- 'Critical tier of traffic' is not defined in Stripe's 2023 letter; the 2017 rate-limiter post's example of a critical method is creating charges.\n- No separate root-cause analysis of 8 February 2024 was found; the letter's paragraph is the whole record.\n- Neither company has published a check of money correctness tied to a deployment; Stripe's 2024 Ledger post describes continuous verification, which is not the same thing.\n- Adyen's Annual Report 2025 sentence that each incident triggers a root-cause analysis was read by the research brief from a copy that is not the official filing; the chapter does not quote it.\n\n## Decision log\n\n- **2026-11-17** — The chapter is planned at 39 units and about 5,700 words by the checker's count (which includes the three tables and the source list of about 600 words; about 4,900 before Sources), a typical chapter's length, because the fixed elements and the part closing take eleven units and the public record supports one section each on rollout and migration and a combined section on incidents and engineering culture. Rejected: Separate sections for postmortems and for engineering culture, which the evidence would not fill.; A 2,000 to 3,000 word chapter, which could not carry the part closing and both acceptance probes.\n- **2026-11-17** — Reconciliation after a change is presented only as the author's recommendation, in the claim paragraph, the comparison section and the synthesis, with the statement that neither company has published such a gate (AC-3). Rejected: Citing Stripe's Ledger post as evidence of a deployment gate, which it does not describe.\n- **2026-11-17** — Larkfield's 'migration behind the Version Cliff' is told as the March 2026 deploy read as a change (scene) and the May 2027 upgrade as a staged change (in practice); versioning detail stays in chapter 19. New ledger facts: the staged flag by studio (62 of 6,200 studios first), the finance-export comparison in the dark run, the build identifier on attempt rows, and a change staying open until a named reconciliation passes. Rejected: Inventing a schema migration of the payment record store, which the ledger does not contain.; Naming the Stripe release crossed in May 2027, which would invent a future version.\n- **2026-11-17** — Dark launch on a money path (the shadow must not move money) is given as industry practice and the author's judgement, since neither company documents shadowing of payment calls. Rejected: Presenting shadow traffic as a documented Stripe or Adyen practice for payments.\n- **2026-11-17** — The quotation of the 2023 letter uses the US-English edition linked from stripe.com/annual-updates/2023. Rejected: The en-GB PDF, whose wording differs slightly ('most affected users', 'failed payments').\n\n## Sources\n\n- **Internal**\n  - _research/brief-reliability-and-scale.md — Part 5 (safe change), sections 1.3, 2.1, 2.2, the blunt table and the open questions.\n  - _research/brief-companies-and-bets.md — Hosting and capital-expenditure statements; the in-house self-description.\n  - _research/scenario-ledger.md — The Version Cliff, the Renewal Wave, the Double Charge, K1, K2, K3, K5, K7, the cast, studio counts, and the additions of chapters 15, 19 and 21.\n  - _research/consistency-issues.md — Rulings 12 and 16.\n- **External**\n  - Pages fetched by the writer on 2026-11-17: Stripe 2023 annual letter (US-English PDF linked from stripe.com/annual-updates/2023); stripe.com/rcas/2019-07-10; stripe.com/blog/online-migrations; stripe.com/blog/rate-limiters; the stripe.dev posts on document databases (2024), selective test execution (2026) and the mesh proxy (2026); the Stripe Sessions 2024 reliability talk; stripe.com/newsroom/news/amazon-and-stripe; Adyen knowledge-hub posts 'From 0 to $100 billion' (2018), 'Updating a 50 terabyte PostgreSQL database' (2018), 'Design to Duty' part 1 (2021), 'engineers as designers, architects, coders and testers' (2021), 'Implementing Service Level Objectives' (2023), 'Maintenance under pressure' (2024), 'Test selection at Adyen' (2024), the DDoS incident update and follow-up (2025), 'Partitioning an environment, not individual tables' (2025), 'We built Architect for humans' (2026); Adyen H1 2026 results release. — Verification of every quotation used.\n\n## Changelog\n\n- **2026-11-17** — Reconciliation pass (parts 6-8): fields copied from the journal spec and unit-level controlling ideas and evidence brought into line with the verified page and the consistency rulings; no unit added, dropped, merged or reordered.\n- **2026-11-17** — Verification pass: 75 claims checked (58 confirmed, 7 corrected, 6 hedged, 4 unsupported and removed or relabeled, 0 unreachable); Stripe has two root-cause analyses on its site (2019 outage, 2020 vendor data exposure), not one. Three inline inferences moved into INFERENCE blocks, nine sources added, Adyen's documented peak-day code freeze, continuous releases and four-weekly terminal releases added (rulings 39 and 42), displayed dates applied (ruling 25), reconciliation described as run on the report-ready signal (chapter 15), max_words raised from 5800 to 6100 for the added attributions.\n- **2026-11-17** — Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes). Notes acted on: the small-team paragraph moved from the designs section to open the Larkfield upgrade; release windows and freezes are defined where changing rarely is refuted; reconciliation is named in the designs section as the step no design supplies; the Version Cliff is named in the scene; the 2025 Adyen incident is identified as the denial-of-service attack; the part-closing paragraph no longer relies on unglossed labels; the declared reason says what breaks for the incident section and the last section. Not acted on: cutting the paragraph on language and repository, which the journal entry's outcome requires.\n- **2026-11-17** — First version, written from the PLAN contract, the journal spec entry and the research briefs.\n- **2026-11-17** — Absence audit: absences re-tested with a wide search (documentation and help-center sitemaps, company sites, web search). Overturned: 'no deployment frequency found for Adyen's platform' (Adyen's infrastructure page: new releases of the core system every week); text, table row and p14 updated, one source added. Holds: no check of money correctness tied to a deployment found for either company (cells now name the support sites searched). Locked intent.know sentence 'no platform-wide deployment frequency is public for Adyen' is now too strong and was reported, not edited.\n- **2026-11-17** — Journal-spec entry corrected after verification; intent, thesis and role re-synced ('and that no platform-wide deployment frequency is public for' -> 'and that Adyen's Infrastructure page says it publishes new r').\n- **2026-11-17** — Journal-spec entry corrected after verification; intent, thesis and role re-synced ('each may do both, and no platform-wide deployment frequency ' -> 'each may do both; Adyen states a weekly release of its core ').\n- **2026-11-24** — Sweep of rulings 45 to 48: the closing sentence on what neither provider has documented now names the topology and timing of a failover, cells and synchronous replication, since Adyen names its regions and states failover in general terms (45a, 46g); conclusion synthesis and p37 evidence aligned with the part's closing.\n- **2026-11-17** — Visual layer: 4 figures generated and inspected (article-illustrator).\n"}]}]}</script>
+<script>
+    (function () {
+        const data = JSON.parse(document.getElementById('data').textContent);
+        const root = document.getElementById('content');
+
+        const postId = (data.meta && data.meta.id) ? String(data.meta.id) : '';
+        const postStatusRaw = (data.meta && data.meta.status) ? String(data.meta.status) : '';
+        if (postId || postStatusRaw) {
+            const header = document.getElementById('post-header');
+            let sectionEl = header.querySelector('p.section');
+            if (!sectionEl) {
+                sectionEl = document.createElement('p');
+                sectionEl.className = 'section';
+                header.insertBefore(sectionEl, header.firstChild);
+            }
+            // Status pill goes first, then a " / " separator before the existing
+            // content (section name and/or id).
+            if (postStatusRaw) {
+                const parts = postStatusRaw.split(':');
+                const statusName = parts[0].trim();
+                const statusColor = (parts[1] || '').trim();
+                const wrap = document.createElement('span');
+                wrap.className = 'post-status';
+                const dot = document.createElement('span');
+                dot.className = 'status-dot';
+                if (statusColor) dot.style.background = statusColor;
+                wrap.appendChild(dot);
+                wrap.appendChild(document.createTextNode(statusName));
+                if (sectionEl.firstChild) {
+                    sectionEl.insertBefore(document.createTextNode(' • '), sectionEl.firstChild);
+                    sectionEl.insertBefore(wrap, sectionEl.firstChild);
+                } else {
+                    sectionEl.appendChild(wrap);
+                }
+            }
+            if (postId) {
+                if (sectionEl.firstChild) sectionEl.appendChild(document.createTextNode(' • '));
+                sectionEl.appendChild(document.createTextNode(postId));
+            }
+        }
+
+        const tagsHost = document.getElementById('tags');
+        (data.tags || []).forEach(function (t) {
+            const span = document.createElement('span');
+            span.className = 'tag';
+            span.textContent = t;
+            tagsHost.appendChild(span);
+        });
+
+        // Minimal markdown renderer. Supports: ATX headings, paragraphs, blockquotes,
+        // unordered/ordered lists, fenced code, inline code, bold/italic/strikethrough, links, images, hr.
+        // Sufficient for the posts in this repo; replace with a fuller parser if needed.
+        function renderMarkdown(src) {
+            const lines = src.replace(/\r\n/g, '\n').split('\n');
+            const out = [];
+            let i = 0;
+
+            const bullet = /^(\s*)([-*])\s+(.*)$/;
+            const ordered = /^(\s*)(\d+)\.\s+(.*)$/;
+            const tableRow = /^\s*\|(.+)\|\s*$/;
+            const tableSep = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+
+            function splitRow(s) {
+                let t = s.trim();
+                if (t.startsWith('|')) t = t.slice(1);
+                if (t.endsWith('|')) t = t.slice(0, -1);
+                return t.split('|').map(c => c.trim());
+            }
+
+            function inline(s) {
+                // Posts are trusted content, so raw HTML passes through unescaped
+                // (some posts embed inline <blockquote>, <div>, etc.).
+                // Stray ampersands still get fixed up.
+                s = s.replace(/&(?![a-zA-Z]+;|#\d+;)/g, '&amp;');
+                s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<a class="image-link" href="$2" target="_blank" rel="noopener noreferrer"><img alt="$1" src="$2"></a>');
+                s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+                s = s.replace(/`([^`]+)`/g, function (_, c) {
+                    return '<code>' + c.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
+                });
+                // Bold/italic, including nested combinations: ***x***,
+                // **a *b*** / ***a* b** (shared delimiters), and **a *b* c**.
+                s = s.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+                s = s.replace(/\*\*([^*\n]+)\*([^*\n]+)\*\*\*/g, '<strong>$1<em>$2</em></strong>');
+                s = s.replace(/\*\*\*([^*\n]+)\*([^*\n]+)\*\*/g, '<strong><em>$1</em>$2</strong>');
+                s = s.replace(/\*\*((?:[^*\n]|\*(?!\*)[^*\n]+\*(?!\*))+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+                s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+                return s;
+            }
+
+            while (i < lines.length) {
+                const line = lines[i];
+                if (!line.trim()) {
+                    i++;
+                    continue;
+                }
+
+                const fence = line.match(/^```(\w*)\s*$/);
+                if (fence) {
+                    i++;
+                    const buf = [];
+                    while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+                        buf.push(lines[i]);
+                        i++;
+                    }
+                    i++;
+                    const escaped = buf.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const cls = fence[1] ? ' class="lang-' + fence[1] + '"' : '';
+                    out.push('<pre><code' + cls + '>' + escaped + '</code></pre>');
+                    continue;
+                }
+
+                const h = line.match(/^(#{1,6})\s+(.*)$/);
+                if (h) {
+                    out.push('<h' + h[1].length + '>' + inline(h[2]) + '</h' + h[1].length + '>');
+                    i++;
+                    continue;
+                }
+
+                if (/^\s*(?:-\s*){3,}\s*$/.test(line) || /^\s*\*{3,}\s*$/.test(line)) {
+                    out.push('<hr>');
+                    i++;
+                    continue;
+                }
+
+                if (/^>\s?/.test(line)) {
+                    const buf = [];
+                    while (i < lines.length && /^>\s?/.test(lines[i])) {
+                        buf.push(lines[i].replace(/^>\s?/, ''));
+                        i++;
+                    }
+                    out.push('<blockquote>' + renderMarkdown(buf.join('\n')) + '</blockquote>');
+                    continue;
+                }
+
+                if (tableRow.test(line) && i + 1 < lines.length && tableSep.test(lines[i + 1])) {
+                    const headers = splitRow(line);
+                    const aligns = splitRow(lines[i + 1]).map(function (c) {
+                        c = c.trim();
+                        const left = c.startsWith(':'), right = c.endsWith(':');
+                        return left && right ? 'center' : right ? 'num' : '';
+                    });
+                    const cellOpen = function (tag, idx) {
+                        return aligns[idx] ? '<' + tag + ' class="' + aligns[idx] + '">' : '<' + tag + '>';
+                    };
+                    i += 2;
+                    const rows = [];
+                    while (i < lines.length && tableRow.test(lines[i])) {
+                        rows.push(splitRow(lines[i]));
+                        i++;
+                    }
+                    let html = '<div class="table-wrap"><table><thead><tr>';
+                    headers.forEach((h, idx) => {
+                        html += cellOpen('th', idx) + inline(h) + '</th>';
+                    });
+                    html += '</tr></thead><tbody>';
+                    rows.forEach(r => {
+                        html += '<tr>';
+                        r.forEach((c, idx) => {
+                            html += cellOpen('td', idx) + inline(c) + '</td>';
+                        });
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                    out.push(html);
+                    continue;
+                }
+
+                if (bullet.test(line) || ordered.test(line)) {
+                    // Indent of the first bullet defines this list's base level.
+                    // Deeper-indented bullets become nested lists (rendered by
+                    // recursing into renderMarkdown). Same-or-less indent at a
+                    // bullet starts a sibling item (or ends the list).
+                    const firstMatch = line.match(bullet) || line.match(ordered);
+                    const baseIndent = firstMatch[1].length;
+                    const isOrdered = ordered.test(line);
+                    const items = [];
+                    let hasTask = false;
+                    while (i < lines.length) {
+                        const cur = lines[i];
+                        if (!cur.trim()) {
+                            // blank line breaks the list (matches CommonMark-ish behaviour)
+                            i++;
+                            break;
+                        }
+                        const mBul = cur.match(bullet);
+                        const mOrd = cur.match(ordered);
+                        const m = mBul || mOrd;
+                        if (!m) break;
+                        if (m[1].length < baseIndent) break;
+                        if (m[1].length > baseIndent) break; // shouldn't happen at top of loop
+                        // Same-type check: switching between -/* and 1. closes the list
+                        if (isOrdered !== !!mOrd) break;
+
+                        const itemBuf = [m[3]];
+                        const nestedBuf = [];
+                        i++;
+                        while (i < lines.length) {
+                            const nxt = lines[i];
+                            if (!nxt.trim()) break;
+                            const nBul = nxt.match(bullet);
+                            const nOrd = nxt.match(ordered);
+                            const nm = nBul || nOrd;
+                            if (nm) {
+                                if (nm[1].length > baseIndent) {
+                                    // nested list line — dedent and stash
+                                    nestedBuf.push(nxt.slice(baseIndent + 2));
+                                    i++;
+                                    continue;
+                                }
+                                // sibling or end of list
+                                break;
+                            }
+                            // Plain continuation text
+                            if (nestedBuf.length) {
+                                // continuation inside the nested block
+                                nestedBuf.push(nxt.slice(baseIndent + 2));
+                            } else {
+                                itemBuf.push(nxt.trim());
+                            }
+                            i++;
+                        }
+
+                        // GitHub-style task items: "- [ ] text" / "- [x] text"
+                        // render as (clickable, unpersisted) checkboxes.
+                        const itemText = itemBuf.join('\n');
+                        const task = !isOrdered && itemText.match(/^\[( |x|X)\]\s+/);
+                        let liHtml = inline(task ? itemText.slice(task[0].length) : itemText);
+                        if (task) {
+                            hasTask = true;
+                            liHtml = '<input type="checkbox"' + (task[1] === ' ' ? '' : ' checked') + '>' + liHtml;
+                        }
+                        if (nestedBuf.length) {
+                            liHtml += renderMarkdown(nestedBuf.join('\n'));
+                        }
+                        items.push(task ? '<li class="task">' + liHtml + '</li>' : '<li>' + liHtml + '</li>');
+                    }
+                    out.push((isOrdered ? '<ol>' : (hasTask ? '<ul class="task-list">' : '<ul>')) + items.join('') + (isOrdered ? '</ol>' : '</ul>'));
+                    continue;
+                }
+
+                const buf = [line];
+                i++;
+                while (i < lines.length && lines[i].trim() && !/^#{1,6}\s/.test(lines[i]) && !/^>\s?/.test(lines[i]) && !bullet.test(lines[i]) && !ordered.test(lines[i]) && !/^```/.test(lines[i]) && !tableRow.test(lines[i])) {
+                    buf.push(lines[i]);
+                    i++;
+                }
+                out.push('<p>' + inline(buf.join(' ')) + '</p>');
+            }
+            return out.join('\n');
+        }
+
+        // Block dispatcher. New block types plug in here.
+        const renderers = {
+            markdown: function (block) {
+                const div = document.createElement('div');
+                div.innerHTML = renderMarkdown(block.content);
+                return div;
+            },
+            mermaid: function (block) {
+                // Mermaid scans elements with class "mermaid" whose textContent
+                // is the diagram source. We collect these nodes and run
+                // mermaid.run() once after all blocks are in the DOM.
+                const div = document.createElement('div');
+                div.className = 'mermaid';
+                div.textContent = block.content;
+                return div;
+            },
+            'force-graph': function (block) {
+                // build.py emits parsed JSON: {nodes:[{id,size}], links:[{source,target}]}.
+                // We instantiate force-graph after the container is in the DOM
+                // so it can measure its own width.
+                const div = document.createElement('div');
+                div.className = 'force-graph';
+                const data = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.ForceGraph) return;
+                    const maxSize = data.nodes.reduce((m, n) => Math.max(m, n.size || 1), 1);
+                    window.ForceGraph()(div)
+                        .graphData(data)
+                        .width(div.clientWidth)
+                        .height(div.clientHeight)
+                        .nodeRelSize(4)
+                        .nodeVal(n => Math.max(20 * (n.size || 1) / maxSize, 0.001))
+                        .nodeLabel(n => n.id + ' (' + (n.size || 1) + ')')
+                        .nodeColor(() => 'rgba(135, 206, 235, 0.7)')
+                        .linkColor(() => 'rgba(60, 60, 60, 0.4)')
+                        .linkDirectionalArrowLength(4)
+                        .linkDirectionalArrowRelPos(1)
+                        .linkWidth(1);
+                });
+                return div;
+            },
+            'bubble-chart': function (block) {
+                // build.py emits {nodes:[{name,size}]}. Renders a D3 circle-pack
+                // SVG (same shape as the obren.io reference, just inline).
+                const wrap = document.createElement('div');
+                wrap.className = 'bubble-chart';
+                const payload = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.d3) return;
+                    const diameter = 480;
+                    const fill = '#c0deed';
+                    const textColor = '#111111';
+                    const fontSize = 12;
+
+                    const svg = window.d3.select(wrap).append('svg')
+                        .attr('viewBox', '0 0 ' + diameter + ' ' + diameter)
+                        .attr('width', diameter)
+                        .attr('height', diameter);
+
+                    const root = window.d3.hierarchy({children: payload.nodes})
+                        .sum(d => d.size || 0)
+                        .sort((a, b) => b.value - a.value);
+
+                    window.d3.pack().size([diameter, diameter]).padding(2)(root);
+
+                    const node = svg.selectAll('g')
+                        .data(root.leaves())
+                        .enter().append('g')
+                        .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+
+                    node.append('title').text(d => d.data.name + ': ' + d.value);
+                    node.append('circle').attr('r', d => d.r).style('fill', fill);
+                    node.append('text')
+                        .attr('dy', '.3em')
+                        .style('text-anchor', 'middle')
+                        .style('fill', textColor)
+                        .style('font-size', fontSize + 'px')
+                        .text(d => d.data.name.substring(0, Math.max(0, Math.floor(d.r / 3))));
+                });
+                return wrap;
+            }
+        };
+
+        // Render one modality's blocks into a host element. Mermaid runs
+        // scoped to just the nodes created here, so lazily rendered tabs get
+        // their diagrams on first activation.
+        let mermaidInitialized = false;
+        function renderBlocksInto(blocks, host) {
+            const mermaidNodes = [];
+            blocks.forEach(function (block) {
+                const r = renderers[block.type];
+                if (!r) {
+                    const pre = document.createElement('pre');
+                    pre.textContent = '[unknown block type: ' + block.type + ']';
+                    host.appendChild(pre);
+                    return;
+                }
+                const node = r(block);
+                if (node instanceof Node) {
+                    host.appendChild(node);
+                    if (block.type === 'mermaid') mermaidNodes.push(node);
+                }
+            });
+            if (mermaidNodes.length && window.mermaid) {
+                if (!mermaidInitialized) {
+                    window.mermaid.initialize({startOnLoad: false, theme: 'default'});
+                    mermaidInitialized = true;
+                }
+                window.mermaid.run({nodes: mermaidNodes});
+            }
+            markScrollableTables(host);
+        }
+
+        // A table wider than its wrapper scrolls sideways. Mark those wrappers
+        // so the CSS can show a cue, and make them focusable so keyboard users
+        // can reach and scroll them. Hidden panes measure 0 and are re-marked
+        // when activated or when the window is resized.
+        function markScrollableTables(host) {
+            host.querySelectorAll('.table-wrap').forEach(function (wrap) {
+                const scrolls = wrap.scrollWidth > wrap.clientWidth + 1;
+                wrap.classList.toggle('is-scrollable', scrolls);
+                if (scrolls) {
+                    wrap.setAttribute('tabindex', '0');
+                    wrap.setAttribute('role', 'region');
+                    wrap.setAttribute('aria-label', 'Table that scrolls sideways');
+                } else {
+                    wrap.removeAttribute('tabindex');
+                    wrap.removeAttribute('role');
+                    wrap.removeAttribute('aria-label');
+                }
+            });
+        }
+
+        // Modality tabs. One <article class="pane"> per modality; panes are
+        // rendered lazily on first activation (force-graph / D3 / mermaid
+        // need a visible, measurable container). With a single modality the
+        // tab bar stays hidden and the page looks exactly like before.
+        const mods = data.modalities;
+        const tabBar = document.getElementById('modality-tabs');
+        const panes = {};
+        const tabButtons = {};
+        const renderedPanes = {};
+
+        // With several modalities each pane is a tabpanel labelled by its
+        // tab (W3C APG tabs pattern); tabindex=0 lets keyboard users move
+        // from the tab list straight into the active content.
+        mods.forEach(function (m) {
+            const pane = document.createElement('article');
+            pane.className = 'pane';
+            pane.dataset.key = m.key;
+            pane.hidden = true;
+            if (mods.length > 1) {
+                pane.id = 'pane-' + m.key;
+                pane.setAttribute('role', 'tabpanel');
+                pane.setAttribute('aria-labelledby', 'tab-' + m.key);
+                pane.setAttribute('tabindex', '0');
+            }
+            root.appendChild(pane);
+            panes[m.key] = pane;
+        });
+
+        const defaultKey = mods.some(m => m.key === 'index') ? 'index' : mods[0].key;
+
+        function activate(key, updateHash) {
+            mods.forEach(function (m) {
+                const isActive = m.key === key;
+                panes[m.key].hidden = !isActive;
+                if (tabButtons[m.key]) {
+                    tabButtons[m.key].classList.toggle('active', isActive);
+                    tabButtons[m.key].setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    // Roving tabindex: only the selected tab is in the Tab
+                    // order; the arrow keys move between tabs.
+                    tabButtons[m.key].setAttribute('tabindex', isActive ? '0' : '-1');
+                }
+            });
+            // Unhide first, then render: the chart libraries measure widths.
+            if (!renderedPanes[key]) {
+                renderBlocksInto(mods.find(m => m.key === key).blocks, panes[key]);
+                renderedPanes[key] = true;
+            } else {
+                markScrollableTables(panes[key]);
+            }
+            if (updateHash) {
+                history.replaceState(null, '',
+                    key === defaultKey ? location.pathname + location.search : '#' + key);
+            }
+        }
+
+        if (mods.length > 1) {
+            mods.forEach(function (m) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = m.label;
+                btn.id = 'tab-' + m.key;
+                btn.dataset.key = m.key;
+                btn.setAttribute('role', 'tab');
+                btn.setAttribute('aria-controls', 'pane-' + m.key);
+                btn.addEventListener('click', function () { activate(m.key, true); });
+                tabBar.appendChild(btn);
+                tabButtons[m.key] = btn;
+            });
+            // Keyboard support per the W3C APG tabs pattern (automatic
+            // activation): Left/Right move between tabs and wrap, Home/End
+            // jump to the first/last tab, and the focused tab is selected.
+            tabBar.addEventListener('keydown', function (ev) {
+                const keys = mods.map(function (m) { return m.key; });
+                const focused = document.activeElement;
+                const current = focused && focused.dataset ? keys.indexOf(focused.dataset.key) : -1;
+                if (current < 0) return;
+                let next = null;
+                if (ev.key === 'ArrowRight') next = (current + 1) % keys.length;
+                else if (ev.key === 'ArrowLeft') next = (current - 1 + keys.length) % keys.length;
+                else if (ev.key === 'Home') next = 0;
+                else if (ev.key === 'End') next = keys.length - 1;
+                if (next === null) return;
+                ev.preventDefault();
+                activate(keys[next], true);
+                tabButtons[keys[next]].focus();
+            });
+            tabBar.hidden = false;
+        }
+
+        // The hash selects a tab only when it matches a modality key, so
+        // existing anchors keep working.
+        const initialHash = location.hash.slice(1);
+        activate(mods.some(m => m.key === initialHash) ? initialHash : defaultKey, false);
+        window.addEventListener('hashchange', function () {
+            const k = location.hash.slice(1);
+            if (mods.some(m => m.key === k)) activate(k, false);
+        });
+        window.addEventListener('resize', function () { markScrollableTables(root); });
+    })();
+</script>
+</body>
+</html>

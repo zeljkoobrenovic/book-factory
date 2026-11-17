@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Spec: The Provider Calls You: Webhooks and Events</title>
+    <meta name="description" content="How does a payment provider tell millions of endpoints what happened, and what may a receiver assume? It sends each event again until the endpoint acknowledges it or a retry window closes, so a webhook is a notice to store and then confirm against the provider's own record: three days of retries at Stripe, up to 30 days in a queue at Adyen.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SETTLED: Architecting Payments and Revenue Infrastructure">
+    <meta property="og:title" content="Spec: The Provider Calls You: Webhooks and Events">
+    <meta property="og:description" content="How does a payment provider tell millions of endpoints what happened, and what may a receiver assume? It sends each event again until the endpoint acknowledges it or a retry window closes, so a webhook is a notice to store and then confirm against the provider's own record: three days of retries at Stripe, up to 30 days in a queue at Adyen.">
+    <meta property="og:url" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/payment-webhooks-and-events.spec.html">
+    <meta property="og:image" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/assets/images/20-webhooks-and-events/logo.jpeg">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="site.css">
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-129891352-1"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+        dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'UA-129891352-1');
+</script>
+    <style>
+        body {
+            line-height: 1.65;
+        }
+
+        main {
+            padding-top: 32px;
+        }
+
+        nav.post-nav {
+            font-size: 14px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: baseline;
+            flex-wrap: wrap;
+        }
+
+        nav.post-nav a {
+            color: var(--muted);
+            text-decoration: none;
+        }
+
+        nav.post-nav a:hover {
+            color: var(--accent);
+        }
+
+        nav.post-nav .nav-right {
+            margin-left: auto;
+            display: inline-flex;
+            gap: 4px;
+            align-items: baseline;
+        }
+
+        nav.post-nav .nav-sep {
+            color: var(--muted);
+        }
+
+        footer nav.post-nav {
+            margin-top: 24px;
+            margin-bottom: 0;
+        }
+
+        header.post {
+            margin-bottom: 32px;
+        }
+
+        header.post .section {
+            color: var(--muted);
+            font-size: 13px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin: 0 0 -6px;
+        }
+
+        header.post .section a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        header.post .section a:hover {
+            color: var(--accent);
+        }
+
+        header.post .section .post-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        header.post .section .post-status .status-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        header.post .logo {
+            display: block;
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            border: 1px solid lightgrey;
+
+        }
+
+        header.post .logo-credit {
+            color: var(--muted);
+            font-size: 12px;
+            margin: -4px 0 24px;
+            text-align: right;
+        }
+
+        header.post h1 {
+            font-size: 52px;
+            line-height: 1.2;
+            margin: 0 0 2px;
+            padding: 0;
+            letter-spacing: -0.01em;
+            font-weight: normal;
+        }
+
+        header.post .byline {
+            color: var(--muted);
+            font-size: 15px;
+            margin: 0;
+        }
+
+        header.post .byline .spec-link {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        header.post .byline .spec-link:hover {
+            text-decoration: underline;
+        }
+
+        header.post .byline .spec-link-drifted {
+            color: #b8650f;
+        }
+
+        header.post .byline .spec-link-superseded {
+            color: var(--muted);
+        }
+
+        header.post .ai-credit {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 4px 0 0;
+        }
+
+        header.post .ai-credit a {
+            color: inherit;
+        }
+
+        header.post .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 10px 0 10px;
+        }
+
+        header.post .tags .tag {
+            font-size: 14px;
+            padding: 1px 8px;
+            border: 1px solid deepskyblue;
+            color: blue;
+            border-radius: 999px;
+            background-color: var(--tag-bg);
+        }
+
+        nav.modality-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--rule);
+            margin: 0 0 28px;
+            flex-wrap: wrap;
+        }
+
+        nav.modality-tabs button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font: inherit;
+            font-size: 14px;
+            color: var(--muted);
+            padding: 8px 14px;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            letter-spacing: 0.02em;
+        }
+
+        nav.modality-tabs button:hover {
+            color: var(--accent);
+        }
+
+        nav.modality-tabs button.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        #content .pane[hidden] {
+            display: none;
+        }
+
+        #content .pane:focus {
+            outline: none;
+        }
+
+        #content .pane:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 6px;
+        }
+
+        article h2 {
+            font-size: 26px;
+            margin: 40px 0 12px;
+            letter-spacing: -0.01em;
+        }
+
+        article h3 {
+            font-size: 20px;
+            margin: 28px 0 8px;
+        }
+
+        article h4 {
+            font-size: 17px;
+            margin: 20px 0 6px;
+        }
+
+        article p {
+            margin: 0 0 16px;
+        }
+
+        article a {
+            color: var(--accent);
+        }
+
+        article a.image-link {
+            display: inline-block;
+            line-height: 0;
+        }
+
+        article img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        article a.image-link img {
+            display: block;
+        }
+
+        article ul, article ol {
+            padding-left: 24px;
+            margin: 0 0 16px;
+        }
+
+        article li {
+            margin-bottom: 6px;
+        }
+
+        article ul.task-list {
+            list-style: none;
+            padding-left: 4px;
+        }
+
+        article ul.task-list li.task > input[type="checkbox"] {
+            margin-right: 8px;
+            accent-color: var(--accent);
+        }
+
+        article hr {
+            border: none;
+            border-top: 1px solid var(--rule);
+            margin: 32px 0;
+        }
+
+        article blockquote {
+            margin: 16px 0;
+            padding: 12px 18px;
+            background: var(--quote-bg);
+            border-left: 3px solid var(--accent);
+            color: #333;
+        }
+
+        article blockquote p:last-child {
+            margin-bottom: 0;
+        }
+
+        article code {
+            background: var(--code-bg);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 0.92em;
+        }
+
+        article pre {
+            background: var(--code-bg);
+            padding: 14px 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        article pre code {
+            background: none;
+            padding: 0;
+        }
+
+        article .table-wrap {
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+
+        article table {
+            border-collapse: collapse;
+            margin: 16px 0;
+            width: 100%;
+            font-size: 15px;
+        }
+
+        article .table-wrap table {
+            margin: 0;
+        }
+
+        /* Wide tables scroll on narrow screens instead of crushing their columns.
+           A table wrapped in <div class="table-compact"> opts out: it has few,
+           short columns and wraps its cells to fit the screen instead. */
+        @media (max-width: 640px) {
+            article .table-wrap table {
+                min-width: 560px;
+            }
+            article .table-compact .table-wrap table {
+                min-width: 0;
+            }
+        }
+
+        /* Tables that actually overflow get a visible cue and keyboard focus
+           (markScrollableTables() sets the class and attributes). */
+        article .table-wrap.is-scrollable::before {
+            content: "Scroll sideways to see the whole table";
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        article .table-wrap.is-scrollable:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        article th, article td {
+            border: 1px solid var(--rule);
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        article th {
+            background: var(--code-bg);
+            font-weight: 600;
+        }
+
+        /* GFM column alignment from the separator row. Right-aligned columns
+           hold numbers; their cells never wrap, so a sign, a currency symbol
+           and its amount stay on one line while label columns still wrap. */
+        article th.num, article td.num {
+            text-align: right;
+        }
+
+        article td.num {
+            white-space: nowrap;
+        }
+
+        article th.center, article td.center {
+            text-align: center;
+        }
+
+        article .mermaid {
+            text-align: center;
+            margin: 24px 0;
+        }
+
+        article .force-graph {
+            margin: 24px 0;
+            border: 1px solid var(--rule);
+            border-radius: 6px;
+            background: #fff;
+            height: 480px;
+            overflow: hidden;
+        }
+
+        article .bubble-chart {
+            margin: 24px 0;
+            text-align: center;
+        }
+
+        article .bubble-chart svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <nav class="post-nav"><a class="nav-back" href="payment-webhooks-and-events.html">← The Provider Calls You: Webhooks and Events</a><span class="nav-right"></span></nav>
+    <header class="post" id="post-header">
+        <p class="section"><span>SPEC</span> • <span class="post-status"><span class="status-dot" style="background:green"></span>accepted</span> • <span>revised 2026-11-17</span></p>
+        <h1>Spec: The Provider Calls You: Webhooks and Events</h1>
+        <p class="byline"></p>
+        
+        <div class="tags" id="tags"></div>
+        
+    </header>
+    <nav class="modality-tabs" id="modality-tabs" hidden role="tablist" aria-label="Reading formats"></nav>
+    <div id="content"></div>
+    <footer>
+        <nav class="post-nav"><a class="nav-back" href="payment-webhooks-and-events.html">← The Provider Calls You: Webhooks and Events</a><span class="nav-right"></span></nav>
+    </footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/force-graph"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script id="data" type="application/json">{"meta": {}, "tags": [], "modalities": [{"key": "spec", "label": "Spec", "meta": {}, "blocks": [{"type": "markdown", "content": "## Intent\n\n**After reading, the reader should:**\n\n- **Know:** Why a provider can only promise at-least-once delivery, and what follows: duplicates, no guaranteed order, a retry window.\n- **Know:** The two documented delivery contracts side by side as of November 2026. Stripe: any 2xx returned quickly, retries for up to three days, order not guaranteed, events readable through the API for 30 days, a signature over timestamp and body, snapshot and thin events. Adyen: a 2xx within 10 seconds, a per-endpoint retry queue for up to 30 days, a timestamp or sequence number to restore order, a signature over eight fields for the Standard webhook, and, in its Checkout API for online payments, no call to read a payment back.\n- **Know:** That neither company has published how its webhook sender is built.\n- **Believe:** The webhook is the doorbell and the provider's record is the truth: an event says that something changed, and the state is read from the provider.\n- **Believe:** The absence of an event is not evidence that nothing happened.\n- **Be able to:** Build a receiver that verifies, stores, acknowledges and only then processes, removes duplicates, and does not depend on arrival order.\n- **Be able to:** Write the recovery plan for an endpoint outage of a given length at each provider.\n- **Be able to:** Add a sweep that resolves every payment still pending after a set time by reading the provider's record or report.\n\n**Audience:** An engineer or architect new to payments who has to build or review the receiving side of a payment provider integration.\n\n**Already knows:**\n\n- HTTP, queues, retries, HMAC and what a webhook endpoint is.\n- The payment as a long-lived record with states, and that Adyen's Checkout API has no call that returns an online payment (payment-state-machines).\n- The unknown outcome and idempotency keys (idempotency-and-retries).\n- API version pinning (payment-api-versioning).\n- That a settlement report is complete and late while a webhook is prompt and may be missing (payment-reconciliation-and-reporting).\n\n**Does not yet know:**\n\n- The documented delivery terms of Stripe and Adyen: acknowledgement, retry windows, order, duplicates, signatures.\n- Snapshot and thin events, event destinations.\n- What a receiver must build because of those terms.\n\n**Acceptance criteria**\n\n| Id | Criterion | Check | Method | Severity |\n| --- | --- | --- | --- | --- |\n| AC-1 | Given an endpoint outage longer than one provider's retry window and shorter than the other's, the reader writes the recovery steps for each. *Probe:* Your webhook endpoint was down from Friday 18:00 to Wednesday 09:00. One provider retries each event for up to three days and keeps events readable through its API for 30 days. The other queues all events for your endpoint for up to 30 days and has no call that returns a payment by its identifier. For each provider, what do you do on Wednesday morning? | `custom` | cold_reader | major |\n| AC-2 | Given two events for one payment in an implausible order, the reader says what may be concluded and what the handler does. *Probe:* Your receiver gets a 'refunded' event for a payment and, one second later, a 'captured' event for the same payment. What can you conclude about the order in which the two things happened, and what should the handler do with each? | `custom` | cold_reader | major |\n| AC-3 | The chapter's account of what building a webhook sender involves is labeled as reference-architecture inference and states that neither Stripe nor Adyen has published its sender design. | `custom` | rubric | blocker |\n| AC-4 | The Larkfield worked example uses the ledger's figures for the Silent Webhook (14 September 2026; 9 hours; 3,200 memberships; 460 support tickets) and shows which part of the harm retries repaired and which part Keel decision K2 addresses. | `custom` | rubric | major |\n\n## Thesis\n\n**Question:** How does a provider tell millions of endpoints what happened, and what may a receiver assume?\n\n> **Claim:** A provider tells its endpoints by sending each event again until the endpoint acknowledges it or a retry window closes, and the only delivery guarantee a receiver gets from that is that an event it has not acknowledged will be sent again while the window is open. It may not assume that an event arrives once, in order, with current data, or at all after the window, so a webhook is a notice to store and then confirm against the provider's own record (the object read back by identifier where the API allows it, the settlement report where it does not), and is not the final word on a payment.\n\n**Disputed by:** The view that a signed webhook is the provider's authoritative statement of what happened, so a handler can update its state directly from the payload and treat the order of arrival as the order of events.\n\n**So what:** The receiver is designed around what it cannot assume: it stores and acknowledges before any business logic, removes duplicates, reads state back where the provider allows it, and runs a sweep for everything still pending. The recovery plan differs by provider: at Stripe an outage longer than three days is repaired by reading events back from the API within 30 days; at Adyen the queue holds events for up to 30 days and releases them together, and since its Checkout API has no call that returns a payment, the stored events are the integrator's working record until the settlement report confirms them, which makes storing before acknowledging carry more weight.\n\n**How and why:** The sender cannot know that a receiver has processed an event, only that it answered, so it repeats until it gets an answer; repetition produces duplicates and, with retries at different times, disorder; and no sender retries forever. The documented terms (accessed November 2026): Stripe retries for up to three days with exponential backoff, says it does not guarantee order, and recommends fetching the object because a snapshot can be stale; Adyen requires a 2xx within 10 seconds, moves all events for a failing endpoint to a retry queue for up to 30 days, and tells receivers to check the timestamp or a sequence number. Larkfield's Silent Webhook lasted 9 hours at its Stripe receiver, well inside the three-day window, so the documented retries cover every event it missed; the harm was that 3,200 memberships read as unpaid in the meantime, because the absence of an event was taken as a fact. How either sender is built (fan-out, isolating slow endpoints, storing the backlog) is not public, and the chapter marks that section as inference.\n\n**Supporting claims**\n\n- **C1** — A sender knows only that an endpoint answered, so it repeats each event until it is acknowledged or a window closes; duplicates, disorder, stale payloads and, after the window, silence all follow from that.\n- **C2** — The two documented contracts differ on every term: Stripe takes any 2xx returned quickly, retries for up to three days, disclaims order and keeps events readable for 30 days; Adyen requires a 2xx within 10 seconds, queues a failing endpoint's events for up to 30 days, points to a timestamp or sequence number, and has no call in its Checkout API that returns an online payment.\n- **C3** — A signature proves who sent a message and that the signed part is unchanged, not that the message is new or current: Stripe signs a timestamp and the body, Adyen's Standard webhook signs eight fields and no timestamp.\n- **C4** — An event carries a picture of the object or a pointer to it: a snapshot is tied to an API version and can be stale, a thin event has no version and must be fetched, and an event bus changes the transport without changing the delivery terms.\n- **C5** — Neither Stripe nor Adyen has published how its webhook sender is built; fan-out, isolation of slow endpoints and backlog storage can be described only as reference-architecture inference.\n- **C6** — The receiver's design follows from what it may not assume: verify, store and acknowledge before any business logic, remove duplicates, ignore arrival order, confirm against the provider's record (the object at Stripe, the settlement report at Adyen) and sweep what stays pending.\n\n## Role in the part\n\nCovers the outcomes that arrive after the response, which the three request-side chapters cannot, and states what the integrator must build because delivery is at-least-once and time-limited. Supports P4-4 of part `part-4`.\n\n## Flow\n\n**Pattern:** `problem_solution` (also `prerequisite_order` in at-least-once before contracts, signatures and payload; all three before sender and receiver: the general limits, then each provider's terms, then the machinery on each side; `comparison` in contracts, signatures, payload and where-they-differ: each term read at both providers, then gathered in one table; `problem_solution` in sender to receiver: each limit of the sender is the problem one step of the receiver solves)\n\nThe reader meets an incident in which the provider did everything it documents and members were still turned away, so the question 'what may a receiver assume?' is felt before any term is defined. The limits of at-least-once delivery come next because they hold for any sender and give the reader the four limits (count, order, freshness, window) that the two providers' terms then make specific. The contracts, the signature and the payload are the terms themselves, in the order a message meets them: delivered, authenticated, opened. The sender section follows the terms because its only evidence is those terms seen from outside, and it precedes the receiver because the sender's choice between holding later events and delivering them independently explains why one provider's recovery is a burst and the other's is disorder, which the receiver's steps and the failure section then use; dropping it would leave those two behaviors as unexplained quirks. The comparison table comes after the receiver's contract so that its last column can say what an integrator does, not only what differs. The worked example and the failures come last because they use every earlier section. Putting the receiver's contract first, as a checklist, would give the reader steps without the reasons that let them adapt the steps to a third provider.\n\n## Introduction\n\n**Hook** (`puzzling_scenario`): On 14 September 2026 members who had paid for their memberships were turned away at the studio door. The provider had recorded every payment. No money was missing. A certificate on one receiving endpoint had expired, and for nine hours Larkfield's records waited for messages that could not get in.\n\n**Bridge:** An engineer who has built webhook consumers for other products treats them as a convenience: a callback that saves polling. → In payments the callback carries outcomes that exist nowhere in the API response, so the integrator's endpoint becomes a server that the correctness of its records depends on, under delivery terms the provider sets.\n\n**Thesis statement** (KEY POINTS callout and paragraph p03): A provider sends each event again until the endpoint acknowledges it or a retry window closes, and that is the whole delivery guarantee; a webhook is a notice to store and then confirm against the provider's own record, not the final word on a payment.\n\n**Roadmap** (IN THIS CHAPTER callout and paragraph p05):\n\n- Start from Larkfield's nine hours without events. *Kept in:* scene.\n- Explain why any sender can promise only at-least-once delivery within a window. *Kept in:* at-least-once.\n- Read the two documented delivery contracts term by term, then the signatures. *Kept in:* contracts, signatures.\n- Compare what an event can carry: a snapshot, a thin event, a message on an event bus. *Kept in:* payload.\n- Say what building a sender involves and that neither company has published its design. *Kept in:* sender.\n- Set out the receiver's contract. *Kept in:* receiver.\n- Compare the two providers. *Kept in:* where-they-differ.\n- Replay the Silent Webhook under Keel decision K2 and go through the ways a receiver fails. *Kept in:* in-practice, when-it-goes-wrong.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p01 | context | On 14 September 2026 Larkfield turned members away at check-in for memberships they had paid for, although the provider had recorded every payment correctly and no money was lost: what failed was a notification. | case: The Silent Webhook (scenario ledger): 14 September 2026, the Stripe webhook receiver's TLS certificate expired, events failed for 9 hours, 3,200 memberships were shown as unpaid, 460 support tickets, no money lost. |  |\n| p02 | context | In the three previous chapters the integrator called and the provider answered; here the direction is reversed, the provider calls with its own rules for acknowledgement, retry, order and authenticity, and the integrator is the server whose reliability matters. | reasoning: Chapter 18's unknown outcome (a response that never arrives) and chapter 19's pinned version (which also fixes the shape of what the provider sends) both reappear on the receiving side. | `contrast`: Three chapters of request and response, the unknown outcome and the pinned version. → The reversed direction: the provider is the client and the integrator the server. |\n| p03 | claim | A provider sends each event again until the endpoint acknowledges it or a retry window closes, and that is the only delivery guarantee; a receiver may not assume once, in order, current or delivered after the window, so a webhook is a notice to store and then confirm against the provider's own record. |  | `problem_solution`: The integrator as a server that can be down, slow or wrong. → The chapter's claim about what delivery guarantees and what follows for the receiver. |\n| p04 | context | In the journey of Mila's class pass this chapter covers the message that follows the approval at 19:42 on 9 March 2027, the notification that moves Larkfield's record to paid, and every later message about the same payment. | scenario: Mila's class pass (scenario ledger): EUR 120.00 on Tuesday 9 March 2027 at 19:42 at Studio Noord, on Adyen; the refund request of 18 March; chapter 8's addition that on Adyen the row becomes paid on the AUTHORISATION webhook. | `example`: The claim that a webhook is a notice to confirm. → Where such notices occur for the book's recurring payment. |\n| p05 | transition | The chapter goes from Larkfield's nine hours without events, through why delivery can only be at-least-once, the two documented contracts, signatures, what an event carries, what building a sender involves, and the receiver's contract, to the comparison of the two providers, the worked example and the failures. |  | `sequence`: Where the chapter sits in the payment's journey. → The order of the sections. |\n\n## Sections\n\n### Setting the Scene at Larkfield: Nine Hours Without Events\n\n**Controlling idea** (`example`, id `scene`): The Silent Webhook was two failures, a delivery failure that the provider's retries repaired and a reading of silence as 'unpaid' that nothing repaired, and the second is the one Larkfield has to design for.\n\n**Advances the thesis** (C1, C6): Poses the chapter's question in an incident where the provider kept its documented promise and the harm happened anyway.\n\n**Transition in:** `example`: The claim that a webhook is a notice and not the record. → The incident in which Larkfield treated it as the record.\n\n**Order of paragraphs** (`chronological`): What happened, what repaired itself and what did not, then the question Femke asks in 2027.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p06 | context | Before Keel, Larkfield's Stripe webhook receiver was the only writer of the paid state for payments on Stripe, so when its certificate expired on 14 September 2026 and events failed for 9 hours, 3,200 renewed memberships read as unpaid and members were turned away at check-in. | case: Scenario ledger: Silent Webhook, 14 September 2026, 9 hours, 3,200 memberships, 460 support tickets, no money lost; the Stripe receiver predates the payment service; the payment record store is fed by webhooks through an inbox table. |  |\n| p07 | analysis | Two different things failed in those nine hours: delivery, which Stripe's documented retries repaired once the certificate was renewed, and Larkfield's reading of a missing event as the fact 'unpaid', which nothing repaired during the nine hours. | fact: Stripe documentation (https://docs.stripe.com/webhooks (n.d., accessed 2026-11)): 'Stripe attempts to deliver events to your destination for up to three days with an exponential back off in live mode.' Nine hours is inside three days. | `cause_effect`: Nine hours in which the rows said unpaid. → The separation of the delivery failure from the reading of silence. |\n| p08 | claim | Femke de Graaf's question for Keel decision K2 is what the receiver may assume about each provider's deliveries, and what Larkfield must build itself for everything it may not assume. | scenario: Keel K2 (scenario ledger): 'The provider's record is the truth; the webhook is the doorbell. Receivers verify, persist and acknowledge; a state change is confirmed against the provider's own record (the payment object where the API lets Larkfield read it, the settlement report where it does not); a job sweeps everything still pending.' | `problem_solution`: A harm that the provider's retries could not prevent. → The design question whose answer is the receiver's contract. |\n\n### Why a Sender Can Promise Only At-Least-Once\n\n**Controlling idea** (`explanation`, id `at-least-once`): A sender can observe that an endpoint answered and nothing more, so it repeats until it gets an answer or a window closes, and duplicates, disorder, stale data and eventual silence all follow from that one fact.\n\n**Advances the thesis** (C1): Derives the limits of delivery from the sender's position, before any provider's terms are read.\n\n**Transition in:** `elaboration`: Larkfield's question: what may a receiver assume? → Why any sender, whatever its quality, can promise only repetition within a window.\n\n**Order of paragraphs** (`prerequisite_order`): Event and webhook are defined first; at-least-once follows from what the sender can see; its consequences follow from repetition; the window follows from cost. Each paragraph uses the term the previous one defined.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p09 | definition | An event is the provider's record that the state of something changed, and a webhook is the delivery of that event as an HTTP request to an endpoint the integrator registered; events exist because many payment outcomes arrive after the API response. | quotation: Stripe API reference (https://docs.stripe.com/api/events, n.d., accessed 2026-11): 'When the state of another API resource changes, Stripe creates an Event object that contains all the relevant information associated with that action'. Adyen (https://docs.adyen.com/development-resources/webhooks, n.d., accessed 2026-11): 'Many flows in Adyen integrations are asynchronous, meaning the final status of a resource is not known immediately after you make an API request.'; example: Outcomes that arrive later: a bank-transfer or direct-debit payment confirmed after the customer leaves, a capture rejected days later (Adyen CAPTURE_FAILED, chapter 8), a dispute, a payout. |  |\n| p10 | cause_effect | The sender can see only the HTTP response, not whether the receiver processed the event, and its acknowledgement can be lost on the way back, so the sender repeats until it gets an answer: delivery is at-least-once, never exactly-once. | reasoning: The mirror image of chapter 18's lost response: there the integrator could not tell whether its request was processed; here the provider cannot tell whether its event was. | `cause_effect`: The webhook as an HTTP request from the provider. → What the provider can and cannot learn from the response, and the delivery guarantee that follows. |\n| p11 | cause_effect | Repetition produces duplicates, retries at different times produce disorder, and the time between creating and processing an event makes its payload a picture of the past. | example: Event 1 fails and is retried a minute later while event 2 is delivered at once: the receiver sees 2 then 1, and the object in event 1's payload is older than the provider's current state. | `cause_effect`: Sending again until acknowledged. → What repetition does to count, order and freshness. |\n| p12 | claim | No sender retries forever, so every delivery contract has a window after which an unacknowledged event is not sent again, and the absence of an event is therefore not evidence that nothing happened. | table: What a webhook promises / what it does not promise: that an unacknowledged event is sent again while the window is open, that a signed event came from the provider; not once-only, not in order, not current data, not delivery after the window, not an event for every change.; figure: Conceptual figure: a doorbell beside a record book; the bell says something changed, the book says what is true. | `additional_support`: Duplicates, disorder and staleness. → The fourth limit, the window, and what silence means. |\n\n### The Two Delivery Contracts, Term by Term\n\n**Controlling idea** (`comparison`, id `contracts`): Stripe and Adyen each document the terms of delivery (what counts as an acknowledgement, how long and how an event is retried, what is said about order and duplicates, and what can be read back) and they differ on every one.\n\n**Advances the thesis** (C2): Supplies the documented terms on which the thesis's 'window' and 'provider's own record' depend, per provider, with dates.\n\n**Transition in:** `example`: The general limits of at-least-once delivery. → The two providers' documented versions of those limits.\n\n**Order of paragraphs** (`grouping`): One paragraph per term of the contract, in the order a delivery meets them: acknowledgement, retry, order, duplicates, reading back. Both providers are read on each term so the difference is visible where it occurs.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p13 | comparison | Both providers count a 2xx status as the acknowledgement; Stripe says it must come quickly and publishes no number of seconds, Adyen gives 10 seconds, and until 2024 Adyen acknowledged by a response body instead of a status code. | quotation: Stripe (https://docs.stripe.com/webhooks (n.d., accessed 2026-11)): the endpoint 'must quickly return a successful status code (2xx) before any complex logic that could cause a timeout'. Adyen (https://docs.adyen.com/development-resources/webhooks/handle-webhook-events (n.d., accessed 2026-11)): 'If Adyen does not receive this response within 10 seconds, for example because your server is down, we mark the webhook as Failing and put it in a retry queue.'; source: Adyen knowledge hub, Beppe Catanese, 'Optimizing Webhook Integration: a new approach to accept events from the Adyen platform' (https://www.adyen.com/knowledge-hub/webhooks-accept-2xx, 2024-05-01): receivers 'must accept a webhook within 10 seconds' under the old rule too; 'All integrations built with Adyen have been accepting webhooks by responding with a response body containing the string '[accepted]'; existing webhooks 'are not automatically updated and keep functioning as before'. |  |\n| p14 | comparison | Stripe retries each event for up to three days with exponential backoff and does not publish the intervals; Adyen moves a failing endpoint's events to a retry queue and retries for up to 30 days at published intervals, then releases the queue in a short time when the endpoint recovers. | quotation: Stripe (https://docs.stripe.com/webhooks (n.d., accessed 2026-11)): 'for up to three days with an exponential back off in live mode'; 'We retry event deliveries created in a sandbox three times over the course of a few hours.'; quotation: Adyen (https://docs.adyen.com/development-resources/webhooks/troubleshoot (n.d., accessed 2026-11)): 'we automatically try to send the webhook for up to 30 days at the following retry intervals' (30 seconds, 30 seconds, 1 minute, 2 minutes, 5 minutes, 10 minutes, 15 minutes, 30 minutes, 1 hour, 2 hours, 4 hours, 8 hours); 'If a retry is successful, we continue with the next webhook in the queue'; a 429 'can happen after you fix a failing endpoint, as the queued webhooks are sent in a short timeframe'. Configure page (https://docs.adyen.com/development-resources/webhooks/configure-and-manage (n.d., accessed 2026-11)): 'all webhook events to your endpoint go to the retry queue'. | `sequence`: What counts as an acknowledgement. → What each provider does when it does not get one. |\n| p15 | comparison | Stripe states outright that order is not guaranteed and that its creation timestamp must not be used to order events; Adyen tells receivers to check the timestamp and offers a sequence number on its platform transfer webhooks but not on the Standard webhook, its main payments webhook, and no Adyen page read for this chapter either guarantees or disclaims delivery order. | quotation: Stripe (https://docs.stripe.com/webhooks (n.d., accessed 2026-11)): 'Stripe doesn't guarantee the delivery of events in the order that they're generated'; 'Snapshot events record created in seconds, so distinct events can share a timestamp. Don't use created to determine event order or whether you've already processed an event.'; quotation: Adyen (https://docs.adyen.com/development-resources/webhooks/handle-webhook-events (n.d., accessed 2026-11)): 'To ensure you are processing events in the correct chronological order, always check the timestamp. Some webhooks also contain unique identifiers such as sequenceNumber'. Transfer webhook specification (Adyen OpenAPI, BalancePlatformTransferNotification-v4): the sequence number 'can help you restore the correct sequence of events even if they arrive out of order'. | `cause_effect`: Retries at different times. → What each provider says about the order that results. |\n| p16 | comparison | Both providers say duplicates happen; a Stripe event has its own identifier to deduplicate on, while an Adyen Standard webhook item has none and is identified by its event code and PSP reference. | quotation: Stripe (https://docs.stripe.com/webhooks (n.d., accessed 2026-11)): 'Webhook endpoints might occasionally receive the same event more than once'; 'In some cases, two separate Event objects are generated and sent. To identify these duplicates, use the ID of the object in data.object along with the event.type.'; quotation: Adyen (https://docs.adyen.com/development-resources/webhooks/handle-webhook-events (n.d., accessed 2026-11)): duplicates 'have the same values in the eventCode and pspReference fields, while the eventDate and other fields can be different. Your server should use the details from the latest webhook event.' | `additional_support`: Disorder as one consequence of retries. → Duplicates as the other, and the identity each provider gives an event. |\n| p17 | comparison | After the retries end, Stripe lets an integrator read events back through its API for 30 days and list those not delivered, while Adyen's Checkout API has no call that returns an online payment, so recovery there runs through the retry queue, the Customer Area and reports. | fact: Stripe (https://docs.stripe.com/api/events, n.d., accessed 2026-11): 'You can access events through the Retrieve Event API for 30 days.' Manage page (https://docs.stripe.com/events/manage-webhook-endpoints (n.d., accessed 2026-11)): list events with delivery_success=false and ending_before to process the backlog; 'Stripe still considers manually processed events as undelivered and continues its automatic retry schedule.'; fact: Adyen Checkout API v72 OpenAPI specification (https://github.com/Adyen/adyen-openapi): 28 paths, three GET operations (payment links, sessions, stored payment methods), none returning a payment by PSP reference (consistency ruling 12). Troubleshoot page (https://docs.adyen.com/development-resources/webhooks/troubleshoot (n.d., accessed 2026-11)): Retry and Ignore in the Customer Area; alerts 'after 5 retry attempts' and 'after 7 days of a webhook failing'.; figure: Structural figure: sender, endpoint, the 2xx acknowledgement, a failed attempt, retries with growing gaps, the end of the window. | `problem_solution`: Events that were never acknowledged. → What each provider offers once its automatic retries are not enough. |\n\n### Proving Who Sent It: Signatures and Replay Protection\n\n**Controlling idea** (`explanation`, id `signatures`): A webhook endpoint is public, so a receiver must prove each message came from the provider; a signature proves origin and integrity for exactly the bytes it covers, and Stripe's covers a timestamp and the whole body while Adyen's Standard webhook signature covers eight fields and no timestamp.\n\n**Advances the thesis** (C3): Separates what a valid signature establishes (the provider sent this) from what it does not (that it is new, or that it is the current state).\n\n**Transition in:** `additional_support`: The delivery terms: acknowledgement, retry, order, duplicates. → The remaining term of the contract: how the receiver knows the sender.\n\n**Order of paragraphs** (`problem_solution`): The threat first, then each provider's answer to it, the second read against the first.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p18 | explanation | Anyone who learns the endpoint's URL can post a message that says a payment succeeded, so the receiver verifies a signature: a keyed hash (HMAC) that it recomputes with a secret shared with the provider. | quotation: Stripe (https://docs.stripe.com/webhooks (n.d., accessed 2026-11)): 'Without verification, an attacker could send fake webhook events to your endpoint to trigger actions like fulfilling orders, granting account access, or modifying records.' |  |\n| p19 | description | Stripe signs the timestamp and the unmodified request body with HMAC-SHA256, sends both in one header, and regenerates them for every delivery attempt, which lets a receiver reject old messages without rejecting retries. | fact: Stripe (https://docs.stripe.com/webhooks (n.d., accessed 2026-11)): Stripe-Signature header with t and v1; signed payload is the timestamp, a '.', and 'the unmodified HTTP request body'; 'Our libraries have a default tolerance of 5 minutes'; 'If Stripe retries an event ... then we generate a new signature and timestamp for the new delivery attempt'. | `example`: Signature verification as the defense. → Stripe's scheme and what it covers. |\n| p20 | comparison | Adyen's Standard webhook signature covers eight fields of the notification and travels inside the payload, with no signed timestamp and no documented tolerance window; Adyen also lets the receiver authenticate the sender by OAuth 2.0 or basic authentication and publishes no IP address list. | fact: Adyen (https://docs.adyen.com/development-resources/webhooks/secure-webhooks/verify-hmac-signatures (n.d., accessed 2026-11)): concatenate pspReference, originalReference, merchantAccountCode, merchantReference, value, currency, eventCode, success with ':'; HMAC-SHA256; signature in additionalData.hmacSignature; for other webhooks the signature is in a header. Secure webhooks page (https://docs.adyen.com/development-resources/webhooks/secure-webhooks (n.d., accessed 2026-11)): OAuth 2.0 'strongly recommended and supported for the Standard webhook and all Balance Platform webhook types'; 'Basic authentication only guarantees that the webhook event was sent by Adyen, not that it wasn't modified during transmission'; 'We do not provide a list of IP addresses.'; the page offers the domain out.adyen.com for an allowlist.; reasoning: INFERENCE block: because no timestamp is signed, a captured Standard webhook would verify again if replayed; deduplication on event code and PSP reference, plus TLS and endpoint authentication, is then the defense. Adyen does not say this; it is the author's reading of the field list. | `contrast`: Stripe's signature over timestamp and body. → Adyen's signature over eight fields, and its other mechanisms. |\n\n### What the Event Carries: Snapshots, Thin Events and Event Buses\n\n**Controlling idea** (`comparison`, id `payload`): An event can carry a picture of the object or only a pointer to it, and can travel by HTTP or through a cloud event bus; the picture is versioned and can be stale, the pointer is unversioned and costs a read, and the bus changes the transport without changing the delivery contract.\n\n**Advances the thesis** (C4): Explains why 'current data' is not among the things a receiver may assume, and what the documented alternatives trade.\n\n**Transition in:** `elaboration`: A verified message from the provider. → What that message contains, and how the choice of content changes the receiver's work.\n\n**Order of paragraphs** (`comparison`): Three designs in the order they appeared (snapshot, thin event, event bus), then a table that sets them side by side.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p21 | definition | A snapshot event carries a copy of the object as it was when the event was created, in the shape of one API version, so it can be out of date when processed and it ties the receiver to a version; Stripe's original format and Adyen's webhooks are of this kind. | quotation: Stripe (https://docs.stripe.com/events/how-events-work (n.d., accessed 2026-11)): 'Because this snapshot can be stale by the time your application processes it, fetch the latest version of the resource from the API before acting on the data.' Webhooks page: 'The API version in your account settings when the event occurs dictates the API version, and therefore the structure of an Event sent to your destination.' Adyen (https://docs.adyen.com/development-resources/webhooks, n.d., accessed 2026-11): 'Webhook messages contain a snapshot of the resource so your system can update its state accordingly.' |  |\n| p22 | definition | A thin event carries only the event's type and identifiers, so the receiver must fetch the current object; it has no version to pin, and Stripe recommends it for new integrations as of November 2026, though its coverage of payment event types should be checked in the catalog before relying on it. | quotation: Stripe (https://docs.stripe.com/events/how-events-work (n.d., accessed 2026-11)): 'For new integrations, use thin events. Thin events are unversioned, fully typed in the Stripe SDKs, and let your integration fetch the latest resource state.' Stripe developer blog (https://stripe.dev/blog/event-notification-handlers-thin-events, 2026-06-24): 'Stripe's solution to the maintenance problem is thin events, which are unversioned JSON payloads'; the same post offers 'early access to thin events for v1 resources'. Changelog 2024-09-30: thin events first shipped with the v2 Events API ('The Meters API is the first API to use thin events'). Thin event catalog (https://docs.stripe.com/api/v2/core/events/event-types, n.d., accessed 2026-11): lists public thin events for v1 resources, among them v1.payment_intent.succeeded and v1.charge.refunded. | `problem_solution`: A snapshot that can be stale and is tied to a version. → The notice that carries no state at all. |\n| p23 | description | Stripe can also deliver events to Amazon EventBridge or Azure Event Grid instead of an HTTP endpoint, which removes the public endpoint and the signature check from the integrator's code but keeps the three-day retry and the absence of an ordering guarantee; no destination other than HTTP was found in Adyen's documentation. | fact: Stripe (https://docs.stripe.com/events/how-events-work (n.d., accessed 2026-11)): 'Stripe pushes events to your configured destinations, which can be webhook endpoints, Amazon EventBridge, or Azure Event Grid.' EventBridge page (https://docs.stripe.com/event-destinations/eventbridge, n.d., accessed 2026-11): same automatic-retry and event-ordering statements. Stripe developer blog (https://stripe.dev/blog/growing-your-stripe-integration-with-event-destinations, 2024-10-31): 'Event Destinations is now in GA'; merchants 'can trust each event is from Stripe without needing to verify webhook signatures in their code'. Adyen configure page (https://docs.adyen.com/development-resources/webhooks/configure-and-manage (n.d., accessed 2026-11)): delivery formats JSON, HTTP POST or SOAP. | `additional_support`: Two payload formats over HTTP. → A second transport. |\n| p24 | comparison | The three designs trade the same things against each other: a snapshot saves a read and can mislead, a thin event is always confirmed and costs a read per event, and a bus moves the endpoint's availability to a cloud provider without removing duplicates or disorder. | table: Design / what the receiver gets / what it costs / when it fits: snapshot event; thin event; event bus destination. The last column is the author's judgement. | `conclusion_summary`: Snapshot, thin event and bus, each described. → What each costs and when each is the right choice. |\n\n### What Building the Sender Involves, and What Nobody Has Published\n\n**Controlling idea** (`analysis`, id `sender`): Neither Stripe nor Adyen has published how its webhook sender is built; the documented contracts show a few of its properties from outside, and the rest of this section is reference-architecture inference.\n\n**Advances the thesis** (C5): States where the evidence stops and keeps the account of fan-out, isolation and backlog apart from documented fact.\n\n**Transition in:** `cause_effect`: The contracts and formats as the receiver sees them. → The machinery on the sending side that would produce them, and how little of it is public.\n\n**Order of paragraphs** (`large_to_small`): What is known (nothing about internals, a few visible properties), then the parts any sender needs, then the one design choice the two contracts make visible.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p25 | claim | Neither company has published its sender design, and what the documentation shows from outside is limited to a few properties: events are created asynchronously, each destination has its own secret, version, retry state and delivery log, and Adyen holds a queue per endpoint. | fact: Stripe (https://docs.stripe.com/events/how-events-work (n.d., accessed 2026-11) and webhooks page): 'Events are delivered asynchronously'; a new signature per attempt; a delivery log per destination with the next retry time; 'a maximum of 16 event destinations per livemode or sandbox account'. Adyen (https://docs.adyen.com/development-resources/webhooks/troubleshoot (n.d., accessed 2026-11), https://docs.adyen.com/development-resources/webhooks/configure-and-manage (n.d., accessed 2026-11)): a Failing status per endpoint, a retry queue per endpoint. |  |\n| p26 | explanation | As a reference architecture and not a description of either company, a sender needs five things: an event written durably with the state change it reports, a fan-out from each event to the destinations subscribed to it, delivery state per destination, isolation so that one slow endpoint cannot delay the others, and storage for the backlog sized by the retry window. | reasoning: Each part answers a failure: an event lost between the state change and its recording; one event owed to several destinations; a retry schedule that belongs to a destination, not to an event; a destination that takes ten seconds per request; a destination that is down for the whole window. | `elaboration`: The few properties visible from outside. → The parts that any sender meeting such a contract would need, labeled as inference. |\n| p27 | analysis | The choice a sender cannot avoid is what to do with later events while an earlier one is failing: hold them behind it, which keeps their order and delays everything, or deliver each independently, which keeps events flowing and gives up order; the first explains a burst on recovery and a queue blocked by one bad message, the second explains disorder. | reasoning: INFERENCE block: Adyen's wording ('all webhook events to your endpoint go to the retry queue', 'we continue with the next webhook in the queue') reads like a per-endpoint queue released in order; Stripe's ('Stripe doesn't guarantee the delivery of events in the order that they're generated', retries per event) reads like independent deliveries. Neither company states this, and neither documents how a slow endpoint is isolated. | `example`: Isolation and backlog as requirements. → The one trade-off between them that the two contracts appear to resolve differently. |\n\n### The Receiver's Contract: Verify, Store, Acknowledge, Confirm, Sweep\n\n**Controlling idea** (`process`, id `receiver`): Because delivery is at-least-once, unordered, possibly stale and time-limited, the receiver verifies, stores and acknowledges before any business logic, removes duplicates, ignores arrival order, confirms state against the provider's record and sweeps what stays pending.\n\n**Advances the thesis** (C6): Turns each thing the receiver may not assume into a step it performs, which is the thesis's 'so what'.\n\n**Transition in:** `problem_solution`: A sender that can promise only repetition within a window, by either design. → What the receiver does about each missing guarantee.\n\n**Order of paragraphs** (`prerequisite_order`): The steps in the order a message meets them: verify, store and acknowledge; then deduplicate; then order; then confirm; then the sweep for messages that never came. Each step assumes the one before.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p28 | process | The receiver does four things in a fixed order (verify the signature on the raw body, store the message, return 2xx, process later), because any business logic before the acknowledgement turns a bug or a slow dependency into failed deliveries. | quotation: Adyen (https://docs.adyen.com/development-resources/webhooks/handle-webhook-events (n.d., accessed 2026-11)): '1. Verify the webhook message ... 2. Store the webhook message in your database or a queue so you can process it later. 3. Accept the webhook message ... 4. Process the data and apply your business logic. Make sure that you acknowledge the webhook before applying any business logic, because errors in your business logic could lead to failing webhooks.' Stripe (https://docs.stripe.com/webhooks (n.d., accessed 2026-11)): 'you must return a 200 response before updating a customer's invoice as paid in your accounting system'.; table: Requirements for the receiver: time to acknowledge (Adyen 10 seconds; Stripe 'quickly', no number); availability (higher than the rest of the system, since retries end); durability of the stored message before 2xx; what happens on failure (the event is retried within the window, then not at all). Larkfield's own targets are labeled as assumptions. |  |\n| p29 | process | The stored message gets a unique key so that a repeat changes nothing: the event ID at Stripe, with object ID and event type as a second check, and at Adyen the event code with the PSP reference for Standard webhooks and the transfer ID with the sequence number for transfer webhooks. | fact: The duplicate rules quoted in the contracts section (Stripe webhooks page; Adyen handle-webhook-events page) and the transfer webhook's data.id and sequenceNumber (Adyen OpenAPI, BalancePlatformTransferNotification-v4). | `sequence`: A message stored and acknowledged. → How the store recognizes a message it already has. |\n| p30 | process | The handler never treats arrival order as the order of events: where the provider lets it read the object it reads the current state, and where it cannot it orders by the provider's sequence number or event time and applies only the transitions its own state machine allows. | reasoning: A 'captured' event arriving after a 'refunded' event for the same payment: nothing follows from the arrival order; a state machine with no transition from refunded to captured keeps the later-arriving event and does not move the state (chapter 8). | `sequence`: Duplicates removed. → Distinct events in the wrong order. |\n| p31 | claim | An event is confirmed against the provider's own record before the business acts on it: on Stripe by reading the object, and on Adyen, where an online payment cannot be read back through the Checkout API, the stored events are the working record until the settlement report confirms them, which is why storing before acknowledging carries more weight there. | fact: Stripe (https://docs.stripe.com/events/how-events-work (n.d., accessed 2026-11)): 'fetch the latest version of the resource from the API before acting on the data'. Adyen: no GET for a payment by its PSP reference in Checkout API v72 (rulings 12 and 29: true of the Checkout API for online payments); 'Adyen does not send a webhook message when a payment settles successfully' (https://docs.adyen.com/development-resources/webhooks/webhook-types, n.d., accessed 2026-11); the settlement report as the confirming record (chapter 15). | `cause_effect`: An order of events the receiver cannot fully trust. → The record that settles what is true. |\n| p32 | recommendation | A sweep job takes every payment that has been pending longer than a set time and resolves it from the provider's record or report, and until then the system shows the payment as unknown and not as failed, because the receiver cannot learn from the event stream that an event is missing. | reasoning: After the retry window an event is not sent again (three days at Stripe, up to 30 at Adyen); a receiver that only reacts never notices. On Stripe the sweep reads the object or lists undelivered events; on Adyen it waits for the report and raises anything the report does not explain.; figure: Structural figure: the receiver as a pipeline (verify, store, acknowledge, process, confirm) with a sweep loop over pending payments. | `additional_support`: Events confirmed when they arrive. → What covers the events that never arrive. |\n\n### Stripe and Adyen: Where They Differ\n\n**Controlling idea** (`comparison`, id `where-they-differ`): On the public record the two delivery contracts differ in seven aspects: the stated deadline, the retry window, what is said about order, the identity of an event, what the signature covers, the payload and its destinations, and whether state can be read back.\n\n**Advances the thesis** (C2, C3, C4): Sets the documented terms side by side and says what an integrator does differently on each.\n\n**Transition in:** `conclusion_summary`: The contracts, signatures, formats and the receiver's steps. → The same facts as one comparison.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p33 | comparison | Seven aspects of the two contracts can be compared from documentation accessed in November 2026, and the last column of the table is the author's reading, not either company's statement. | table: Aspect / Stripe / Adyen / what the difference suggests: acknowledgement; retry window and schedule; order; duplicate identity; signature; payload and destinations; reading state back. Every cell is a fact cited earlier in the chapter. |  |\n| p34 | recommendation | On Stripe the integrator plans for a short push window and a longer pull window and reads the object after every event; on Adyen it plans for a long queue that arrives as a burst, stores every message before acknowledging, and takes the settlement report as the check. |  | `cause_effect`: The differences in the table. → What an integrator does differently on each provider. |\n\n### In Practice at Larkfield: The Silent Webhook Replayed Under K2\n\n**Controlling idea** (`example`, id `in-practice`): Replayed against the documented contract, the Silent Webhook shows that retries repaired the records and that K2's sweep and confirmation address the nine hours in which the records were wrong; Mila's class pass shows the same receiver on Adyen, where an online payment cannot be read back.\n\n**Advances the thesis** (C6): Applies the receiver's contract to the ledger's incident and to the recurring payment, on both providers.\n\n**Transition in:** `example`: What an integrator does differently on each provider. → Larkfield doing it: once on Stripe for the incident, once on Adyen for Mila's pass.\n\n**Order of paragraphs** (`chronological`): The incident as it happened, then the same outage under K2, then a later payment on the other provider.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p35 | example | In the Silent Webhook the outage lasted 9 hours against a retry window of three days, so every missed event was delivered again after the certificate was renewed and the 3,200 rows corrected themselves; the retries repaired the data and could not repair the morning. | case: Scenario ledger: 14 September 2026, 9 hours, 3,200 memberships, 460 support tickets. Stripe documentation: retries 'for up to three days'. |  |\n| p36 | example | Under K2 the same outage would leave the rows wrong for at most the sweep interval instead of nine hours, because a job reads the PaymentIntent of every renewal still pending and the check-in screen shows an unconfirmed renewal as 'being checked', not as unpaid. | scenario: Keel K2 (scenario ledger) and chapter 8's ledger addition (on Stripe a row moves only after the PaymentIntent is re-read). Local illustrative details, labeled as assumptions: a sweep every 15 minutes over renewals pending longer than 30 minutes; the check-in screen admits a member whose renewal is being checked. | `contrast`: The outage as it happened. → The same outage with K2's sweep and confirmation in place. |\n| p37 | example | For Mila's class pass on Adyen the receiver stores the AUTHORISATION notification under its event code and PSP reference, acknowledges inside the 10 seconds, and moves the row to paid; since an online payment cannot be read back through the Checkout API, that stored message is Larkfield's working record until the settlement report for the batch confirms it. | scenario: Mila's class pass (scenario ledger): EUR 120.00, 9 March 2027, 19:42, Studio Noord on Adyen, payout Thursday 11 March; chapter 8: paid on AUTHORISATION success with automatic capture; chapter 15: the reconciliation job writes ledger entries only from report lines. | `similarity`: K2 on Stripe: confirm by reading the object. → K2 on Adyen: confirm by the report, with the stored event as the working record. |\n\n### When It Goes Wrong: Long Outages, Bursts, Disorder and Forgery\n\n**Controlling idea** (`analysis`, id `when-it-goes-wrong`): The receiver's failures are an outage longer than a retry window, a burst or a poison message on recovery, events that contradict each other's order, and verification that fails or is switched off; each has a recovery that follows from the provider's documented terms.\n\n**Advances the thesis** (C1, C6): Tests the receiver's contract against the cases where the delivery guarantee runs out.\n\n**Transition in:** `contrast`: A nine-hour outage well inside the retry window. → The outages and faults that the window does not cover.\n\n**Order of paragraphs** (`order_of_importance`): From the failure that loses events for good (an outage past the window), through the ones that delay them (burst, poison message), to the ones that mislead (disorder) and the one that opens the door (verification switched off).\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p38 | analysis | The recovery plan for an endpoint outage depends on its length measured against each provider's windows: inside the retry window the events come again, between three and 30 days at Stripe they must be read back from the Events API, and at Adyen they arrive from the queue as a burst and are checked against the settlement report. | table: Outage length (under 3 days; 3 to 30 days; over 30 days) by provider: what the provider does, what the integrator does. Built from the retry and retention terms cited in the contracts section; the over-30-days rows say that the events are gone as full payloads (Stripe keeps summaries only) and that Adyen's documentation does not say what happens to the queue after 30 days.; figure: Conceptual figure: one outage bar laid against two timelines, Provider A with a 3-day retry window and a 30-day read-back window, Provider B with a 30-day queue. |  |\n| p39 | analysis | Recovery itself can fail: the queued events arrive in a short time and a receiver that processes inline answers 429 or times out, and a single message that makes the handler return an error keeps failing while, on Adyen, the endpoint's other events wait in the queue. | quotation: Adyen (https://docs.adyen.com/development-resources/webhooks/troubleshoot (n.d., accessed 2026-11)): a 429 'can happen after you fix a failing endpoint, as the queued webhooks are sent in a short timeframe. Ensure your server can handle the load.' A 422: 'We recommend acknowledging receipt with [200 OK] first, and performing business logic separately.' | `sequence`: An outage that has ended. → What can go wrong while the backlog is delivered. |\n| p40 | example | When a 'refunded' event arrives one second before a 'captured' event for the same payment, nothing can be concluded about which happened first; the handler stores both, reads the object or orders by the provider's own sequence or event time, and applies only allowed transitions. | example: The pair refunded-then-captured: on Stripe the handler retrieves the PaymentIntent and its refunds and writes what it finds; on Adyen it compares eventDate (outside the Standard webhook's signed fields) and its own state machine, and keeps the event it cannot apply for review. | `additional_support`: Events that arrive late or in a burst. → Events that arrive in an order that cannot be true. |\n| p41 | recommendation | When signature verification fails for genuine messages, the cause is usually a changed body, a rotated secret or a wrong clock, and the repair is to fix that cause, never to switch verification off to restore delivery. | fact: Stripe (https://docs.stripe.com/webhooks (n.d., accessed 2026-11)): verification needs 'the unmodified HTTP request body'; 'Any manipulation to the raw body of the request causes the verification to fail'; a 5-minute default tolerance that depends on an accurate clock. Adyen (https://docs.adyen.com/development-resources/webhooks/secure-webhooks (n.d., accessed 2026-11)): after generating a new HMAC key 'make sure that you can still accept webhook events signed with your previous HMAC key for some time'. | `contrast`: Genuine events misread. → Genuine events rejected, and the temptation that follows. |\n\n## Conclusion: What to Take Away\n\n**Synthesis:** Every step of the receiver's contract is the answer to one thing the sender cannot promise: store-then-acknowledge answers the deadline, the unique key answers repetition, the read of the object or the sequence number answers disorder and staleness, and the sweep answers the window. The two providers differ in which of these steps carries the most weight, not in whether the steps are needed.\n\n**So what:** A team that updates state directly from payloads has records that are right while its endpoint is up and the events arrive in order; a team that stores, confirms and sweeps has records that become right again after any outage shorter than the provider's windows, and knows what to do after a longer one.\n\n**Callback:** The members turned away on 14 September 2026. The provider's retries delivered every event; what would have kept the doors open was a receiver that treated nine hours of silence as 'unknown, go and read' instead of 'unpaid'.\n\n**Takeaway** (`course_of_action`): For each provider, write down the acknowledgement deadline, the retry window, the read-back window and the deduplication key, then check that the receiver stores before it acknowledges, that state is confirmed against the provider's record, and that a sweep covers everything still pending.\n\n**Hand-off** to [Keys, Sandboxes and Limits: The Developer Platform Around the API](payment-developer-platform.html): `cause_effect`: The integrator this part has produced: retries with stored keys, a read of the provider's record after every event, a sweep over pending payments and a rehearsal before each upgrade. → The consequence: all of it is traffic on a shared API, sent with credentials, rehearsed in a test environment and subject to limits.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p42 | synthesis (list) | Established: delivery is at-least-once within a window at both providers, both prescribe acknowledging before processing, both document duplicates, and neither has published its sender. |  |  |\n| p43 | synthesis (list) | Depends on context: snapshot or thin events, HTTP endpoint or event bus, how often to sweep, and how much to rely on Adyen's longer queue all depend on volume, on the provider and on what a wrong state costs for how long. |  | `contrast`: What the documentation establishes. → What changes with the integrator's situation. |\n| p44 | recommendation (list) | The author's synthesis: design the receiver from the list of things it may not assume, treat silence as unknown and never as a fact, and take the provider's two windows, not its uptime, as the measure of the contract. |  | `additional_support`: What is established and what depends. → The author's own position. |\n| p45 | recommendation (list) | Eight questions let the reader test a webhook integration or a provider's delivery contract in a design review. |  | `sequence`: The author's position. → Questions that apply it. |\n| p46 | transition | Everything this chapter and the two before it asked the integrator to build (retries with stored keys, a read after every event, a sweep, an upgrade rehearsal) is traffic on a shared API, sent with credentials, rehearsed in a test environment and subject to limits, and the next chapter covers those terms. |  | `cause_effect`: The receiver, the sweep and the reads they cause. → The consequence: that traffic meets keys, sandboxes and rate limits. |\n\n## Non-goals\n\n- The payment state machine and the mapping of each provider's event types to states. See [One Object, Many Outcomes: The Payment State Machine](payment-state-machines.html).\n- Resolving a request whose outcome is unknown, and idempotency keys. See [Exactly Once, Over a Network That Does Not Allow It: Idempotency and Retries](idempotency-and-retries.html).\n- API version pinning and the webhook endpoint's version during an upgrade. See [Changing the API Without Breaking a Million Integrations: Versioning](payment-api-versioning.html).\n- Rate limits met by the reads a receiver makes, API keys and test environments. See [Keys, Sandboxes and Limits: The Developer Platform Around the API](payment-developer-platform.html).\n- Settlement reports and the daily close. See [Proving the Money: Reconciliation Inside the Provider and Out](payment-reconciliation-and-reporting.html).\n- Dispute and verification webhooks in detail. See [Money Flowing Backward: Refunds, Reversals and Disputes](refunds-reversals-and-disputes.html), [Letting Sellers In: Onboarding and Verification on Platforms](platform-onboarding-and-verification.html).\n- Event-driven architecture inside a merchant's own systems. See [Built to Disagree and Recover: Events, Eventual Consistency and Reconciliation](../commerce-platform-architecture/events-consistency-and-reconciliation.html).\n- A catalog of event types of either provider.\n\n## Modalities\n\nArticle only.\n\n## Open questions\n\n- How either company's sender is built (queues, isolation of slow endpoints, backlog storage) is not public.\n- Stripe publishes no acknowledgement timeout in seconds and no retry intervals.\n- Adyen's documentation neither guarantees nor disclaims delivery order, and does not say what follows the twelfth retry interval or what happens to a queue after 30 days.\n- Whether Stripe still disables an endpoint that keeps failing was not found on the pages read in November 2026; the chapter does not state it.\n- Resolved in the verification pass of 17 November 2026: Stripe's thin event catalog lists v1 payment event types (v1.payment_intent.*, v1.charge.*, v1.refund.*); a June 2026 Stripe post still offered early access, so the coverage is recent. The catalog page carries no preview or general-availability label.\n- Whether Adyen relies on TLS and deduplication alone against replay of a Standard webhook is the author's reading, not a documented statement.\n- Resolved by ruling 20: the Silent Webhook is Monday 14 September 2026; the certificate expired shortly after midnight, events failed for 9 hours, and members were turned away on Monday morning. The chapter names Monday.\n\n## Decision log\n\n- **2026-11-17** — Signatures get their own section, apart from the delivery terms, because what a signature covers is a separate claim (C3) with its own inference about replay. Rejected: One long contracts section with six terms.\n- **2026-11-17** — The sender section is short (three paragraphs) and wholly labeled as inference beyond a list of externally visible properties, since no engineering source from either company exists. Rejected: A component-by-component sender design presented as how the providers work.; Dropping the section, which the chapter contract and AC-3 require.\n- **2026-11-17** — Thin events are presented as Stripe's stated direction with a caveat on coverage of payment event types. Rejected: Stating that payment_intent events are available as thin events.\n- **2026-11-17** — Larkfield's sweep interval, pending threshold and silence alert are local illustrative details labeled as assumptions; they are not appended to the ledger as canonical numbers. Rejected: Adding numeric sweep parameters to the scenario ledger.\n- **2026-11-17** — Flow rubric (sound with notes). Acted on: the Standard/transfer webhook distinction is introduced in the order paragraph; the 'unknown, not failed' state is part of the sweep step; the sender's hold-or-independent choice is tied to burst, blocking and disorder; the flow rationale no longer claims a one-for-one mapping. Not acted on, left for the author: merging the refunded-before-captured example into the receiver's order step (kept in the failure section because acceptance criterion AC-2 is answered there); shrinking the first paragraph of the worked example; folding the paragraph after the comparison table into the table (the style guide requires it). Rejected: Reordering or cutting units after a 'sound with notes' verdict without the author's decision.\n- **2026-11-17** — The chapter dates the Silent Webhook Monday 14 September 2026 (ruling 20): the certificate expired shortly after midnight and members were turned away on Monday morning. Rejected: Naming any other weekday for 14 September 2026, as an earlier ledger line did.\n- **2026-11-17** — Verification pass: the thin-event caveat now says that the thin event catalog lists v1 payment types as of November 2026, and keeps the June 2026 early-access offer as evidence that the coverage is recent. Rejected: Keeping the caveat as if payment event types were still in early access.\n\n## Sources\n\n- **Internal**\n  - PLAN.md, chapter contract 20 — Scope, owned terms, Larkfield thread.\n  - _research/brief-stripe-payments-and-api.md, Part 5 and section 4.4 — Verified quotations on Stripe events, delivery, signing, event destinations; the statement that nothing is public on the sender.\n  - _research/brief-adyen-payments-and-api.md, Part 6 and sections 1.4, 2.2, 5.5 — Verified quotations on Adyen acknowledgement, retry queue, duplicates, ordering, HMAC, and the absence of a payment GET.\n  - _research/brief-reliability-and-scale.md, section 6.2 — Confirmation that neither company has published its sender design.\n  - _research/scenario-ledger.md and consistency-issues.md (rulings 4 and 12) — The Silent Webhook, Keel K2, Mila's class pass; ownership of the receiver's contract.\n- **External**\n  - docs.stripe.com: webhooks, events/how-events-work, events/manage-webhook-endpoints, api/events, event-destinations/eventbridge (n.d., fetched 2026-11-17) — Stripe's delivery contract, signing scheme, formats, retention and destinations.\n  - stripe.dev/blog: event-notification-handlers-thin-events (2026-06-24); growing-your-stripe-integration-with-event-destinations (2024-10-31) — Motive for thin events and their status; Event Destinations general availability.\n  - docs.adyen.com/development-resources/webhooks: overview, handle-webhook-events, troubleshoot, configure-and-manage, secure-webhooks, verify-hmac-signatures, webhook-types (fetched 2026-11-17) — Adyen's delivery contract, retry queue, security mechanisms.\n  - adyen.com/knowledge-hub/webhooks-accept-2xx (2024-05-01); github.com/Adyen/adyen-openapi (CheckoutService-v72, BalancePlatformTransferNotification-v4) — The change from '[accepted]' to 2xx; no payment GET; the transfer webhook's sequence number.\n\n## Changelog\n\n- **2026-11-17** — Absence audit: 7 statements of absence re-tested with a wide search (documentation sitemaps, support and help centers, company sites, engineering posts, web search). All hold; two sentences now say what was searched. No unit or evidence changed.\n- **2026-11-17** — First version, written from the chapter contract, the Stripe, Adyen and scale research briefs and the scenario ledger; intent, thesis and role copied from the journal spec.\n- **2026-11-17** — Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes).\n- **2026-11-17** — Verification pass: 72 claims checked (65 confirmed, 4 corrected, 3 hedged, 0 unsupported and removed or relabeled, 0 unreachable); the thin-event caveat now says Stripe's catalog lists v1 payment event types as of November 2026, and the Silent Webhook is dated Monday 14 September 2026 (ruling 20), with 'no call that returns a payment' scoped to the Checkout API for online payments (ruling 29).\n- **2026-11-17** — Journal-spec entry corrected after verification; intent, thesis and role re-synced ('and no call to read a payment back.' -> 'and, in its Checkout API for online payments, no call to rea').\n- **2026-11-17** — Journal-spec entry corrected after verification; intent, thesis and role re-synced ('because a payment cannot be read back, the settlement report' -> 'because an online payment cannot be read back through the Ch').\n- **2026-11-17** — Visual layer: 4 figures generated and inspected (article-illustrator).\n"}]}]}</script>
+<script>
+    (function () {
+        const data = JSON.parse(document.getElementById('data').textContent);
+        const root = document.getElementById('content');
+
+        const postId = (data.meta && data.meta.id) ? String(data.meta.id) : '';
+        const postStatusRaw = (data.meta && data.meta.status) ? String(data.meta.status) : '';
+        if (postId || postStatusRaw) {
+            const header = document.getElementById('post-header');
+            let sectionEl = header.querySelector('p.section');
+            if (!sectionEl) {
+                sectionEl = document.createElement('p');
+                sectionEl.className = 'section';
+                header.insertBefore(sectionEl, header.firstChild);
+            }
+            // Status pill goes first, then a " / " separator before the existing
+            // content (section name and/or id).
+            if (postStatusRaw) {
+                const parts = postStatusRaw.split(':');
+                const statusName = parts[0].trim();
+                const statusColor = (parts[1] || '').trim();
+                const wrap = document.createElement('span');
+                wrap.className = 'post-status';
+                const dot = document.createElement('span');
+                dot.className = 'status-dot';
+                if (statusColor) dot.style.background = statusColor;
+                wrap.appendChild(dot);
+                wrap.appendChild(document.createTextNode(statusName));
+                if (sectionEl.firstChild) {
+                    sectionEl.insertBefore(document.createTextNode(' • '), sectionEl.firstChild);
+                    sectionEl.insertBefore(wrap, sectionEl.firstChild);
+                } else {
+                    sectionEl.appendChild(wrap);
+                }
+            }
+            if (postId) {
+                if (sectionEl.firstChild) sectionEl.appendChild(document.createTextNode(' • '));
+                sectionEl.appendChild(document.createTextNode(postId));
+            }
+        }
+
+        const tagsHost = document.getElementById('tags');
+        (data.tags || []).forEach(function (t) {
+            const span = document.createElement('span');
+            span.className = 'tag';
+            span.textContent = t;
+            tagsHost.appendChild(span);
+        });
+
+        // Minimal markdown renderer. Supports: ATX headings, paragraphs, blockquotes,
+        // unordered/ordered lists, fenced code, inline code, bold/italic/strikethrough, links, images, hr.
+        // Sufficient for the posts in this repo; replace with a fuller parser if needed.
+        function renderMarkdown(src) {
+            const lines = src.replace(/\r\n/g, '\n').split('\n');
+            const out = [];
+            let i = 0;
+
+            const bullet = /^(\s*)([-*])\s+(.*)$/;
+            const ordered = /^(\s*)(\d+)\.\s+(.*)$/;
+            const tableRow = /^\s*\|(.+)\|\s*$/;
+            const tableSep = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+
+            function splitRow(s) {
+                let t = s.trim();
+                if (t.startsWith('|')) t = t.slice(1);
+                if (t.endsWith('|')) t = t.slice(0, -1);
+                return t.split('|').map(c => c.trim());
+            }
+
+            function inline(s) {
+                // Posts are trusted content, so raw HTML passes through unescaped
+                // (some posts embed inline <blockquote>, <div>, etc.).
+                // Stray ampersands still get fixed up.
+                s = s.replace(/&(?![a-zA-Z]+;|#\d+;)/g, '&amp;');
+                s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<a class="image-link" href="$2" target="_blank" rel="noopener noreferrer"><img alt="$1" src="$2"></a>');
+                s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+                s = s.replace(/`([^`]+)`/g, function (_, c) {
+                    return '<code>' + c.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
+                });
+                // Bold/italic, including nested combinations: ***x***,
+                // **a *b*** / ***a* b** (shared delimiters), and **a *b* c**.
+                s = s.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+                s = s.replace(/\*\*([^*\n]+)\*([^*\n]+)\*\*\*/g, '<strong>$1<em>$2</em></strong>');
+                s = s.replace(/\*\*\*([^*\n]+)\*([^*\n]+)\*\*/g, '<strong><em>$1</em>$2</strong>');
+                s = s.replace(/\*\*((?:[^*\n]|\*(?!\*)[^*\n]+\*(?!\*))+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+                s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+                return s;
+            }
+
+            while (i < lines.length) {
+                const line = lines[i];
+                if (!line.trim()) {
+                    i++;
+                    continue;
+                }
+
+                const fence = line.match(/^```(\w*)\s*$/);
+                if (fence) {
+                    i++;
+                    const buf = [];
+                    while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+                        buf.push(lines[i]);
+                        i++;
+                    }
+                    i++;
+                    const escaped = buf.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const cls = fence[1] ? ' class="lang-' + fence[1] + '"' : '';
+                    out.push('<pre><code' + cls + '>' + escaped + '</code></pre>');
+                    continue;
+                }
+
+                const h = line.match(/^(#{1,6})\s+(.*)$/);
+                if (h) {
+                    out.push('<h' + h[1].length + '>' + inline(h[2]) + '</h' + h[1].length + '>');
+                    i++;
+                    continue;
+                }
+
+                if (/^\s*(?:-\s*){3,}\s*$/.test(line) || /^\s*\*{3,}\s*$/.test(line)) {
+                    out.push('<hr>');
+                    i++;
+                    continue;
+                }
+
+                if (/^>\s?/.test(line)) {
+                    const buf = [];
+                    while (i < lines.length && /^>\s?/.test(lines[i])) {
+                        buf.push(lines[i].replace(/^>\s?/, ''));
+                        i++;
+                    }
+                    out.push('<blockquote>' + renderMarkdown(buf.join('\n')) + '</blockquote>');
+                    continue;
+                }
+
+                if (tableRow.test(line) && i + 1 < lines.length && tableSep.test(lines[i + 1])) {
+                    const headers = splitRow(line);
+                    const aligns = splitRow(lines[i + 1]).map(function (c) {
+                        c = c.trim();
+                        const left = c.startsWith(':'), right = c.endsWith(':');
+                        return left && right ? 'center' : right ? 'num' : '';
+                    });
+                    const cellOpen = function (tag, idx) {
+                        return aligns[idx] ? '<' + tag + ' class="' + aligns[idx] + '">' : '<' + tag + '>';
+                    };
+                    i += 2;
+                    const rows = [];
+                    while (i < lines.length && tableRow.test(lines[i])) {
+                        rows.push(splitRow(lines[i]));
+                        i++;
+                    }
+                    let html = '<div class="table-wrap"><table><thead><tr>';
+                    headers.forEach((h, idx) => {
+                        html += cellOpen('th', idx) + inline(h) + '</th>';
+                    });
+                    html += '</tr></thead><tbody>';
+                    rows.forEach(r => {
+                        html += '<tr>';
+                        r.forEach((c, idx) => {
+                            html += cellOpen('td', idx) + inline(c) + '</td>';
+                        });
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                    out.push(html);
+                    continue;
+                }
+
+                if (bullet.test(line) || ordered.test(line)) {
+                    // Indent of the first bullet defines this list's base level.
+                    // Deeper-indented bullets become nested lists (rendered by
+                    // recursing into renderMarkdown). Same-or-less indent at a
+                    // bullet starts a sibling item (or ends the list).
+                    const firstMatch = line.match(bullet) || line.match(ordered);
+                    const baseIndent = firstMatch[1].length;
+                    const isOrdered = ordered.test(line);
+                    const items = [];
+                    let hasTask = false;
+                    while (i < lines.length) {
+                        const cur = lines[i];
+                        if (!cur.trim()) {
+                            // blank line breaks the list (matches CommonMark-ish behaviour)
+                            i++;
+                            break;
+                        }
+                        const mBul = cur.match(bullet);
+                        const mOrd = cur.match(ordered);
+                        const m = mBul || mOrd;
+                        if (!m) break;
+                        if (m[1].length < baseIndent) break;
+                        if (m[1].length > baseIndent) break; // shouldn't happen at top of loop
+                        // Same-type check: switching between -/* and 1. closes the list
+                        if (isOrdered !== !!mOrd) break;
+
+                        const itemBuf = [m[3]];
+                        const nestedBuf = [];
+                        i++;
+                        while (i < lines.length) {
+                            const nxt = lines[i];
+                            if (!nxt.trim()) break;
+                            const nBul = nxt.match(bullet);
+                            const nOrd = nxt.match(ordered);
+                            const nm = nBul || nOrd;
+                            if (nm) {
+                                if (nm[1].length > baseIndent) {
+                                    // nested list line — dedent and stash
+                                    nestedBuf.push(nxt.slice(baseIndent + 2));
+                                    i++;
+                                    continue;
+                                }
+                                // sibling or end of list
+                                break;
+                            }
+                            // Plain continuation text
+                            if (nestedBuf.length) {
+                                // continuation inside the nested block
+                                nestedBuf.push(nxt.slice(baseIndent + 2));
+                            } else {
+                                itemBuf.push(nxt.trim());
+                            }
+                            i++;
+                        }
+
+                        // GitHub-style task items: "- [ ] text" / "- [x] text"
+                        // render as (clickable, unpersisted) checkboxes.
+                        const itemText = itemBuf.join('\n');
+                        const task = !isOrdered && itemText.match(/^\[( |x|X)\]\s+/);
+                        let liHtml = inline(task ? itemText.slice(task[0].length) : itemText);
+                        if (task) {
+                            hasTask = true;
+                            liHtml = '<input type="checkbox"' + (task[1] === ' ' ? '' : ' checked') + '>' + liHtml;
+                        }
+                        if (nestedBuf.length) {
+                            liHtml += renderMarkdown(nestedBuf.join('\n'));
+                        }
+                        items.push(task ? '<li class="task">' + liHtml + '</li>' : '<li>' + liHtml + '</li>');
+                    }
+                    out.push((isOrdered ? '<ol>' : (hasTask ? '<ul class="task-list">' : '<ul>')) + items.join('') + (isOrdered ? '</ol>' : '</ul>'));
+                    continue;
+                }
+
+                const buf = [line];
+                i++;
+                while (i < lines.length && lines[i].trim() && !/^#{1,6}\s/.test(lines[i]) && !/^>\s?/.test(lines[i]) && !bullet.test(lines[i]) && !ordered.test(lines[i]) && !/^```/.test(lines[i]) && !tableRow.test(lines[i])) {
+                    buf.push(lines[i]);
+                    i++;
+                }
+                out.push('<p>' + inline(buf.join(' ')) + '</p>');
+            }
+            return out.join('\n');
+        }
+
+        // Block dispatcher. New block types plug in here.
+        const renderers = {
+            markdown: function (block) {
+                const div = document.createElement('div');
+                div.innerHTML = renderMarkdown(block.content);
+                return div;
+            },
+            mermaid: function (block) {
+                // Mermaid scans elements with class "mermaid" whose textContent
+                // is the diagram source. We collect these nodes and run
+                // mermaid.run() once after all blocks are in the DOM.
+                const div = document.createElement('div');
+                div.className = 'mermaid';
+                div.textContent = block.content;
+                return div;
+            },
+            'force-graph': function (block) {
+                // build.py emits parsed JSON: {nodes:[{id,size}], links:[{source,target}]}.
+                // We instantiate force-graph after the container is in the DOM
+                // so it can measure its own width.
+                const div = document.createElement('div');
+                div.className = 'force-graph';
+                const data = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.ForceGraph) return;
+                    const maxSize = data.nodes.reduce((m, n) => Math.max(m, n.size || 1), 1);
+                    window.ForceGraph()(div)
+                        .graphData(data)
+                        .width(div.clientWidth)
+                        .height(div.clientHeight)
+                        .nodeRelSize(4)
+                        .nodeVal(n => Math.max(20 * (n.size || 1) / maxSize, 0.001))
+                        .nodeLabel(n => n.id + ' (' + (n.size || 1) + ')')
+                        .nodeColor(() => 'rgba(135, 206, 235, 0.7)')
+                        .linkColor(() => 'rgba(60, 60, 60, 0.4)')
+                        .linkDirectionalArrowLength(4)
+                        .linkDirectionalArrowRelPos(1)
+                        .linkWidth(1);
+                });
+                return div;
+            },
+            'bubble-chart': function (block) {
+                // build.py emits {nodes:[{name,size}]}. Renders a D3 circle-pack
+                // SVG (same shape as the obren.io reference, just inline).
+                const wrap = document.createElement('div');
+                wrap.className = 'bubble-chart';
+                const payload = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.d3) return;
+                    const diameter = 480;
+                    const fill = '#c0deed';
+                    const textColor = '#111111';
+                    const fontSize = 12;
+
+                    const svg = window.d3.select(wrap).append('svg')
+                        .attr('viewBox', '0 0 ' + diameter + ' ' + diameter)
+                        .attr('width', diameter)
+                        .attr('height', diameter);
+
+                    const root = window.d3.hierarchy({children: payload.nodes})
+                        .sum(d => d.size || 0)
+                        .sort((a, b) => b.value - a.value);
+
+                    window.d3.pack().size([diameter, diameter]).padding(2)(root);
+
+                    const node = svg.selectAll('g')
+                        .data(root.leaves())
+                        .enter().append('g')
+                        .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+
+                    node.append('title').text(d => d.data.name + ': ' + d.value);
+                    node.append('circle').attr('r', d => d.r).style('fill', fill);
+                    node.append('text')
+                        .attr('dy', '.3em')
+                        .style('text-anchor', 'middle')
+                        .style('fill', textColor)
+                        .style('font-size', fontSize + 'px')
+                        .text(d => d.data.name.substring(0, Math.max(0, Math.floor(d.r / 3))));
+                });
+                return wrap;
+            }
+        };
+
+        // Render one modality's blocks into a host element. Mermaid runs
+        // scoped to just the nodes created here, so lazily rendered tabs get
+        // their diagrams on first activation.
+        let mermaidInitialized = false;
+        function renderBlocksInto(blocks, host) {
+            const mermaidNodes = [];
+            blocks.forEach(function (block) {
+                const r = renderers[block.type];
+                if (!r) {
+                    const pre = document.createElement('pre');
+                    pre.textContent = '[unknown block type: ' + block.type + ']';
+                    host.appendChild(pre);
+                    return;
+                }
+                const node = r(block);
+                if (node instanceof Node) {
+                    host.appendChild(node);
+                    if (block.type === 'mermaid') mermaidNodes.push(node);
+                }
+            });
+            if (mermaidNodes.length && window.mermaid) {
+                if (!mermaidInitialized) {
+                    window.mermaid.initialize({startOnLoad: false, theme: 'default'});
+                    mermaidInitialized = true;
+                }
+                window.mermaid.run({nodes: mermaidNodes});
+            }
+            markScrollableTables(host);
+        }
+
+        // A table wider than its wrapper scrolls sideways. Mark those wrappers
+        // so the CSS can show a cue, and make them focusable so keyboard users
+        // can reach and scroll them. Hidden panes measure 0 and are re-marked
+        // when activated or when the window is resized.
+        function markScrollableTables(host) {
+            host.querySelectorAll('.table-wrap').forEach(function (wrap) {
+                const scrolls = wrap.scrollWidth > wrap.clientWidth + 1;
+                wrap.classList.toggle('is-scrollable', scrolls);
+                if (scrolls) {
+                    wrap.setAttribute('tabindex', '0');
+                    wrap.setAttribute('role', 'region');
+                    wrap.setAttribute('aria-label', 'Table that scrolls sideways');
+                } else {
+                    wrap.removeAttribute('tabindex');
+                    wrap.removeAttribute('role');
+                    wrap.removeAttribute('aria-label');
+                }
+            });
+        }
+
+        // Modality tabs. One <article class="pane"> per modality; panes are
+        // rendered lazily on first activation (force-graph / D3 / mermaid
+        // need a visible, measurable container). With a single modality the
+        // tab bar stays hidden and the page looks exactly like before.
+        const mods = data.modalities;
+        const tabBar = document.getElementById('modality-tabs');
+        const panes = {};
+        const tabButtons = {};
+        const renderedPanes = {};
+
+        // With several modalities each pane is a tabpanel labelled by its
+        // tab (W3C APG tabs pattern); tabindex=0 lets keyboard users move
+        // from the tab list straight into the active content.
+        mods.forEach(function (m) {
+            const pane = document.createElement('article');
+            pane.className = 'pane';
+            pane.dataset.key = m.key;
+            pane.hidden = true;
+            if (mods.length > 1) {
+                pane.id = 'pane-' + m.key;
+                pane.setAttribute('role', 'tabpanel');
+                pane.setAttribute('aria-labelledby', 'tab-' + m.key);
+                pane.setAttribute('tabindex', '0');
+            }
+            root.appendChild(pane);
+            panes[m.key] = pane;
+        });
+
+        const defaultKey = mods.some(m => m.key === 'index') ? 'index' : mods[0].key;
+
+        function activate(key, updateHash) {
+            mods.forEach(function (m) {
+                const isActive = m.key === key;
+                panes[m.key].hidden = !isActive;
+                if (tabButtons[m.key]) {
+                    tabButtons[m.key].classList.toggle('active', isActive);
+                    tabButtons[m.key].setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    // Roving tabindex: only the selected tab is in the Tab
+                    // order; the arrow keys move between tabs.
+                    tabButtons[m.key].setAttribute('tabindex', isActive ? '0' : '-1');
+                }
+            });
+            // Unhide first, then render: the chart libraries measure widths.
+            if (!renderedPanes[key]) {
+                renderBlocksInto(mods.find(m => m.key === key).blocks, panes[key]);
+                renderedPanes[key] = true;
+            } else {
+                markScrollableTables(panes[key]);
+            }
+            if (updateHash) {
+                history.replaceState(null, '',
+                    key === defaultKey ? location.pathname + location.search : '#' + key);
+            }
+        }
+
+        if (mods.length > 1) {
+            mods.forEach(function (m) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = m.label;
+                btn.id = 'tab-' + m.key;
+                btn.dataset.key = m.key;
+                btn.setAttribute('role', 'tab');
+                btn.setAttribute('aria-controls', 'pane-' + m.key);
+                btn.addEventListener('click', function () { activate(m.key, true); });
+                tabBar.appendChild(btn);
+                tabButtons[m.key] = btn;
+            });
+            // Keyboard support per the W3C APG tabs pattern (automatic
+            // activation): Left/Right move between tabs and wrap, Home/End
+            // jump to the first/last tab, and the focused tab is selected.
+            tabBar.addEventListener('keydown', function (ev) {
+                const keys = mods.map(function (m) { return m.key; });
+                const focused = document.activeElement;
+                const current = focused && focused.dataset ? keys.indexOf(focused.dataset.key) : -1;
+                if (current < 0) return;
+                let next = null;
+                if (ev.key === 'ArrowRight') next = (current + 1) % keys.length;
+                else if (ev.key === 'ArrowLeft') next = (current - 1 + keys.length) % keys.length;
+                else if (ev.key === 'Home') next = 0;
+                else if (ev.key === 'End') next = keys.length - 1;
+                if (next === null) return;
+                ev.preventDefault();
+                activate(keys[next], true);
+                tabButtons[keys[next]].focus();
+            });
+            tabBar.hidden = false;
+        }
+
+        // The hash selects a tab only when it matches a modality key, so
+        // existing anchors keep working.
+        const initialHash = location.hash.slice(1);
+        activate(mods.some(m => m.key === initialHash) ? initialHash : defaultKey, false);
+        window.addEventListener('hashchange', function () {
+            const k = location.hash.slice(1);
+            if (mods.some(m => m.key === k)) activate(k, false);
+        });
+        window.addEventListener('resize', function () { markScrollableTables(root); });
+    })();
+</script>
+</body>
+</html>

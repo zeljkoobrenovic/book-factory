@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Spec: Charging Again and Again: Subscriptions and the Billing Engine</title>
+    <meta name="description" content="What does a billing engine do that a payment API does not? It decides what is owed, for which period and when to ask, and writes the answer down as an invoice; Stripe keeps that engine in its platform, while Adyen’s documentation offers a stored token with a recurring flag and leaves the rest to you.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SETTLED: Architecting Payments and Revenue Infrastructure">
+    <meta property="og:title" content="Spec: Charging Again and Again: Subscriptions and the Billing Engine">
+    <meta property="og:description" content="What does a billing engine do that a payment API does not? It decides what is owed, for which period and when to ask, and writes the answer down as an invoice; Stripe keeps that engine in its platform, while Adyen’s documentation offers a stored token with a recurring flag and leaves the rest to you.">
+    <meta property="og:url" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/subscriptions-and-billing-engines.spec.html">
+    <meta property="og:image" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/assets/images/27-subscriptions-and-billing-engines/logo.jpeg">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="site.css">
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-129891352-1"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+        dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'UA-129891352-1');
+</script>
+    <style>
+        body {
+            line-height: 1.65;
+        }
+
+        main {
+            padding-top: 32px;
+        }
+
+        nav.post-nav {
+            font-size: 14px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: baseline;
+            flex-wrap: wrap;
+        }
+
+        nav.post-nav a {
+            color: var(--muted);
+            text-decoration: none;
+        }
+
+        nav.post-nav a:hover {
+            color: var(--accent);
+        }
+
+        nav.post-nav .nav-right {
+            margin-left: auto;
+            display: inline-flex;
+            gap: 4px;
+            align-items: baseline;
+        }
+
+        nav.post-nav .nav-sep {
+            color: var(--muted);
+        }
+
+        footer nav.post-nav {
+            margin-top: 24px;
+            margin-bottom: 0;
+        }
+
+        header.post {
+            margin-bottom: 32px;
+        }
+
+        header.post .section {
+            color: var(--muted);
+            font-size: 13px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin: 0 0 -6px;
+        }
+
+        header.post .section a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        header.post .section a:hover {
+            color: var(--accent);
+        }
+
+        header.post .section .post-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        header.post .section .post-status .status-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        header.post .logo {
+            display: block;
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            border: 1px solid lightgrey;
+
+        }
+
+        header.post .logo-credit {
+            color: var(--muted);
+            font-size: 12px;
+            margin: -4px 0 24px;
+            text-align: right;
+        }
+
+        header.post h1 {
+            font-size: 52px;
+            line-height: 1.2;
+            margin: 0 0 2px;
+            padding: 0;
+            letter-spacing: -0.01em;
+            font-weight: normal;
+        }
+
+        header.post .byline {
+            color: var(--muted);
+            font-size: 15px;
+            margin: 0;
+        }
+
+        header.post .byline .spec-link {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        header.post .byline .spec-link:hover {
+            text-decoration: underline;
+        }
+
+        header.post .byline .spec-link-drifted {
+            color: #b8650f;
+        }
+
+        header.post .byline .spec-link-superseded {
+            color: var(--muted);
+        }
+
+        header.post .ai-credit {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 4px 0 0;
+        }
+
+        header.post .ai-credit a {
+            color: inherit;
+        }
+
+        header.post .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 10px 0 10px;
+        }
+
+        header.post .tags .tag {
+            font-size: 14px;
+            padding: 1px 8px;
+            border: 1px solid deepskyblue;
+            color: blue;
+            border-radius: 999px;
+            background-color: var(--tag-bg);
+        }
+
+        nav.modality-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--rule);
+            margin: 0 0 28px;
+            flex-wrap: wrap;
+        }
+
+        nav.modality-tabs button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font: inherit;
+            font-size: 14px;
+            color: var(--muted);
+            padding: 8px 14px;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            letter-spacing: 0.02em;
+        }
+
+        nav.modality-tabs button:hover {
+            color: var(--accent);
+        }
+
+        nav.modality-tabs button.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        #content .pane[hidden] {
+            display: none;
+        }
+
+        #content .pane:focus {
+            outline: none;
+        }
+
+        #content .pane:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 6px;
+        }
+
+        article h2 {
+            font-size: 26px;
+            margin: 40px 0 12px;
+            letter-spacing: -0.01em;
+        }
+
+        article h3 {
+            font-size: 20px;
+            margin: 28px 0 8px;
+        }
+
+        article h4 {
+            font-size: 17px;
+            margin: 20px 0 6px;
+        }
+
+        article p {
+            margin: 0 0 16px;
+        }
+
+        article a {
+            color: var(--accent);
+        }
+
+        article a.image-link {
+            display: inline-block;
+            line-height: 0;
+        }
+
+        article img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        article a.image-link img {
+            display: block;
+        }
+
+        article ul, article ol {
+            padding-left: 24px;
+            margin: 0 0 16px;
+        }
+
+        article li {
+            margin-bottom: 6px;
+        }
+
+        article ul.task-list {
+            list-style: none;
+            padding-left: 4px;
+        }
+
+        article ul.task-list li.task > input[type="checkbox"] {
+            margin-right: 8px;
+            accent-color: var(--accent);
+        }
+
+        article hr {
+            border: none;
+            border-top: 1px solid var(--rule);
+            margin: 32px 0;
+        }
+
+        article blockquote {
+            margin: 16px 0;
+            padding: 12px 18px;
+            background: var(--quote-bg);
+            border-left: 3px solid var(--accent);
+            color: #333;
+        }
+
+        article blockquote p:last-child {
+            margin-bottom: 0;
+        }
+
+        article code {
+            background: var(--code-bg);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 0.92em;
+        }
+
+        article pre {
+            background: var(--code-bg);
+            padding: 14px 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        article pre code {
+            background: none;
+            padding: 0;
+        }
+
+        article .table-wrap {
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+
+        article table {
+            border-collapse: collapse;
+            margin: 16px 0;
+            width: 100%;
+            font-size: 15px;
+        }
+
+        article .table-wrap table {
+            margin: 0;
+        }
+
+        /* Wide tables scroll on narrow screens instead of crushing their columns.
+           A table wrapped in <div class="table-compact"> opts out: it has few,
+           short columns and wraps its cells to fit the screen instead. */
+        @media (max-width: 640px) {
+            article .table-wrap table {
+                min-width: 560px;
+            }
+            article .table-compact .table-wrap table {
+                min-width: 0;
+            }
+        }
+
+        /* Tables that actually overflow get a visible cue and keyboard focus
+           (markScrollableTables() sets the class and attributes). */
+        article .table-wrap.is-scrollable::before {
+            content: "Scroll sideways to see the whole table";
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        article .table-wrap.is-scrollable:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        article th, article td {
+            border: 1px solid var(--rule);
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        article th {
+            background: var(--code-bg);
+            font-weight: 600;
+        }
+
+        /* GFM column alignment from the separator row. Right-aligned columns
+           hold numbers; their cells never wrap, so a sign, a currency symbol
+           and its amount stay on one line while label columns still wrap. */
+        article th.num, article td.num {
+            text-align: right;
+        }
+
+        article td.num {
+            white-space: nowrap;
+        }
+
+        article th.center, article td.center {
+            text-align: center;
+        }
+
+        article .mermaid {
+            text-align: center;
+            margin: 24px 0;
+        }
+
+        article .force-graph {
+            margin: 24px 0;
+            border: 1px solid var(--rule);
+            border-radius: 6px;
+            background: #fff;
+            height: 480px;
+            overflow: hidden;
+        }
+
+        article .bubble-chart {
+            margin: 24px 0;
+            text-align: center;
+        }
+
+        article .bubble-chart svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <nav class="post-nav"><a class="nav-back" href="subscriptions-and-billing-engines.html">← Charging Again and Again: Subscriptions and the Billing Engine</a><span class="nav-right"></span></nav>
+    <header class="post" id="post-header">
+        <p class="section"><span>SPEC</span> • <span class="post-status"><span class="status-dot" style="background:green"></span>accepted</span> • <span>revised 2026-11-17</span></p>
+        <h1>Spec: Charging Again and Again: Subscriptions and the Billing Engine</h1>
+        <p class="byline"></p>
+        
+        <div class="tags" id="tags"></div>
+        
+    </header>
+    <nav class="modality-tabs" id="modality-tabs" hidden role="tablist" aria-label="Reading formats"></nav>
+    <div id="content"></div>
+    <footer>
+        <nav class="post-nav"><a class="nav-back" href="subscriptions-and-billing-engines.html">← Charging Again and Again: Subscriptions and the Billing Engine</a><span class="nav-right"></span></nav>
+    </footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/force-graph"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script id="data" type="application/json">{"meta": {}, "tags": [], "modalities": [{"key": "spec", "label": "Spec", "meta": {}, "blocks": [{"type": "markdown", "content": "## Intent\n\n**After reading, the reader should:**\n\n- **Know:** The parts of a billing engine (scheduler, price calculator, subscription state machine) and the objects Stripe documents for them: product, price, subscription, schedule, invoice, and the payment created for an invoice.\n- **Know:** What a billing cycle anchor, a proration and a subscription status are, and how Stripe documents month ends, UTC instants, eight statuses and two billing modes.\n- **Know:** That Adyen's documented recurring model is a stored token charged with a declared processing model, and that Orb, acquired on 1 July 2026, is not documented as part of Adyen's platform as of November 2026.\n- **Believe:** A subscription is a state machine that produces invoices, not a job that charges a card.\n- **Believe:** Billing rules such as proration are part of the agreement with the customer and cannot be changed under invoices already issued.\n- **Be able to:** List the decisions their own code must make if they run renewals on a bare payment API.\n- **Be able to:** Say, for a given provider, where the schedule, the amount and the invoice live.\n\n**Audience:** A software engineer or architect who has integrated or is about to integrate a payment API and has been asked to make it charge customers repeatedly.\n\n**Already knows:**\n\n- Authorization, stored credentials and merchant-initiated transactions (payment-authorization, tokenization-vaulting-and-pci).\n- Payment states and why a webhook is not the record (payment-state-machines, payment-webhooks-and-events).\n- Idempotency keys (idempotency-and-retries).\n- Larkfield, its two providers, the 2026 incidents and the Keel decisions (meet-larkfield, part-6).\n\n**Does not yet know:**\n\n- Subscription, billing cycle, billing cycle anchor, proration, billing scheduler, dunning (named only), invoice as the engine's output.\n- What Stripe Billing documents, what Adyen documents for recurring payments, and the status of Orb.\n\n**Acceptance criteria**\n\n| Id | Criterion | Check | Method | Severity |\n| --- | --- | --- | --- | --- |\n| AC-1 | Given a subscription case the chapter does not contain, the reader names the decisions a billing engine makes that a payment API does not. *Probe:* A language-learning app charges €12 a month. A customer signs up on 31 January and, halfway through March, moves to the €20 plan. The team uses only a payment API with saved cards. Which decisions does their own code now have to make? | `custom` | cold_reader | major |\n| AC-2 | The reader can state what Adyen's documentation provides for recurring payments and what must be supplied elsewhere, with the Orb acquisition's status as of November 2026. *Probe:* A colleague says 'we are on Adyen, so Adyen handles our subscriptions'. From this chapter: what does Adyen's documentation provide, and what has to live somewhere else? | `custom` | cold_reader | major |\n| AC-3 | Every statement about how Stripe's scheduler or Adyen's platform works internally is either a dated documented fact or a labeled inference, and the chapter says where the public record on renewal scheduling stops: one 2024 Stripe engineering post describes a scheduling service, and neither company has published how that work is partitioned, paced or kept from running twice. | `custom` | rubric | blocker |\n\n## Thesis\n\n**Question:** What does a billing engine do that a payment API does not?\n\n> **Claim:** A billing engine decides what is owed, for which period and when to ask: it is a scheduler, a price calculator and a subscription state machine whose output is an invoice, and the payment API executes only the last step. Stripe keeps that engine in its platform, with subscription, invoice and payment as separate objects; Adyen's documentation offers a stored token charged with a recurring flag and leaves the schedule, the amount and the invoice to the merchant or a connected billing system, and Orb, acquired on 1 July 2026, is not documented as part of Adyen's platform as of November 2026.\n\n**Disputed by:** The view that a subscription is a monthly job that charges a saved card, so a payment API with stored credentials is enough and a billing engine is packaging around it.\n\n**So what:** A team choosing between running renewals itself and using a billing engine knows what it is taking on: period boundaries, a proration rule it cannot change later, a status for every unpaid state, and one charge per period. A team on Adyen knows it must name the system that holds those, because the payment provider does not.\n\n**How and why:** Charging on a clock raises questions a customer-started payment never asks: what 'the 31st' means in February, at which instant a period starts (Stripe stores anchors as UTC seconds), what a mid-period plan change is worth, and what a subscription is while its invoice is unpaid. Stripe's documentation answers each with a rule: eight subscription statuses, month-end anchoring, proration to the second, and since 2025 two billing modes with one-way migration, which the chapter reads, as a labeled inference, as a sign that billing rules cannot be changed in place once invoices exist. The public record stops at the scheduler itself: Stripe documents its visible timing (a renewal invoice stays in draft for about an hour, and finalization waits for webhook acknowledgment) and one 2024 Stripe engineering post describes a scheduling service that finds subscriptions whose billing periods have just ended and triggers a new invoice; no Stripe or Adyen publication describes how that work is partitioned, paced or kept from running twice.\n\n**Supporting claims**\n\n- **S1** — A charge made on a clock raises decisions a customer-started payment never asks: on which day and at which instant a period starts, what a mid-period change is worth, what the subscription is while its charge is unpaid, and what makes each period's charge one charge.\n- **S2** — A billing engine is the system that makes those decisions: a scheduler, a price calculator and a subscription state machine whose output is an invoice, with the payment API executing only the last step.\n- **S3** — Stripe documents that engine inside its platform, with subscription, invoice and payment as separate objects and a stated rule for each decision; of its renewal scheduler only one passage is public (a 2024 engineering post), and its partitioning, pacing and duplicate protection are not.\n- **S4** — Adyen's documentation offers a stored token charged with a declared recurring model and leaves the schedule, the amount and the invoice to the merchant or a connected billing system; Orb, acquired on 1 July 2026, is not documented as part of Adyen's platform as of November 2026.\n- **S5** — Billing rules such as proration are part of the agreement with the customer and cannot be changed under invoices already issued.\n- **S6** — Whether the engine is the provider's, a dedicated billing system's or the team's own code, the same decisions are made somewhere, and when one is left unmade the failure is a charge that is late, taken twice or computed under the wrong rule.\n\n## Role in the part\n\nDefines the second state machine and its output, the invoice, which every later chapter of the part fills, collects or reads; and establishes where that machine sits on each provider. Supports P6-1, P6-5 of part `part-6`.\n\n## Flow\n\n**Pattern:** `prerequisite_order` (also `problem_solution` in scene to in-practice: the question 'where do the schedule, the amount and the invoice live' is posed in the first section and answered for both Larkfield engines in the eighth; `comparison` in stripe-billing, adyen-recurring, designs, where-they-differ)\n\nThe reader meets two billing problems, then the decisions a clock forces, then the engine that makes them, because Stripe's eight statuses and two billing modes read as a feature list until each is seen as the answer to a decision already posed. Stripe comes before Adyen because Adyen's documentation is understood by what it lacks relative to an engine. The general designs follow both companies because they generalize them, the comparison table closes the company material, and the worked example and failures come last because they use every term. Moving the companies ahead of the decisions would make the chapter a product tour. The comparison table comes after the three designs because its row on the billing companies each bought in 2026 needs the designs to be read.\n\n## Introduction\n\n**Hook** (`puzzling_scenario`): On 1 November 2026 a renewal job at Larkfield timed out on a provider call and tried again, and 1,840 members paid for November twice. Every one of those 3,680 payments was valid: approved by the member's bank, captured, reported as successful. Which system was supposed to know that there is only one November?\n\n**Bridge:** An engineer who has integrated a payment API sees a subscription as a cron job over a table of saved cards: once a month, for each row, charge the amount. → The job hides a second system that decides what is owed, for which period and when to ask; that system is a billing engine, and the payment API only executes its last step.\n\n**Thesis statement** (KEY POINTS bullets 1 and 2, and paragraph p02): A billing engine decides what is owed, for which period and when to ask: it is a scheduler, a price calculator and a subscription state machine whose output is an invoice, and the payment API executes only the last step. Stripe keeps that engine in its platform; Adyen's documentation offers a stored token charged with a recurring flag and leaves the schedule, the amount and the invoice to the merchant or a connected billing system.\n\n**Roadmap** (IN THIS CHAPTER callout and paragraph p04):\n\n- Start at Larkfield, which runs two billing engines and had noticed only one of them. *Kept in:* scene.\n- Set out the decisions a charge made on a clock forces, with the vocabulary: subscription, billing cycle, anchor, proration. *Kept in:* clock-decisions.\n- Assemble the engine that makes those decisions from three parts whose output is an invoice. *Kept in:* engine.\n- Read what Stripe documents about its engine and what Adyen documents about recurring payments and Orb, and put the two side by side. *Kept in:* stripe-billing, adyen-recurring, where-they-differ.\n- Compare the three places the engine can be kept. *Kept in:* designs.\n- Work one upgrade and one renewal at Larkfield, then the ways billing goes wrong. *Kept in:* in-practice, when-it-goes-wrong.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p01 | context | The Double Charge of 1 November 2026 was made of valid payments, so the fault lay in whatever was supposed to know that a member owes one charge per month. | scenario: The Double Charge: 1 November 2026, a timed-out renewal call retried under a new idempotency key, 1,840 members charged twice, €71,300 refunded, 212 disputes anyway. |  |\n| p02 | claim | The system that knows is a billing engine, which decides what is owed, for which period and when to ask, and Stripe keeps one in its platform while Adyen's documentation leaves it to the merchant. |  | `problem_solution`: Two valid payments for one month. → The billing engine as the missing system, and the thesis in plain words, with where the engine sits on each provider. |\n| p03 | context | Mila's class pass was a payment she started herself; this chapter is about the payments nobody starts, such as her €49.00 membership renewal on the 1st of each month. | scenario: Mila's class pass (€120.00, 9 March 2027, started by her in the app) against her €49.00 monthly membership at Studio Noord, set up 12 January 2027 and renewed on the 1st. | `place`: The chapter's claim. → Its position relative to the recurring payment of the book. |\n| p04 | transition | The chapter goes from Larkfield's two billing engines, through the decisions a clock forces and the engine that makes them, to what Stripe and Adyen document, the three places to keep the engine, a worked upgrade and renewal, and the failures. |  | `sequence`: Where the chapter sits. → The order of its sections. |\n\n## Sections\n\n### Setting the Scene at Larkfield: Two Billing Engines, One of Them Unnoticed\n\n**Controlling idea** (`example`, id `scene`): Larkfield runs two billing engines, a bought one for 6,200 studio subscriptions and a home-built one for about 940,000 member renewals a month, and its 2026 incidents fall on the one nobody called an engine.\n\n**Advances the thesis** (S6): Poses the chapter's question through two real billing problems inside one company, before any vocabulary.\n\n**Transition in:** `example`: The introduction's claim that something above the payment decides. → Larkfield's two versions of that something.\n\n**Order of paragraphs** (`problem_solution`): What the inventory finds, the incidents each engine produced, then the question those incidents raise; the question is the problem the chapter solves.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p05 | context | When the billing integration moved to the payments team in May 2027, Femke de Graaf's inventory found two engines: Stripe Billing for the studios' software plans, and the booking app's renewal job for members' memberships on both providers. | scenario: Studio subscriptions: plans at €89, €189 and €349 a month per location, billed with Stripe Billing since 2018, €24.5M in 2026, owned by the growth team until 2027. Member memberships: about 940,000 renewals a month, about €46 million, charged by Larkfield's own renewal job through the payment service. |  |\n| p06 | evidence | Sorted by engine, the 2026 incidents show the pattern: the Double Charge and the Renewal Wave happened in the home-built engine, and the Version Cliff in the integration with the bought one. | table: Rows: studio subscriptions vs member memberships. Columns: who is billed, typical amount, renewals a month, where the engine runs, 2026 incident. | `additional_support`: Two engines. → The incidents each one produced. |\n| p07 | claim | Femke's question for each engine is where the schedule, the amount and the record of what is owed for a period (the invoice) live, and for the member memberships the honest answer before Keel was a cron expression, a column and nowhere. |  | `cause_effect`: Incidents sorted by engine. → The three-part question the rest of the chapter answers. |\n\n### What a Charge on a Clock Has to Decide\n\n**Controlling idea** (`explanation`, id `clock-decisions`): A recurring charge has no moment, no amount and no identity until something computes them, and computing them means deciding the day, the instant, the value of a mid-period change, the state while unpaid and what counts as one period's charge.\n\n**Advances the thesis** (S1, S5): Establishes the decisions and the owned vocabulary (subscription, billing cycle, anchor, proration) that the engine in the next section exists to make.\n\n**Transition in:** `elaboration`: The question of where schedule, amount and invoice live. → Why those three things do not exist until something decides them.\n\n**Order of paragraphs** (`prerequisite_order`): Subscription first, then the period and its two boundary questions (day, instant), then what happens inside a period (proration), then what happens when its charge fails (status), then what ties them together (one charge per period).\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p08 | definition | A subscription is a standing agreement to charge a customer on a schedule, and unlike a payment the customer starts, the charge it produces has neither a moment nor an amount until a system supplies both. | reasoning: Mila's pass: she tapped pay at 19:42 for €120.00, so the moment and amount came from her. Her renewal: nobody is present; the card networks call this a merchant-initiated transaction. |  |\n| p09 | definition | A billing cycle is the repeating period a subscription bills for, fixed by an anchor, and the first decision is which day a period starts on when the anchor's day does not exist in a month. | example: A membership started on 31 March: does it renew on 30 April, 1 May, or 'every 30 days'? Each answer bills a different number of periods per year (12 or about 12.17). | `sequence`: A charge with no moment of its own. → The period and its anchor, and the month-end question. |\n| p10 | explanation | The second decision is the instant: a period is an interval between two points in time, and 'the first of the month' is a different instant for customers in different time zones. | example: 1 April 2027 00:00 UTC is 02:00 on 1 April in Amsterdam (CEST, UTC+2) and 20:00 on 31 March in New York (EDT, UTC-4). | `additional_support`: Which day. → Which instant, and in whose time zone. |\n| p11 | definition | The third decision is proration, charging or crediting a fraction of a price because the customer changed plan part-way through a period, and it is a rule with choices that becomes part of what the customer agreed to. | reasoning: The choices: the unit of time (second or day), whether the difference is charged now or on the next invoice, and whether a credit is computed from what was actually paid. | `sequence`: Where a period starts. → What a change inside a period is worth. |\n| p12 | explanation | The fourth decision is what the subscription is at any moment (in a trial, unpaid, paused, canceled), because the product has to decide every day whether the customer still gets the service. | scenario: Mila's renewal is declined on 1 April 2027 and succeeds on 4 April: on 2 April the front desk has to know whether to let her in.; reasoning: A trial that ends, a pause that ends and a cancellation date that arrives are changes of state that the clock makes, with no request behind them. | `sequence`: Changes inside a period. → The subscription's state when its charge has failed or the clock has changed it. |\n| p13 | claim | The fifth decision is identity: something must record that one amount is owed for one period, once, before any payment is attempted, and that record is the invoice. | case: The Double Charge: the retry created a second payment because no record said 'November for this membership has already been asked for'. | `conclusion_summary`: Day, instant, proration and status. → The record that holds their result, the invoice. |\n\n### The Engine: A Scheduler, a Price Calculator and a State Machine\n\n**Controlling idea** (`process`, id `engine`): A billing engine is three cooperating parts that turn a subscription and the clock into an invoice, and it hands that invoice to a payment engine whose answer it then has to wait for.\n\n**Advances the thesis** (S2): Builds the mechanism from the decisions of the previous section, as a reference design not tied to either company.\n\n**Transition in:** `problem_solution`: Five decisions and the invoice that records them. → The parts of the system that makes them.\n\n**Order of paragraphs** (`chronological`): The parts in the order a renewal passes through them: the overview, the scheduler that wakes, the calculator that fills the invoice, the state machine that reacts, the hand-off to the payment.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p14 | claim | The engine has three parts, a scheduler that decides when, a price calculator that decides how much and a state machine that decides what the subscription now is, and its output is an invoice that a payment engine is asked to collect. | figure: Component layout: clock and catalog feed scheduler, calculator and state machine; an invoice crosses a boundary line to the payment engine; a result returns. |  |\n| p15 | process | The scheduler finds every subscription whose period has ended and creates exactly one invoice for that subscription and period, and its hard requirements are about being neither late nor twice. | table: Requirements table: how fast (minutes to hours after the boundary is acceptable; days is not), how consistent (exactly one invoice per subscription and period), how available (a stopped scheduler must catch up without skipping or doubling), what happens on failure (a rerun must find the existing invoice). | `sequence`: The three parts. → The first to act, the scheduler. |\n| p16 | process | The price calculator turns an entry in the price list (the catalog), a quantity and any mid-period changes into invoice lines, and it must give the same answer whenever it is rerun for the same period. | reasoning: Inputs: product and price (what is sold, how much and how often), quantity, trial or discount, proration lines for changes; output: lines with a service period each. | `sequence`: An empty invoice for a period. → How it is filled. |\n| p17 | process | The state machine moves the subscription between statuses on two kinds of event, an invoice's outcome and the passing of time, and the product reads access from it. | reasoning: Events from invoices: paid, payment failed, retries exhausted. Events from the clock: trial ended, pause ended, cancellation date reached. | `sequence`: A filled invoice. → What its outcome does to the subscription. |\n| p18 | explanation | Between the engine and the money sits an ordinary payment, which can be declined, wait for authentication or come back weeks later as a dispute, so the billing engine inherits the gap between the instant answer and the slow truth. | reasoning: A direct-debit renewal is accepted today and can be returned days later; a card renewal can be charged back months later. Links: payment-state-machines, payment-webhooks-and-events, local-payment-methods. | `cause_effect`: The invoice handed over. → What the payment's slower truth means for the engine. |\n\n### Stripe Billing's Object Model, as Documented\n\n**Controlling idea** (`evidence`, id `stripe-billing`): Stripe documents an engine with separate subscription, invoice and payment objects and a stated rule for each decision, including two versions of the proration rule, and has published one 2024 engineering post that describes a scheduling service, but not how that work is partitioned, paced or kept from running twice.\n\n**Advances the thesis** (S3, S5): Supplies the documented half of the thesis for Stripe and the evidence for the claim that billing rules cannot be changed in place.\n\n**Transition in:** `example`: The engine as a reference design. → One real engine, read from its documentation as of November 2026.\n\n**Order of paragraphs** (`prerequisite_order`): Objects first, then Stripe's rule for each decision in the order section two raised them (day and instant, proration and its two modes, status, the clock's changes), then what is visible of the scheduler and where the record stops, so the reader maps each rule to a decision already posed.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p19 | evidence | Stripe's documentation splits the engine's work across objects: product and price for the catalog, subscription for the agreement and its status, invoice for what is owed, and a PaymentIntent created for the invoice. | table: Object table with documented wording: Product ('what your business offers'), Price ('how much and how often to charge'), Subscription, Invoice ('statements of amounts owed by a customer'), InvoicePayment ('the mapping between payment objects, such as Payment Intent, and Invoices'), PaymentIntent.; quotation: 'When you create a subscription, Stripe automatically generates invoices, attempts payment collection, and manages the subscription status throughout its lifecycle.' |  |\n| p21 | evidence | For the first two decisions, the day and the instant, Stripe documents one rule each: a month-end anchor bills on the last day of shorter months, and an anchor is a UTC timestamp in seconds. | quotation: 'A monthly subscription with a billing cycle anchor date of January 31 bills the last day of the month closest to the anchor date, so February 28 (or February 29 in a leap year), then March 31, April 30, and so on.' 'Billing cycle anchors are UNIX timestamps in seconds from the current epoch.' 'The billing cycle anchor uses Coordinated Universal Time (UTC).' | `sequence`: The objects. → Stripe's rules for the period boundaries. |\n| p22 | evidence | For proration Stripe documents a default for each choice: computed to the second, not billed until the next invoice unless asked, and selectable per change. | quotation: 'By default, Stripe calculates prorations down to the second.' 'Negative prorations aren't automatically refunded and positive prorations aren't immediately billed, although you can do both manually.' Worked example: 10 USD to 20 USD halfway through the period gives a 5 USD credit and a 10 USD debit. `proration_behavior` values: create_prorations, always_invoice, none. | `sequence`: Period boundaries. → Changes inside a period. |\n| p23 | analysis | Since 2025 Stripe has run two billing modes side by side, classic and flexible, with migration allowed in one direction only, which I read as public evidence that a billing rule cannot be changed under subscriptions that already have invoices. | quotation: 'You can't migrate a subscription from flexible billing mode to classic billing mode.' 'For API version `2025-09-30.clover` and later, the default is `flexible`. For earlier versions, the default is `classic`.' Classic is 'maintained for backward compatibility with older integrations'.; example: Stripe's documented scenario: a 10 USD plan is upgraded to 20 USD without proration on April 11 and downgraded on April 21; classic credits 'a third of the month for 20 USD (-6.67 USD), even though the customer never paid for' that price; flexible credits the 3.33 USD actually billed, total 0 USD.; reasoning: INFERENCE, NOT DOCUMENTED block: Stripe does not say why the modes coexist; the reading that issued invoices pin the rule is the author's. | `emphasis`: A documented default for each proration choice. → The fact that there are now two sets of defaults, and what that implies. |\n| p20 | evidence | For the fourth decision Stripe documents eight subscription statuses, and two of their details matter to an integrator: 'active' does not mean every invoice is paid, and what follows failed retries is a setting, not a fixed path. | table: Status table: incomplete (23 hours to pay), incomplete_expired, trialing, active, past_due, unpaid, canceled (terminal), paused, with condensed documented meanings.; quotation: '`active` doesn't necessarily indicate that all outstanding invoices associated with the subscription have been paid.' After retries end, failed payment settings 'determine whether the subscription remains `past_due` or changes to `unpaid` or `canceled`'. | `sequence`: Proration and its two modes. → The subscription's status vocabulary. |\n| p24 | evidence | The changes the clock makes each have documented behavior too: trials, two different kinds of pause, cancellation and schedules of up to ten current or future phases. | table: Pause payment collection (status stays active, invoices still generated, not collected) vs pause subscription (status paused, invoice generation stops, requires flexible billing mode); schedules: 'Phase transitions happen automatically after the `end_date` on a phase is reached'; canceled is terminal and resubscribing needs a new subscription. | `additional_support`: Statuses driven by invoices. → Status changes driven by the clock. |\n| p25 | analysis | Of the scheduler itself Stripe documents only the timing an integrator can observe (a renewal invoice stays in draft for about an hour, and collection waits for webhook acknowledgment), and one passage in a 2024 Stripe engineering post describes a scheduling service that finds subscriptions whose billing periods have ended and triggers invoice creation; nothing public says how that scan is partitioned, paced or kept from running twice. | quotation: At renewal Stripe 'Leaves the invoice in a `draft` status for about an hour'. 'We wait 1 hour after receiving a successful response to the `invoice.created` event from all listening webhooks before attempting payment. If we don't receive a successful response within 72 hours, we attempt to finalize and send the invoice.'; fact: Stripe's engineering posts touching Billing (online migrations, 2017-02-02: 'hundreds of millions of Subscriptions objects', evidence age 9 years; usage-based billing, 2025-01-28; real-time analytics, 2025-09-16) do not describe the scheduler. The test clocks post (stripe.dev, 2024-05-09) does, in one passage: 'a scheduling service that looks for database records meeting certain criteria, and which triggers certain events when it finds them'; a subscription is picked up by the part that looks for subscriptions 'whose billing periods have just ended, and triggers the creation of a new Invoice'.; reasoning: INFERENCE, NOT DOCUMENTED block: that invoice creation is keyed on subscription and period so a rerun cannot double it is a reference-design expectation, not a Stripe fact. | `contrast`: Rules that are documented in detail. → The component that is not: the scheduler. |\n\n### Adyen's Recurring Model: A Token and a Flag\n\n**Controlling idea** (`evidence`, id `adyen-recurring`): Adyen's documentation describes recurring payments as a stored token charged with a declared processing model, contains no subscription or invoice object in the pages read, and does not yet show Orb, which Adyen bought in July 2026, as part of the platform.\n\n**Advances the thesis** (S4): Supplies the documented half of the thesis for Adyen and states the Orb status with dates.\n\n**Transition in:** `contrast`: A provider that documents a billing engine. → A provider whose documentation offers the payment step of one.\n\n**Order of paragraphs** (`chronological`): What the documentation has long offered, what it leaves out, then the 2026 acquisition and its status, then where the record stops.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p26 | evidence | Adyen documents a recurring charge as a payment made with a stored token under one of three processing models, started by the merchant. | quotation: '**Subscription** (`Subscription`): A payment where you initiate a subscription payment to bill the shopper at regular intervals.' Also CardOnFile and UnscheduledCardOnFile; merchant-initiated payments use shopperInteraction ContAuth. Tokenization overview: 'Subscriptions: recurring transactions you initiate at regular intervals for a product or a service'. |  |\n| p27 | analysis | The Adyen pages read for this chapter describe no plan, price, subscription object, billing cycle, proration or invoice, so the schedule, the amount and the invoice sit with the merchant or a billing system connected to Adyen, which is an inference from absence that three sources support. | quotation: Auto Rescue (Adyen's payment-level retry): the merchant provides 'a unique `merchantOrderReference`. This should represent a specific billing cycle or subscription'.; quotation: Orb's documentation: 'Orb integrates with payment gateways like Adyen and Stripe for payment processing'; 'For gateways without a synced default (such as Adyen), you designate the customer's default payment method yourself.' Adyen, 2026: seat-based subscription billing 'is well-served today, including by partners we work with closely'. | `contrast`: What Adyen's documentation offers. → What it does not contain, and who therefore holds it. |\n| p28 | evidence | Adyen announced the acquisition of the billing company Orb on 11 June 2026 for $335 million and closed it on 1 July 2026; its own statements describe a separately run product that still supports other payment providers, with convergence as an intention. | quotation: Announcement, 2026-06-11: 'The total consideration for the transaction is $335 million'; 'Adyen is adopting an incubator model, preserving Orb's operational continuity during the first phase of the acquisition and continuing to support multi-PSP environments. Beyond this first phase, the strategic intent is convergence: a single infrastructure experience for merchants across billing and payments.' Closing release, 2026-07-01: 'Both transactions officially closed on July 1, 2026'. Knowledge-hub article, 2026-09-29: 'You'll soon see how we bring this unified Adyen and Orb experience to life across our platform.' | `time`: The documentation as it has long stood. → What changed in 2026. |\n| p29 | analysis | As of 17 November 2026 no Adyen documentation page on billing or Orb was found and Adyen documents no first-party renewal scheduler (Stripe has published one passage about its own), so on Adyen the engine's place has to be named by the merchant. | fact: Searches of docs.adyen.com, adyen.com/knowledge-hub and Adyen's technology blog (research brief, 17 November 2026) found no page describing an integrated billing product; Orb's rationale is usage-priced software, which usage-metering-and-rating covers. | `conclusion_summary`: The acquisition and its stated status. → Where the public record stops and what follows for a merchant. |\n\n### Three Places to Keep the Engine\n\n**Controlling idea** (`comparison`, id `designs`): The engine can live in the payment provider, in a dedicated billing system above one or more providers, or in the team's own code, and the choice is about where the decisions of this chapter are made, not whether they are.\n\n**Advances the thesis** (S6): Turns the two company accounts into a general design choice with a trade-off table.\n\n**Transition in:** `conclusion_summary`: One provider with an engine and one without. → The general choice of where an engine can be kept.\n\n**Order of paragraphs** (`comparison`): Three designs in order of how much the team builds itself, then the table that compares them.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p30 | description | In the first design the payment provider runs the engine, as Stripe Billing does: one platform holds the subscription, the invoice and the payment, and the team configures rules instead of writing them. | fact: Stripe announced in October 2024 'the ability to manage subscriptions with Stripe while processing transactions with other payments providers' (current availability not re-checked).; fact: Stripe completed its acquisition of the usage-billing company Metronome on 14 January 2026, and its documentation calls Metronome 'Stripe's primary usage-based billing platform' (usage-metering-and-rating covers it). |  |\n| p31 | description | In the second design a dedicated billing system holds the engine and sends payment requests to one or more providers, and it makes the same decisions with its own defaults. | quotation: Chargebee documents proration as a site-wide choice: 'There are two proration modes: day-based and millisecond-based'. Orb charges through 'payment gateways like Adyen and Stripe'. Zuora's documentation could not be fetched and is not characterized. | `contrast`: The engine inside the provider. → The engine above the provider. |\n| p32 | description | In the third design the team's own code is the engine and the provider supplies only stored credentials and a payment call, which is justified when the subscription cannot be separated from the product's own rules. | scenario: Larkfield's member memberships: the amount depends on studio-specific rules, the money goes to the studio with Larkfield's fee split off, and the members are on two providers. | `contrast`: Engines somebody else runs. → The engine you write. |\n| p33 | recommendation | Set side by side, the three designs trade the cost of building against control over the rules and freedom to change provider, and my default is to buy the engine unless the billing rules are the product. | table: Trade-off table. Rows: provider's engine, dedicated billing system, own engine. Columns: who decides period and proration rules; where the invoice lives; provider independence; what you must build; when it is right. | `conclusion_summary`: Three designs described. → Their trade-offs and the author's default. |\n\n### Stripe and Adyen: Where They Differ\n\n**Controlling idea** (`comparison`, id `where-they-differ`): In the public record Stripe holds the subscription, the schedule and the invoice and Adyen holds the token and the payment, and Adyen's 2026 purchase of Orb has not yet changed that for an Adyen integrator.\n\n**Advances the thesis** (S3, S4): The required comparison: documented facts per aspect, 'Not public' where they stop, and the author's reading marked as inference.\n\n**Transition in:** `conclusion_summary`: Each company's documentation and the three designs. → The two companies set side by side.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p34 | comparison | Aspect by aspect, Stripe documents a billing engine and Adyen documents the payment step under one, with the last column of the table as the author's inference. | table: Rows: subscription and its status; schedule and amount; who holds the invoice; billing company bought in 2026 (Metronome completed 14 January 2026; Orb closed 1 July 2026); design of the renewal scheduler (Stripe: a scheduling service that scans for ended billing periods, engineering post 2024, the rest Not public; Adyen: Not public). Columns: Stripe, Adyen, what the difference suggests. |  |\n| p35 | recommendation | On Stripe the integrator's work is to choose the rules deliberately and read them back per subscription; on Adyen it is to name the system that holds the schedule, the amount and the invoice before the first renewal runs. |  | `cause_effect`: The differences in the table. → What to do differently on each provider. |\n\n### In Practice at Larkfield: One Upgrade, One Renewal\n\n**Controlling idea** (`example`, id `in-practice`): One plan upgrade on Stripe Billing and one membership renewal on Larkfield's own engine show the same decisions being made by configuration in the first case and by Larkfield's code in the second.\n\n**Advances the thesis** (S1, S2, S6): Works the chapter's decisions with ledger numbers on both of Larkfield's engines.\n\n**Transition in:** `example`: The comparison of the two providers. → Both engines at work on Larkfield's own numbers.\n\n**Order of paragraphs** (`comparison`): The bought engine first (amount, then instant), then the home-built one, then the two in one table.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p36 | example | When Studio Noord moves from the €89 plan to the €189 plan exactly halfway through April 2027, Stripe's default proration credits €44.50, debits €94.50 and adds the €50.00 difference to the 1 May invoice, which comes to €239.00. | statistic: Period 1 April to 1 May 2027 (30 days); change at 16 April 00:00 UTC (15 days in). Credit 89 × 15/30 = 44.50; debit 189 × 15/30 = 94.50; net 50.00; next invoice 189.00 + 50.00 = 239.00. Default behavior: positive prorations are not billed immediately. |  |\n| p37 | example | The same subscription shows the instant: Larkfield anchors studio plans at 00:00 UTC on the 1st, which is 02:00 in Utrecht and 20:00 the evening before for a studio in New York. | example: 1 April 2027 00:00 UTC = 02:00 CEST in Utrecht = 20:00 EDT on 31 March in New York; a US studio's 'April invoice' is dated 31 March locally. | `additional_support`: The amount of the upgrade. → The instant its period starts. |\n| p38 | example | For Mila's €49.00 membership, on Adyen, every one of those decisions is Larkfield's code: the renewal job picks 1 April, computes €49.00, sends a token payment flagged as a subscription payment, and must itself know what the membership is between the decline on 1 April and the success on 4 April. | scenario: Mila's renewal: declined 1 April 2027 (insufficient funds), retried 4 April as scheduled attempt 2 under its own key (K1: membership id + billing period + attempt number). Under Keel the booking app writes a period record (membership, period, amount, state open/paid/void) before the first attempt; the membership is past_due and keeps access inside the retry window. | `contrast`: A renewal the bought engine runs. → A renewal Larkfield's own engine runs. |\n| p39 | comparison | Put in one table, the five decisions and the scheduler's pacing are settings in Larkfield's Stripe Billing integration and code in its renewal job, and the 2026 incidents sit in the rows where a decision had been left unmade. | table: Rows: day of renewal; instant and time zone; proration; status; one charge per period; plus the scheduler's pacing. Columns: studio subscriptions (Stripe Billing), member memberships (own engine, before Keel), member memberships (under Keel). | `conclusion_summary`: Two worked renewals. → The decisions behind them, side by side. |\n\n### When It Goes Wrong: Late, Twice, the Wrong Rule and the Wrong State\n\n**Controlling idea** (`analysis`, id `when-it-goes-wrong`): Billing engines fail in four recognizable ways, a renewal that runs late, one that runs twice, one computed under a rule nobody chose and a status that reports the wrong thing, and each has a check that finds it.\n\n**Advances the thesis** (S5, S6): Gives detection and recovery for the failures the mechanism makes possible, using documented provider behavior and Larkfield's incidents.\n\n**Transition in:** `contrast`: The engines working as designed. → The ways they fail.\n\n**Order of paragraphs** (`grouping`): The two failures of the scheduler (late, twice), then the failure of the calculator (wrong rule), then the failure of the state machine (wrong state): one group per part of the engine.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p40 | analysis | A renewal runs late when the scheduler waits on something slow: on Stripe a webhook endpoint that does not acknowledge invoice.created holds collection back for up to 72 hours, and in a home-built engine the provider's rate limit does the same, as in Larkfield's Renewal Wave. | quotation: Stripe: while the webhook is being retried 'we won't attempt to charge the customer unless we receive a successful response'.; case: The Renewal Wave, 1 October 2026: 7,900 renewals delayed a day by the provider's rate limit, and members received dunning emails; K5 paces renewals over 18 hours. |  |\n| p41 | analysis | A renewal runs twice when the charge is not tied to one record per subscription and period, and the check is a count of successful charges grouped by subscription and period. | case: The Double Charge: 1,840 members, €71,300 refunded, 212 disputes anyway; K1 derives the key from membership, period and attempt number. | `additional_support`: Late. → Twice. |\n| p42 | analysis | A renewal is computed under the wrong rule when a default changes underneath the integration, as Stripe documents for an API upgrade that changes the billing mode of new subscriptions. | quotation: 'Upgrading your API version to `2025-09-30.clover` or later changes the default billing mode for new subscriptions from `classic` to `flexible`. Flexible billing mode changes how subscriptions calculate prorations, handle trials, and process cancellations.'; scenario: Femke's May 2027 audit finds studio subscriptions in both modes, split at the SDK upgrade of March 2026 (the Version Cliff); the fix is to set the mode explicitly and store it per subscription. | `contrast`: Failures of the scheduler. → A failure of the calculator's rules. |\n| p43 | analysis | A status reports the wrong thing when 'not yet confirmed' is stored as 'unpaid', so the state machine needs a state for not knowing and the access decision needs to read it. | case: The Silent Webhook, Monday 14 September 2026: 9 hours of failed events, 3,200 memberships shown as unpaid, members turned away at check-in on Monday morning though no payment had failed. | `additional_support`: Wrong amount. → Wrong state. |\n\n## Conclusion: What to Take Away\n\n**Synthesis:** Scheduler, calculator and state machine are three views of one answer to one question, what is owed for which period, and the invoice is the place where that answer is written down once. Late, twice and the wrong rule are that answer arriving after its period, existing twice, or being computed by a rule the customer never agreed to. Where the invoice lives is therefore the first fact about any recurring business: it says who can be asked what a customer owes.\n\n**So what:** A team that runs renewals on a bare payment API is running a billing engine whether it calls it one or not, and it should write down the five decisions and the scheduler's pacing before the next first of the month. A team on Adyen must name the system that holds them; a team on Stripe must read back the rules it was given.\n\n**Callback:** The 1,840 members who paid for November twice. The reader can now say what was missing: a record of one debt per membership and period, written before any payment, from which the key and the status are derived.\n\n**Takeaway** (`course_of_action`): For each recurring product, write one line per decision (day, instant and time zone, proration rule, status while unpaid, what identifies a period's charge, pacing) and next to it the system that makes it and where its answer can be read back.\n\n**Hand-off** to [Counting Before Charging: Usage Metering and Rating](usage-metering-and-rating.html): `contrast`: The billing period, the invoice as the engine's output, and a price that is known the moment the period starts. → A price that is not known until the period ends, because it depends on usage events that arrive late and more than once.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p44 | synthesis (list) | Established: a recurring charge needs a schedule, an amount and a record of one debt per period; Stripe documents all three as platform objects and Adyen documents a token payment with a recurring flag. |  |  |\n| p45 | synthesis (list) | Depends on context: whether to use the provider's engine, a dedicated one or your own, whether UTC anchors are acceptable, and how much to rely on Orb for an Adyen estate. |  | `contrast`: What is settled. → What changes with the situation. |\n| p46 | recommendation (list) | The author's synthesis: the invoice, not the charge, is the unit to design around, and a billing rule is a contract term to be stored per subscription. |  | `contrast`: What is established and what depends. → The author's own position, returning to the doubled November. |\n| p47 | recommendation (list) | Eight questions let the reader test a recurring product or a provider for where the engine's decisions are made. |  | `cause_effect`: The take-aways. → Questions that apply them. |\n| p48 | transition | This chapter's price was known when the period started; the next chapter's is not known until the period ends, because it depends on usage events that arrive late and twice. |  | `contrast`: A period, an invoice and a fixed price. → A price that has to be counted before it can be charged. |\n\n## Non-goals\n\n- Usage events, meters, rating, credits and commitments; Orb's and Metronome's designs. See [Counting Before Charging: Usage Metering and Rating](usage-metering-and-rating.html).\n- The invoice's life cycle, finalization, credit notes, retry schedules, Smart Retries, Auto Rescue in detail, card updating and customer communication. See [From Invoice to Cash: Invoicing, Collections and Dunning](invoicing-collections-and-dunning.html).\n- Tax on invoices. See [Whose Tax, at What Rate: Tax Calculation in the Payment Path](billing-and-payment-tax.html).\n- Revenue schedules and deferred revenue, including the annual plan. See [Cash Is Not Revenue: Revenue Recognition and the Hand-off to Finance](billing-revenue-recognition.html).\n- Merchant-initiated transaction rules, stored-credential frameworks and decline codes. See [The First Promise: Authorization](payment-authorization.html), [Raising the Approval Rate: Retries, Tokens and Optimization](authorization-optimization.html).\n- Idempotency key mechanics and provider retention windows. See [Exactly Once, Over a Network That Does Not Allow It: Idempotency and Retries](idempotency-and-retries.html).\n- Pacing a renewal peak and provider rate limits. See [The Biggest Day: Peak Load and Capacity](payment-peak-load.html), [Keys, Sandboxes and Limits: The Developer Platform Around the API](payment-developer-platform.html).\n- Mila's failed renewal end to end. See [Journey 2: A Membership Renewal That Fails, and Comes Back](journey-failed-renewal.html).\n- Entitlements as a product, pricing-page design and subscription analytics.\n\n## Modalities\n\nArticle only.\n\n## Open questions\n\n- How Stripe partitions, paces and de-duplicates renewals is not public; the chapter states the observable contract and the one passage of a 2024 engineering post on the scheduling service.\n- Whether and when Orb becomes a documented part of Adyen's platform; as of 17 November 2026 only forward-looking statements exist.\n- Current availability of Stripe Billing with third-party processors (announced October 2024) was not re-checked.\n- Zuora's documentation could not be fetched (404); the chapter names Zuora only as a member of the product category.\n- The ledger addition that the March 2026 SDK upgrade crossed API version 2025-09-30.clover must agree with payment-api-versioning, which was not yet written.\n- The Adyen knowledge-hub article on Orb displays the date 29 September 2026 (ruling 21); the research brief dated it 2026-10-19, and its sentence 'We completed our acquisition of Orb on 1 July.' is not on the page fetched, which reads 'On July 1st, we acquired Orb.'\n\n## Decision log\n\n- **2026-11-17** — The Larkfield scene is an inventory that finds two billing engines, because the contract asks for 'two different billing problems' and the ledger's 2026 incidents already divide between them. Rejected: Opening with the Double Charge as the scene: it is the part intro's opening and returns here only as the hook and a failure case.; Inventing a new billing incident.\n- **2026-11-17** — The invoice is defined by its job (one debt per period) and its life cycle is left to invoicing-collections-and-dunning, under consistency ruling 6, which gives this chapter 'who holds the invoice'. Rejected: Teaching draft, open, paid, void and uncollectible here.\n- **2026-11-17** — The worked proration uses a studio plan upgrade at the exact midpoint of a 30-day month so the arithmetic is checkable by eye, and the AC-1 probe's case (31 January sign-up, €12 to €20) is not used. Rejected: Reusing Stripe's 10 to 20 USD example as the Larkfield example.\n- **2026-11-17** — Dedicated billing systems appear only as far as fetched documentation supports: Chargebee's proration modes and Orb's gateway model. Zuora and Recurly are named without characterization. Rejected: Describing Zuora's object model from memory.\n\n## Sources\n\n- **Internal**\n  - _research/brief-billing-and-revenue.md — Part 1 (sections 1.1 to 1.11), section 3.2 (Auto Rescue), section 7.1, the research limitations and open questions 1, 3, 4 and 14.\n  - _research/scenario-ledger.md — Larkfield's business lines, incidents, K1, K2, K5, K7, Mila's membership renewal.\n  - _research/consistency-issues.md — Rulings 6, 12 and 13.\n  - journal-spec.json — Intent, acceptance criteria, thesis and role, copied unchanged; neighbours' transitions.\n- **External**\n  - Pages fetched by the writer on 2026-11-17: Stripe documentation (subscriptions overview, billing cycle, prorations, billing mode and comparison, subscription invoices, workflow transitions, pause, pause payment collection, subscription schedules, test clocks, trials, products and prices, InvoicePayment API reference); Stripe blog post of 2024-10-29; Adyen documentation (tokenization, make token payments, Auto Rescue for cards); Adyen press releases of 2026-06-11 and 2026-07-01 and knowledge-hub article of 2026-09-29; Orb documentation (payments); Chargebee documentation (proration). — Verification of every quotation used.\n\n## Changelog\n\n- **2026-11-17** — Reconciliation pass (parts 6-8): fields copied from the journal spec and unit-level controlling ideas and evidence brought into line with the verified page and the consistency rulings; no unit added, dropped, merged or reordered.\n- **2026-11-17** — Verification pass: 58 claims checked (48 confirmed, 8 corrected, 0 hedged, 0 unsupported and removed or relabeled, 0 unreachable; 2 not checked); the claim that no Stripe publication describes how renewals are scheduled was wrong: a 2024 Stripe engineering post on test clocks describes a scheduling service that finds subscriptions whose billing periods have ended and triggers invoice creation, so S3, p25, p29 and the comparison row now say that only its partitioning, pacing and duplicate protection are not public (thesis.how_why still carries the old wording because it must equal the journal spec). Also: Silent Webhook is Monday 14 September 2026 (ruling 20), Adyen documentation dates per ruling 30, schedules hold up to ten current or future phases, inline URLs removed (ruling 22).\n- **2026-11-17** — While drafting: the comparison table's row on billing separable from the provider's payments was dropped for length (the fact stays in the designs section), and the schedule object left the object table (it stays in the paragraph on clock-driven changes). No unit added, dropped or reordered.\n- **2026-11-17** — Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes). Notes acted on: the Stripe section now follows the order of the decisions (day and instant, proration, status, clock-driven changes); the status decision covers trial, pause and cancellation; 'invoice' and 'catalog' are glossed where first used; the count of decisions is five plus pacing throughout; the claim about Adyen's unpublished scheduler moved to the Adyen section; Metronome is introduced before the comparison table. Notes not acted on: moving the comparison section before the three designs (the style guide's body order and two table rows depend on the designs); trimming the comparison table.\n- **2026-11-17** — First version, written from the PLAN contract, the journal spec entry and the research brief.\n- **2026-11-17** — Journal-spec entry corrected after verification; intent, thesis and role re-synced ('but no Stripe or Adyen publication describes how renewals ar' -> 'and one 2024 Stripe engineering post describes a scheduling ').\n- **2026-11-17** — Absence audit: 'Stripe does not say why two modes coexist' narrowed (its stated reason for classic mode is backward compatibility; why existing subscriptions are not converted is not stated). Adyen billing-product and scheduler absences re-tested against the documentation sitemap and full text, help center, site and domain-restricted web search: hold; search scope stated.\n- **2026-11-17** — Visual layer: 4 figures generated and inspected (article-illustrator).\n"}]}]}</script>
+<script>
+    (function () {
+        const data = JSON.parse(document.getElementById('data').textContent);
+        const root = document.getElementById('content');
+
+        const postId = (data.meta && data.meta.id) ? String(data.meta.id) : '';
+        const postStatusRaw = (data.meta && data.meta.status) ? String(data.meta.status) : '';
+        if (postId || postStatusRaw) {
+            const header = document.getElementById('post-header');
+            let sectionEl = header.querySelector('p.section');
+            if (!sectionEl) {
+                sectionEl = document.createElement('p');
+                sectionEl.className = 'section';
+                header.insertBefore(sectionEl, header.firstChild);
+            }
+            // Status pill goes first, then a " / " separator before the existing
+            // content (section name and/or id).
+            if (postStatusRaw) {
+                const parts = postStatusRaw.split(':');
+                const statusName = parts[0].trim();
+                const statusColor = (parts[1] || '').trim();
+                const wrap = document.createElement('span');
+                wrap.className = 'post-status';
+                const dot = document.createElement('span');
+                dot.className = 'status-dot';
+                if (statusColor) dot.style.background = statusColor;
+                wrap.appendChild(dot);
+                wrap.appendChild(document.createTextNode(statusName));
+                if (sectionEl.firstChild) {
+                    sectionEl.insertBefore(document.createTextNode(' • '), sectionEl.firstChild);
+                    sectionEl.insertBefore(wrap, sectionEl.firstChild);
+                } else {
+                    sectionEl.appendChild(wrap);
+                }
+            }
+            if (postId) {
+                if (sectionEl.firstChild) sectionEl.appendChild(document.createTextNode(' • '));
+                sectionEl.appendChild(document.createTextNode(postId));
+            }
+        }
+
+        const tagsHost = document.getElementById('tags');
+        (data.tags || []).forEach(function (t) {
+            const span = document.createElement('span');
+            span.className = 'tag';
+            span.textContent = t;
+            tagsHost.appendChild(span);
+        });
+
+        // Minimal markdown renderer. Supports: ATX headings, paragraphs, blockquotes,
+        // unordered/ordered lists, fenced code, inline code, bold/italic/strikethrough, links, images, hr.
+        // Sufficient for the posts in this repo; replace with a fuller parser if needed.
+        function renderMarkdown(src) {
+            const lines = src.replace(/\r\n/g, '\n').split('\n');
+            const out = [];
+            let i = 0;
+
+            const bullet = /^(\s*)([-*])\s+(.*)$/;
+            const ordered = /^(\s*)(\d+)\.\s+(.*)$/;
+            const tableRow = /^\s*\|(.+)\|\s*$/;
+            const tableSep = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+
+            function splitRow(s) {
+                let t = s.trim();
+                if (t.startsWith('|')) t = t.slice(1);
+                if (t.endsWith('|')) t = t.slice(0, -1);
+                return t.split('|').map(c => c.trim());
+            }
+
+            function inline(s) {
+                // Posts are trusted content, so raw HTML passes through unescaped
+                // (some posts embed inline <blockquote>, <div>, etc.).
+                // Stray ampersands still get fixed up.
+                s = s.replace(/&(?![a-zA-Z]+;|#\d+;)/g, '&amp;');
+                s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<a class="image-link" href="$2" target="_blank" rel="noopener noreferrer"><img alt="$1" src="$2"></a>');
+                s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+                s = s.replace(/`([^`]+)`/g, function (_, c) {
+                    return '<code>' + c.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
+                });
+                // Bold/italic, including nested combinations: ***x***,
+                // **a *b*** / ***a* b** (shared delimiters), and **a *b* c**.
+                s = s.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+                s = s.replace(/\*\*([^*\n]+)\*([^*\n]+)\*\*\*/g, '<strong>$1<em>$2</em></strong>');
+                s = s.replace(/\*\*\*([^*\n]+)\*([^*\n]+)\*\*/g, '<strong><em>$1</em>$2</strong>');
+                s = s.replace(/\*\*((?:[^*\n]|\*(?!\*)[^*\n]+\*(?!\*))+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+                s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+                return s;
+            }
+
+            while (i < lines.length) {
+                const line = lines[i];
+                if (!line.trim()) {
+                    i++;
+                    continue;
+                }
+
+                const fence = line.match(/^```(\w*)\s*$/);
+                if (fence) {
+                    i++;
+                    const buf = [];
+                    while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+                        buf.push(lines[i]);
+                        i++;
+                    }
+                    i++;
+                    const escaped = buf.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const cls = fence[1] ? ' class="lang-' + fence[1] + '"' : '';
+                    out.push('<pre><code' + cls + '>' + escaped + '</code></pre>');
+                    continue;
+                }
+
+                const h = line.match(/^(#{1,6})\s+(.*)$/);
+                if (h) {
+                    out.push('<h' + h[1].length + '>' + inline(h[2]) + '</h' + h[1].length + '>');
+                    i++;
+                    continue;
+                }
+
+                if (/^\s*(?:-\s*){3,}\s*$/.test(line) || /^\s*\*{3,}\s*$/.test(line)) {
+                    out.push('<hr>');
+                    i++;
+                    continue;
+                }
+
+                if (/^>\s?/.test(line)) {
+                    const buf = [];
+                    while (i < lines.length && /^>\s?/.test(lines[i])) {
+                        buf.push(lines[i].replace(/^>\s?/, ''));
+                        i++;
+                    }
+                    out.push('<blockquote>' + renderMarkdown(buf.join('\n')) + '</blockquote>');
+                    continue;
+                }
+
+                if (tableRow.test(line) && i + 1 < lines.length && tableSep.test(lines[i + 1])) {
+                    const headers = splitRow(line);
+                    const aligns = splitRow(lines[i + 1]).map(function (c) {
+                        c = c.trim();
+                        const left = c.startsWith(':'), right = c.endsWith(':');
+                        return left && right ? 'center' : right ? 'num' : '';
+                    });
+                    const cellOpen = function (tag, idx) {
+                        return aligns[idx] ? '<' + tag + ' class="' + aligns[idx] + '">' : '<' + tag + '>';
+                    };
+                    i += 2;
+                    const rows = [];
+                    while (i < lines.length && tableRow.test(lines[i])) {
+                        rows.push(splitRow(lines[i]));
+                        i++;
+                    }
+                    let html = '<div class="table-wrap"><table><thead><tr>';
+                    headers.forEach((h, idx) => {
+                        html += cellOpen('th', idx) + inline(h) + '</th>';
+                    });
+                    html += '</tr></thead><tbody>';
+                    rows.forEach(r => {
+                        html += '<tr>';
+                        r.forEach((c, idx) => {
+                            html += cellOpen('td', idx) + inline(c) + '</td>';
+                        });
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                    out.push(html);
+                    continue;
+                }
+
+                if (bullet.test(line) || ordered.test(line)) {
+                    // Indent of the first bullet defines this list's base level.
+                    // Deeper-indented bullets become nested lists (rendered by
+                    // recursing into renderMarkdown). Same-or-less indent at a
+                    // bullet starts a sibling item (or ends the list).
+                    const firstMatch = line.match(bullet) || line.match(ordered);
+                    const baseIndent = firstMatch[1].length;
+                    const isOrdered = ordered.test(line);
+                    const items = [];
+                    let hasTask = false;
+                    while (i < lines.length) {
+                        const cur = lines[i];
+                        if (!cur.trim()) {
+                            // blank line breaks the list (matches CommonMark-ish behaviour)
+                            i++;
+                            break;
+                        }
+                        const mBul = cur.match(bullet);
+                        const mOrd = cur.match(ordered);
+                        const m = mBul || mOrd;
+                        if (!m) break;
+                        if (m[1].length < baseIndent) break;
+                        if (m[1].length > baseIndent) break; // shouldn't happen at top of loop
+                        // Same-type check: switching between -/* and 1. closes the list
+                        if (isOrdered !== !!mOrd) break;
+
+                        const itemBuf = [m[3]];
+                        const nestedBuf = [];
+                        i++;
+                        while (i < lines.length) {
+                            const nxt = lines[i];
+                            if (!nxt.trim()) break;
+                            const nBul = nxt.match(bullet);
+                            const nOrd = nxt.match(ordered);
+                            const nm = nBul || nOrd;
+                            if (nm) {
+                                if (nm[1].length > baseIndent) {
+                                    // nested list line — dedent and stash
+                                    nestedBuf.push(nxt.slice(baseIndent + 2));
+                                    i++;
+                                    continue;
+                                }
+                                // sibling or end of list
+                                break;
+                            }
+                            // Plain continuation text
+                            if (nestedBuf.length) {
+                                // continuation inside the nested block
+                                nestedBuf.push(nxt.slice(baseIndent + 2));
+                            } else {
+                                itemBuf.push(nxt.trim());
+                            }
+                            i++;
+                        }
+
+                        // GitHub-style task items: "- [ ] text" / "- [x] text"
+                        // render as (clickable, unpersisted) checkboxes.
+                        const itemText = itemBuf.join('\n');
+                        const task = !isOrdered && itemText.match(/^\[( |x|X)\]\s+/);
+                        let liHtml = inline(task ? itemText.slice(task[0].length) : itemText);
+                        if (task) {
+                            hasTask = true;
+                            liHtml = '<input type="checkbox"' + (task[1] === ' ' ? '' : ' checked') + '>' + liHtml;
+                        }
+                        if (nestedBuf.length) {
+                            liHtml += renderMarkdown(nestedBuf.join('\n'));
+                        }
+                        items.push(task ? '<li class="task">' + liHtml + '</li>' : '<li>' + liHtml + '</li>');
+                    }
+                    out.push((isOrdered ? '<ol>' : (hasTask ? '<ul class="task-list">' : '<ul>')) + items.join('') + (isOrdered ? '</ol>' : '</ul>'));
+                    continue;
+                }
+
+                const buf = [line];
+                i++;
+                while (i < lines.length && lines[i].trim() && !/^#{1,6}\s/.test(lines[i]) && !/^>\s?/.test(lines[i]) && !bullet.test(lines[i]) && !ordered.test(lines[i]) && !/^```/.test(lines[i]) && !tableRow.test(lines[i])) {
+                    buf.push(lines[i]);
+                    i++;
+                }
+                out.push('<p>' + inline(buf.join(' ')) + '</p>');
+            }
+            return out.join('\n');
+        }
+
+        // Block dispatcher. New block types plug in here.
+        const renderers = {
+            markdown: function (block) {
+                const div = document.createElement('div');
+                div.innerHTML = renderMarkdown(block.content);
+                return div;
+            },
+            mermaid: function (block) {
+                // Mermaid scans elements with class "mermaid" whose textContent
+                // is the diagram source. We collect these nodes and run
+                // mermaid.run() once after all blocks are in the DOM.
+                const div = document.createElement('div');
+                div.className = 'mermaid';
+                div.textContent = block.content;
+                return div;
+            },
+            'force-graph': function (block) {
+                // build.py emits parsed JSON: {nodes:[{id,size}], links:[{source,target}]}.
+                // We instantiate force-graph after the container is in the DOM
+                // so it can measure its own width.
+                const div = document.createElement('div');
+                div.className = 'force-graph';
+                const data = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.ForceGraph) return;
+                    const maxSize = data.nodes.reduce((m, n) => Math.max(m, n.size || 1), 1);
+                    window.ForceGraph()(div)
+                        .graphData(data)
+                        .width(div.clientWidth)
+                        .height(div.clientHeight)
+                        .nodeRelSize(4)
+                        .nodeVal(n => Math.max(20 * (n.size || 1) / maxSize, 0.001))
+                        .nodeLabel(n => n.id + ' (' + (n.size || 1) + ')')
+                        .nodeColor(() => 'rgba(135, 206, 235, 0.7)')
+                        .linkColor(() => 'rgba(60, 60, 60, 0.4)')
+                        .linkDirectionalArrowLength(4)
+                        .linkDirectionalArrowRelPos(1)
+                        .linkWidth(1);
+                });
+                return div;
+            },
+            'bubble-chart': function (block) {
+                // build.py emits {nodes:[{name,size}]}. Renders a D3 circle-pack
+                // SVG (same shape as the obren.io reference, just inline).
+                const wrap = document.createElement('div');
+                wrap.className = 'bubble-chart';
+                const payload = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.d3) return;
+                    const diameter = 480;
+                    const fill = '#c0deed';
+                    const textColor = '#111111';
+                    const fontSize = 12;
+
+                    const svg = window.d3.select(wrap).append('svg')
+                        .attr('viewBox', '0 0 ' + diameter + ' ' + diameter)
+                        .attr('width', diameter)
+                        .attr('height', diameter);
+
+                    const root = window.d3.hierarchy({children: payload.nodes})
+                        .sum(d => d.size || 0)
+                        .sort((a, b) => b.value - a.value);
+
+                    window.d3.pack().size([diameter, diameter]).padding(2)(root);
+
+                    const node = svg.selectAll('g')
+                        .data(root.leaves())
+                        .enter().append('g')
+                        .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+
+                    node.append('title').text(d => d.data.name + ': ' + d.value);
+                    node.append('circle').attr('r', d => d.r).style('fill', fill);
+                    node.append('text')
+                        .attr('dy', '.3em')
+                        .style('text-anchor', 'middle')
+                        .style('fill', textColor)
+                        .style('font-size', fontSize + 'px')
+                        .text(d => d.data.name.substring(0, Math.max(0, Math.floor(d.r / 3))));
+                });
+                return wrap;
+            }
+        };
+
+        // Render one modality's blocks into a host element. Mermaid runs
+        // scoped to just the nodes created here, so lazily rendered tabs get
+        // their diagrams on first activation.
+        let mermaidInitialized = false;
+        function renderBlocksInto(blocks, host) {
+            const mermaidNodes = [];
+            blocks.forEach(function (block) {
+                const r = renderers[block.type];
+                if (!r) {
+                    const pre = document.createElement('pre');
+                    pre.textContent = '[unknown block type: ' + block.type + ']';
+                    host.appendChild(pre);
+                    return;
+                }
+                const node = r(block);
+                if (node instanceof Node) {
+                    host.appendChild(node);
+                    if (block.type === 'mermaid') mermaidNodes.push(node);
+                }
+            });
+            if (mermaidNodes.length && window.mermaid) {
+                if (!mermaidInitialized) {
+                    window.mermaid.initialize({startOnLoad: false, theme: 'default'});
+                    mermaidInitialized = true;
+                }
+                window.mermaid.run({nodes: mermaidNodes});
+            }
+            markScrollableTables(host);
+        }
+
+        // A table wider than its wrapper scrolls sideways. Mark those wrappers
+        // so the CSS can show a cue, and make them focusable so keyboard users
+        // can reach and scroll them. Hidden panes measure 0 and are re-marked
+        // when activated or when the window is resized.
+        function markScrollableTables(host) {
+            host.querySelectorAll('.table-wrap').forEach(function (wrap) {
+                const scrolls = wrap.scrollWidth > wrap.clientWidth + 1;
+                wrap.classList.toggle('is-scrollable', scrolls);
+                if (scrolls) {
+                    wrap.setAttribute('tabindex', '0');
+                    wrap.setAttribute('role', 'region');
+                    wrap.setAttribute('aria-label', 'Table that scrolls sideways');
+                } else {
+                    wrap.removeAttribute('tabindex');
+                    wrap.removeAttribute('role');
+                    wrap.removeAttribute('aria-label');
+                }
+            });
+        }
+
+        // Modality tabs. One <article class="pane"> per modality; panes are
+        // rendered lazily on first activation (force-graph / D3 / mermaid
+        // need a visible, measurable container). With a single modality the
+        // tab bar stays hidden and the page looks exactly like before.
+        const mods = data.modalities;
+        const tabBar = document.getElementById('modality-tabs');
+        const panes = {};
+        const tabButtons = {};
+        const renderedPanes = {};
+
+        // With several modalities each pane is a tabpanel labelled by its
+        // tab (W3C APG tabs pattern); tabindex=0 lets keyboard users move
+        // from the tab list straight into the active content.
+        mods.forEach(function (m) {
+            const pane = document.createElement('article');
+            pane.className = 'pane';
+            pane.dataset.key = m.key;
+            pane.hidden = true;
+            if (mods.length > 1) {
+                pane.id = 'pane-' + m.key;
+                pane.setAttribute('role', 'tabpanel');
+                pane.setAttribute('aria-labelledby', 'tab-' + m.key);
+                pane.setAttribute('tabindex', '0');
+            }
+            root.appendChild(pane);
+            panes[m.key] = pane;
+        });
+
+        const defaultKey = mods.some(m => m.key === 'index') ? 'index' : mods[0].key;
+
+        function activate(key, updateHash) {
+            mods.forEach(function (m) {
+                const isActive = m.key === key;
+                panes[m.key].hidden = !isActive;
+                if (tabButtons[m.key]) {
+                    tabButtons[m.key].classList.toggle('active', isActive);
+                    tabButtons[m.key].setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    // Roving tabindex: only the selected tab is in the Tab
+                    // order; the arrow keys move between tabs.
+                    tabButtons[m.key].setAttribute('tabindex', isActive ? '0' : '-1');
+                }
+            });
+            // Unhide first, then render: the chart libraries measure widths.
+            if (!renderedPanes[key]) {
+                renderBlocksInto(mods.find(m => m.key === key).blocks, panes[key]);
+                renderedPanes[key] = true;
+            } else {
+                markScrollableTables(panes[key]);
+            }
+            if (updateHash) {
+                history.replaceState(null, '',
+                    key === defaultKey ? location.pathname + location.search : '#' + key);
+            }
+        }
+
+        if (mods.length > 1) {
+            mods.forEach(function (m) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = m.label;
+                btn.id = 'tab-' + m.key;
+                btn.dataset.key = m.key;
+                btn.setAttribute('role', 'tab');
+                btn.setAttribute('aria-controls', 'pane-' + m.key);
+                btn.addEventListener('click', function () { activate(m.key, true); });
+                tabBar.appendChild(btn);
+                tabButtons[m.key] = btn;
+            });
+            // Keyboard support per the W3C APG tabs pattern (automatic
+            // activation): Left/Right move between tabs and wrap, Home/End
+            // jump to the first/last tab, and the focused tab is selected.
+            tabBar.addEventListener('keydown', function (ev) {
+                const keys = mods.map(function (m) { return m.key; });
+                const focused = document.activeElement;
+                const current = focused && focused.dataset ? keys.indexOf(focused.dataset.key) : -1;
+                if (current < 0) return;
+                let next = null;
+                if (ev.key === 'ArrowRight') next = (current + 1) % keys.length;
+                else if (ev.key === 'ArrowLeft') next = (current - 1 + keys.length) % keys.length;
+                else if (ev.key === 'Home') next = 0;
+                else if (ev.key === 'End') next = keys.length - 1;
+                if (next === null) return;
+                ev.preventDefault();
+                activate(keys[next], true);
+                tabButtons[keys[next]].focus();
+            });
+            tabBar.hidden = false;
+        }
+
+        // The hash selects a tab only when it matches a modality key, so
+        // existing anchors keep working.
+        const initialHash = location.hash.slice(1);
+        activate(mods.some(m => m.key === initialHash) ? initialHash : defaultKey, false);
+        window.addEventListener('hashchange', function () {
+            const k = location.hash.slice(1);
+            if (mods.some(m => m.key === k)) activate(k, false);
+        });
+        window.addEventListener('resize', function () { markScrollableTables(root); });
+    })();
+</script>
+</body>
+</html>

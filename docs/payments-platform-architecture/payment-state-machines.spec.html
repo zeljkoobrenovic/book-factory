@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Spec: One Object, Many Outcomes: The Payment State Machine</title>
+    <meta name="description" content="How do you model a payment that can be pending, need a customer action, succeed later, be partly captured and partly refunded? As one long-lived record with explicit states, which Stripe lets you read again as an object and Adyen reports as results, modifications and webhooks, and which your own system mirrors in a small vocabulary it controls.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SETTLED: Architecting Payments and Revenue Infrastructure">
+    <meta property="og:title" content="Spec: One Object, Many Outcomes: The Payment State Machine">
+    <meta property="og:description" content="How do you model a payment that can be pending, need a customer action, succeed later, be partly captured and partly refunded? As one long-lived record with explicit states, which Stripe lets you read again as an object and Adyen reports as results, modifications and webhooks, and which your own system mirrors in a small vocabulary it controls.">
+    <meta property="og:url" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/payment-state-machines.spec.html">
+    <meta property="og:image" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/assets/images/08-payment-state-machines/logo.jpeg">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="site.css">
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-129891352-1"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+        dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'UA-129891352-1');
+</script>
+    <style>
+        body {
+            line-height: 1.65;
+        }
+
+        main {
+            padding-top: 32px;
+        }
+
+        nav.post-nav {
+            font-size: 14px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: baseline;
+            flex-wrap: wrap;
+        }
+
+        nav.post-nav a {
+            color: var(--muted);
+            text-decoration: none;
+        }
+
+        nav.post-nav a:hover {
+            color: var(--accent);
+        }
+
+        nav.post-nav .nav-right {
+            margin-left: auto;
+            display: inline-flex;
+            gap: 4px;
+            align-items: baseline;
+        }
+
+        nav.post-nav .nav-sep {
+            color: var(--muted);
+        }
+
+        footer nav.post-nav {
+            margin-top: 24px;
+            margin-bottom: 0;
+        }
+
+        header.post {
+            margin-bottom: 32px;
+        }
+
+        header.post .section {
+            color: var(--muted);
+            font-size: 13px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin: 0 0 -6px;
+        }
+
+        header.post .section a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        header.post .section a:hover {
+            color: var(--accent);
+        }
+
+        header.post .section .post-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        header.post .section .post-status .status-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        header.post .logo {
+            display: block;
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            border: 1px solid lightgrey;
+
+        }
+
+        header.post .logo-credit {
+            color: var(--muted);
+            font-size: 12px;
+            margin: -4px 0 24px;
+            text-align: right;
+        }
+
+        header.post h1 {
+            font-size: 52px;
+            line-height: 1.2;
+            margin: 0 0 2px;
+            padding: 0;
+            letter-spacing: -0.01em;
+            font-weight: normal;
+        }
+
+        header.post .byline {
+            color: var(--muted);
+            font-size: 15px;
+            margin: 0;
+        }
+
+        header.post .byline .spec-link {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        header.post .byline .spec-link:hover {
+            text-decoration: underline;
+        }
+
+        header.post .byline .spec-link-drifted {
+            color: #b8650f;
+        }
+
+        header.post .byline .spec-link-superseded {
+            color: var(--muted);
+        }
+
+        header.post .ai-credit {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 4px 0 0;
+        }
+
+        header.post .ai-credit a {
+            color: inherit;
+        }
+
+        header.post .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 10px 0 10px;
+        }
+
+        header.post .tags .tag {
+            font-size: 14px;
+            padding: 1px 8px;
+            border: 1px solid deepskyblue;
+            color: blue;
+            border-radius: 999px;
+            background-color: var(--tag-bg);
+        }
+
+        nav.modality-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--rule);
+            margin: 0 0 28px;
+            flex-wrap: wrap;
+        }
+
+        nav.modality-tabs button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font: inherit;
+            font-size: 14px;
+            color: var(--muted);
+            padding: 8px 14px;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            letter-spacing: 0.02em;
+        }
+
+        nav.modality-tabs button:hover {
+            color: var(--accent);
+        }
+
+        nav.modality-tabs button.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        #content .pane[hidden] {
+            display: none;
+        }
+
+        #content .pane:focus {
+            outline: none;
+        }
+
+        #content .pane:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 6px;
+        }
+
+        article h2 {
+            font-size: 26px;
+            margin: 40px 0 12px;
+            letter-spacing: -0.01em;
+        }
+
+        article h3 {
+            font-size: 20px;
+            margin: 28px 0 8px;
+        }
+
+        article h4 {
+            font-size: 17px;
+            margin: 20px 0 6px;
+        }
+
+        article p {
+            margin: 0 0 16px;
+        }
+
+        article a {
+            color: var(--accent);
+        }
+
+        article a.image-link {
+            display: inline-block;
+            line-height: 0;
+        }
+
+        article img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        article a.image-link img {
+            display: block;
+        }
+
+        article ul, article ol {
+            padding-left: 24px;
+            margin: 0 0 16px;
+        }
+
+        article li {
+            margin-bottom: 6px;
+        }
+
+        article ul.task-list {
+            list-style: none;
+            padding-left: 4px;
+        }
+
+        article ul.task-list li.task > input[type="checkbox"] {
+            margin-right: 8px;
+            accent-color: var(--accent);
+        }
+
+        article hr {
+            border: none;
+            border-top: 1px solid var(--rule);
+            margin: 32px 0;
+        }
+
+        article blockquote {
+            margin: 16px 0;
+            padding: 12px 18px;
+            background: var(--quote-bg);
+            border-left: 3px solid var(--accent);
+            color: #333;
+        }
+
+        article blockquote p:last-child {
+            margin-bottom: 0;
+        }
+
+        article code {
+            background: var(--code-bg);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 0.92em;
+        }
+
+        article pre {
+            background: var(--code-bg);
+            padding: 14px 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        article pre code {
+            background: none;
+            padding: 0;
+        }
+
+        article .table-wrap {
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+
+        article table {
+            border-collapse: collapse;
+            margin: 16px 0;
+            width: 100%;
+            font-size: 15px;
+        }
+
+        article .table-wrap table {
+            margin: 0;
+        }
+
+        /* Wide tables scroll on narrow screens instead of crushing their columns.
+           A table wrapped in <div class="table-compact"> opts out: it has few,
+           short columns and wraps its cells to fit the screen instead. */
+        @media (max-width: 640px) {
+            article .table-wrap table {
+                min-width: 560px;
+            }
+            article .table-compact .table-wrap table {
+                min-width: 0;
+            }
+        }
+
+        /* Tables that actually overflow get a visible cue and keyboard focus
+           (markScrollableTables() sets the class and attributes). */
+        article .table-wrap.is-scrollable::before {
+            content: "Scroll sideways to see the whole table";
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        article .table-wrap.is-scrollable:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        article th, article td {
+            border: 1px solid var(--rule);
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        article th {
+            background: var(--code-bg);
+            font-weight: 600;
+        }
+
+        /* GFM column alignment from the separator row. Right-aligned columns
+           hold numbers; their cells never wrap, so a sign, a currency symbol
+           and its amount stay on one line while label columns still wrap. */
+        article th.num, article td.num {
+            text-align: right;
+        }
+
+        article td.num {
+            white-space: nowrap;
+        }
+
+        article th.center, article td.center {
+            text-align: center;
+        }
+
+        article .mermaid {
+            text-align: center;
+            margin: 24px 0;
+        }
+
+        article .force-graph {
+            margin: 24px 0;
+            border: 1px solid var(--rule);
+            border-radius: 6px;
+            background: #fff;
+            height: 480px;
+            overflow: hidden;
+        }
+
+        article .bubble-chart {
+            margin: 24px 0;
+            text-align: center;
+        }
+
+        article .bubble-chart svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <nav class="post-nav"><a class="nav-back" href="payment-state-machines.html">← One Object, Many Outcomes: The Payment State Machine</a><span class="nav-right"></span></nav>
+    <header class="post" id="post-header">
+        <p class="section"><span>SPEC</span> • <span class="post-status"><span class="status-dot" style="background:green"></span>accepted</span> • <span>revised 2026-11-17</span></p>
+        <h1>Spec: One Object, Many Outcomes: The Payment State Machine</h1>
+        <p class="byline"></p>
+        
+        <div class="tags" id="tags"></div>
+        
+    </header>
+    <nav class="modality-tabs" id="modality-tabs" hidden role="tablist" aria-label="Reading formats"></nav>
+    <div id="content"></div>
+    <footer>
+        <nav class="post-nav"><a class="nav-back" href="payment-state-machines.html">← One Object, Many Outcomes: The Payment State Machine</a><span class="nav-right"></span></nav>
+    </footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/force-graph"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script id="data" type="application/json">{"meta": {}, "tags": [], "modalities": [{"key": "spec", "label": "Spec", "meta": {}, "blocks": [{"type": "markdown", "content": "## Intent\n\n**After reading, the reader should:**\n\n- **Know:** Why a single charge request with a yes-or-no answer could not represent payments that need a customer action or are confirmed later, as Stripe described it in 2020.\n- **Know:** The states of Stripe's PaymentIntent (introduced 2018) and how a failed attempt returns it to an earlier state; Adyen's result codes, action objects (since Checkout API v49, May 2019) and modifications as separate asynchronous requests.\n- **Know:** What a payment state machine must guarantee: one terminal outcome, only legal transitions, and transitions that are safe to apply twice.\n- **Believe:** Waiting for the customer and waiting for the network are different states, and the synchronous API response is one transition, not the outcome.\n- **Believe:** A consumer should keep the provider's status as received and derive its own smaller vocabulary from it.\n- **Be able to:** Design a payment record that mirrors two providers with different models: one that offers an object to re-read and one that reports results per request and by webhook.\n- **Be able to:** Given an event that arrives late, twice or out of order, say which transition is legal and which must be ignored.\n\n**Acceptance criteria**\n\n| Id | Criterion | Check | Method | Severity |\n| --- | --- | --- | --- | --- |\n| AC-1 | Given a payment flow the chapter does not contain, the reader places each moment in a state and says which system's message moves it on. *Probe:* A customer pays by scanning a QR code with their banking app. The API call returns at once with the code to display; the customer scans it four minutes later; the bank confirms a few seconds after that; the customer has already closed the browser tab. Using only this chapter: which states does your payment record pass through, and what triggers the last transition? | `custom` | cold_reader | major |\n| AC-2 | Given a late contradictory event, the reader applies the guarantees: one terminal outcome, legal transitions only, repeated events harmless. *Probe:* Your record shows a payment as captured. Two days later the provider sends an event saying the capture failed. A minute later the same event arrives again. What should your state machine do with each, according to this chapter? | `custom` | cold_reader | major |\n| AC-3 | The chapter's account of Stripe's redesign is dated to its 2020 source with its age stated, Adyen's model is described from its documentation and API specification, and the absence of a comparable Adyen design history is said outright. | `custom` | rubric | blocker |\n\n## Thesis\n\n**Question:** How do you model a payment that can be pending, need a customer action, succeed later, be partly captured and partly refunded?\n\n> **Claim:** Such a payment has to be modeled as one long-lived record that moves through explicit states, with waiting for the customer and waiting for the network as separate states and the synchronous response as one transition among several; captures and refunds are separate operations recorded against that record, each for its own amount and with its own outcome. Stripe and Adyen both arrived at this model and expose it differently: Stripe as a PaymentIntent that can be retrieved and retried (2018), Adyen as a result code per request, follow-up operations as separate asynchronous requests and outcomes by webhook, with no endpoint in its Checkout API that returns a payment by its identifier.\n\n**Disputed by:** The view that a payment is a request with a yes-or-no answer, and that pending, action-required and partial outcomes are exceptions to cover with a few extra status values on the charge record.\n\n**So what:** The integrator's own payment record is designed, not copied: it stores each provider's status as received, maps it to a small vocabulary of its own (Larkfield's five states), accepts a state change only from the provider's confirmed record, and tolerates late and repeated events. With two providers, one side is read from an object and the other is assembled from results and events.\n\n**How and why:** Stripe's own account (December 2020, six years old) is that its Charge was built for US cards, which finalize at once with no customer action; a pending state was added in 2015 for bank debits, a client-driven object followed, and payments went uncompleted and were refunded when the browser lost its connection, so in 2018 it introduced an intent with states for customer action and for processing and with no failed state, since a failed attempt returns the intent to where a new attempt can be made. Adyen's documentation shows the same shape reached by another route: an action object in responses since May 2019, a recommendation not to update order systems from the result code, and captures and refunds that are answered 'received' and can still fail days after a webhook reported success. Adyen has published no design history comparable to Stripe's: a knowledge-hub post of 5 October 2021 gives the reason for `/sessions` (API calls 'reduced from three to only one'), an engineering post of July 2021 gives the reason for asynchronous modifications (it keeps the edge layer stateless), and its reasons for result codes are not on record; the difference in what the integrator must store is the author's inference from the two documented contracts.\n\n**Supporting claims**\n\n- **S1** — A charge request with a yes-or-no answer cannot represent a payment whose outcome needs a customer action or arrives later, and adding status values to it does not repair that, as Stripe's dated account of its own API shows.\n- **S2** — The model that works is one server-side record with explicit states, in which waiting for the customer and waiting for the network are different states, the synchronous response is one transition, and captures and refunds are separate operations with their own amounts and outcomes.\n- **S3** — Stripe and Adyen both document this model and expose it differently: Stripe as a PaymentIntent that can be retrieved and retried, Adyen as result codes, modifications and webhooks with no payment read endpoint in its Checkout API.\n- **S4** — A payment state machine is useful only if it guarantees one terminal outcome, legal transitions only and transitions safe to apply twice, and success states are not terminal.\n- **S5** — The integrator's payment record is designed, not copied: it keeps each provider's status as received, maps it to a small vocabulary of its own, and changes state only on the provider's confirmed record.\n\n## Role in the part\n\nSupplies the model (attempt, state, transition, terminal outcome) that the optimization and routing chapters count in and that Parts III and IV record and expose. Supports P2-3 of part `part-2`.\n\n## Flow\n\n**Pattern:** `problem_solution` (also `chronological` in why-charge-broke: Stripe's API history from 2011 to 2018; `prerequisite_order` in the-model, stripe-paymentintent, adyen-results-and-modifications: the neutral model, then each provider read against it; `comparison` in guarantees-and-mirrors and where-they-differ)\n\nThe reader meets a record that fails (Larkfield's five words) and a model that failed (the charge request) before the model that works, so the states arrive as answers to problems already felt. The neutral model comes before either provider so that Stripe's statuses and Adyen's result codes can each be read as a version of it, and Stripe comes first because it is the only one with a published history and its object is the simpler case. The guarantees follow the two exposures because their hard part, that success is not terminal, rests on behavior documented in those sections; the provider comparison follows the guarantees so the table can be read as a summary. Larkfield's redesigned record comes after the comparison because it has to absorb exactly those differences, and the failure cases close the body because each applies a guarantee to that record. Putting the providers before the neutral model would teach two vocabularies with nothing to map them to; putting the guarantees before the providers would assert that success can be undone before the reader has seen either provider say so.\n\n## Introduction\n\n**Hook** (`puzzling_scenario`): On 12 January 2027 Mila Janssen types her Visa debit card into the member app to start a €49 membership. Larkfield's server calls the provider and has an answer in under a second. The answer is neither 'approved' nor 'declined': her bank wants her to confirm in its app. What should Larkfield's payment record say while she reaches for her phone?\n\n**Bridge:** An engineer expects a request to return a result, and a payment call looks like a request. → The first response of an ordinary European card payment can be 'the customer must act', and for other methods 'ask again in three days'; a record built for yes or no has to guess, which turns the question into how to model the payment.\n\n**Thesis statement** (KEY POINTS callout, first and second bullets, and paragraph p03): A payment is one long-lived record that moves through explicit states; waiting for the customer and waiting for the network are different states, the API response is one transition, and captures and refunds are separate operations with their own amounts. Stripe exposes the record as an object you can read again; Adyen as results, modifications and webhooks.\n\n**Roadmap** (IN THIS CHAPTER callout and paragraph p05):\n\n- Start from Larkfield's five-state record and what it could not express, and return to it redesigned. *Kept in:* scene, in-practice.\n- Explain why a yes-or-no charge request stopped working. *Kept in:* why-charge-broke.\n- Set out the model: one record, explicit states, separate operations. *Kept in:* the-model.\n- Show how Stripe and then Adyen expose the model, and compare them. *Kept in:* stripe-paymentintent, adyen-results-and-modifications, where-they-differ.\n- State what a state machine must guarantee and compare four ways to mirror one. *Kept in:* guarantees-and-mirrors.\n- Say what to do with events that arrive late, twice or in contradiction. *Kept in:* when-it-goes-wrong.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p01 | context | When Mila types her card in to start a membership, the provider answers Larkfield within a second, and the answer is neither approved nor declined: her bank wants her to confirm in its app. | scenario: Mila's membership set-up on 12 January 2027: a €49.00 monthly membership at Studio Noord, a Dutch Visa debit card typed in, a 3-D Secure challenge passed in her banking app. |  |\n| p02 | cause_effect | A payment record that can say only paid or not paid has to guess during that wait, and each wrong guess costs someone: a charged member shown as unpaid, or access granted for money that never arrives. |  | `cause_effect`: The answer that is neither yes nor no. → What a two-valued record does with it, and who pays for the guess. |\n| p03 | claim | A payment has to be modeled as one long-lived record that moves through explicit states, with captures and refunds recorded against it as separate operations; Stripe and Adyen both arrived there and expose the record in different ways. |  | `problem_solution`: The record that has to guess. → The model that removes the guess, and the two forms in which the anchor providers present it. |\n| p04 | context | In the journey of Mila's class pass, this chapter covers the record that exists from the moment she taps pay at 19:42 until the provider confirms the outcome, and that every later step writes to. | scenario: Mila's class pass: €120.00 at Studio Noord on Tuesday 9 March 2027 at 19:42, Dutch Visa debit card in a phone wallet, Studio Noord on Adyen, captured automatically, payout on Thursday 11 March. | `place`: The model just stated. → Where it sits on the recurring payment of the book. |\n| p05 | transition | The chapter starts at Larkfield's five-state record, explains why a charge request stopped working, sets out the model, shows how Stripe and then Adyen expose it, states what a state machine must guarantee and how to mirror one, compares the two providers, works Mila's payments through, and ends with events that arrive late, twice or in contradiction. |  | `sequence`: The chapter's place on the payment's journey. → The order of the sections. |\n\n## Sections\n\n### Setting the Scene at Larkfield: Five Words, Two Providers\n\n**Controlling idea** (`example`, id `scene`): Larkfield's five-state payment record cannot place several ordinary payments, and an outage showed that the record was a copy of state held at the provider.\n\n**Advances the thesis** (S5): Poses the consumer's design question on a concrete record before the model is introduced.\n\n**Transition in:** `example`: The claim that a payment needs a record with explicit states. → One company's record, with five states, and what it could not express.\n\n**Order of paragraphs** (`small_to_large`): From the record as it is, to the payments it cannot place, to the incident that showed where the state really lived, to the question the rest of the chapter answers; the question only makes sense once the reader has seen the record fail.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p06 | context | In late March 2027 Femke de Graaf reviews the payment record store with Tom Hendriks: one row per payment, one of five states, and both providers' references. | scenario: The payment record store: PostgreSQL, five-state vocabulary (pending, authorized, paid, refunded, disputed), both providers' raw references, fed by webhooks through an inbox table; built in 2024 by Tom Hendriks. Larkfield is fictional. |  |\n| p07 | example | Three ordinary payments have no clear place in the five words: a wait for the customer, a wait for the bank and a partial refund. | scenario: Mila's 12 January set-up waiting on her banking app; a SEPA Direct Debit membership payment that the provider reports as still processing for days; the €84.00 refund on 18 March 2027 of the unused part of the €120.00 pass. | `contrast`: The five words. → Payments the five words cannot describe. |\n| p08 | evidence | The Silent Webhook showed that Larkfield's record was a copy: for nine hours it said 3,200 memberships were unpaid while Stripe's own objects said they were paid. | scenario: The Silent Webhook, 14 September 2026: the Stripe webhook receiver's certificate expired, events failed for 9 hours, 3,200 memberships were shown as unpaid and members were turned away at check-in; no money was lost. | `additional_support`: A record that cannot describe some payments. → A record that was wrong about payments it could describe. |\n| p09 | claim | Femke's question is the chapter's: for each of the five words, which message from which provider may move a record into it and out of it? |  | `cause_effect`: A record that is both too coarse and only a copy. → The design question that follows. |\n\n### Why a Yes-or-No Charge Stopped Working\n\n**Controlling idea** (`cause_effect`, id `why-charge-broke`): A charge request with a synchronous yes-or-no answer assumes the outcome is known at once and needs no customer; Stripe's own dated account shows each step at which that assumption failed and why extra status values did not repair it.\n\n**Advances the thesis** (S1): Supplies the dated evidence that the request model failed for structural reasons.\n\n**Transition in:** `elaboration`: Larkfield's question about which message may move a record. → Why a payment needs a record with states at all, from the history of the provider that documented it.\n\n**Order of paragraphs** (`chronological`): Stripe's account is a history (2011, 2015, 2015 to 2017, 2018), and each step is a response to the failure before it; the classification table and the diagnosis come last because they are what the history adds up to.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p10 | definition | In the charge-request model a payment is one server call that carries the card details and returns the outcome, and the merchant's record is that answer. | reasoning: The model holds only if the outcome is known within the call and nobody but the merchant's server has to act. |  |\n| p11 | evidence | Stripe's own account, published in 2020, is that its first API was a charge request because US card payments allowed it. | source: Token created in the browser plus Charge created on the server, 2011 to 2015; card payments 'can be immediately finalized'; payments are 'finalized' 'when a user has sufficient confidence the funds are guaranteed'. | `example`: The charge-request model. → The best documented instance of it. |\n| p12 | evidence | In 2015 two methods broke the assumption: a bank debit that is finalized days later and a method the customer has to start. | quotation: A pending state was added to the Charge for ACH debit; with Bitcoin the integration 'involved managing two state machines to complete payment: BitcoinReceiver on the client and Charge on the server'. | `time`: The model while it fitted. → The first payments it did not fit. |\n| p13 | evidence | The next design moved the state to the browser, and payments were lost when the browser did not come back. | quotation: Sources (2015 to 2017), 'a client-driven state machine'; with iDEAL, if the browser lost its connection 'the next request to create a Charge wouldn't make it through, even though the customer believes they paid', and 'we'd refund the money associated with the Source after a few hours. This is a conversion nightmare.' | `time`: Two state machines for one payment. → A single client-driven one, and its failure. |\n| p14 | analysis | Stripe's own classification sorts payment methods on two questions, and cards without authentication are the only ones that answer no to both. | table: Two-by-two table from the 2020 post: finalized immediately or later, against customer action required or not; cards alone in the first cell; bank debits finalize later; iDEAL, Bancontact and cards with 3-D Secure need an action; vouchers need both. | `conclusion_summary`: Three failures in sequence. → The two properties that explain all three. |\n| p15 | claim | More status values could not repair the charge, because the fault was where the state lived and who had to make the next call. | quotation: 'Charges and Tokens were foundational in the API because they were the first APIs we had, not because they were the right abstraction for global payments'; the Charge grew 'from having 11 properties to 36 properties' between 2011 and 2018. | `cause_effect`: The two properties. → Why they require a different kind of record. |\n\n### One Record, Explicit States, Separate Operations\n\n**Controlling idea** (`explanation`, id `the-model`): The model that replaces the charge request is a record created before any money moves, with a state for each kind of waiting, transitions that different parties trigger, and captures and refunds held as separate operations with their own amounts.\n\n**Advances the thesis** (S2): Defines the model in provider-neutral terms so the two providers' versions can be read against it.\n\n**Transition in:** `problem_solution`: The diagnosis: the state lived in the wrong place. → The model in which the state lives in one server-side record.\n\n**Order of paragraphs** (`prerequisite_order`): Record and attempt first, because the states are states of the record; the states before the difference between the two waits; the next action before the synchronous response, since the response is what carries it; operations last, because they act on a payment that has already reached a state.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p16 | definition | A payment state machine is a record created on the server before any money moves, which holds a state, the transitions allowed from it and every attempt made to pay. | reasoning: A payment is the customer's purchase; an attempt is one try to collect it with one payment method. One payment can hold several attempts. |  |\n| p17 | description | Six states are enough to describe the model, and each is left by a different party. | table: State, what it means, who moves it on: needs payment details (customer, through the client); needs customer action (customer); processing (bank or network, reported by the provider); authorized (merchant's server, by capture or cancel, or the expiry of the hold); succeeded (nobody; later operations are separate records); canceled (nobody).; figure: State machine figure: the six states and the party behind each arrow. | `elaboration`: The record and its attempts. → The states the record passes through. |\n| p18 | explanation | Waiting for the customer and waiting for the network are different states because a different party ends each, on a different clock. | reasoning: A customer action takes seconds or minutes and may never happen; a bank debit takes days and almost always resolves. The first needs a reminder and an expiry, the second needs patience and no reminder. | `emphasis`: The six states. → The two that are most often merged. |\n| p19 | definition | A next action is the provider's instruction to the client about what the customer must do before the payment can go on. | example: A redirect to the customer's bank; a 3-D Secure challenge (the card networks' protocol by which the customer's bank authenticates her, used to meet the European rule of strong customer authentication); a voucher or QR code to display. | `elaboration`: The state of waiting for the customer. → What the provider returns in that state. |\n| p20 | claim | The synchronous API response reports the state reached so far and is one transition; the last transition comes from the provider's server-side notification, because the customer may never return. | table: Requirements table: how fast (the response within seconds; the outcome in seconds to days), how consistent (the provider's record wins), how available (the record must accept events when the customer's client is gone), what happens on failure (the payment stays in its state until the provider reports). | `cause_effect`: A next action performed by a client the server does not control. → Why the response cannot be the outcome. |\n| p20b | explanation | That notification is delivered at least once and in no guaranteed order, and each provider documents the identity by which a repeat can be recognized. | quotation: Stripe: 'Webhook endpoints might occasionally receive the same event more than once' and 'Stripe doesn't guarantee the delivery of events in the order that they're generated'; the guard is the event ID. Adyen: duplicates 'have the same values in the eventCode and pspReference fields'; 'always check the timestamp'. | `elaboration`: The server-side notification as the carrier of the outcome. → What may be assumed about its delivery. |\n| p21 | explanation | Captures, cancellations, refunds and disputes are separate records against the payment, each with its own amount and its own outcome, so 'partly captured and partly refunded' is two amounts and not a state. | scenario: Mila's €120.00 pass with €84.00 refunded: authorized 120.00, captured 120.00, refunded 84.00. | `additional_support`: The states of the payment up to success. → What happens to a payment after it. |\n\n### Stripe: A PaymentIntent You Can Read Again\n\n**Controlling idea** (`description`, id `stripe-paymentintent`): Stripe exposes the model as a PaymentIntent, an object with a status field that the integrator creates on the server, lets the client confirm, and can retrieve by its identifier at any time.\n\n**Advances the thesis** (S3): Documents the first of the two exposures.\n\n**Transition in:** `example`: The provider-neutral model. → The first provider's version of it, with dated sources.\n\n**Order of paragraphs** (`prerequisite_order`): The object first, then its statuses, then the rule that makes it retriable, then how its two waiting states are reported, then the operations after success, then the sibling object that shares its states; each paragraph uses the fields the one before introduced.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p22 | definition | A PaymentIntent, introduced by Stripe in 2018, is the server-created record of one purchase, which the customer's client confirms using a secret that belongs to that one intent. | source: 'Each PaymentIntent typically correlates with a single shopping cart or customer session'; create and confirm are two actions; the client secret 'lets the client access important fields from the PaymentIntent (status, amount, currency) while hiding sensitive ones'; each intent 'has a unique ID that you can use to retrieve it'.; source: Introduced 2018; rollout 'took almost two years'. |  |\n| p23 | description | The PaymentIntent has seven statuses, and Stripe's documentation says what each one waits for. | table: requires_payment_method, requires_confirmation, requires_action, processing, requires_capture, succeeded, canceled, each with Stripe's own description. | `elaboration`: The object. → Its status field. |\n| p24 | explanation | There is no failed status: a failed attempt returns the intent to requires_payment_method, and the attempt itself is kept as a Charge. | quotation: 'There's no failed state because if a single payment attempt fails, the PaymentIntent goes back to the requires_payment_method state so that the customer can try again with a different payment method.'; source: latest_charge: 'ID of the latest Charge object created by this PaymentIntent'; the lifecycle page advises creating the intent early 'so Stripe can record all attempted payments'. | `contrast`: Seven statuses. → The status a reader expects and does not find. |\n| p25 | explanation | Stripe reports the two waits as requires_action, with a next_action field for the client, and processing, and tells integrators to act on the server-side event in both cases. | quotation: 'Don't attempt to handle order fulfillment on the client side because customers can leave the page after payment is complete but before the fulfillment process initiates'; polling the intent is possible 'but it's much less reliable and might trigger rate limits'. | `sequence`: A failed attempt. → An attempt that is still in progress. |\n| p26 | explanation | After authorization the operations hang off the same record: capture is a call on the intent, and a refund or a dispute is its own object that changes the payment's outcome while the intent's status field still reads succeeded. | quotation: 'Subsequent refunds, disputes, and outcomes are reflected on the Charge. These might change what you see in the Dashboard, even though the PaymentIntent remains succeeded.'; source: Capture when status is requires_capture, with amount_to_capture at most the original amount; uncaptured intents are canceled after 7 days by default; a Refund has status pending, requires_action, succeeded, failed or canceled. | `sequence`: The states before success. → What Stripe records after it. |\n| p27 | description | A SetupIntent runs through the same statuses to save a payment method for later use without charging it. | quotation: 'Both Payment Intents and Setup Intents go through the same set of states'; Setup Intents 'set up payment credentials but don't process payments'. | `similarity`: The PaymentIntent's machine. → The sibling object that reuses it. |\n\n### Adyen: Result Codes, Modifications and Webhooks\n\n**Controlling idea** (`description`, id `adyen-results-and-modifications`): Adyen exposes the same model as a result code on each response, an action object for the client, modifications as separate asynchronous requests and outcomes by webhook, with no endpoint in its Checkout API that returns a payment by its identifier.\n\n**Advances the thesis** (S3): Documents the second exposure and says where the evidence for its reasons stops.\n\n**Transition in:** `contrast`: An object the integrator can read again. → A provider that reports results per request and by event.\n\n**Order of paragraphs** (`prerequisite_order`): The limits of the evidence first, so the reader knows the section describes a contract and not a design history; then the session, the result code, the action and the warning about the result code, in the order a payment meets them; then modifications and their two-stage outcome; the missing read endpoint last, because it is what turns the earlier facts into a storage requirement.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p28 | context | Adyen has published no design history comparable to Stripe's, so its model is described here from its documentation, its API specification and the dates in its release notes. | source: Release notes: resultCode presentToShopper in Checkout API v41 (14 February 2019); 'The response now contains an action object that indicates the action to be taken for completing the payment' in v49 (14 May 2019); captures, refunds, cancellations and reversals in the Checkout API on 3 June 2021; POST /sessions in v68 (6 October 2021). |  |\n| p29 | definition | A payment session is a short-lived server-created object that Adyen's client library uses to run the whole checkout, and its status is not the payment's record. | quotation: Session expiry 'is set to 1 hour after session creation' by default and at most 24 hours; of the session result: 'The status included in the response doesn't get updated. Do not make the request again to check for payment status updates.' | `sequence`: Where the evidence comes from. → The first object an integrator meets. |\n| p30 | description | Each response from the payment endpoints carries a result code, and Adyen's documentation sorts the codes into authentication steps, intermediate results and final results. | table: Result codes by group: IdentifyShopper, ChallengeShopper, RedirectShopper (3-D Secure 2); Received, Pending, PresentToShopper (intermediate); PartiallyAuthorised; Authorised, Refused, Cancelled, Error (final). Received 'is the initial state for all payments'. | `sequence`: The session. → What a response says about the payment's state. |\n| p31 | explanation | When the customer has to act, the response carries an action object that the client library performs, and if the customer never returns Adyen tells the integrator to wait for the webhook. | source: Action types redirect, threeDS2, qrCode, sdk, voucher, await; 'If the response has no action object, get the payment outcome. If the response contains an action object, handle the additional action.'; quotation: 'If the shopper doesn't return to you website, you do not get a redirectResult. You do not need to do anything to handle the redirect in this case. Instead, wait for the webhook'. | `elaboration`: The authentication and intermediate codes. → How the client is told what to do. |\n| p32 | evidence | Adyen tells integrators not to treat the result code as the record. | quotation: 'The status of a payment can sometimes change after you get the result code, so we recommend that you do not use the result code to update your order management system.'; quotation: 'Although you can use the payment result from the API, we recommend that you rely on the webhook to trigger any business logic'. | `emphasis`: Result codes and actions. → What they must not be used for. |\n| p33 | definition | A modification is Adyen's name for any operation on an existing payment, and each one is a separate request with its own reference, answered 'received' and resolved by webhook. | quotation: Capture response: 'status: received. Your capture request will be processed asynchronously. You will receive the result in a webhook'; an HTTP 200 means 'We still do not know if the capture operation will be successful or not.'; source: 'Every payment or modification request ... has a globally unique 16-character string called the PSP reference'. | `sequence`: The payment up to authorization. → The operations after it. |\n| p34 | evidence | Even a modification's success is a promise: a capture or refund reported successful can fail days later. | quotation: CAPTURE success true: 'In rare cases the card scheme can still reject the capture, and you will receive a CAPTURE_FAILED webhook'; 'This can even happen a few days after you submitted the capture request'; refunds likewise (REFUND_FAILED, REFUNDED_REVERSED).; quotation: 'Adyen does not send a webhook message when a payment settles successfully.' | `emphasis`: A modification's asynchronous result. → A second stage after that result. |\n| p35 | evidence | Adyen's Checkout API has no endpoint that returns a payment by its identifier; outside the integrator's own record, a payment can be looked up only in Adyen's Customer Area and reports. | fact: The Checkout API v72 specification has three GET operations: /paymentLinks/{linkId}, /sessions/{sessionId} and /storedPaymentMethods; none returns a payment.; reasoning: INFERENCE block: the difference in what the integrator must store is the author's reading of the two documented contracts; Adyen's reasons are not published. | `cause_effect`: Results that arrive only by request response and by event. → What is absent, and what follows for the integrator. |\n\n### What a State Machine Must Guarantee, and Four Ways to Mirror One\n\n**Controlling idea** (`comparison`, id `guarantees-and-mirrors`): A payment state machine is worth having only if it guarantees one terminal outcome, legal transitions only and transitions safe to apply twice, and the consumer's choice among four ways of mirroring it decides whether those guarantees survive in its own record.\n\n**Advances the thesis** (S4, S5): States the guarantees and compares the consumer's designs against them.\n\n**Transition in:** `conclusion_summary`: Two exposures of one model. → What any version of the model has to guarantee, the consumer's copy included.\n\n**Order of paragraphs** (`assertion_evidence_reasoning`): The three guarantees are asserted, then the two that readers misapply are explained with the providers' documented behavior, and only then are the consumer designs compared, since the comparison's criteria are the guarantees.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p36 | claim (list) | A payment state machine owes its users three guarantees: one terminal outcome, legal transitions only, and transitions that are safe to apply twice. |  |  |\n| p37 | explanation | A state is terminal only if no later message from the provider can change what it promised, and by that test 'succeeded' and 'captured' are not terminal for the payment, whatever the provider's status field goes on saying. | reasoning: Stripe keeps the intent succeeded while refunds and disputes land on the Charge; Adyen sends CAPTURE_FAILED after a successful CAPTURE. Canceled, expired and refused attempts are terminal; success is a state with exits. | `elaboration`: The first guarantee. → What 'terminal' may be claimed of. |\n| p38 | explanation | Legal transitions are a table of from-state, message and to-state, and a message is made safe to apply twice by the identity the provider documents for it. | source: Stripe: 'Webhook endpoints might occasionally receive the same event more than once'; guard by logging event IDs. Adyen: duplicates 'have the same values in the eventCode and pspReference fields'. | `sequence`: The first guarantee. → The second and third. |\n| p39 | comparison | A consumer can mirror the provider's machine in four ways: a flag set from the API response, a copy of the provider's status, its own small vocabulary beside the provider's status as received, or an event log from which the state is derived. | table: Design, what it stores, what it gets right, where it fails, when it fits: flag; copied status; own vocabulary plus verbatim status and child records; event log with derived state. | `cause_effect`: The guarantees. → The designs that keep or lose them. |\n| p40 | recommendation | I would keep a small vocabulary of my own beside each provider's status as received, built from the provider messages stored as received, unless there is one provider and its object can be re-read. | reasoning: Providers add and rename states (Stripe renamed two PaymentIntent statuses in API version 2019-02-11); two providers never share a vocabulary; a stored raw event lets a mapping mistake be replayed. | `conclusion_summary`: The four designs. → The author's choice among them and its condition. |\n\n### Stripe and Adyen: Where They Differ\n\n**Controlling idea** (`comparison`, id `where-they-differ`): Across seven aspects of the public record, Stripe and Adyen agree on the model, on the advice about the synchronous response and on a session as the recommended entry point, and differ in where the state can be read, how a failed attempt and the two waits are represented, how operations report and whether the reasons are published.\n\n**Advances the thesis** (S3): Sets the two documented contracts side by side and separates the facts from the author's reading.\n\n**Transition in:** `contrast`: Designs a consumer chooses. → The differences between providers that the consumer does not choose.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p41 | comparison | Seven aspects separate what each company documents from what the difference suggests. | table: Aspect, Stripe, Adyen, what the difference suggests: where the state can be read; a failed attempt; the two waits; operations after authorization; advice on the synchronous result; recommended entry point; published design history. |  |\n| p42 | recommendation | On Stripe the integrator confirms an event by reading the object; on Adyen it must store every result and event itself and close the gap with reports. |  | `cause_effect`: The table of differences. → What an integrator does differently on each provider. |\n\n### In Practice at Larkfield: Mila's Payments in Five States\n\n**Controlling idea** (`example`, id `in-practice`): Under Keel, Larkfield keeps its five words as a summary, stores each provider's status as received with who the payment is waiting on, holds attempts, captures, refunds and disputes as child records, and lets only the provider's confirmed record move a state.\n\n**Advances the thesis** (S5): Shows the designed record at work on the recurring payments, on both providers.\n\n**Transition in:** `example`: The differences between the two providers. → One record that absorbs them, at the fictional platform.\n\n**Order of paragraphs** (`large_to_small`): The mapping for all payments first, then single payments read through it: the class pass on each provider, then the two cases the old record could not place, and finally the limit of the vocabulary, which only makes sense once 'paid' has been used.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p43 | description | The redesigned record keeps the five words and adds what they could not say. | table: Larkfield state, what it promises, Stripe evidence that moves a record into it, Adyen evidence that moves a record into it; beside the state: provider status as received, waiting_on, closed_reason, and child records with amounts. |  |\n| p44 | example | Mila's class pass, on Adyen, becomes 'paid' when the AUTHORISATION webhook arrives, not when the app shows the result code. | scenario: 9 March 2027, 19:42, €120.00, Studio Noord on Adyen, wallet authentication with no challenge, automatic capture; Larkfield's fee €2.53, the studio receives €117.47.; source: 'A payment that is automatically captured does not trigger a separate CAPTURE webhook.' | `example`: The mapping. → One payment read through it. |\n| p45 | example | Had Studio Noord been on Stripe, the same pass would become 'paid' when the payment service re-reads the PaymentIntent after the event and finds it succeeded. | scenario: The same €120.00 pass as a PaymentIntent created by the payment service, confirmed in the app, with Keel decision K2: the provider's record is the truth and the webhook is the doorbell.; source: A PaymentIntent can be retrieved by its ID; the payment_intent.succeeded event signals success. | `contrast`: The pass on Adyen. → The same pass on the other provider. |\n| p46 | example | Mila's membership set-up on 12 January sits in 'pending' with waiting_on set to the customer, which tells the booking app to prompt her and a timeout job to expire the attempt, not to wait for a bank. | scenario: 12 January 2027: card typed in, 3-D Secure challenge in the banking app, first €49.00 payment. | `additional_support`: A payment with no customer action. → One with a customer action. |\n| p47 | example | The €84.00 refund on 18 March is a child record with its own status, and the payment's summary becomes 'refunded' with two amounts beside it. | scenario: 18 March 2027: refund of €84.00 of the €120.00 pass, after the payout of 11 March.; source: REFUND with success true can be followed by REFUND_FAILED. | `additional_support`: A payment before success. → An operation after it. |\n| p48 | claim | None of the five words means settled: 'paid' promises that the provider has confirmed the capture, and whether the money arrived is established by the ledger and the reconciliation job. | source: 'Adyen does not send a webhook message when a payment settles successfully.' | `contrast`: What the five words now say. → What they still do not say. |\n\n### When It Goes Wrong: Late, Repeated and Contradictory Events\n\n**Controlling idea** (`process`, id `when-it-goes-wrong`): Each way an event can misbehave has a rule in the state machine: a repeat changes nothing, an event that would move a state backward is recorded and not applied, a late contradiction of a non-terminal success is applied, a missing event is found by a sweep, and an unknown status is stored and held for review.\n\n**Advances the thesis** (S4, S5): Applies the three guarantees to the failures a consumer actually meets.\n\n**Transition in:** `contrast`: The record working as designed. → The record under events that arrive wrong.\n\n**Order of paragraphs** (`prerequisite_order`): Five failure cases in dependency order: the repeat rule first, then the transition table for events out of order, then the late contradiction, which uses both; the missing event follows because it is the absence of all three, and the unknown status comes last because it is the only case the table cannot decide. Moving the late contradiction first would ask the reader to accept a backward step before seeing why most backward steps are refused.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p49 | process | A repeated event is detected by the provider's documented identity for it and changes nothing. | source: Stripe event ID; Adyen eventCode plus pspReference, with 'Your server should use the details from the latest webhook event'. |  |\n| p50 | process | An event that arrives out of order is stored, and applied only if the transition table allows it from the current state. | quotation: 'Stripe doesn't guarantee the delivery of events in the order that they're generated.' Adyen: 'To ensure you are processing events in the correct chronological order, always check the timestamp.' | `sequence`: The same event twice. → Different events in the wrong order. |\n| p51 | process | A failed capture reported two days after 'paid' is a legal transition and is applied: the capture record becomes failed, the payment returns to 'authorized', and whatever depended on 'paid' is told. | source: CAPTURE_FAILED can arrive 'a few days after you submitted the capture request'; 'Technical failures are automatically re-captured by Adyen within 10 business days.' | `contrast`: Events the table refuses. → A contradiction the table must accept. |\n| p52 | process | An event that never arrives is found by a sweep of records still pending past the expected time, and what the sweep can do depends on the provider. | source: Stripe: retrieve the PaymentIntent. Adyen: no payment read endpoint; the Customer Area transaction list and the settlement reports; card offers 'expire after 12 hours by default'. | `contrast`: Events that arrive wrong. → Events that do not arrive. |\n| p53 | process | A status value the mapping has never seen is stored as received and held for review, never mapped to a default. | source: 'Versions of the API before 2019-02-11 show requires_source instead of requires_payment_method and requires_source_action instead of requires_action.' | `additional_support`: Known events at the wrong time. → An unknown value. |\n\n## Conclusion: What to Take Away\n\n**Synthesis:** The history, the two providers' contracts and the failure cases say one thing together that none says alone: every message about a payment, including the API response and including 'success', is a transition in someone else's record, so the consumer's job is to decide in advance which transitions it will accept from which message.\n\n**So what:** A team that has written that table can add a provider or a payment method without redesigning its record, and can say what its 'paid' promises; a team that has not finds out during the next missed webhook or failed capture.\n\n**Callback:** Mila confirming her membership payment in her banking app on 12 January 2027. The reader can now name that moment as a state (waiting for the customer, with a next action), say which message ends it, and say what the record does if she never taps.\n\n**Takeaway** (`course_of_action`): For each provider, write the transition table of your own payment record: each state, what it promises, and the one provider message or read that may move a record into it. Eight questions to ask follow.\n\n**Hand-off** to [Raising the Approval Rate: Retries, Tokens and Optimization](authorization-optimization.html): `elaboration`: The distinction between a payment and its attempts: a failed attempt returns the payment to a state from which another can be made. → Why attempts fail at the issuer, who makes the next one and with what changes, and how an approval rate is counted once one payment can hold several attempts.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p54 | synthesis (list) | Established: the response is not the outcome, operations after authorization are asynchronous and can fail after reporting success, and both providers document duplicate and unordered events. |  |  |\n| p55 | synthesis (list) | Depends on context: whether to copy the provider's statuses or keep your own, how much to rely on re-reading an object, and how long a payment may wait before a sweep closes it. |  | `contrast`: What is settled. → What depends on the integrator's situation. |\n| p56 | recommendation (list) | The author's synthesis: treat every message as a transition in someone else's record, write the table of the ones you accept, and count 'succeeded' as a state with exits. |  | `contrast`: Conditional recommendations. → The author's own position. |\n| p57 | recommendation (list) | Eight questions let the reader test a payment record or a provider's state model in a design review. |  | `cause_effect`: The author's position. → Questions that apply it. |\n| p58 | transition | Mila's moment in the banking app is now a named state with a known exit, and the next chapter takes the attempt that fails at the issuer and asks why it failed and who tries again. |  | `sequence`: The state model. → The next chapter's question about attempts. |\n\n## Non-goals\n\n- What an authorization promises, holds and their expiry, customer-initiated and merchant-initiated transactions. See [The First Promise: Authorization](payment-authorization.html).\n- How payment methods differ in finality, refund and dispute rules. See [A Payment Is Not a Card: Local Methods and Real-Time Rails](local-payment-methods.html).\n- The dispute lifecycle and refund mechanics beyond their place as child records. See [Money Flowing Backward: Refunds, Reversals and Disputes](refunds-reversals-and-disputes.html).\n- Idempotency keys and retries of requests whose outcome is unknown. See [Exactly Once, Over a Network That Does Not Allow It: Idempotency and Retries](idempotency-and-retries.html).\n- The webhook delivery contract and the receiver's obligations (persist, deduplicate, confirm, sweep) in full. See [The Provider Calls You: Webhooks and Events](payment-webhooks-and-events.html).\n- Object-model conventions, identifiers and error models of the two APIs. See [Objects, Commands and Events: How Payment APIs Are Designed](payment-api-design.html).\n- 3-D Secure and strong customer authentication beyond their role as a next action. See [Proving It Is You: 3-D Secure and Strong Customer Authentication](three-d-secure-and-sca.html).\n- Settlement, balances and reconciliation of what 'paid' does not establish. See [The Slow Truth: Capture, Clearing and Settlement](clearing-and-settlement.html), [The Book of Record: How Payment Companies Build Ledgers](payment-ledgers.html), [Proving the Money: Reconciliation Inside the Provider and Out](payment-reconciliation-and-reporting.html).\n\n## Modalities\n\nArticle only.\n\n## Open questions\n\n- Adyen has published no account of why its Checkout API reports results per request and by webhook and offers no payment read endpoint; the chapter says so and does not supply a reason.\n- Whether a retried payment within one Adyen session keeps any documented link between attempts beyond the merchant reference was not verified; the chapter states only that each request has its own PSP reference.\n- The launch dates of Adyen's Checkout API before v37 (February 2018) and of Drop-in were not found.\n- The shutdown date of Stripe's Sources API is not public; the chapter mentions Sources only as history.\n\n## Decision log\n\n- **2026-11-17** — Present a provider-neutral six-state model before either provider, so both vocabularies map to something. Rejected: Teach Stripe's seven statuses as the model and present Adyen as a deviation from it.\n- **2026-11-17** — Keep Larkfield's five-state vocabulary as canon and add fields beside it (provider status as received, waiting_on, closed_reason, child records) to carry what the five words cannot. Rejected: Replace the five states with a longer list, which would contradict the ledger and other chapters.\n- **2026-11-17** — Treat the webhook contract briefly (duplicates, order) and link to the chapter that owns it, per consistency ruling 8. Rejected: Explain delivery, signing and retries here.\n- **2026-11-17** — State the absence of an Adyen design history in the section's first paragraph and the storage consequence as a labeled inference, per acceptance criterion AC-3 and consistency rulings 1 and 12. Rejected: Infer Adyen's reasons from its architecture.\n\n## Sources\n\n- **Internal**\n  - PLAN.md, contract 08-payment-state-machines — Scope, owned terms, the Larkfield thread.\n  - _research/brief-stripe-payments-and-api.md, part 1 — The dated history from Charges to PaymentIntents, the status table, confirmation, capture, refunds as objects.\n  - _research/brief-adyen-payments-and-api.md, parts 1 and 2 — Sessions and Advanced flow, result codes and actions, modifications, the two-stage outcome, the absence of a payment read endpoint, dated release notes.\n  - _research/scenario-ledger.md — The five-state vocabulary, Mila's payments, the Silent Webhook, Keel decision K2.\n  - _research/consistency-issues.md, rulings 1, 8, 12 and 14 — Ownership of where payment state lives; webhook as known vocabulary; no payment GET on Adyen; the 3-D Secure example is the membership set-up.\n- **External**\n  - Michelle Bu, 'Stripe's payments APIs: The first 10 years', Stripe, 2020-12-15 — The primary account of why the charge request failed and how the PaymentIntent was designed.\n  - Stripe documentation and API reference on PaymentIntents, n.d., accessed 2026-11 — Current statuses, fields and advice; re-fetched in this session.\n  - Adyen documentation, release notes and Checkout API OpenAPI definition v72, accessed 2026-11 — Result codes, actions, modifications, webhooks, dated versions; re-fetched in this session.\n\n## Changelog\n\n- **2026-11-17** — Verification pass: 94 claims checked (89 confirmed, 2 corrected, 3 hedged, 0 unsupported and removed or relabeled, 0 unreachable); the most significant fix: Adyen's design history is no longer called wholly 'not public', because a 2021 Adyen developer-advocate post gives the reason for /sessions. Wording only; no unit added, dropped, merged or reordered.\n- **2026-11-17** — Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes).\n- **2026-11-17** — After the flow rubric: added p20b on event delivery so the guarantees rest on something shown; narrowed p27 to SetupIntents; aligned p26 and p37 on what 'succeeded' ends; section 9 declared as dependency order; section 7 reconciled with its seven aspects.\n- **2026-11-17** — First draft of the spec from the PLAN contract, the journal spec entry and the two API briefs.\n- **2026-11-17** — Reconciliation after verification: journal-spec entry and spec body brought into line with the verified page and consistency rulings (journal entry thesis.how_why (ruling 29) re-synced; ruling 29). No unit added, dropped, merged or reordered.\n- **2026-11-17** — Absence audit: 3 statements of absence re-tested with a wide search (1 overturned in part, 0 narrowed, 2 hold; table in _research/absence-audit/08-payment-state-machines.md). Overturned in part: Adyen's 2021 engineering post gives its reason for asynchronous modifications (a stateless edge layer); only the reason for result codes and no retrievable payment remains unpublished. Consistency ruling 29's last clause needs the same correction.\n- **2026-11-17** — Journal-spec entry corrected after verification; intent, thesis and role re-synced (', and its reasons for result codes and asynchronous modifica' -> ', an engineering post of July 2021 gives the reason for asyn').\n- **2026-11-24** — Sweep of rulings 46-48: thesis how_why now gives Adyen's published reason for asynchronous modifications (July 2021 post) and keeps 'not on record' for result codes only (rulings 47b, 48a). Prose unchanged.\n- **2026-11-17** — Visual layer: 3 figures generated and inspected (article-illustrator).\n"}]}]}</script>
+<script>
+    (function () {
+        const data = JSON.parse(document.getElementById('data').textContent);
+        const root = document.getElementById('content');
+
+        const postId = (data.meta && data.meta.id) ? String(data.meta.id) : '';
+        const postStatusRaw = (data.meta && data.meta.status) ? String(data.meta.status) : '';
+        if (postId || postStatusRaw) {
+            const header = document.getElementById('post-header');
+            let sectionEl = header.querySelector('p.section');
+            if (!sectionEl) {
+                sectionEl = document.createElement('p');
+                sectionEl.className = 'section';
+                header.insertBefore(sectionEl, header.firstChild);
+            }
+            // Status pill goes first, then a " / " separator before the existing
+            // content (section name and/or id).
+            if (postStatusRaw) {
+                const parts = postStatusRaw.split(':');
+                const statusName = parts[0].trim();
+                const statusColor = (parts[1] || '').trim();
+                const wrap = document.createElement('span');
+                wrap.className = 'post-status';
+                const dot = document.createElement('span');
+                dot.className = 'status-dot';
+                if (statusColor) dot.style.background = statusColor;
+                wrap.appendChild(dot);
+                wrap.appendChild(document.createTextNode(statusName));
+                if (sectionEl.firstChild) {
+                    sectionEl.insertBefore(document.createTextNode(' • '), sectionEl.firstChild);
+                    sectionEl.insertBefore(wrap, sectionEl.firstChild);
+                } else {
+                    sectionEl.appendChild(wrap);
+                }
+            }
+            if (postId) {
+                if (sectionEl.firstChild) sectionEl.appendChild(document.createTextNode(' • '));
+                sectionEl.appendChild(document.createTextNode(postId));
+            }
+        }
+
+        const tagsHost = document.getElementById('tags');
+        (data.tags || []).forEach(function (t) {
+            const span = document.createElement('span');
+            span.className = 'tag';
+            span.textContent = t;
+            tagsHost.appendChild(span);
+        });
+
+        // Minimal markdown renderer. Supports: ATX headings, paragraphs, blockquotes,
+        // unordered/ordered lists, fenced code, inline code, bold/italic/strikethrough, links, images, hr.
+        // Sufficient for the posts in this repo; replace with a fuller parser if needed.
+        function renderMarkdown(src) {
+            const lines = src.replace(/\r\n/g, '\n').split('\n');
+            const out = [];
+            let i = 0;
+
+            const bullet = /^(\s*)([-*])\s+(.*)$/;
+            const ordered = /^(\s*)(\d+)\.\s+(.*)$/;
+            const tableRow = /^\s*\|(.+)\|\s*$/;
+            const tableSep = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+
+            function splitRow(s) {
+                let t = s.trim();
+                if (t.startsWith('|')) t = t.slice(1);
+                if (t.endsWith('|')) t = t.slice(0, -1);
+                return t.split('|').map(c => c.trim());
+            }
+
+            function inline(s) {
+                // Posts are trusted content, so raw HTML passes through unescaped
+                // (some posts embed inline <blockquote>, <div>, etc.).
+                // Stray ampersands still get fixed up.
+                s = s.replace(/&(?![a-zA-Z]+;|#\d+;)/g, '&amp;');
+                s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<a class="image-link" href="$2" target="_blank" rel="noopener noreferrer"><img alt="$1" src="$2"></a>');
+                s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+                s = s.replace(/`([^`]+)`/g, function (_, c) {
+                    return '<code>' + c.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
+                });
+                // Bold/italic, including nested combinations: ***x***,
+                // **a *b*** / ***a* b** (shared delimiters), and **a *b* c**.
+                s = s.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+                s = s.replace(/\*\*([^*\n]+)\*([^*\n]+)\*\*\*/g, '<strong>$1<em>$2</em></strong>');
+                s = s.replace(/\*\*\*([^*\n]+)\*([^*\n]+)\*\*/g, '<strong><em>$1</em>$2</strong>');
+                s = s.replace(/\*\*((?:[^*\n]|\*(?!\*)[^*\n]+\*(?!\*))+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+                s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+                return s;
+            }
+
+            while (i < lines.length) {
+                const line = lines[i];
+                if (!line.trim()) {
+                    i++;
+                    continue;
+                }
+
+                const fence = line.match(/^```(\w*)\s*$/);
+                if (fence) {
+                    i++;
+                    const buf = [];
+                    while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+                        buf.push(lines[i]);
+                        i++;
+                    }
+                    i++;
+                    const escaped = buf.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const cls = fence[1] ? ' class="lang-' + fence[1] + '"' : '';
+                    out.push('<pre><code' + cls + '>' + escaped + '</code></pre>');
+                    continue;
+                }
+
+                const h = line.match(/^(#{1,6})\s+(.*)$/);
+                if (h) {
+                    out.push('<h' + h[1].length + '>' + inline(h[2]) + '</h' + h[1].length + '>');
+                    i++;
+                    continue;
+                }
+
+                if (/^\s*(?:-\s*){3,}\s*$/.test(line) || /^\s*\*{3,}\s*$/.test(line)) {
+                    out.push('<hr>');
+                    i++;
+                    continue;
+                }
+
+                if (/^>\s?/.test(line)) {
+                    const buf = [];
+                    while (i < lines.length && /^>\s?/.test(lines[i])) {
+                        buf.push(lines[i].replace(/^>\s?/, ''));
+                        i++;
+                    }
+                    out.push('<blockquote>' + renderMarkdown(buf.join('\n')) + '</blockquote>');
+                    continue;
+                }
+
+                if (tableRow.test(line) && i + 1 < lines.length && tableSep.test(lines[i + 1])) {
+                    const headers = splitRow(line);
+                    const aligns = splitRow(lines[i + 1]).map(function (c) {
+                        c = c.trim();
+                        const left = c.startsWith(':'), right = c.endsWith(':');
+                        return left && right ? 'center' : right ? 'num' : '';
+                    });
+                    const cellOpen = function (tag, idx) {
+                        return aligns[idx] ? '<' + tag + ' class="' + aligns[idx] + '">' : '<' + tag + '>';
+                    };
+                    i += 2;
+                    const rows = [];
+                    while (i < lines.length && tableRow.test(lines[i])) {
+                        rows.push(splitRow(lines[i]));
+                        i++;
+                    }
+                    let html = '<div class="table-wrap"><table><thead><tr>';
+                    headers.forEach((h, idx) => {
+                        html += cellOpen('th', idx) + inline(h) + '</th>';
+                    });
+                    html += '</tr></thead><tbody>';
+                    rows.forEach(r => {
+                        html += '<tr>';
+                        r.forEach((c, idx) => {
+                            html += cellOpen('td', idx) + inline(c) + '</td>';
+                        });
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                    out.push(html);
+                    continue;
+                }
+
+                if (bullet.test(line) || ordered.test(line)) {
+                    // Indent of the first bullet defines this list's base level.
+                    // Deeper-indented bullets become nested lists (rendered by
+                    // recursing into renderMarkdown). Same-or-less indent at a
+                    // bullet starts a sibling item (or ends the list).
+                    const firstMatch = line.match(bullet) || line.match(ordered);
+                    const baseIndent = firstMatch[1].length;
+                    const isOrdered = ordered.test(line);
+                    const items = [];
+                    let hasTask = false;
+                    while (i < lines.length) {
+                        const cur = lines[i];
+                        if (!cur.trim()) {
+                            // blank line breaks the list (matches CommonMark-ish behaviour)
+                            i++;
+                            break;
+                        }
+                        const mBul = cur.match(bullet);
+                        const mOrd = cur.match(ordered);
+                        const m = mBul || mOrd;
+                        if (!m) break;
+                        if (m[1].length < baseIndent) break;
+                        if (m[1].length > baseIndent) break; // shouldn't happen at top of loop
+                        // Same-type check: switching between -/* and 1. closes the list
+                        if (isOrdered !== !!mOrd) break;
+
+                        const itemBuf = [m[3]];
+                        const nestedBuf = [];
+                        i++;
+                        while (i < lines.length) {
+                            const nxt = lines[i];
+                            if (!nxt.trim()) break;
+                            const nBul = nxt.match(bullet);
+                            const nOrd = nxt.match(ordered);
+                            const nm = nBul || nOrd;
+                            if (nm) {
+                                if (nm[1].length > baseIndent) {
+                                    // nested list line — dedent and stash
+                                    nestedBuf.push(nxt.slice(baseIndent + 2));
+                                    i++;
+                                    continue;
+                                }
+                                // sibling or end of list
+                                break;
+                            }
+                            // Plain continuation text
+                            if (nestedBuf.length) {
+                                // continuation inside the nested block
+                                nestedBuf.push(nxt.slice(baseIndent + 2));
+                            } else {
+                                itemBuf.push(nxt.trim());
+                            }
+                            i++;
+                        }
+
+                        // GitHub-style task items: "- [ ] text" / "- [x] text"
+                        // render as (clickable, unpersisted) checkboxes.
+                        const itemText = itemBuf.join('\n');
+                        const task = !isOrdered && itemText.match(/^\[( |x|X)\]\s+/);
+                        let liHtml = inline(task ? itemText.slice(task[0].length) : itemText);
+                        if (task) {
+                            hasTask = true;
+                            liHtml = '<input type="checkbox"' + (task[1] === ' ' ? '' : ' checked') + '>' + liHtml;
+                        }
+                        if (nestedBuf.length) {
+                            liHtml += renderMarkdown(nestedBuf.join('\n'));
+                        }
+                        items.push(task ? '<li class="task">' + liHtml + '</li>' : '<li>' + liHtml + '</li>');
+                    }
+                    out.push((isOrdered ? '<ol>' : (hasTask ? '<ul class="task-list">' : '<ul>')) + items.join('') + (isOrdered ? '</ol>' : '</ul>'));
+                    continue;
+                }
+
+                const buf = [line];
+                i++;
+                while (i < lines.length && lines[i].trim() && !/^#{1,6}\s/.test(lines[i]) && !/^>\s?/.test(lines[i]) && !bullet.test(lines[i]) && !ordered.test(lines[i]) && !/^```/.test(lines[i]) && !tableRow.test(lines[i])) {
+                    buf.push(lines[i]);
+                    i++;
+                }
+                out.push('<p>' + inline(buf.join(' ')) + '</p>');
+            }
+            return out.join('\n');
+        }
+
+        // Block dispatcher. New block types plug in here.
+        const renderers = {
+            markdown: function (block) {
+                const div = document.createElement('div');
+                div.innerHTML = renderMarkdown(block.content);
+                return div;
+            },
+            mermaid: function (block) {
+                // Mermaid scans elements with class "mermaid" whose textContent
+                // is the diagram source. We collect these nodes and run
+                // mermaid.run() once after all blocks are in the DOM.
+                const div = document.createElement('div');
+                div.className = 'mermaid';
+                div.textContent = block.content;
+                return div;
+            },
+            'force-graph': function (block) {
+                // build.py emits parsed JSON: {nodes:[{id,size}], links:[{source,target}]}.
+                // We instantiate force-graph after the container is in the DOM
+                // so it can measure its own width.
+                const div = document.createElement('div');
+                div.className = 'force-graph';
+                const data = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.ForceGraph) return;
+                    const maxSize = data.nodes.reduce((m, n) => Math.max(m, n.size || 1), 1);
+                    window.ForceGraph()(div)
+                        .graphData(data)
+                        .width(div.clientWidth)
+                        .height(div.clientHeight)
+                        .nodeRelSize(4)
+                        .nodeVal(n => Math.max(20 * (n.size || 1) / maxSize, 0.001))
+                        .nodeLabel(n => n.id + ' (' + (n.size || 1) + ')')
+                        .nodeColor(() => 'rgba(135, 206, 235, 0.7)')
+                        .linkColor(() => 'rgba(60, 60, 60, 0.4)')
+                        .linkDirectionalArrowLength(4)
+                        .linkDirectionalArrowRelPos(1)
+                        .linkWidth(1);
+                });
+                return div;
+            },
+            'bubble-chart': function (block) {
+                // build.py emits {nodes:[{name,size}]}. Renders a D3 circle-pack
+                // SVG (same shape as the obren.io reference, just inline).
+                const wrap = document.createElement('div');
+                wrap.className = 'bubble-chart';
+                const payload = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.d3) return;
+                    const diameter = 480;
+                    const fill = '#c0deed';
+                    const textColor = '#111111';
+                    const fontSize = 12;
+
+                    const svg = window.d3.select(wrap).append('svg')
+                        .attr('viewBox', '0 0 ' + diameter + ' ' + diameter)
+                        .attr('width', diameter)
+                        .attr('height', diameter);
+
+                    const root = window.d3.hierarchy({children: payload.nodes})
+                        .sum(d => d.size || 0)
+                        .sort((a, b) => b.value - a.value);
+
+                    window.d3.pack().size([diameter, diameter]).padding(2)(root);
+
+                    const node = svg.selectAll('g')
+                        .data(root.leaves())
+                        .enter().append('g')
+                        .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+
+                    node.append('title').text(d => d.data.name + ': ' + d.value);
+                    node.append('circle').attr('r', d => d.r).style('fill', fill);
+                    node.append('text')
+                        .attr('dy', '.3em')
+                        .style('text-anchor', 'middle')
+                        .style('fill', textColor)
+                        .style('font-size', fontSize + 'px')
+                        .text(d => d.data.name.substring(0, Math.max(0, Math.floor(d.r / 3))));
+                });
+                return wrap;
+            }
+        };
+
+        // Render one modality's blocks into a host element. Mermaid runs
+        // scoped to just the nodes created here, so lazily rendered tabs get
+        // their diagrams on first activation.
+        let mermaidInitialized = false;
+        function renderBlocksInto(blocks, host) {
+            const mermaidNodes = [];
+            blocks.forEach(function (block) {
+                const r = renderers[block.type];
+                if (!r) {
+                    const pre = document.createElement('pre');
+                    pre.textContent = '[unknown block type: ' + block.type + ']';
+                    host.appendChild(pre);
+                    return;
+                }
+                const node = r(block);
+                if (node instanceof Node) {
+                    host.appendChild(node);
+                    if (block.type === 'mermaid') mermaidNodes.push(node);
+                }
+            });
+            if (mermaidNodes.length && window.mermaid) {
+                if (!mermaidInitialized) {
+                    window.mermaid.initialize({startOnLoad: false, theme: 'default'});
+                    mermaidInitialized = true;
+                }
+                window.mermaid.run({nodes: mermaidNodes});
+            }
+            markScrollableTables(host);
+        }
+
+        // A table wider than its wrapper scrolls sideways. Mark those wrappers
+        // so the CSS can show a cue, and make them focusable so keyboard users
+        // can reach and scroll them. Hidden panes measure 0 and are re-marked
+        // when activated or when the window is resized.
+        function markScrollableTables(host) {
+            host.querySelectorAll('.table-wrap').forEach(function (wrap) {
+                const scrolls = wrap.scrollWidth > wrap.clientWidth + 1;
+                wrap.classList.toggle('is-scrollable', scrolls);
+                if (scrolls) {
+                    wrap.setAttribute('tabindex', '0');
+                    wrap.setAttribute('role', 'region');
+                    wrap.setAttribute('aria-label', 'Table that scrolls sideways');
+                } else {
+                    wrap.removeAttribute('tabindex');
+                    wrap.removeAttribute('role');
+                    wrap.removeAttribute('aria-label');
+                }
+            });
+        }
+
+        // Modality tabs. One <article class="pane"> per modality; panes are
+        // rendered lazily on first activation (force-graph / D3 / mermaid
+        // need a visible, measurable container). With a single modality the
+        // tab bar stays hidden and the page looks exactly like before.
+        const mods = data.modalities;
+        const tabBar = document.getElementById('modality-tabs');
+        const panes = {};
+        const tabButtons = {};
+        const renderedPanes = {};
+
+        // With several modalities each pane is a tabpanel labelled by its
+        // tab (W3C APG tabs pattern); tabindex=0 lets keyboard users move
+        // from the tab list straight into the active content.
+        mods.forEach(function (m) {
+            const pane = document.createElement('article');
+            pane.className = 'pane';
+            pane.dataset.key = m.key;
+            pane.hidden = true;
+            if (mods.length > 1) {
+                pane.id = 'pane-' + m.key;
+                pane.setAttribute('role', 'tabpanel');
+                pane.setAttribute('aria-labelledby', 'tab-' + m.key);
+                pane.setAttribute('tabindex', '0');
+            }
+            root.appendChild(pane);
+            panes[m.key] = pane;
+        });
+
+        const defaultKey = mods.some(m => m.key === 'index') ? 'index' : mods[0].key;
+
+        function activate(key, updateHash) {
+            mods.forEach(function (m) {
+                const isActive = m.key === key;
+                panes[m.key].hidden = !isActive;
+                if (tabButtons[m.key]) {
+                    tabButtons[m.key].classList.toggle('active', isActive);
+                    tabButtons[m.key].setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    // Roving tabindex: only the selected tab is in the Tab
+                    // order; the arrow keys move between tabs.
+                    tabButtons[m.key].setAttribute('tabindex', isActive ? '0' : '-1');
+                }
+            });
+            // Unhide first, then render: the chart libraries measure widths.
+            if (!renderedPanes[key]) {
+                renderBlocksInto(mods.find(m => m.key === key).blocks, panes[key]);
+                renderedPanes[key] = true;
+            } else {
+                markScrollableTables(panes[key]);
+            }
+            if (updateHash) {
+                history.replaceState(null, '',
+                    key === defaultKey ? location.pathname + location.search : '#' + key);
+            }
+        }
+
+        if (mods.length > 1) {
+            mods.forEach(function (m) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = m.label;
+                btn.id = 'tab-' + m.key;
+                btn.dataset.key = m.key;
+                btn.setAttribute('role', 'tab');
+                btn.setAttribute('aria-controls', 'pane-' + m.key);
+                btn.addEventListener('click', function () { activate(m.key, true); });
+                tabBar.appendChild(btn);
+                tabButtons[m.key] = btn;
+            });
+            // Keyboard support per the W3C APG tabs pattern (automatic
+            // activation): Left/Right move between tabs and wrap, Home/End
+            // jump to the first/last tab, and the focused tab is selected.
+            tabBar.addEventListener('keydown', function (ev) {
+                const keys = mods.map(function (m) { return m.key; });
+                const focused = document.activeElement;
+                const current = focused && focused.dataset ? keys.indexOf(focused.dataset.key) : -1;
+                if (current < 0) return;
+                let next = null;
+                if (ev.key === 'ArrowRight') next = (current + 1) % keys.length;
+                else if (ev.key === 'ArrowLeft') next = (current - 1 + keys.length) % keys.length;
+                else if (ev.key === 'Home') next = 0;
+                else if (ev.key === 'End') next = keys.length - 1;
+                if (next === null) return;
+                ev.preventDefault();
+                activate(keys[next], true);
+                tabButtons[keys[next]].focus();
+            });
+            tabBar.hidden = false;
+        }
+
+        // The hash selects a tab only when it matches a modality key, so
+        // existing anchors keep working.
+        const initialHash = location.hash.slice(1);
+        activate(mods.some(m => m.key === initialHash) ? initialHash : defaultKey, false);
+        window.addEventListener('hashchange', function () {
+            const k = location.hash.slice(1);
+            if (mods.some(m => m.key === k)) activate(k, false);
+        });
+        window.addEventListener('resize', function () { markScrollableTables(root); });
+    })();
+</script>
+</body>
+</html>

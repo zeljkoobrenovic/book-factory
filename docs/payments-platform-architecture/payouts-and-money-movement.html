@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Getting Money Out: Payouts and Money Movement</title>
+    <meta name="description" content="How does money leave a payment provider and reach a bank account, and what happens when it does not arrive? In two steps that finish at different times: the provider debits the balance, a bank network delivers or returns the transfer later, and “paid” means sent, not received.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SETTLED: Architecting Payments and Revenue Infrastructure">
+    <meta property="og:title" content="Getting Money Out: Payouts and Money Movement">
+    <meta property="og:description" content="How does money leave a payment provider and reach a bank account, and what happens when it does not arrive? In two steps that finish at different times: the provider debits the balance, a bank network delivers or returns the transfer later, and “paid” means sent, not received.">
+    <meta property="og:url" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/payouts-and-money-movement.html">
+    <meta property="og:image" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/assets/images/14-payouts-and-money-movement/logo.jpeg">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="site.css">
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-129891352-1"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+        dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'UA-129891352-1');
+</script>
+    <style>
+        body {
+            line-height: 1.65;
+        }
+
+        main {
+            padding-top: 32px;
+        }
+
+        nav.post-nav {
+            font-size: 14px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: baseline;
+            flex-wrap: wrap;
+        }
+
+        nav.post-nav a {
+            color: var(--muted);
+            text-decoration: none;
+        }
+
+        nav.post-nav a:hover {
+            color: var(--accent);
+        }
+
+        nav.post-nav .nav-right {
+            margin-left: auto;
+            display: inline-flex;
+            gap: 4px;
+            align-items: baseline;
+        }
+
+        nav.post-nav .nav-sep {
+            color: var(--muted);
+        }
+
+        footer nav.post-nav {
+            margin-top: 24px;
+            margin-bottom: 0;
+        }
+
+        header.post {
+            margin-bottom: 32px;
+        }
+
+        header.post .section {
+            color: var(--muted);
+            font-size: 13px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin: 0 0 -6px;
+        }
+
+        header.post .section a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        header.post .section a:hover {
+            color: var(--accent);
+        }
+
+        header.post .section .post-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        header.post .section .post-status .status-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        header.post .logo {
+            display: block;
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            border: 1px solid lightgrey;
+
+        }
+
+        header.post .logo-credit {
+            color: var(--muted);
+            font-size: 12px;
+            margin: -4px 0 24px;
+            text-align: right;
+        }
+
+        header.post h1 {
+            font-size: 52px;
+            line-height: 1.2;
+            margin: 0 0 2px;
+            padding: 0;
+            letter-spacing: -0.01em;
+            font-weight: normal;
+        }
+
+        header.post .byline {
+            color: var(--muted);
+            font-size: 15px;
+            margin: 0;
+        }
+
+        header.post .byline .spec-link {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        header.post .byline .spec-link:hover {
+            text-decoration: underline;
+        }
+
+        header.post .byline .spec-link-drifted {
+            color: #b8650f;
+        }
+
+        header.post .byline .spec-link-superseded {
+            color: var(--muted);
+        }
+
+        header.post .ai-credit {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 4px 0 0;
+        }
+
+        header.post .ai-credit a {
+            color: inherit;
+        }
+
+        header.post .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 10px 0 10px;
+        }
+
+        header.post .tags .tag {
+            font-size: 14px;
+            padding: 1px 8px;
+            border: 1px solid deepskyblue;
+            color: blue;
+            border-radius: 999px;
+            background-color: var(--tag-bg);
+        }
+
+        nav.modality-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--rule);
+            margin: 0 0 28px;
+            flex-wrap: wrap;
+        }
+
+        nav.modality-tabs button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font: inherit;
+            font-size: 14px;
+            color: var(--muted);
+            padding: 8px 14px;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            letter-spacing: 0.02em;
+        }
+
+        nav.modality-tabs button:hover {
+            color: var(--accent);
+        }
+
+        nav.modality-tabs button.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        #content .pane[hidden] {
+            display: none;
+        }
+
+        #content .pane:focus {
+            outline: none;
+        }
+
+        #content .pane:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 6px;
+        }
+
+        article h2 {
+            font-size: 26px;
+            margin: 40px 0 12px;
+            letter-spacing: -0.01em;
+        }
+
+        article h3 {
+            font-size: 20px;
+            margin: 28px 0 8px;
+        }
+
+        article h4 {
+            font-size: 17px;
+            margin: 20px 0 6px;
+        }
+
+        article p {
+            margin: 0 0 16px;
+        }
+
+        article a {
+            color: var(--accent);
+        }
+
+        article a.image-link {
+            display: inline-block;
+            line-height: 0;
+        }
+
+        article img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        article a.image-link img {
+            display: block;
+        }
+
+        article ul, article ol {
+            padding-left: 24px;
+            margin: 0 0 16px;
+        }
+
+        article li {
+            margin-bottom: 6px;
+        }
+
+        article ul.task-list {
+            list-style: none;
+            padding-left: 4px;
+        }
+
+        article ul.task-list li.task > input[type="checkbox"] {
+            margin-right: 8px;
+            accent-color: var(--accent);
+        }
+
+        article hr {
+            border: none;
+            border-top: 1px solid var(--rule);
+            margin: 32px 0;
+        }
+
+        article blockquote {
+            margin: 16px 0;
+            padding: 12px 18px;
+            background: var(--quote-bg);
+            border-left: 3px solid var(--accent);
+            color: #333;
+        }
+
+        article blockquote p:last-child {
+            margin-bottom: 0;
+        }
+
+        article code {
+            background: var(--code-bg);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 0.92em;
+        }
+
+        article pre {
+            background: var(--code-bg);
+            padding: 14px 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        article pre code {
+            background: none;
+            padding: 0;
+        }
+
+        article .table-wrap {
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+
+        article table {
+            border-collapse: collapse;
+            margin: 16px 0;
+            width: 100%;
+            font-size: 15px;
+        }
+
+        article .table-wrap table {
+            margin: 0;
+        }
+
+        /* Wide tables scroll on narrow screens instead of crushing their columns.
+           A table wrapped in <div class="table-compact"> opts out: it has few,
+           short columns and wraps its cells to fit the screen instead. */
+        @media (max-width: 640px) {
+            article .table-wrap table {
+                min-width: 560px;
+            }
+            article .table-compact .table-wrap table {
+                min-width: 0;
+            }
+        }
+
+        /* Tables that actually overflow get a visible cue and keyboard focus
+           (markScrollableTables() sets the class and attributes). */
+        article .table-wrap.is-scrollable::before {
+            content: "Scroll sideways to see the whole table";
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        article .table-wrap.is-scrollable:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        article th, article td {
+            border: 1px solid var(--rule);
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        article th {
+            background: var(--code-bg);
+            font-weight: 600;
+        }
+
+        /* GFM column alignment from the separator row. Right-aligned columns
+           hold numbers; their cells never wrap, so a sign, a currency symbol
+           and its amount stay on one line while label columns still wrap. */
+        article th.num, article td.num {
+            text-align: right;
+        }
+
+        article td.num {
+            white-space: nowrap;
+        }
+
+        article th.center, article td.center {
+            text-align: center;
+        }
+
+        article .mermaid {
+            text-align: center;
+            margin: 24px 0;
+        }
+
+        article .force-graph {
+            margin: 24px 0;
+            border: 1px solid var(--rule);
+            border-radius: 6px;
+            background: #fff;
+            height: 480px;
+            overflow: hidden;
+        }
+
+        article .bubble-chart {
+            margin: 24px 0;
+            text-align: center;
+        }
+
+        article .bubble-chart svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <nav class="post-nav"><a class="nav-back" href="index.html">SETTLED: Architecting Payments and Revenue Infrastructure</a><span class="nav-right"><a class="nav-prev" href="balances-and-funds-flows.html" title="Pending, Available, Reserved: Balances and Funds Flows">← Previous</a><span class="nav-sep">&nbsp;|&nbsp;</span><a class="nav-next" href="payment-reconciliation-and-reporting.html" title="Proving the Money: Reconciliation Inside the Provider and Out">Next →</a></span></nav>
+    <header class="post" id="post-header">
+        <p class="section">Part III — LEDGER: Recording and Moving Money</p>
+        <h1>Getting Money Out: Payouts and Money Movement</h1>
+        <p class="byline">Željko Obrenović  ·  2026-11-17  ·  24 min read · <a class="spec-link" href="payouts-and-money-movement.spec.html">View spec</a></p>
+        <p class="ai-credit">AI-assisted: researched and written with Claude Code; illustrations generated with Gemini. <a href="https://zeljkoobrenovic.github.io/book-factory/foundations/ai-mediated-authoring.html">How this works</a></p>
+        <div class="tags" id="tags"></div>
+        <a href="assets/images/14-payouts-and-money-movement/logo.jpeg" target="_blank" rel="noopener noreferrer" aria-label="Open header illustration at full size"><img class="logo" src="assets/images/14-payouts-and-money-movement/logo.jpeg" alt=""></a>
+        <p class="logo-credit">Image generated by Google Gemini (gemini-3-pro-image-preview)</p>
+    </header>
+    <nav class="modality-tabs" id="modality-tabs" hidden role="tablist" aria-label="Reading formats"></nav>
+    <div id="content"></div>
+    <footer>
+        <nav class="post-nav"><a class="nav-back" href="index.html">SETTLED: Architecting Payments and Revenue Infrastructure</a><span class="nav-right"><a class="nav-prev" href="balances-and-funds-flows.html" title="Pending, Available, Reserved: Balances and Funds Flows">← Previous</a><span class="nav-sep">&nbsp;|&nbsp;</span><a class="nav-next" href="payment-reconciliation-and-reporting.html" title="Proving the Money: Reconciliation Inside the Provider and Out">Next →</a></span></nav>
+    </footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/force-graph"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script id="data" type="application/json">{"meta": {"title": "Getting Money Out: Payouts and Money Movement", "date": "2026-11-17", "author": "Željko Obrenović", "excerpt": "How does money leave a payment provider and reach a bank account, and what happens when it does not arrive? In two steps that finish at different times: the provider debits the balance, a bank network delivers or returns the transfer later, and “paid” means sent, not received.", "permalink": "payouts-and-money-movement", "timetoread": "24 min read", "icon": "assets/icons/14-payouts-and-money-movement.png", "logo": "assets/images/14-payouts-and-money-movement/logo.jpeg", "logo_credit": "Image generated by Google Gemini (gemini-3-pro-image-preview)"}, "tags": [], "modalities": [{"key": "index", "label": "Article", "meta": {}, "blocks": [{"type": "markdown", "content": "> **IN THIS CHAPTER, YOU WILL:** Follow a payout from the provider's balance onto a bank network and learn to record it so that a transfer that comes back days later has somewhere to land.\n\n> **KEY POINTS:**\n>\n> * **“Paid” means sent.** The provider debits the balance when it instructs the transfer; a bank network then delivers it on its own schedule. Stripe's documentation (accessed November 2026) says a failed payout \"might initially show as `paid`\"; Adyen's says a non-instant payout \"cannot fail\" but can be returned.\n> * **A payout that fails comes back as a new credit, days later.** Both providers book the return as a separate transaction. A payout record needs four states (instructed, sent, arrived, returned) and must stay open through the return window.\n> * **Check the payee before the money leaves.** A transfer to a valid account that belongs to someone else does not come back. Since 9 October 2025, euro-area payment providers must check the payee's name before a credit transfer is authorized; the result is a warning, and the decision stays with the sender.\n\n> **[FAILURE PATTERNS THIS CHAPTER ADDRESSES](where-payment-systems-go-wrong.html):**\n>\n> * **The Stranded Payout** — a payout is closed when the provider says \"paid\", the bank returns it a week later, and the credit has no payout to attach to and no owner.\n> * **The Black-Box Balance** — a returned payout raises a seller's balance with a line nobody can explain, because the record that would explain it was already closed.\n\n<br>\nA studio owner calls support. Her dashboard has shown this week's payout as \"Paid\" for eight days, and **her bank account shows nothing**. The support agent checks the provider: the balance was debited that day, for the right amount. No system is broken. Both statements are true.\n\nThey are true because a payout is **two processes that finish at different times**. The first is accounting: the provider debits the balance it owes and instructs a transfer. The second is delivery: a bank network carries the instruction to the receiving bank, which credits the account or refuses. The provider runs only the first, reports it as \"paid\", and learns of a failure only when the money comes back days later **as a new credit**. Reading \"paid\" like an HTTP 200 answers a different question.\n\n**Where we are in the payment's journey.** Mila Janssen's €120.00 class pass, bought on Tuesday 9 March 2027 at 19:42, left €117.47 owed to Studio Noord in Adyen's books ([Pending, Available, Reserved: Balances and Funds Flows](balances-and-funds-flows.html)). This chapter is the step where that amount leaves the provider for the bank account of Ines Bakker, the studio's owner. It is the first movement outside the provider's ledger. The money is due in her account on Thursday 11 March; Larkfield's record calls the payout arrived only on Thursday 25 March, and the chapter explains why those are two different facts.\n\nThe chapter starts at Larkfield with 412 payouts that were marked paid and came back. It then separates the provider's accounting from the bank's delivery and describes the networks a payout travels on. Next come the payout states Stripe and Adyen document, including the return, and the check of the payee's name before sending. Three ways to record a payout and a comparison of the two providers follow. It ends with one payout worked through Larkfield's record and the failures that remain.\n\n## Setting the Scene at Larkfield: 412 Payouts Marked Paid\n\nLarkfield is the fictional studio-software platform this book follows ([Meet Larkfield](meet-larkfield.html)): studios sell classes through it, and Stripe or Adyen pays each studio out. In June 2026 a form in the studio back office let owners change their bank details, and nothing checked that the new account belonged to the studio. Over three weeks, receiving banks sent back **412 payouts worth €386,000**. Larkfield calls it the Payout That Bounced.\n\nThe returns were ordinary. The damage came from Larkfield's payout record, which had one final state: when the provider's notification said paid, the record was closed. A credit that arrived at the provider days later therefore had no open payout to attach to and no team that owned it. The returns **sat unreconciled** while Aylin Demir's support team heard from studios. It took 19 days to pay every studio, and two studios left.\n\nWhen Femke de Graaf takes over payments engineering in January 2027, the incident gives her three questions, and they are this chapter's. What does \"paid\" assert? For how long after it can a payout still come back? And what should have stopped these transfers before they left?\n\n## Two Processes, Two Clocks: Why “Paid” Means Sent\n\nA **payout** is the provider sending money it owes you, from a balance in its own books, to a bank account outside the provider; a transfer between two balances inside the provider never leaves the ledger. Stripe's documentation (n.d., accessed November 2026) puts it in one line: Stripe \"sends funds from your available balance to your bank account as payouts\". The balance is the provider's debt to the merchant ([Pending, Available, Reserved: Balances and Funds Flows](balances-and-funds-flows.html)); the payout is that debt being paid.\n\nThe first process is accounting, inside the provider's ledger ([The Book of Record: How Payment Companies Build Ledgers](payment-ledgers.html)). Adyen's payout lifecycle page (n.d., accessed November 2026) names its steps: received, then authorised (\"we reserve the payout amount on your balance account\"), then booked (\"Adyen deducts the funds from your balance account and creates a transaction\"). All of it finishes before any bank is involved.\n\nThe second process starts there. The provider, or a bank it works with, submits a payment instruction to a **payout rail**: the bank network that carries a transfer to the receiving bank. Many rails process instructions in batches, a few times per business day, and each has a **cut-off time**, after which an instruction waits for the next cycle. The receiving bank then credits the payee and sets the **value date**, the date from which it counts the money as the payee's.\n\n| Step | Who holds the money | Who can see the state |\n| --- | --- | --- |\n| Balance at the provider | The provider, as its debt to the merchant | Provider and merchant |\n| Instruction submitted to the rail | In transit between banks | The provider sees \"submitted\" |\n| At the receiving bank, before credit | The receiving bank | The receiving bank only |\n| Credited to the account | The account holder, who may not be the intended payee | The account holder and their bank |\n\nBecause a batch rail sends the sender no confirmation that the payee was credited, the status a provider shows after sending describes **the provider's own action**. Both say so. Stripe's status table for its third-party payout product (n.d., accessed November 2026) reads: \"A posted status doesn’t guarantee that your recipient has received money, because their bank might delay the release of funds.\" Adyen gives a bank transfer on a non-instant route a `tracking.estimatedArrivalTime`, which is a forecast.\n\n![Two timelines: the provider's ledger ends at a debit flagged paid; the bank rail ends later in a credit or a return.](assets/images/14-payouts-and-money-movement/14-two-clocks.jpeg)\n**Figure 1:** *The provider's accounting ends with a debit it reports as paid; the bank rail's delivery ends later, with a credit or with a return that arrives as a new credit.*\n\nThe second process does send one signal back. A **payout return** is the receiving bank sending the money back after the rail accepted the transfer. Stripe's Global Payouts documentation (n.d., accessed November 2026) gives the usual causes: \"Incorrect destination information causes most returned payouts (for example, the provided bank account is closed, or the account holder’s details don’t match the recipient’s information).\" The return travels a rail too, so it reaches the sender as a new transaction, days after the payout was marked sent.\n\n![A sender holds a receipt marked sent; the letter travels to a house and comes back to the sender's mailbox days later.](assets/images/14-payouts-and-money-movement/14-letter-in-the-post.jpeg)\n**Figure 2:** *A receipt for posting proves the letter was sent; whether it was delivered is known only if it comes back, days later, as a new item in the sender's own mailbox.*\n\n## The Rails a Payout Travels On\n\nRails differ in whether they process in batches or one transfer at a time, when they operate, and whether the sender learns the outcome. The behavior column below is industry practice in general terms. The bank rails are named as in Stripe's Global Payouts price list and network options (n.d., accessed November 2026); its overview page adds payouts \"to debit cards\".\n\n| Rail | Where | How it commonly behaves |\n| --- | --- | --- |\n| SEPA Credit Transfer | Euro transfers in the Single Euro Payments Area | Batches on business days; a failure comes back as a return |\n| SEPA Instant Credit Transfer | Same area | One transfer at a time, around the clock, with an immediate answer |\n| ACH (Automated Clearing House) | United States | Batches, next day or same day; returns arrive on later days |\n| Faster Payments | United Kingdom | One transfer at a time, around the clock, usually within seconds or minutes |\n| Wires: Fedwire, SWIFT | US high-value; international | One at a time in operating hours; across borders through intermediary banks |\n| Push to card | Debit cards on the card networks | The card network delivers to the card's account, typically in minutes |\n\nCut-off times turn the time of day into a processing date. Adyen's published examples list, as of November 2026, a `regular` transfer cut-off of 15:45 CET in the euro area with same-day settlement; transfers \"initiated after the cut-off time will be processed the next day\". At Stripe, a manual payout in euros can arrive the same day if initiated \"before 4 pm Europe/Copenhagen\". These settings will change; read the current page before you design around one.\n\nWeekends, holidays and the receiving bank add to that. Stripe's API reference (n.d., accessed November 2026) describes a payout's `arrival_date` as the \"Date that you can expect the payout to arrive in the bank. This factors in delays to account for weekends or bank holidays\". Adyen's Getting paid page (n.d., accessed November 2026) says it \"cannot process payouts on bank holidays\" and that after initiation \"your bank may need up to three more business days to post the funds\". The value date is the receiving bank's, and no provider promises it.\n\nAn instant rail replaces the schedule with a synchronous answer. Regulation (EU) 2024/886 of 13 March 2024 defines an instant credit transfer as one \"executed immediately, 24 hours a day and on any calendar day\", with the money available to the payee \"within 10 seconds\"; euro-area payment service providers had to offer sending them by 9 October 2025. The price is a ceiling and gaps in reach: as of November 2026 Adyen caps an `instant` euro transfer at 100,000.00 EUR, and notes that \"while most banks can process **regular** transfers, some do not support **instant** transfers\". One payout API has to cover both contracts.\n\n| Requirement | Batch rail | Instant rail |\n| --- | --- | --- |\n| How fast | Same day to several business days | Seconds |\n| How definite the answer | \"Sent\"; arrival is inferred | Credited or failed |\n| When it operates | Business days, before the cut-off | Around the clock |\n| What failure looks like | A return, days later, as a new credit | An immediate failure; retry or fall back |\n\nA payout that crosses a border adds intermediary banks and a currency conversion (foreign exchange, FX). Adyen says of its `crossBorder` priority that \"payout delays and additional fees may occur due to intermediary banks. As a result, the beneficiary may receive a lower amount than the instructed value.\" Stripe's price list, as of November 2026, charges 20.00 EUR for a payout over SWIFT and an FX fee of 0.50% on 20 listed currencies and 1.00% on all others, applying the higher of the two currencies' rates.\n\n## How a Payout Leaves, and How It Comes Back, at Each Provider\n\n### Schedules and batches\n\nA standard payout is a scheduled batch that sweeps up many payments, minus refunds and fees. (Both providers' documentation quoted in this section is undated and was read in November 2026.) At Stripe the merchant picks a schedule (manual, daily, weekly, monthly), and \"Choosing a payout schedule doesn’t change how long it takes for your pending balance to become available. It only controls when payouts are sent.\" At Adyen the unit is the payable batch, which under its sales-day payout model holds one sales day's payments paid out together: \"After the payable batch closes, it can take one to two business days for the payout to be initiated.\" On Adyen's platform product a managed payout schedule (n.d., accessed November 2026) is Standard, with funds arriving \"two business days after capture\", or Accelerated, one. Per-seller schedules belong to [Dividing the Money: Splits, Platform Balances and Seller Payouts](splits-balances-and-platform-payouts.html).\n\n### Stripe: two objects, two vocabularies\n\nStripe's Payout object (API reference, n.d., accessed November 2026) has a status: \"A payout is `pending` until it’s submitted to the bank, when it becomes `in_transit`. The status changes to `paid` if the transaction succeeds, or to `failed` or `canceled` (within 5 business days). Some payouts that fail might initially show as `paid`, then change to `failed`.\" The state that looks final is documented as reversible.\n\nStripe's second payout product has its own object. Global Payouts sends money to third parties who are not merchants on Stripe; each payout is an OutboundPayment (created directly or, in the API version in preview in November 2026, through a PayoutIntent) with the statuses `processing`, `failed`, `canceled`, `posted` and `returned`. Here `posted` plays the part of `paid`: \"The payout posts and funds leave the financial account\" (the stored balance the sender pays from). Stripe may review a payout first: \"Creating an OutboundPayment doesn’t mean that Stripe has sent the funds.\"\n\n### Adyen: accounting events, then tracking events\n\nAdyen splits the lifecycle in two. Accounting events end at `booked`, the debit. Tracking events follow and differ by route: instant bank transfers \"receive a **credited** `status` when the funds arrive, or **failed**\"; payouts to cards receive `accepted`; non-instant bank transfers receive only the estimate. Booked is not departure either: \"After a payout reaches the **booked** `status`, but before the funds leave Adyen, the payout is automatically analyzed\", and one that fails manual review is frozen. Adyen's payout webhooks page for platforms (n.d., accessed November 2026) says of `booked`: \"This status is not final.\"\n\nThree vocabularies describe one lifecycle, and an integrator needs four states. The empty cells are the point: on a batch rail neither provider has a status that means arrived.\n\n| State you need | Stripe Payout | Stripe Global Payouts | Adyen transfer |\n| --- | --- | --- | --- |\n| Instructed | `pending` | `processing` | `received`, `authorised` |\n| Sent | `in_transit`, then `paid` | `posted` | `booked`, then an estimated arrival time |\n| Arrived | No status | No status | `credited`, instant bank transfers only |\n| Returned | `failed` after `paid` | `returned` | `returned` |\n\n### The return is a new movement\n\nBoth providers document a failed delivery as a new movement that credits the balance. Stripe: \"It can take up to 5 additional business days for your bank to return the payout and inform us that it failed\", and the Payout then carries a `failure_balance_transaction`, \"the balance transaction that reverses the initial balance transaction and returns the funds from the failed payout back in your balance\". For Global Payouts: \"Stripe returns the funds to you in a separate transaction\", typically \"within 2–3 business days, but might take longer depending on the recipient country\". Adyen: \"Payouts that do not have an **instant** `priority` cannot fail, but they can be returned by the counterparty's bank\", and \"A new transaction is created for the return\". For an Adyen merchant's ordinary payout the return shows in a report, under the journal type `BankInstructionReturned`. In every case the original debit stands and a second entry answers it.\n\nWho sends the money again differs by product. For a merchant's own scheduled payout Stripe does, once the bank details are corrected: \"Stripe then reattempts the payout at the next scheduled payout interval.\" For Global Payouts, \"Stripe doesn’t retry or reroute payouts automatically.\" Adyen lets the sender list several priorities and tries the next \"If that route is unavailable\", but that happens before sending. After a return the resend is the sender's: Adyen's webhook documentation (n.d., accessed November 2026) gives each return a reason code with advice to retry or not, and says \"Adyen blocks subsequent transfer attempts when a reason code indicates a permanent issue\" until the bank details are updated.\n\nThat is where the public record stops. Stripe's payouts page names no rail for a standard payout. Adyen's press release of 9 April 2026 says its banking licenses enable \"direct connections to payment rails\" and does not list them. Neither publishes which bank or rail carries a merchant payout in each country, or how often payouts are returned.\n\n> **INFERENCE, NOT DOCUMENTED:** A provider that pays very many merchants each business day most plausibly submits standard payouts in bulk on each country's domestic batch rail, directly where it is a participant and through partner banks elsewhere, and matches the banks' return files back to payouts. That would explain the cut-offs and five-business-day windows both document.\n\nOne failure never comes back. A transfer to a valid account that belongs to someone else is, to every bank involved, a success. Stripe: \"If you provide incorrect information, such as a mistyped account number or an incorrect routing number, Stripe might send payouts to the wrong bank account and might not be able to recover the funds. Any fees or losses that you incur because of incorrect information fall under your responsibility.\" There is no general undo: Stripe lists Global Payouts reversals as possible for US domestic payouts \"within 24 hours\", not for UK Faster Payments or cross-border payouts, and \"can’t guarantee a reversal\".\n\n## Checking the Payee Before the Money Leaves\n\nA misdirected payout succeeds because bank transfers are routed by account identifier, such as the IBAN (international bank account number), and not by name. EU law says as much: Regulation 2024/886 speaks of \"the execution of a credit transfer to an unintended payee on the basis of an incorrect unique identifier\". A number that is valid and belongs to someone else is not an error any system on the rail can see.\n\nThe EU's answer is **verification of payee**. Article 5c, which the same regulation inserts into the SEPA Regulation (EU) No 260/2012, requires that \"A payer’s PSP shall offer the payer a service ensuring verification of the payee\", performed \"before the payer is offered the possibility of authorising that credit transfer\". A PSP is a payment service provider, here the sender's bank or payment company; it asks the payee's provider whether name and account match, and on an almost-match shows the payer the name on the account. The service is free, has applied in the euro area since 9 October 2025, and may not block the payer from going ahead. Business users who submit payment orders \"as a package\" may opt out, which matters for bulk payouts.\n\nThe United Kingdom has run the equivalent, **Confirmation of Payee**, for longer. Its operator Pay.UK says (n.d., accessed November 2026): \"Since launching in 2020, over 300 organisations have already implemented CoP, with more than 2m checks being completed every day.\" It is \"an API-based peer-to-peer service, with no central infrastructure in place, but with a directory identifying the organisations in the ecosystem\".\n\nBoth providers pass the result to the sender. In Stripe's Global Payouts (documentation n.d., accessed November 2026), a payout in pounds between UK accounts requires a Confirmation of Payee check. In the Dashboard its outcomes are Match, \"Partial Match or No Match\", and Unavailable, and the last two offer \"Continue without match\"; through the API the result is returned in a `recipient_verification` field and anything but a match must be acknowledged before the payout is sent. For EU recipients, a Stripe support article (n.d., accessed November 2026) says: \"When initiating a payout to an EU recipient in the Dashboard, Stripe will perform the VoP check\", and on a mismatch or close match the sender is \"prompted to acknowledge the difference and either edit the details or cancel the payout\". Adyen offers `POST /verifyCounterpartyName` (n.d., accessed November 2026) for its enterprise payouts to domestic EU and UK accounts. It answers `nameMatch`, `partialNameMatch`, `noNameMatch` or `nameMatchNotSupported`, and returns the account's name only for a partial match, \"To safeguard against name-guessing\". I found nothing from either about such a check on a merchant's standard payout; there the account is verified at onboarding ([Letting Sellers In: Onboarding and Verification on Platforms](platform-onboarding-and-verification.html)).\n\nWhat to do with the result is the sender's decision, and this is the rule I use. A no-match stops the payout until someone has spoken to the payee. A partial match goes to a person who sees the bank's name next to the name on file. Whoever continues is recorded. The strictness follows the loss. Stripe: \"Only continue without a match if you’re confident the bank account belongs to the intended recipient. Funds sent to the wrong bank account might not be recoverable.\" Under Article 5c a provider that performed the check \"shall not be held liable for the execution of a credit transfer to an unintended payee\". After a warning, the misdirected payout is the sender's.\n\n## Three Ways to Record a Payout, and What Speed Costs\n\nThe simplest record copies the provider's status into one field and treats \"paid\" as final. It is right for most payouts, and it is the record Larkfield had in June 2026. Its weakness is that it has nowhere to put the correction: a return arrives for a payout the system considers finished.\n\nThe second design keeps four states (instructed, sent, arrived, returned) and leaves a sent payout open for a **return window**; if the window passes with no return, the payout is marked arrived, by inference. The window's length is partly documented (all three pages n.d., accessed November 2026): Stripe's `paid` can become `failed` within 5 business days, Global Payouts returns \"typically\" take 2–3, and Adyen advises looking for a returned instruction five business days after the batch closed. No source gives an upper bound, so the window is a policy you choose, and a later return must still be handled.\n\n![State machine with four payout states: instructed, sent, arrived and returned, with a late return possible after arrived.](assets/images/14-payouts-and-money-movement/14-payout-states.jpeg)\n**Figure 3:** *A payout record with four states: arrival is confirmed or inferred when the return window closes, and a return, even a late one, makes the amount owed again.*\n\nThe third design buys certainty from a rail that reports the credit, and both providers sell it with a fee and a ceiling. Stripe's Instant Payouts (n.d., accessed November 2026) \"typically settle in the associated payout account within 30 minutes\"; an account may make at most 10 a day, each up to 9,999 EUR in the euro area, and \"Stripe assesses a fee on each Instant Payout\". The pricing page for Connect, Stripe's platform product, as shown in euros in November 2026, lists 1% of payout volume; I did not check other countries. At Adyen instant is a transfer priority: \"A payout with a higher priority incurs higher fees\", no price list is public, and `credited` is the confirmation. At 1%, receiving Mila's €117.47 instantly would cost about €1.17 *(illustration)*.\n\nThe three designs trade cost against how soon and how surely you know the money arrived. For scheduled payouts to sellers I would build the second first and offer the third where a payee will pay for speed.\n\n| Design | \"Arrived\" rests on | Cost | What it misses | When it is right |\n| --- | --- | --- | --- | --- |\n| Copy the provider's status | The provider's \"paid\" | None | Every return | One merchant paid to one long-standing account |\n| Four states and a window | No return within the window | An open-items list with an owner | Late returns; misdirected payouts | Platforms; many payees on batch rails |\n| Confirmed arrival | The rail's credited status | A fee; amount limits; not every bank | Misdirected payouts | Payees who need the money today |\n\nPaying someone who is not a merchant on the provider uses a separate product at each company, and the same record applies. As of November 2026, Stripe's Global Payouts is open to senders located in the United Kingdom or the United States, with 22 more countries in private preview; it \"requires Treasury\", Stripe's stored-balance product, and is \"best for businesses that already hold the licenses required to move money themselves\" ([Whose Money Is It? Licences, Safeguarding and Where Funds Sit](licences-and-safeguarding.html)). Such payouts \"don’t flow through a Stripe balance belonging to the recipient\", so tracking what each recipient is owed is the sender's job. Adyen's payouts service (n.d., accessed November 2026) pays third parties from a balance account through its Transfers API, funded by \"funds acquired through payments with Adyen or externally transferred funds\". Availability of both will change faster than this book.\n\n## Stripe and Adyen: Where They Differ\n\nThe table sets this chapter's documented facts side by side; the last column is my reading and is inference. The Stripe and Adyen cells come from the documentation cited above, accessed in November 2026.\n\n| Aspect | Stripe | Adyen | What the difference suggests |\n| --- | --- | --- | --- |\n| Status after sending | `paid`, which may change to `failed` \"within 5 business days\"; Global Payouts: `posted`, then possibly `returned` | `booked` (\"This status is not final\"), tracking events, then possibly `returned` | No material difference: both treat sent and arrived as separate facts |\n| How the sender picks speed (third-party payouts) | Names networks in `preferred_networks`: `ach`, `fedwire`, `fps`, `sepa`, `swift`; otherwise \"Stripe selects the most appropriate network\" | Names a `priority`: regular, fast, instant, wire, cross-border; Adyen maps it to a transfer route | Stripe exposes the rail and Adyen abstracts it; an adapter should carry the intent |\n| Confirmation of arrival | None; `posted` \"doesn’t guarantee that your recipient has received money\" | `credited` for instant bank transfers; an estimate otherwise | Only Adyen's instant route gives a machine-readable \"arrived\" |\n| After a failed delivery | Standard payout reattempted \"at the next scheduled payout interval\"; Global Payouts \"doesn’t retry or reroute payouts automatically\" | A new transaction credits the balance account; the sender retries by reason code, and Adyen blocks transfers to an account with a permanent issue | Outside a merchant's own scheduled payout at Stripe, resending is the sender's job |\n| Payee-name check | Confirmation of Payee on UK domestic Global Payouts in pounds, in the Dashboard and the API; an EU check in the Dashboard per a support article | `POST /verifyCounterpartyName` for enterprise payouts, EU and UK | Both hand the result to the sender, who decides what to do with it |\n| Published prices | A per-rail fee table | \"A payout with a higher priority incurs higher fees\"; no price list found in documentation, pricing page or help center (November 2026) | A Stripe payout can be costed from the documentation; an Adyen one needs a quote |\n\nHave your payout request carry an intent (amount, payee, latest acceptable arrival) and let each adapter translate it: into a network list at Stripe, a priority list at Adyen. On both, store the return as a record of its own, linked to the payout. On Adyen, use `credited` where you get it; on Stripe, plan for inference everywhere.\n\n## In Practice at Larkfield: One Payout Record for Two Providers\n\nTake the payout that carries Mila's €117.47. Studio Noord is on Adyen with the Standard schedule, so the pass captured on Tuesday 9 March 2027 is due in Ines Bakker's account two business days later, on Thursday 11 March. That is the best case: Adyen's Getting paid page allows up to five business days from the close of a batch until the bank posts the funds. On Thursday 11 March Adyen's transfer webhook reports `booked`, and Larkfield's payment record store moves the payout from instructed to **sent**. In this example the money does reach Ines's account that day, but the record does not move to arrived: Larkfield cannot see her bank account and the route is not instant, so it has no evidence of the credit. Under Keel, Larkfield's 2027 program to repair its payments, a sent payout stays open for 10 business days *(Larkfield's choice, an assumption for teaching)*. On Thursday 25 March, with no return, a job marks it **arrived**. The state `arrived` is a statement about Larkfield's record: it gives the day Larkfield stopped expecting a return, two weeks after the money landed, and is never shown to a studio as the date it was paid.\n\nKeel decision K3 demands a ledger entry for every movement. The payout's entries pass through a clearing account, payouts in transit, for money that has left the provider and is not yet known to have landed. A clearing account must return to zero ([The Book of Record: How Payment Companies Build Ledgers](payment-ledgers.html)), so whatever stays in it beyond the window is the list of stranded payouts.\n\n| Event | Debit | Credit | Effect |\n| --- | --- | --- | --- |\n| Sent | Payouts in transit | Funds at provider | The money is on the rail; the studio is still owed |\n| Arrived (confirmed, or window closed) | Owed to studio | Payouts in transit | The debt is settled |\n| Returned within the window | Funds at provider | Payouts in transit | The money is back; the debt was never closed |\n| Returned after the window | Funds at provider | Owed to studio | A new entry reopens the debt |\n\nReplay June 2026 against this record. Each of the 412 returns, about €937 on average, would have arrived carrying the provider's reference for a payout that was still open. The matching entry would have left the studio's debt visibly unpaid and the payout in a state a named team works through. The €386,000 would have been a queue on day one instead of a discovery over 19 days. The record would not have prevented the returns; a second Keel change does that: a change of bank details now triggers a check of the account holder's name and holds the studio's next payout until it passes or a person approves it.\n\nFor Ironworks Climbing, Ravi Shah's three locations in Manchester on Stripe Connect, the record is the same and the signals differ. The `payout.paid` event sets sent. A later `payout.failed` on the same payout sets returned, and the `failure_balance_transaction` is the entry to match. There is no arrived signal, so the window does all the work. Webhooks only move the record's state; the ledger entries are written from the provider's report lines, which is decision K2 ([The Provider Calls You: Webhooks and Events](payment-webhooks-and-events.html)).\n\n## When It Goes Wrong\n\nThe first failure happens before any rail. Where Larkfield initiates a payout itself and the call times out, a retry with a fresh key can instruct the same payout twice. The defense is Keel decision K1: one writer, and an idempotency key derived from the payout's business identity (studio, currency, payout period), so the provider recognizes the retry ([Exactly Once, Over a Network That Does Not Allow It: Idempotency and Retries](idempotency-and-retries.html)).\n\nNext, a payout can be debited and still not have left, because both providers document (n.d., accessed November 2026) a review of payouts after the accounting step. At Adyen a flagged payout goes to `pending` after `booked`; at Stripe a Global Payout held for review stays `processing` with the reason `under_review`, typically for up to 2 business days. A missed verification deadline also pauses payouts ([Know Your Customer, Watch the Money: Compliance as a System](payment-compliance-and-regulation.html)).\n\nLater, a return can arrive after the window closed and the payout was marked arrived; Stripe says returns \"might take longer depending on the recipient country\". The recovery is the last row of the table above: a new entry, linked to the original payout, that reopens the debt. Do not edit the closed payout.\n\nLast comes the failure with no signal: the misdirected payout the receiving bank keeps. No webhook fires, so the detector is the payee's complaint. Stripe's Payout carries a `trace_id`, \"A value that generates from the beneficiary’s bank that allows users to track payouts with their bank\"; Adyen tells merchants to \"download the bank instruction letter\" and share it with their bank. Both help a bank find a transfer and neither brings it back.\n\n## What to Take Away\n\n**Established.**\n\n- A payout status reports that the provider sent the money. As of November 2026, Stripe documents that `paid` may become `failed` within five business days; Adyen documents that `booked` \"is not final\".\n- A failed delivery comes back as a new movement: both providers book the return as a separate transaction that credits the balance, days later.\n- Transfers are executed on the account identifier. A payee-name check before authorization is required of euro-area providers since 9 October 2025 (Regulation (EU) 2024/886) and has existed in the UK since 2020.\n\n**Depends on context.**\n\n- The return window. Five business days covers what both providers document for domestic payouts; cross-border needs longer, and no source gives a maximum.\n- Whether instant payout is worth its fee. It is where the payee values the day more than the fee; it does not replace the four-state record, because instant routes fail and fall back.\n- How strictly to stop on a partial name match. A platform paying verified businesses can let a person approve it; one paying strangers should stop.\n\n**The author's synthesis.**\n\n- \"Arrived\" is a state you have to earn: buy it from an instant rail, infer it from a closed window, or hear it from the payee. The studio owner of the opening was told the truth by her dashboard; the return was already in her balance, in a record with no place to show it.\n- Put the control where the money can still be stopped. After sending, the best record only shows a loss sooner; the payee check and a hold on changed bank details are the steps that prevent one.\n\n## Questions to Ask\n\n1. Which of our payout states is set by the provider's \"paid\", and what do we call a payout between that moment and the money landing?\n2. How long does a sent payout stay open, who chose that number, and what happens to a return that arrives later?\n3. When a return arrives, which field links it to the original payout, and which entry reopens what we owe the payee?\n4. Which clearing account holds payouts in transit, and who looks at its balance by age?\n5. On each provider and route, do we get a confirmation of arrival, an estimate, or nothing?\n6. What runs when a payee changes bank details: a name check, a hold on the next payout, a person?\n7. Who may continue past a partial match or a no-match, and where is that recorded?\n8. If we pay people who are not merchants on our provider, whose license covers the money while we hold it?\n\nA returned payout leaves two records of the same money that disagree: paid at the provider, nothing at the bank, and nothing in either record alone to say which is right. This chapter handled that one case by keeping the payout open. The general answer is to match every movement you expect against the other party's record of it, give whatever does not match an age and an owner, and use the reports providers publish for that purpose. That is the subject of [Proving the Money: Reconciliation Inside the Provider and Out](payment-reconciliation-and-reporting.html).\n\n## Sources and Evidence\n\n*Company, product and investor sources*\n\n- [Receive payouts from Stripe](https://docs.stripe.com/payouts), Stripe, n.d., accessed 2026-11 — payout schedules, same-day manual payouts, payout failures (\"might initially show as `paid`\"), misdirected funds, reattempts, the `payout.paid` and `payout.failed` events.\n- [The Payout object](https://docs.stripe.com/api/payouts/object), Stripe API reference, n.d., accessed 2026-11 — statuses, `arrival_date`, `failure_balance_transaction`, `trace_id`.\n- [Global Payouts](https://docs.stripe.com/global-payouts), Stripe, n.d., accessed 2026-11 — sender availability (GB, US; 22 countries in private preview), the Treasury requirement, positioning (volatile).\n- [Manage payouts](https://docs.stripe.com/global-payouts/manage-payouts), Stripe, n.d., accessed 2026-11 — OutboundPayment statuses, `posted` and `returned`, risk review, reversals, causes of returns.\n- [Send payouts](https://docs.stripe.com/global-payouts/send-money), Stripe, n.d., accessed 2026-11 — `preferred_networks`, no automatic retry, Confirmation of Payee outcomes in the Dashboard and the API.\n- [Supplemental pricing information](https://docs.stripe.com/global-payouts/supplemental-pricing-information), Stripe, n.d., accessed 2026-11 — per-rail and FX fees for Global Payouts (volatile).\n- [Understand differences between Global Payouts and Connect cross-border payouts](https://docs.stripe.com/connect/cross-border-payouts-to-recipients/compare-global-payouts), Stripe, n.d., accessed 2026-11 — ledgering responsibility for recipient funds.\n- [Instant Payouts for Stripe Dashboard users](https://docs.stripe.com/payouts/instant-payouts), Stripe, n.d., accessed 2026-11 — timing, daily and per-payout limits, fee (volatile).\n- [Connect pricing](https://stripe.com/connect/pricing), Stripe, n.d., accessed 2026-11 — Instant Payouts at 1% of payout volume as shown in euros; other countries not checked (volatile).\n- [Verification of Payee support for Treasury](https://support.stripe.com/questions/verification-of-payee-support-for-treasury), Stripe Support, n.d., accessed 2026-11 — the EU check on Dashboard payouts and what the sender is asked to do on a mismatch.\n- [Payout lifecycle](https://docs.adyen.com/payouts/payout-service/payout-lifecycle), Adyen, n.d., accessed 2026-11 — accounting and tracking events, review after booking, returns as new transactions.\n- [Pay out to bank accounts](https://docs.adyen.com/payouts/payout-service/pay-out-to-bank-accounts), Adyen, n.d., accessed 2026-11 — priorities, transfer routes, cut-off times and maximum amounts, cross-border caveat (volatile).\n- [Verify counterparty name](https://docs.adyen.com/payouts/payout-service/pay-out-to-bank-accounts/verify-counterparty), Adyen, n.d., accessed 2026-11 — the name-check endpoint and its responses.\n- [Getting paid](https://docs.adyen.com/account/getting-paid), Adyen, n.d., accessed 2026-11 — payout initiation timing, bank holidays, `BankInstructionReturned`, the bank instruction letter.\n- [Payouts and Payments](https://docs.adyen.com/payouts/payout-service), Adyen, n.d., accessed 2026-11 — third-party payouts and their funding.\n- [Managed payouts](https://docs.adyen.com/platforms/managed-payouts), Adyen, n.d., accessed 2026-11 — Standard and Accelerated payout schedules.\n- [Initiate on-demand payouts](https://docs.adyen.com/platforms/custom-payouts/on-demand-payouts), Adyen, n.d., accessed 2026-11 — the priority list and bank reach.\n- [Payout transfer webhooks](https://docs.adyen.com/platforms/payout-webhooks), Adyen, n.d., accessed 2026-11 — \"This status is not final\"; return reason codes, which to retry, and the block on transfers after a permanent reason.\n- [Adyen launches Intelligent Money Movement](https://www.adyen.com/press-and-media/adyen-launches-intelligent-money-movement), Adyen, 2026-04-09 — the packaging of payouts with liquidity management; \"direct connections to payment rails\".\n\n*Standards, regulation and official documentation*\n\n- [Regulation (EU) 2024/886 (instant payments)](http://publications.europa.eu/resource/celex/32024R0886), Official Journal, 2024-03-19 — the definition of an instant credit transfer, the 10 seconds, sending and receiving deadlines, charges, and verification of the payee (Article 5c) with its dates and liability rule; the Publications Office link serves the English text to a browser (a client that sends no language header gets an error).\n- [Confirmation of Payee](https://www.wearepay.uk/what-we-do/overlay-services/confirmation-of-payee/), Pay.UK, n.d., accessed 2026-11 — launch year, adoption, peer-to-peer design.\n\n*Research and practitioner sources*\n\n- None. The European Payments Council's page on its Verification Of Payee scheme returned HTTP 403 and is not used; the rule is cited from the regulation.\n\nLarkfield is fictional; architectural recommendations, labeled inferences and labeled assumptions are the author's judgement.\n"}]}]}</script>
+<script>
+    (function () {
+        const data = JSON.parse(document.getElementById('data').textContent);
+        const root = document.getElementById('content');
+
+        const postId = (data.meta && data.meta.id) ? String(data.meta.id) : '';
+        const postStatusRaw = (data.meta && data.meta.status) ? String(data.meta.status) : '';
+        if (postId || postStatusRaw) {
+            const header = document.getElementById('post-header');
+            let sectionEl = header.querySelector('p.section');
+            if (!sectionEl) {
+                sectionEl = document.createElement('p');
+                sectionEl.className = 'section';
+                header.insertBefore(sectionEl, header.firstChild);
+            }
+            // Status pill goes first, then a " / " separator before the existing
+            // content (section name and/or id).
+            if (postStatusRaw) {
+                const parts = postStatusRaw.split(':');
+                const statusName = parts[0].trim();
+                const statusColor = (parts[1] || '').trim();
+                const wrap = document.createElement('span');
+                wrap.className = 'post-status';
+                const dot = document.createElement('span');
+                dot.className = 'status-dot';
+                if (statusColor) dot.style.background = statusColor;
+                wrap.appendChild(dot);
+                wrap.appendChild(document.createTextNode(statusName));
+                if (sectionEl.firstChild) {
+                    sectionEl.insertBefore(document.createTextNode(' • '), sectionEl.firstChild);
+                    sectionEl.insertBefore(wrap, sectionEl.firstChild);
+                } else {
+                    sectionEl.appendChild(wrap);
+                }
+            }
+            if (postId) {
+                if (sectionEl.firstChild) sectionEl.appendChild(document.createTextNode(' • '));
+                sectionEl.appendChild(document.createTextNode(postId));
+            }
+        }
+
+        const tagsHost = document.getElementById('tags');
+        (data.tags || []).forEach(function (t) {
+            const span = document.createElement('span');
+            span.className = 'tag';
+            span.textContent = t;
+            tagsHost.appendChild(span);
+        });
+
+        // Minimal markdown renderer. Supports: ATX headings, paragraphs, blockquotes,
+        // unordered/ordered lists, fenced code, inline code, bold/italic/strikethrough, links, images, hr.
+        // Sufficient for the posts in this repo; replace with a fuller parser if needed.
+        function renderMarkdown(src) {
+            const lines = src.replace(/\r\n/g, '\n').split('\n');
+            const out = [];
+            let i = 0;
+
+            const bullet = /^(\s*)([-*])\s+(.*)$/;
+            const ordered = /^(\s*)(\d+)\.\s+(.*)$/;
+            const tableRow = /^\s*\|(.+)\|\s*$/;
+            const tableSep = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+
+            function splitRow(s) {
+                let t = s.trim();
+                if (t.startsWith('|')) t = t.slice(1);
+                if (t.endsWith('|')) t = t.slice(0, -1);
+                return t.split('|').map(c => c.trim());
+            }
+
+            function inline(s) {
+                // Posts are trusted content, so raw HTML passes through unescaped
+                // (some posts embed inline <blockquote>, <div>, etc.).
+                // Stray ampersands still get fixed up.
+                s = s.replace(/&(?![a-zA-Z]+;|#\d+;)/g, '&amp;');
+                s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<a class="image-link" href="$2" target="_blank" rel="noopener noreferrer"><img alt="$1" src="$2"></a>');
+                s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+                s = s.replace(/`([^`]+)`/g, function (_, c) {
+                    return '<code>' + c.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
+                });
+                // Bold/italic, including nested combinations: ***x***,
+                // **a *b*** / ***a* b** (shared delimiters), and **a *b* c**.
+                s = s.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+                s = s.replace(/\*\*([^*\n]+)\*([^*\n]+)\*\*\*/g, '<strong>$1<em>$2</em></strong>');
+                s = s.replace(/\*\*\*([^*\n]+)\*([^*\n]+)\*\*/g, '<strong><em>$1</em>$2</strong>');
+                s = s.replace(/\*\*((?:[^*\n]|\*(?!\*)[^*\n]+\*(?!\*))+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+                s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+                return s;
+            }
+
+            while (i < lines.length) {
+                const line = lines[i];
+                if (!line.trim()) {
+                    i++;
+                    continue;
+                }
+
+                const fence = line.match(/^```(\w*)\s*$/);
+                if (fence) {
+                    i++;
+                    const buf = [];
+                    while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+                        buf.push(lines[i]);
+                        i++;
+                    }
+                    i++;
+                    const escaped = buf.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const cls = fence[1] ? ' class="lang-' + fence[1] + '"' : '';
+                    out.push('<pre><code' + cls + '>' + escaped + '</code></pre>');
+                    continue;
+                }
+
+                const h = line.match(/^(#{1,6})\s+(.*)$/);
+                if (h) {
+                    out.push('<h' + h[1].length + '>' + inline(h[2]) + '</h' + h[1].length + '>');
+                    i++;
+                    continue;
+                }
+
+                if (/^\s*(?:-\s*){3,}\s*$/.test(line) || /^\s*\*{3,}\s*$/.test(line)) {
+                    out.push('<hr>');
+                    i++;
+                    continue;
+                }
+
+                if (/^>\s?/.test(line)) {
+                    const buf = [];
+                    while (i < lines.length && /^>\s?/.test(lines[i])) {
+                        buf.push(lines[i].replace(/^>\s?/, ''));
+                        i++;
+                    }
+                    out.push('<blockquote>' + renderMarkdown(buf.join('\n')) + '</blockquote>');
+                    continue;
+                }
+
+                if (tableRow.test(line) && i + 1 < lines.length && tableSep.test(lines[i + 1])) {
+                    const headers = splitRow(line);
+                    const aligns = splitRow(lines[i + 1]).map(function (c) {
+                        c = c.trim();
+                        const left = c.startsWith(':'), right = c.endsWith(':');
+                        return left && right ? 'center' : right ? 'num' : '';
+                    });
+                    const cellOpen = function (tag, idx) {
+                        return aligns[idx] ? '<' + tag + ' class="' + aligns[idx] + '">' : '<' + tag + '>';
+                    };
+                    i += 2;
+                    const rows = [];
+                    while (i < lines.length && tableRow.test(lines[i])) {
+                        rows.push(splitRow(lines[i]));
+                        i++;
+                    }
+                    let html = '<div class="table-wrap"><table><thead><tr>';
+                    headers.forEach((h, idx) => {
+                        html += cellOpen('th', idx) + inline(h) + '</th>';
+                    });
+                    html += '</tr></thead><tbody>';
+                    rows.forEach(r => {
+                        html += '<tr>';
+                        r.forEach((c, idx) => {
+                            html += cellOpen('td', idx) + inline(c) + '</td>';
+                        });
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                    out.push(html);
+                    continue;
+                }
+
+                if (bullet.test(line) || ordered.test(line)) {
+                    // Indent of the first bullet defines this list's base level.
+                    // Deeper-indented bullets become nested lists (rendered by
+                    // recursing into renderMarkdown). Same-or-less indent at a
+                    // bullet starts a sibling item (or ends the list).
+                    const firstMatch = line.match(bullet) || line.match(ordered);
+                    const baseIndent = firstMatch[1].length;
+                    const isOrdered = ordered.test(line);
+                    const items = [];
+                    let hasTask = false;
+                    while (i < lines.length) {
+                        const cur = lines[i];
+                        if (!cur.trim()) {
+                            // blank line breaks the list (matches CommonMark-ish behaviour)
+                            i++;
+                            break;
+                        }
+                        const mBul = cur.match(bullet);
+                        const mOrd = cur.match(ordered);
+                        const m = mBul || mOrd;
+                        if (!m) break;
+                        if (m[1].length < baseIndent) break;
+                        if (m[1].length > baseIndent) break; // shouldn't happen at top of loop
+                        // Same-type check: switching between -/* and 1. closes the list
+                        if (isOrdered !== !!mOrd) break;
+
+                        const itemBuf = [m[3]];
+                        const nestedBuf = [];
+                        i++;
+                        while (i < lines.length) {
+                            const nxt = lines[i];
+                            if (!nxt.trim()) break;
+                            const nBul = nxt.match(bullet);
+                            const nOrd = nxt.match(ordered);
+                            const nm = nBul || nOrd;
+                            if (nm) {
+                                if (nm[1].length > baseIndent) {
+                                    // nested list line — dedent and stash
+                                    nestedBuf.push(nxt.slice(baseIndent + 2));
+                                    i++;
+                                    continue;
+                                }
+                                // sibling or end of list
+                                break;
+                            }
+                            // Plain continuation text
+                            if (nestedBuf.length) {
+                                // continuation inside the nested block
+                                nestedBuf.push(nxt.slice(baseIndent + 2));
+                            } else {
+                                itemBuf.push(nxt.trim());
+                            }
+                            i++;
+                        }
+
+                        // GitHub-style task items: "- [ ] text" / "- [x] text"
+                        // render as (clickable, unpersisted) checkboxes.
+                        const itemText = itemBuf.join('\n');
+                        const task = !isOrdered && itemText.match(/^\[( |x|X)\]\s+/);
+                        let liHtml = inline(task ? itemText.slice(task[0].length) : itemText);
+                        if (task) {
+                            hasTask = true;
+                            liHtml = '<input type="checkbox"' + (task[1] === ' ' ? '' : ' checked') + '>' + liHtml;
+                        }
+                        if (nestedBuf.length) {
+                            liHtml += renderMarkdown(nestedBuf.join('\n'));
+                        }
+                        items.push(task ? '<li class="task">' + liHtml + '</li>' : '<li>' + liHtml + '</li>');
+                    }
+                    out.push((isOrdered ? '<ol>' : (hasTask ? '<ul class="task-list">' : '<ul>')) + items.join('') + (isOrdered ? '</ol>' : '</ul>'));
+                    continue;
+                }
+
+                const buf = [line];
+                i++;
+                while (i < lines.length && lines[i].trim() && !/^#{1,6}\s/.test(lines[i]) && !/^>\s?/.test(lines[i]) && !bullet.test(lines[i]) && !ordered.test(lines[i]) && !/^```/.test(lines[i]) && !tableRow.test(lines[i])) {
+                    buf.push(lines[i]);
+                    i++;
+                }
+                out.push('<p>' + inline(buf.join(' ')) + '</p>');
+            }
+            return out.join('\n');
+        }
+
+        // Block dispatcher. New block types plug in here.
+        const renderers = {
+            markdown: function (block) {
+                const div = document.createElement('div');
+                div.innerHTML = renderMarkdown(block.content);
+                return div;
+            },
+            mermaid: function (block) {
+                // Mermaid scans elements with class "mermaid" whose textContent
+                // is the diagram source. We collect these nodes and run
+                // mermaid.run() once after all blocks are in the DOM.
+                const div = document.createElement('div');
+                div.className = 'mermaid';
+                div.textContent = block.content;
+                return div;
+            },
+            'force-graph': function (block) {
+                // build.py emits parsed JSON: {nodes:[{id,size}], links:[{source,target}]}.
+                // We instantiate force-graph after the container is in the DOM
+                // so it can measure its own width.
+                const div = document.createElement('div');
+                div.className = 'force-graph';
+                const data = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.ForceGraph) return;
+                    const maxSize = data.nodes.reduce((m, n) => Math.max(m, n.size || 1), 1);
+                    window.ForceGraph()(div)
+                        .graphData(data)
+                        .width(div.clientWidth)
+                        .height(div.clientHeight)
+                        .nodeRelSize(4)
+                        .nodeVal(n => Math.max(20 * (n.size || 1) / maxSize, 0.001))
+                        .nodeLabel(n => n.id + ' (' + (n.size || 1) + ')')
+                        .nodeColor(() => 'rgba(135, 206, 235, 0.7)')
+                        .linkColor(() => 'rgba(60, 60, 60, 0.4)')
+                        .linkDirectionalArrowLength(4)
+                        .linkDirectionalArrowRelPos(1)
+                        .linkWidth(1);
+                });
+                return div;
+            },
+            'bubble-chart': function (block) {
+                // build.py emits {nodes:[{name,size}]}. Renders a D3 circle-pack
+                // SVG (same shape as the obren.io reference, just inline).
+                const wrap = document.createElement('div');
+                wrap.className = 'bubble-chart';
+                const payload = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.d3) return;
+                    const diameter = 480;
+                    const fill = '#c0deed';
+                    const textColor = '#111111';
+                    const fontSize = 12;
+
+                    const svg = window.d3.select(wrap).append('svg')
+                        .attr('viewBox', '0 0 ' + diameter + ' ' + diameter)
+                        .attr('width', diameter)
+                        .attr('height', diameter);
+
+                    const root = window.d3.hierarchy({children: payload.nodes})
+                        .sum(d => d.size || 0)
+                        .sort((a, b) => b.value - a.value);
+
+                    window.d3.pack().size([diameter, diameter]).padding(2)(root);
+
+                    const node = svg.selectAll('g')
+                        .data(root.leaves())
+                        .enter().append('g')
+                        .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+
+                    node.append('title').text(d => d.data.name + ': ' + d.value);
+                    node.append('circle').attr('r', d => d.r).style('fill', fill);
+                    node.append('text')
+                        .attr('dy', '.3em')
+                        .style('text-anchor', 'middle')
+                        .style('fill', textColor)
+                        .style('font-size', fontSize + 'px')
+                        .text(d => d.data.name.substring(0, Math.max(0, Math.floor(d.r / 3))));
+                });
+                return wrap;
+            }
+        };
+
+        // Render one modality's blocks into a host element. Mermaid runs
+        // scoped to just the nodes created here, so lazily rendered tabs get
+        // their diagrams on first activation.
+        let mermaidInitialized = false;
+        function renderBlocksInto(blocks, host) {
+            const mermaidNodes = [];
+            blocks.forEach(function (block) {
+                const r = renderers[block.type];
+                if (!r) {
+                    const pre = document.createElement('pre');
+                    pre.textContent = '[unknown block type: ' + block.type + ']';
+                    host.appendChild(pre);
+                    return;
+                }
+                const node = r(block);
+                if (node instanceof Node) {
+                    host.appendChild(node);
+                    if (block.type === 'mermaid') mermaidNodes.push(node);
+                }
+            });
+            if (mermaidNodes.length && window.mermaid) {
+                if (!mermaidInitialized) {
+                    window.mermaid.initialize({startOnLoad: false, theme: 'default'});
+                    mermaidInitialized = true;
+                }
+                window.mermaid.run({nodes: mermaidNodes});
+            }
+            markScrollableTables(host);
+        }
+
+        // A table wider than its wrapper scrolls sideways. Mark those wrappers
+        // so the CSS can show a cue, and make them focusable so keyboard users
+        // can reach and scroll them. Hidden panes measure 0 and are re-marked
+        // when activated or when the window is resized.
+        function markScrollableTables(host) {
+            host.querySelectorAll('.table-wrap').forEach(function (wrap) {
+                const scrolls = wrap.scrollWidth > wrap.clientWidth + 1;
+                wrap.classList.toggle('is-scrollable', scrolls);
+                if (scrolls) {
+                    wrap.setAttribute('tabindex', '0');
+                    wrap.setAttribute('role', 'region');
+                    wrap.setAttribute('aria-label', 'Table that scrolls sideways');
+                } else {
+                    wrap.removeAttribute('tabindex');
+                    wrap.removeAttribute('role');
+                    wrap.removeAttribute('aria-label');
+                }
+            });
+        }
+
+        // Modality tabs. One <article class="pane"> per modality; panes are
+        // rendered lazily on first activation (force-graph / D3 / mermaid
+        // need a visible, measurable container). With a single modality the
+        // tab bar stays hidden and the page looks exactly like before.
+        const mods = data.modalities;
+        const tabBar = document.getElementById('modality-tabs');
+        const panes = {};
+        const tabButtons = {};
+        const renderedPanes = {};
+
+        // With several modalities each pane is a tabpanel labelled by its
+        // tab (W3C APG tabs pattern); tabindex=0 lets keyboard users move
+        // from the tab list straight into the active content.
+        mods.forEach(function (m) {
+            const pane = document.createElement('article');
+            pane.className = 'pane';
+            pane.dataset.key = m.key;
+            pane.hidden = true;
+            if (mods.length > 1) {
+                pane.id = 'pane-' + m.key;
+                pane.setAttribute('role', 'tabpanel');
+                pane.setAttribute('aria-labelledby', 'tab-' + m.key);
+                pane.setAttribute('tabindex', '0');
+            }
+            root.appendChild(pane);
+            panes[m.key] = pane;
+        });
+
+        const defaultKey = mods.some(m => m.key === 'index') ? 'index' : mods[0].key;
+
+        function activate(key, updateHash) {
+            mods.forEach(function (m) {
+                const isActive = m.key === key;
+                panes[m.key].hidden = !isActive;
+                if (tabButtons[m.key]) {
+                    tabButtons[m.key].classList.toggle('active', isActive);
+                    tabButtons[m.key].setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    // Roving tabindex: only the selected tab is in the Tab
+                    // order; the arrow keys move between tabs.
+                    tabButtons[m.key].setAttribute('tabindex', isActive ? '0' : '-1');
+                }
+            });
+            // Unhide first, then render: the chart libraries measure widths.
+            if (!renderedPanes[key]) {
+                renderBlocksInto(mods.find(m => m.key === key).blocks, panes[key]);
+                renderedPanes[key] = true;
+            } else {
+                markScrollableTables(panes[key]);
+            }
+            if (updateHash) {
+                history.replaceState(null, '',
+                    key === defaultKey ? location.pathname + location.search : '#' + key);
+            }
+        }
+
+        if (mods.length > 1) {
+            mods.forEach(function (m) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = m.label;
+                btn.id = 'tab-' + m.key;
+                btn.dataset.key = m.key;
+                btn.setAttribute('role', 'tab');
+                btn.setAttribute('aria-controls', 'pane-' + m.key);
+                btn.addEventListener('click', function () { activate(m.key, true); });
+                tabBar.appendChild(btn);
+                tabButtons[m.key] = btn;
+            });
+            // Keyboard support per the W3C APG tabs pattern (automatic
+            // activation): Left/Right move between tabs and wrap, Home/End
+            // jump to the first/last tab, and the focused tab is selected.
+            tabBar.addEventListener('keydown', function (ev) {
+                const keys = mods.map(function (m) { return m.key; });
+                const focused = document.activeElement;
+                const current = focused && focused.dataset ? keys.indexOf(focused.dataset.key) : -1;
+                if (current < 0) return;
+                let next = null;
+                if (ev.key === 'ArrowRight') next = (current + 1) % keys.length;
+                else if (ev.key === 'ArrowLeft') next = (current - 1 + keys.length) % keys.length;
+                else if (ev.key === 'Home') next = 0;
+                else if (ev.key === 'End') next = keys.length - 1;
+                if (next === null) return;
+                ev.preventDefault();
+                activate(keys[next], true);
+                tabButtons[keys[next]].focus();
+            });
+            tabBar.hidden = false;
+        }
+
+        // The hash selects a tab only when it matches a modality key, so
+        // existing anchors keep working.
+        const initialHash = location.hash.slice(1);
+        activate(mods.some(m => m.key === initialHash) ? initialHash : defaultKey, false);
+        window.addEventListener('hashchange', function () {
+            const k = location.hash.slice(1);
+            if (mods.some(m => m.key === k)) activate(k, false);
+        });
+        window.addEventListener('resize', function () { markScrollableTables(root); });
+    })();
+</script>
+</body>
+</html>

@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Spec: Objects, Commands and Events: How Payment APIs Are Designed</title>
+    <meta name="description" content="What makes a payment API usable for ten years, and how do Stripe's and Adyen's object models differ? An integration lasts when it depends only on a stable identifier, a normalized vocabulary of states and refusal reasons, and an explicit line between the response and what arrives later; Stripe keeps the current state in an object you can fetch again, Adyen's Checkout API in a reference, a result code and the events that follow.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SETTLED: Architecting Payments and Revenue Infrastructure">
+    <meta property="og:title" content="Spec: Objects, Commands and Events: How Payment APIs Are Designed">
+    <meta property="og:description" content="What makes a payment API usable for ten years, and how do Stripe's and Adyen's object models differ? An integration lasts when it depends only on a stable identifier, a normalized vocabulary of states and refusal reasons, and an explicit line between the response and what arrives later; Stripe keeps the current state in an object you can fetch again, Adyen's Checkout API in a reference, a result code and the events that follow.">
+    <meta property="og:url" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/payment-api-design.spec.html">
+    <meta property="og:image" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/assets/images/17-api-design-and-object-models/logo.jpeg">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="site.css">
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-129891352-1"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+        dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'UA-129891352-1');
+</script>
+    <style>
+        body {
+            line-height: 1.65;
+        }
+
+        main {
+            padding-top: 32px;
+        }
+
+        nav.post-nav {
+            font-size: 14px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: baseline;
+            flex-wrap: wrap;
+        }
+
+        nav.post-nav a {
+            color: var(--muted);
+            text-decoration: none;
+        }
+
+        nav.post-nav a:hover {
+            color: var(--accent);
+        }
+
+        nav.post-nav .nav-right {
+            margin-left: auto;
+            display: inline-flex;
+            gap: 4px;
+            align-items: baseline;
+        }
+
+        nav.post-nav .nav-sep {
+            color: var(--muted);
+        }
+
+        footer nav.post-nav {
+            margin-top: 24px;
+            margin-bottom: 0;
+        }
+
+        header.post {
+            margin-bottom: 32px;
+        }
+
+        header.post .section {
+            color: var(--muted);
+            font-size: 13px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin: 0 0 -6px;
+        }
+
+        header.post .section a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        header.post .section a:hover {
+            color: var(--accent);
+        }
+
+        header.post .section .post-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        header.post .section .post-status .status-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        header.post .logo {
+            display: block;
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            border: 1px solid lightgrey;
+
+        }
+
+        header.post .logo-credit {
+            color: var(--muted);
+            font-size: 12px;
+            margin: -4px 0 24px;
+            text-align: right;
+        }
+
+        header.post h1 {
+            font-size: 52px;
+            line-height: 1.2;
+            margin: 0 0 2px;
+            padding: 0;
+            letter-spacing: -0.01em;
+            font-weight: normal;
+        }
+
+        header.post .byline {
+            color: var(--muted);
+            font-size: 15px;
+            margin: 0;
+        }
+
+        header.post .byline .spec-link {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        header.post .byline .spec-link:hover {
+            text-decoration: underline;
+        }
+
+        header.post .byline .spec-link-drifted {
+            color: #b8650f;
+        }
+
+        header.post .byline .spec-link-superseded {
+            color: var(--muted);
+        }
+
+        header.post .ai-credit {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 4px 0 0;
+        }
+
+        header.post .ai-credit a {
+            color: inherit;
+        }
+
+        header.post .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 10px 0 10px;
+        }
+
+        header.post .tags .tag {
+            font-size: 14px;
+            padding: 1px 8px;
+            border: 1px solid deepskyblue;
+            color: blue;
+            border-radius: 999px;
+            background-color: var(--tag-bg);
+        }
+
+        nav.modality-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--rule);
+            margin: 0 0 28px;
+            flex-wrap: wrap;
+        }
+
+        nav.modality-tabs button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font: inherit;
+            font-size: 14px;
+            color: var(--muted);
+            padding: 8px 14px;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            letter-spacing: 0.02em;
+        }
+
+        nav.modality-tabs button:hover {
+            color: var(--accent);
+        }
+
+        nav.modality-tabs button.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        #content .pane[hidden] {
+            display: none;
+        }
+
+        #content .pane:focus {
+            outline: none;
+        }
+
+        #content .pane:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 6px;
+        }
+
+        article h2 {
+            font-size: 26px;
+            margin: 40px 0 12px;
+            letter-spacing: -0.01em;
+        }
+
+        article h3 {
+            font-size: 20px;
+            margin: 28px 0 8px;
+        }
+
+        article h4 {
+            font-size: 17px;
+            margin: 20px 0 6px;
+        }
+
+        article p {
+            margin: 0 0 16px;
+        }
+
+        article a {
+            color: var(--accent);
+        }
+
+        article a.image-link {
+            display: inline-block;
+            line-height: 0;
+        }
+
+        article img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        article a.image-link img {
+            display: block;
+        }
+
+        article ul, article ol {
+            padding-left: 24px;
+            margin: 0 0 16px;
+        }
+
+        article li {
+            margin-bottom: 6px;
+        }
+
+        article ul.task-list {
+            list-style: none;
+            padding-left: 4px;
+        }
+
+        article ul.task-list li.task > input[type="checkbox"] {
+            margin-right: 8px;
+            accent-color: var(--accent);
+        }
+
+        article hr {
+            border: none;
+            border-top: 1px solid var(--rule);
+            margin: 32px 0;
+        }
+
+        article blockquote {
+            margin: 16px 0;
+            padding: 12px 18px;
+            background: var(--quote-bg);
+            border-left: 3px solid var(--accent);
+            color: #333;
+        }
+
+        article blockquote p:last-child {
+            margin-bottom: 0;
+        }
+
+        article code {
+            background: var(--code-bg);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 0.92em;
+        }
+
+        article pre {
+            background: var(--code-bg);
+            padding: 14px 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        article pre code {
+            background: none;
+            padding: 0;
+        }
+
+        article .table-wrap {
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+
+        article table {
+            border-collapse: collapse;
+            margin: 16px 0;
+            width: 100%;
+            font-size: 15px;
+        }
+
+        article .table-wrap table {
+            margin: 0;
+        }
+
+        /* Wide tables scroll on narrow screens instead of crushing their columns.
+           A table wrapped in <div class="table-compact"> opts out: it has few,
+           short columns and wraps its cells to fit the screen instead. */
+        @media (max-width: 640px) {
+            article .table-wrap table {
+                min-width: 560px;
+            }
+            article .table-compact .table-wrap table {
+                min-width: 0;
+            }
+        }
+
+        /* Tables that actually overflow get a visible cue and keyboard focus
+           (markScrollableTables() sets the class and attributes). */
+        article .table-wrap.is-scrollable::before {
+            content: "Scroll sideways to see the whole table";
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        article .table-wrap.is-scrollable:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        article th, article td {
+            border: 1px solid var(--rule);
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        article th {
+            background: var(--code-bg);
+            font-weight: 600;
+        }
+
+        /* GFM column alignment from the separator row. Right-aligned columns
+           hold numbers; their cells never wrap, so a sign, a currency symbol
+           and its amount stay on one line while label columns still wrap. */
+        article th.num, article td.num {
+            text-align: right;
+        }
+
+        article td.num {
+            white-space: nowrap;
+        }
+
+        article th.center, article td.center {
+            text-align: center;
+        }
+
+        article .mermaid {
+            text-align: center;
+            margin: 24px 0;
+        }
+
+        article .force-graph {
+            margin: 24px 0;
+            border: 1px solid var(--rule);
+            border-radius: 6px;
+            background: #fff;
+            height: 480px;
+            overflow: hidden;
+        }
+
+        article .bubble-chart {
+            margin: 24px 0;
+            text-align: center;
+        }
+
+        article .bubble-chart svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <nav class="post-nav"><a class="nav-back" href="payment-api-design.html">← Objects, Commands and Events: How Payment APIs Are Designed</a><span class="nav-right"></span></nav>
+    <header class="post" id="post-header">
+        <p class="section"><span>SPEC</span> • <span class="post-status"><span class="status-dot" style="background:green"></span>accepted</span> • <span>revised 2026-11-17</span></p>
+        <h1>Spec: Objects, Commands and Events: How Payment APIs Are Designed</h1>
+        <p class="byline"></p>
+        
+        <div class="tags" id="tags"></div>
+        
+    </header>
+    <nav class="modality-tabs" id="modality-tabs" hidden role="tablist" aria-label="Reading formats"></nav>
+    <div id="content"></div>
+    <footer>
+        <nav class="post-nav"><a class="nav-back" href="payment-api-design.html">← Objects, Commands and Events: How Payment APIs Are Designed</a><span class="nav-right"></span></nav>
+    </footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/force-graph"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script id="data" type="application/json">{"meta": {}, "tags": [], "modalities": [{"key": "spec", "label": "Spec", "meta": {}, "blocks": [{"type": "markdown", "content": "## Intent\n\n**After reading, the reader should:**\n\n- **Know:** The elements of a payment API's object model: identifiers, states, related objects, metadata, an error model that separates a refused payment from a failed request, and the split between synchronous answers and later results.\n- **Know:** That Stripe documents one resource model with typed, fetchable objects in two namespaces, and that Adyen documents several API families with their own version counters and, in most cases, their own hosts, pagination and error formats, whose Checkout API identifies a payment by a reference and has no call to read it back.\n- **Know:** What each company has published about how it designs APIs, with dates, and that neither has published its design guide.\n- **Believe:** What ages well in a payment API is what the integrator's code depends on (identity, vocabulary, the line between now and later), not the uniformity of its REST style.\n- **Be able to:** Given a provider's API reference, say what their own system must store because the provider will not return it later.\n- **Be able to:** Design the internal interface of an adapter that hides two providers' object models without hiding where each one's state can be read.\n\n**Audience:** An engineer or architect new to payments who integrates, evaluates or wraps a payment provider's API.\n\n**Already knows:**\n\n- REST, HTTP status codes, pagination, OpenAPI, client libraries, adapters.\n- A payment as a record with states, and where each provider keeps that state (payment-state-machines).\n- Authorization, capture, refund and dispute as separate steps (Part I).\n\n**Does not yet know:**\n\n- Resource model, expandable object, error model and API family as terms for parts of a payment API.\n- How Stripe and Adyen each encode a refused payment, an identifier and related data.\n- What either company has published about how it designs its API.\n\n**Acceptance criteria**\n\n| Id | Criterion | Check | Method | Severity |\n| --- | --- | --- | --- | --- |\n| AC-1 | Given the shape of an unfamiliar provider's create-payment response, the reader says what must be stored locally and how later states will be learned. *Probe:* A provider's create-payment call returns an identifier and a result code, and the API has no call that returns a payment by that identifier. Using only this chapter: what must your own system store, when, and how will it learn that the payment was later captured, refunded or disputed? | `custom` | cold_reader | major |\n| AC-2 | Given an HTTP 200 response whose body says the payment was refused, and an HTTP 402 response from another provider for the same event, the reader explains both as the same business outcome and says which of them a retry policy may act on. *Probe:* One provider answers a declined card with HTTP 200 and a result code 'Refused'; another answers with HTTP 402 and an error object carrying a decline code. Your adapter must present one outcome to the rest of your system. What is it, and what would be wrong with treating either response as 'the request failed'? | `custom` | cold_reader | major |\n| AC-3 | Every statement about Stripe's or Adyen's API design practice carries its year, and the chapter says that neither company has published its design guide or review criteria. | `custom` | rubric | blocker |\n\n## Thesis\n\n**Question:** What makes a payment API usable for ten years, and how do Stripe's and Adyen's object models differ?\n\n> **Claim:** A payment API stays usable for ten years when the integrator's code depends only on things that do not change when payment methods and network rules do: a stable identifier for each payment, a normalized vocabulary of states and refusal reasons, and an explicit line between what the response answers and what arrives later. Stripe and Adyen both supply these and differ in where the current state lives: Stripe returns typed objects that can be fetched again by identifier, while Adyen's Checkout API returns a reference and a result code and reports later states through webhooks and reports.\n\n**Disputed by:** The view that an API ages well because it is uniformly resource-oriented, one model applied everywhere, so that an API made of several families with different conventions, such as Adyen's, is a design debt its integrators will pay for.\n\n**So what:** An evaluator stops scoring an API on consistency of style and asks what its own system must remember: with a fetchable object the provider's record can be read after a lost response, and with a reference only, the integrator's own record and its webhook receiver carry that job. An adapter over both providers must hide the two vocabularies without hiding that difference.\n\n**How and why:** Card networks and local methods answer at different speeds and with different codes, and new ones keep arriving; an integration breaks when one of those differences reaches its code. Stripe's 2020 account of its payments APIs reports that the Charge resource grew from 11 to 36 properties between 2011 and 2018 before the model was redesigned around a payment with states. Adyen's 2022 engineering post describes families of APIs over one platform, and its published specification of Checkout API v72 (2026) contains three read operations out of 31 and none that returns a payment. Both have lasted for years on those models, which is why style alone cannot be the explanation. The public record stops at the design process: Stripe has published one paragraph on API review (2017) and a list of automated checks (2026), Adyen one post naming an API Review group (2022), and neither its design guide.\n\n**Supporting claims**\n\n- **C1** — A payment API ages when a difference between the networks underneath reaches the integrator's code, and what stays fixed across such changes is a stable identifier, a normalized vocabulary of states and refusal reasons, and an explicit line between the response and later results; uniformity of style is not what lasts.\n- **C2** — An object model is made of identifiers, states, related objects, lists, metadata, an error model that separates no answer, a rejected request and a refused payment, and a stated split between synchronous answers and later results.\n- **C3** — Stripe documents one resource model with typed, fetchable objects in two namespaces; Adyen documents several API families with their own version counters and, in most cases, their own hosts, pagination and error formats, whose Checkout API identifies a payment by a reference and has no call to read it back.\n- **C4** — Each company has published dated fragments of how it designs APIs (Stripe 2017, 2020 and 2026; Adyen 2022), and neither has published its design guide or review criteria.\n- **C5** — What an integrator must store follows from what the provider will not return later, and an adapter over both providers should hide the two vocabularies without hiding where each one's state can be read.\n\n## Role in the part\n\nDefines what the API exposes (objects or references, identifiers, states, errors) so that the next four chapters can say what is repeated, versioned, reported and limited. Supports P4-1 of part `part-4`.\n\n## Flow\n\n**Pattern:** `prerequisite_order` (also `problem_solution` in scene and why-apis-age pose the problem; object-model through two-shapes supply the answer; in-practice applies it; `small_to_large` in object-model, errors-and-later, two-shapes, design-practice: single elements, then the error and timing contracts, then the whole API, then the process that produces it; `comparison` in two-shapes and where-they-differ)\n\nThe reader meets an adapter that hid the wrong thing before any vocabulary, so the elements arrive as answers to a felt question. Why APIs age comes before the elements because it supplies the test (does this element absorb change underneath?) that each element is then read against. Elements come before shapes because 'resource model' and 'API family' are assemblies of them; the error model and the line between now and later have their own section because the acceptance criteria turn on them. Design practice follows the shapes because it explains nothing the reader needs earlier and would otherwise read as company history. The comparison table comes after every fact in it has been cited. The adapter is rebuilt only after the comparison, because its one visible difference is the table's third row; putting Larkfield's design before the elements would ask the reader to accept an interface whose terms are undefined. Failures come last because each is a failure of a named element.\n\n## Introduction\n\n**Hook** (`puzzling_scenario`): Larkfield's payment service has a call named 'get payment' that works for both providers and has never asked either of them anything. It reads Larkfield's own table. On Adyen's Checkout API there is nothing else to read; on Stripe there is, and on 14 September 2026, with webhooks down for nine hours, nobody could reach it through that call.\n\n**Bridge:** An engineer judges an API by its endpoints and the consistency of its REST style, and wraps two providers behind the lowest common denominator. → For a payment API the questions that decide a ten-year integration are what the provider will let you read again, what its words for 'no' mean, and what the response has not told you yet.\n\n**Thesis statement** (KEY POINTS callout and paragraph p02): A payment API stays usable for ten years when the integrator's code depends only on a stable identifier for each payment, a normalized vocabulary of states and refusal reasons, and an explicit line between what the response answers and what arrives later. Stripe and Adyen both supply these and differ in where the current state lives: a typed object you can fetch again at Stripe, a reference and a result code followed by webhooks and reports at Adyen's Checkout API.\n\n**Roadmap** (IN THIS CHAPTER callout and paragraph p04):\n\n- Start from Larkfield's adapter and the question of what it should promise. *Kept in:* scene.\n- Explain why payment APIs age and what an integration can depend on. *Kept in:* why-apis-age.\n- Take an object model apart: identifiers, state, related data, lists, metadata. *Kept in:* object-model.\n- Explain the error model and the line between the response and later results. *Kept in:* errors-and-later.\n- Compare the two overall shapes, one resource model or several API families, and answer the view that uniform style is what lasts. *Kept in:* two-shapes.\n- Report what each company has published about its API design practice and where the record stops. *Kept in:* design-practice.\n- Set the two providers side by side. *Kept in:* where-they-differ.\n- Rebuild Larkfield's adapter and run two of Mila's payments through it. *Kept in:* in-practice.\n- Show how an object model fails its integrator and how each failure is detected. *Kept in:* when-it-goes-wrong.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p01 | context | The payment service Larkfield built in 2024 has one call named 'get payment' for both providers, and it has never asked either provider anything: it reads Larkfield's own table, which is the only thing that can be read on Adyen's Checkout API and is not the only thing on Stripe. | scenario: Scenario ledger: the payment service (built 2024 by Tom Hendriks for the Adyen launch, an adapter per provider) and the payment record store (fed by webhooks through an inbox table). Local detail added by this chapter: the single read call returns the store's row on both providers. |  |\n| p02 | claim | A payment API stays usable for ten years when the integrator's code depends only on a stable identifier, a normalized vocabulary of states and refusal reasons, and an explicit line between what the response answers and what arrives later; Stripe and Adyen both supply these and differ in where the current state lives. |  | `problem_solution`: One call name hiding two different facts. → The claim: what an integration can safely depend on, and the one difference between the two providers that must stay visible. |\n| p03 | context | In the journey of Mila's class pass this chapter covers the request Larkfield's payment service sends at 19:42 on Tuesday 9 March 2027 and the response it gets back: which names and codes that response carries, and what it leaves for later messages. | scenario: Mila's class pass (scenario ledger): €120.00 at Studio Noord, on Adyen, 9 March 2027 at 19:42, approved at 19:42 and captured automatically. | `example`: The claim about identifier, vocabulary and the line between now and later. → Where those three things appear in the book's recurring payment. |\n| p04 | transition | The chapter goes from Larkfield's adapter, through why payment APIs age, the parts of an object model, the error model and the line between the response and later results, the two overall shapes (one resource model or several API families), what each company has published about its design practice, the comparison of the two providers, the adapter as rebuilt in 2027 and the ways an object model fails its integrator. |  | `sequence`: Where the chapter sits in the payment's journey. → The order of the sections. |\n\n## Sections\n\n### Setting the Scene at Larkfield: One Interface over Two Object Models\n\n**Controlling idea** (`example`, id `scene`): Larkfield's 2024 adapter made two providers look alike by offering only what both could do, and in 2027 Femke de Graaf asks what the interface should promise instead.\n\n**Advances the thesis** (C5): Poses the chapter's question in a system that hid the one difference the thesis says must stay visible.\n\n**Transition in:** `example`: The order of the sections. → A company whose adapter hid both the vocabularies and the difference.\n\n**Order of paragraphs** (`chronological`): The adapter as built in 2024, what its read call cost in September 2026, then the question asked in 2027.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p05 | context | The payment service was built in 2024 so that the booking app could say 'take a payment' without knowing whether a studio is on Stripe or on Adyen, and it reduced both providers to five states of Larkfield's own. | scenario: Scenario ledger: the payment service has 'one internal API for take a payment, refund, pay out; an adapter per provider', routes by studio; the payment record store holds the five-state vocabulary (pending, authorized, paid, refunded, disputed) and both providers' raw references; Stripe carried 44% and Adyen 56% of 2026 member payment volume. |  |\n| p06 | evidence | During the Silent Webhook of 14 September 2026 the record store was nine hours stale for Stripe payments, Stripe's own objects were correct the whole time, and the adapter had no call that could ask for them. | case: The Silent Webhook (scenario ledger): the Stripe webhook receiver's TLS certificate expired, events failed for 9 hours, 3,200 memberships were shown as unpaid and members were turned away at check-in on the morning of Monday 14 September 2026 (consistency ruling 20). Stripe documents retrieval of a PaymentIntent by identifier (https://docs.stripe.com/api/payment_intents/retrieve, n.d., accessed 2026-11). | `cause_effect`: An adapter that offers only what both providers can do. → What that cost on the day the events stopped. |\n| p07 | claim | Femke de Graaf's question for the Keel program is what the internal interface should promise: which parts of the two object models it can make identical, and which difference it must show its callers. | scenario: Keel K2 (scenario ledger): 'a state change is confirmed against the provider's own record (the payment object where the API lets Larkfield read it, the settlement report where it does not)'. Femke de Graaf, Head of Payments Engineering since January 2027, is an experienced engineer new to payments. | `problem_solution`: A capability lost by leveling down. → The design question for 2027. |\n\n### Why Payment APIs Age: The Networks Underneath Keep Changing\n\n**Controlling idea** (`explanation`, id `why-apis-age`): A payment API is an abstraction over networks that answer at different speeds and with different codes, and it ages when one of those differences reaches the integrator's code.\n\n**Advances the thesis** (C1): Establishes what changes underneath an integration over ten years, so that the three stable things can be named as what does not.\n\n**Transition in:** `elaboration`: The question of what an interface over payment providers should promise. → Why the question is hard for the providers themselves: what their own APIs sit on.\n\n**Order of paragraphs** (`problem_solution`): What varies underneath, how long an integration lives, how the variation breaks it, then what an integration can depend on instead.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p08 | explanation | The systems under a payment API do not agree on how fast they answer or whether the customer has to do something first, so one 'pay' call covers cases that finish in a second and cases that finish in days. | source: Stripe's 2020 account classifies payment methods on two questions, whether the payment is 'immediately finalized' or finalized later and whether a customer action is required, and concludes: 'Global payment methods aren't different; cards are!' (https://stripe.dev/blog/payment-api-design (Michelle Bu, Stripe, 2020-12-15; evidence age 6 years)). Terms defined here: issuer, card network, local payment method. |  |\n| p09 | evidence | An integration outlives many of those changes, and the provider's objects swell to carry them: Stripe reports that its first payment object grew from 11 properties to 36 in seven years. | quotation: 'Between 2011 and 2018, the Charge resource grew from having 11 properties to 36 properties and Charge creation grew from accepting 5 parameters to 14 parameters!' (https://stripe.dev/blog/payment-api-design (Michelle Bu, Stripe, 2020-12-15; evidence age 6 years)).; scenario: Scenario ledger: Daniel Osei wrote Larkfield's original Stripe integration in 2017; the Stripe webhook receiver predates the 2024 payment service and still runs in 2027. | `time`: Networks that differ today. → What accumulates over the years an integration lives. |\n| p10 | cause_effect | An integration breaks when a difference between payment methods reaches code that assumed there was none, as happened with the abstractions Stripe had designed for cards. | quotation: 'we built support for new payment methods on top of a set of abstractions that were designed for the simplest payment method of them all: cards' (https://stripe.dev/blog/payment-api-design (Michelle Bu, Stripe, 2020-12-15; evidence age 6 years)). The redesign that followed (PaymentIntents, 2018) is told in payment-state-machines. | `cause_effect`: Objects that grow as methods are added. → The point at which growth becomes breakage. |\n| p11 | claim | Three things in an API can stay fixed while methods and rules change, and they are what an integrator's code should depend on: a stable identifier for each payment, a normalized vocabulary of states and refusal reasons, and an explicit line between what the response answers and what arrives later. | reasoning: A new payment method adds a new way to reach a state, not a new identity for the payment; a new issuer response is mapped into an existing reason; a slower method moves an answer from the response to a later message without changing that such messages exist. The author's argument, tested against both providers in the following sections. | `problem_solution`: Assumptions about one method copied into integrators' code. → What code can depend on that holds for every method. |\n\n### What an Object Model Is Made Of: Identity, State and Related Data\n\n**Controlling idea** (`explanation`, id `object-model`): An object model answers five questions about every payment (what it is called, what state it is in, what it is related to, how many there are, and what of the integrator's own data it carries), and Stripe and Adyen answer each in documented, different ways.\n\n**Advances the thesis** (C2, C3): Defines the elements the thesis names (identifier, state, related objects, metadata) and gives each provider's documented form of each.\n\n**Transition in:** `elaboration`: The three stable things an integration should depend on. → The parts of an API in which those three things, and the rest of a payment's description, are found.\n\n**Order of paragraphs** (`prerequisite_order`): The resource model first because the other elements are properties of it; identity before state because state is read by identity; related data, lists and metadata after, as what hangs off an identified object.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p12 | definition | A resource model is the set of things an API lets you name and read again; an API can instead be built of commands, calls that do something and return a result without leaving anything you can fetch. | example: Stripe: 'Retrieves the details of a PaymentIntent that has previously been created' by GET on /v1/payment_intents/{id} (https://docs.stripe.com/api/payment_intents/retrieve, n.d., accessed 2026-11). Adyen: POST /payments returns a result; CheckoutService-v72.json in https://github.com/Adyen/adyen-openapi (Checkout API v72, released 2026-04-15; accessed 2026-11) has no GET for a payment. |  |\n| p13 | explanation | Every payment carries two identifiers, the provider's and the integrator's, and the provider's style of identifier differs: Stripe's says what kind of object it names, Adyen's names one request. | fact: Stripe: identifiers carry a type prefix (pi_ PaymentIntent, ch_ Charge, cus_ Customer); 'adding a prefix makes the ID human readable' (Paul Asjes, 'Designing APIs for humans: Object IDs', https://dev.to/4thzoa/designing-apis-for-humans-object-ids-3o5a, 2022-08-30, written by a developer advocate at Stripe and published under an organization account on the DEV Community site, not on Stripe's own site; evidence age 4 years); every response object also carries an 'object' field naming its type (https://docs.stripe.com/api/pagination, n.d., accessed 2026-11).; fact: Adyen: 'Every payment or modification request (such as a refund or a capture request) in Adyen's system has a globally unique 16-character string called the PSP reference' (https://docs.adyen.com/adyen-glossary, n.d., accessed 2026-11); the integrator's own 'reference' is a required field of the payment request, maximum 80 characters, 'We strongly recommend that you use a unique value for each transaction', and comes back as merchantReference (CheckoutService-v72.json in https://github.com/Adyen/adyen-openapi (Checkout API v72, released 2026-04-15; accessed 2026-11)). The newer Configuration API uses prefixed identifiers in its examples (AH account holder, BA balance account, PI payment instrument; BalancePlatformService-v2.json, same repository). | `elaboration`: Things that can be named. → The names: whose they are and what they encode. |\n| p14 | explanation | Where the current state lives is the main difference between the two models: on Stripe it is a status field on an object you can fetch, and on Adyen's Checkout API it is a result code on each response followed by webhooks, with no call that returns the payment. | fact: Stripe PaymentIntent 'status': 'one of requires_payment_method, requires_confirmation, requires_action, processing, requires_capture, canceled, or succeeded' (https://docs.stripe.com/api/payment_intents/object, n.d., accessed 2026-11). Adyen: the v72 specification has 31 operations of which three are GET (/paymentLinks/{linkId}, /sessions/{sessionId}, /storedPaymentMethods), none returning a payment (CheckoutService-v72.json in https://github.com/Adyen/adyen-openapi (Checkout API v72, released 2026-04-15; accessed 2026-11)). The state machines themselves are owned by payment-state-machines (consistency ruling 1). | `contrast`: Identifiers at both providers. → What the identifier can be used to read: a state at one, nothing at the other. |\n| p15 | definition | An expandable object is a related object that the API returns as an identifier by default and as the full object on request, which keeps responses small and lets the caller choose what a read costs. | quotation: 'Many objects allow you to request additional information as an expanded response by using the expand request parameter'; nesting goes 'up to a maximum depth of four levels'; 'Performing deep expansions on numerous list requests might result in slower processing times' (https://docs.stripe.com/api/expanding_objects, n.d., accessed 2026-11). In the /v2 namespace 'The expand parameter isn't supported', and some endpoints offer an include parameter (https://docs.stripe.com/api-v2-overview, n.d., accessed 2026-11). | `elaboration`: An object with an identifier and a state. → How the objects around it are reached. |\n| p16 | comparison | Adyen's Checkout API has no expansion: extra fields are switched on per account and arrive as string keys in an additionalData map, so what a response contains depends on configuration outside the request. | fact: The v72 specification describes additionalData as 'Contains additional information about the payment. Some data fields are included only if you select them first. Go to Customer Area > Developers > Additional data' (CheckoutService-v72.json in https://github.com/Adyen/adyen-openapi (Checkout API v72, released 2026-04-15; accessed 2026-11); Customer Area is Adyen's back-office site). | `contrast`: Related data chosen per request. → Related data chosen per account. |\n| p17 | comparison | Lists show the same split: Stripe documents one cursor style for the older part of its API (the /v1 paths) and another for the newer part (/v2), and Adyen documents a different style in each of its separate APIs, with no paginated lists in the Checkout API. | fact: Stripe v1: 'limit' 1 to 100 (default 10), 'starting_after' and 'ending_before' take an object ID, response has has_more (https://docs.stripe.com/api/pagination, n.d., accessed 2026-11). Stripe v2: a page token with previous_page_url and next_page_url; 'Lists are eventually consistent by default and lower-latency', where v1 'Top-level lists are immediately consistent (with higher latency to render)' (https://docs.stripe.com/api-v2-overview, n.d., accessed 2026-11). Adyen: Management API v3 pageNumber and pageSize; Configuration API v2 offset and limit; Transfers API v4 cursor and limit (ManagementService-v3.json, BalancePlatformService-v2.json, TransferService-v4.json in https://github.com/Adyen/adyen-openapi, accessed 2026-11). | `additional_support`: Related data reached differently at each provider. → Collections reached differently too. |\n| p18 | explanation | Metadata is the integrator's side of the identity contract: a field the provider stores and returns without interpreting, in which the integrator puts its own identifier so that a later message can be tied to its own record. | quotation: Stripe: 'You can specify up to 50 keys, with key names up to 40 characters long and values up to 500 characters long'; 'Stripe doesn't use metadata—for example, we don't use it to authorize or decline a charge' (https://docs.stripe.com/api/metadata, n.d., accessed 2026-11); 'When creating a resource, include a local identifier in its metadata so you can match an object received through a webhook to your local records' (https://docs.stripe.com/error-low-level, n.d., accessed 2026-11). Adyen: metadata on a payment is limited to 20 key-value pairs, 20 characters per key and 80 per value (CheckoutService-v72.json in https://github.com/Adyen/adyen-openapi (Checkout API v72, released 2026-04-15; accessed 2026-11)); the required reference field does the tying. | `sequence`: The provider's identifiers, states, relations and lists. → The one field that belongs to the integrator. |\n\n### The Error Model, and the Line Between Now and Later\n\n**Controlling idea** (`explanation`, id `errors-and-later`): An error model has to keep three outcomes apart (no answer, a rejected request, a refused payment), and the API has to say which of its answers are final and which are only received; the two providers encode the same distinctions in opposite ways on the wire.\n\n**Advances the thesis** (C2, C3): Supplies the normalized refusal vocabulary and the explicit line between now and later that the thesis names, with both providers' documented encodings.\n\n**Transition in:** `contrast`: What a response contains when the call works. → What it contains when the answer is no, and what it cannot contain yet.\n\n**Order of paragraphs** (`prerequisite_order`): The three outcomes first, then each provider's encoding of them, then the vocabulary of refusal reasons, then the second distinction (now versus later) and what stating it costs.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p19 | definition | An error model is the API's way of saying what went wrong, and for payments it must keep three outcomes apart: the request got no answer, the request was rejected before anything happened, and the payment was processed and refused. | reasoning: Industry practice. A refusal (a decline) is the issuer, the customer's bank, saying no to a request that reached it; a rejection is the provider refusing a malformed, unauthorized or excess request; no answer leaves the outcome unknown. Only the second is safe to correct and resend; the third has an answer already; the first is the subject of idempotency-and-retries. |  |\n| p20 | explanation | Stripe reports a refused card as an HTTP error: a status in the 4xx range with an error object whose type is card_error and whose fields separate what a program, a person, a form and a support ticket each need. | fact: https://docs.stripe.com/api/errors (n.d., accessed 2026-11): 4xx codes cover 'an omitted required parameter, a failed charge, or a declined card'; 402 is 'The parameters were valid but the request failed'; 5xx is 'Something went wrong on Stripe's end. (These are rare.)'; error types are api_error, card_error, idempotency_error, invalid_request_error; attributes include code, decline_code, message ('For card errors, these messages can be shown to your users'), param, doc_url, request_log_url, plus network_decline_code and advice_code. The PaymentIntent also keeps last_payment_error (https://docs.stripe.com/api/payment_intents/object, n.d., accessed 2026-11). | `example`: Three outcomes to keep apart. → The first provider's encoding of them. |\n| p21 | comparison | Adyen reports the same refused card as a success of the request: HTTP 200 with the result code Refused and a refusal reason, and it reserves 4xx and 5xx for requests it did not accept or store. | quotation: 'Although an HTTP response status code of 200 means that the request was submitted correctly and Adyen processed it successfully, it does not necessarily mean that the payment or modification request was successfully executed'; on 4xx and 5xx 'the Adyen payments platform does not accept or store submitted requests'; error body fields status, errorCode, message, errorType (internal, validation, security, configuration), pspReference (https://docs.adyen.com/development-resources/response-handling, n.d., accessed 2026-11). The Management, Configuration and Transfers APIs use a different error body (type, title, status, detail, errorCode, instance, invalidFields, requestId; RestServiceError in their OpenAPI files, accessed 2026-11).; table: One declined card, two encodings. Rows: HTTP status (Stripe 402 with an error object / Adyen 200); where the outcome is (error.type card_error / resultCode Refused); the reason (decline_code, e.g. insufficient_funds / refusalReasonCode and refusalReason, e.g. 12 'Not enough balance'); a rejected request (400, 401, 403, 429 with invalid_request_error and others / 4xx or 5xx with errorType; not accepted or stored); what a retry policy may do (both: nothing automatic on a refusal; correct and resend a rejection). Sources as cited in this and the previous paragraph, and https://docs.adyen.com/development-resources/refusal-reasons (n.d., accessed 2026-11). | `contrast`: A refusal delivered as an HTTP error. → The same refusal delivered as an HTTP success. |\n| p22 | explanation | The refusal reasons are a normalized vocabulary that each provider maintains over the issuers' own response codes; Adyen tells integrators not to pass the detail to the customer, and Stripe says so for particular codes. | fact: Stripe decline codes (https://docs.stripe.com/declines/codes, n.d., accessed 2026-11): insufficient_funds; do_not_honor 'The card was declined for an unknown reason'; generic_decline 'declined for an unknown reason or Stripe Radar or Adaptive Acceptance blocked the payment'; for fraudulent, 'Don't report more detailed information to your customer. Instead, present it in the same manner as generic_decline'. Adyen refusal reasons (https://docs.adyen.com/development-resources/refusal-reasons, n.d., accessed 2026-11): numbered, e.g. 2 Refused, 12 Not enough balance, 20 FRAUD; 'To prevent malicious use, do not expose the details of the refusal reason to shoppers'. | `elaboration`: Where each provider puts the refusal. → What the reason inside it is and who defines it. |\n| p23 | explanation | The second distinction an API must state is between an answer and an acknowledgment: for many operations the response says only that the request was received, and the result arrives later by another channel. | quotation: Adyen on an HTTP 200 for a capture: 'We received your request. We will execute a payment capture. We still do not know if the capture operation will be successful or not. We will let you know in the corresponding webhook event' (https://docs.adyen.com/development-resources/response-handling, n.d., accessed 2026-11); on result codes: 'The status of a payment can sometimes change after you get the result code, so we recommend that you do not use the result code to update your order management system' (https://docs.adyen.com/online-payments/build-your-integration/payment-result-codes, n.d., accessed 2026-11). Stripe: the PaymentIntent status 'processing' for 'an asynchronous payment method, such as bank debits', which 'can take up to a few days to process' (https://docs.stripe.com/payments/paymentintents/lifecycle, n.d., accessed 2026-11, as verified in the research brief).; table: What the response answers and what arrives later. Rows: card payment, no customer action (the issuer's approval or refusal / capture result, settlement, disputes); bank debit or other delayed method (received or processing / success or failure days later); capture or refund on Adyen (received / CAPTURE or REFUND webhook, and a failure can still follow); dispute (nothing: no request of yours starts it / an event weeks or months later). Industry practice with the documented cells cited above and in payment-state-machines and refunds-reversals-and-disputes. | `additional_support`: Three kinds of no. → A second distinction the response must carry: final or only received. |\n| p24 | analysis | Stating that line makes an API harder to start with and is what lets it last, a cost Stripe's engineers accepted in writing when they replaced the one-call card payment. | quotation: 'PaymentIntents is also objectively a harder integration for users who only care about accepting card payments in the US and Canada. We flipped the order of the client and server calls … and webhooks are often more than a little bit annoying to set up, test, and debug.' (https://stripe.dev/blog/payment-api-design (Michelle Bu, Stripe, 2020-12-15; evidence age 6 years)). | `cause_effect`: A line between now and later, stated in the API. → What stating it costs and why a provider pays it. |\n\n### Two Shapes for the Whole: One Resource Model or Several API Families\n\n**Controlling idea** (`comparison`, id `two-shapes`): Stripe documents one resource model in two namespaces and Adyen several API families with their own conventions; the shapes differ in what the integrator must store and learn, and neither shape is what has kept either API usable.\n\n**Advances the thesis** (C3, C1): Sets out the two designs, compares their trade-offs, and answers the view that uniform style is what makes an API last.\n\n**Transition in:** `elaboration`: The elements of an object model, one at a time. → How each company assembles the elements into a whole API.\n\n**Order of paragraphs** (`comparison`): Each shape described from its documentation, then compared on the same criteria, then the opposing view and the reply to it.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p25 | description | Stripe's API is one host and one object model in two namespaces: /v1, which holds most of the API including payments, and /v2, introduced in 2024 with different conventions and offered beside /v1, not in place of it. | fact: 'API v1: The /v1 namespace includes most of the existing Stripe API today. API v2: The /v2 namespace includes endpoints that use /v2 design patterns'; 'You can use any combination of APIs in the /v1 or /v2 namespace in the same integration'; v1 requests are form-encoded and v2 JSON; v2 requires the Stripe-Version header (https://docs.stripe.com/api-v2-overview, n.d., accessed 2026-11). 'In 2024, Stripe introduced the v2 namespace to bring improved domain modeling and updated API semantics to our users' (https://stripe.dev/blog/how-api-changes-flow-into-stripes-developer-products (Mikael Mello and Anna Mason, Stripe, 2026-06-15)). In the documentation read for this chapter in November 2026, PaymentIntents, Refunds and Disputes are documented under /v1; no public statement on moving payments to /v2 was found. |  |\n| p26 | definition | An API family is a group of endpoints with its own version counter and conventions, and usually its own host, built for one kind of job; Adyen's public surface is several of them over one platform. | quotation: Adyen's 2022 post describes 'different layers (internal and external) and families (payments, banking, platform) of REST APIs sitting on top of a large dynamic platform' (https://www.adyen.com/knowledge-hub/api-first-adyen (Adyen, 2022-09-27; evidence age 4 years)); 'Most integrations use multiple Adyen APIs … Each API has a different version' (https://docs.adyen.com/development-resources/versioning, n.d., accessed 2026-11).; table: Adyen API families, from the OpenAPI files (https://github.com/Adyen/adyen-openapi, accessed 2026-11). Columns: API and version / what it is for / style / identifier / pagination / error body. Checkout API v72: online payments, sessions, modifications / commands, 25 of 31 operations POST / pspReference per request / none / status, errorCode, message, errorType. Management API v3: accounts, stores, terminals, credentials, webhooks / resources, 69 GET, 55 POST, 29 PATCH, 13 DELETE / companyId, merchantId, storeId / pageNumber, pageSize / problem-details shape. Configuration API v2 and Transfers API v4 (balance platform): account holders, balance accounts, transfers / resources / prefixed IDs / offset and limit; cursor / problem-details shape. Terminal API: in-person payments / messages of the nexo point-of-sale standard (in-person-payments). | `contrast`: One model in two namespaces. → Several families, each with its own conventions. |\n| p27 | analysis | The Checkout API is command-shaped (even some reads are POST, and a capture or refund is a new request under the payment's reference), while the platform families added later are resource-shaped with GET, PATCH and DELETE. | fact: CheckoutService-v72.json in https://github.com/Adyen/adyen-openapi (Checkout API v72, released 2026-04-15; accessed 2026-11): 25 POST, 3 GET, 2 PATCH, 1 DELETE across 28 paths; modifications are POST /payments/{paymentPspReference}/captures, /refunds, /cancels, /reversals, /amountUpdates. ManagementService-v3.json: 69 GET of 166 operations. An inference follows in a labeled block: the families appear to carry the conventions of the period in which each was designed; Adyen has not published a reason for the difference between families. For asynchronous modifications it has (2021 architecture post: they keep the edge layer stateless); that a stateless edge also explains the missing payment read is the author's reading, stated by no Adyen source found. | `elaboration`: Families with different conventions. → The two styles found among them and where each sits. |\n| p28 | comparison | The two shapes trade the same things against each other: what can be read back, what the integrator must store, what it costs the provider to serve, and how much there is to learn. | table: Trade-offs. Columns: aspect / fetchable resource model / commands with references and events / when it matters. Rows: reading current state (GET by identifier / your own record, built from responses and webhooks); after a lost response (the object may exist and can be found / only your reference ties later events to the attempt); what you must store (your reference and the provider's ID / every result code and event as well); cost to the provider (reads that must be current: Stripe notes immediately consistent lists come 'with higher latency to render' and that deep expansions are slower / fewer read paths to serve, as an inference); learning cost (one set of conventions per namespace / one per family, mostly hidden by generated libraries). The author's comparison, with the documented cells cited earlier. | `conclusion_summary`: Two documented shapes. → The same criteria applied to both. |\n| p29 | counterargument | The usual judgement is that an API ages well because it is uniformly resource-oriented, so that Adyen's families with their different conventions are a design debt its integrators will pay. | reasoning: The view is reasonable: uniform conventions lower learning cost and make client code reusable, and Stripe's API is widely used as the example. The table above concedes that families cost more to learn. | `contrast`: A comparison in which neither shape wins outright. → The common view that one of them does. |\n| p30 | refutation | Uniform style cannot be the explanation, because the uniform API was redesigned at its center and then given a second namespace, while the family API has served the same reference-and-result-code contract across years of versions; what integrators' code kept depending on in both was the identifier, the vocabulary and the line. | fact: Stripe: the Charge-based model was replaced by PaymentIntents in 2018 and 'rolling out this change took almost two years' (https://stripe.dev/blog/payment-api-design (Michelle Bu, Stripe, 2020-12-15; evidence age 6 years)); /v2 (2024) differs from /v1 in encoding, pagination, expansion, list consistency and idempotency (https://docs.stripe.com/api-v2-overview, n.d., accessed 2026-11). Adyen: the Checkout API release notes and OpenAPI repository run from v37 (2018-02-23) to v72 (2026-04-15), 18 public versions, as verified in the research brief from https://docs.adyen.com/online-payments/release-notes and https://github.com/Adyen/adyen-openapi. | `contrast`: The view that uniformity is what lasts. → The record of both APIs, which does not fit it. |\n\n### How Each Company Says It Designs Its API, and Where the Record Stops\n\n**Controlling idea** (`evidence`, id `design-practice`): Stripe has published a design method (2020), one paragraph on API review (2017) and a list of automated checks (2026); Adyen has published one post naming an API Review group (2022); both generate their client libraries from a published specification, and neither has published its design guide.\n\n**Advances the thesis** (C4): Reports the dated public record of each company's design practice and states where it ends.\n\n**Transition in:** `cause_effect`: Two APIs that kept their integrators through changes of convention. → What each company has said about the process that produces those conventions.\n\n**Order of paragraphs** (`grouping`): Stripe's method and review, then Adyen's, then the practice both document (generated libraries), then the limit of the record.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p31 | evidence | Stripe's most detailed account of its design method is the 2020 post on the payments APIs: a small team, three months, and designs tested by writing the integration guide before the API existed. | quotation: A team of 'five people—four engineers and a PM'; 'One of our primary design tools was writing hypothetical integration guides to validate our concepts and to make sure we didn't introduce old or new pits of failure. We wrote these for every payment method we could list—and even for some payment methods we made up, like sending cash via carrier pigeon'; 'Two overloaded API abstractions are not simpler and are definitely not more flexible and powerful than three or four clearly-defined abstractions' (https://stripe.dev/blog/payment-api-design (Michelle Bu, Stripe, 2020-12-15; evidence age 6 years)). |  |\n| p32 | evidence | On review, Stripe's public record is one paragraph from 2017 and a description of automated checks from 2026. | quotation: 2017: 'Outgoing changes are funneled through a lightweight API review process where they're written up in a brief supporting document and submitted to a mailing list' (https://stripe.com/blog/api-versioning (Brandur Leach, Stripe, 2017-08-05; evidence age 9 years)). 2026: 'we've codified a set of design patterns that all APIs must follow. Before a PR can merge, a set of automated tests validate API changes against those patterns: API naming, field types, versioning considerations such as backwards compatibility, or constraints specific to products (e.g. reserved words in SDKs)', and release tooling gives 'one more place for product architects to review and refine upcoming changes' (https://stripe.dev/blog/how-api-changes-flow-into-stripes-developer-products (Mikael Mello and Anna Mason, Stripe, 2026-06-15)). | `additional_support`: How Stripe designs a new model. → How it reviews changes to an existing one. |\n| p33 | evidence | Adyen's public record on API design is one post from 2022, which names an API Review group that advises teams and does not decide for them, and mentions an unpublished API style guide against which specifications are linted. | quotation: 'there are key individuals (API champions) and groups (API Review group) that enable that vision through initiatives, engagement and knowledge sharing'; 'a company-wide culture where APIs are products, teams are the owners and everyone plays a part in shaping the API strategy'; and, as quoted in the research brief from the same post, the group 'does not dictate how and when things get done' (https://www.adyen.com/knowledge-hub/api-first-adyen (Adyen, 2022-09-27; evidence age 4 years)). No newer statement was found. | `contrast`: Stripe's three dated statements. → Adyen's one. |\n| p34 | explanation | Both companies generate their client libraries from a machine-readable specification of the API, so the library's types are the object model at one version, and the library is where most integrators actually meet it. | fact: Stripe: 'In 2017, we published a public OpenAPI description of our API … In 2019, we used OpenAPI to auto-generate a Stripe SDK for the first time, releasing stripe-java@8.0'; v1 APIs are defined in an internal Ruby-based DSL and v2 APIs with Protocol Buffers, and both now converge on OpenAPI; 'The official SDKs need to have new versions published across seven different languages and three release channels' (https://stripe.dev/blog/how-api-changes-flow-into-stripes-developer-products (Mikael Mello and Anna Mason, Stripe, 2026-06-15)). Adyen: 'Adyen's OpenAPI specifications are generated internally and published to Github'; 'we aim to have general availability across all API Libraries within 2 weeks of new releases' (https://www.adyen.com/knowledge-hub/adyen-api-libraries, Adyen, 2023-03-28; evidence age 3.6 years); the generation scripts are public (https://github.com/Adyen/adyen-sdk-automation, accessed 2026-11, as verified in the research brief). | `similarity`: Design practice that differs in how much is published. → One practice both document in the same way. |\n| p35 | claim | The record stops at the design rules themselves: neither company has published its API design guide, the criteria its reviewers apply or who reviews, and how Adyen's API layer is built is on record only in outline (a stateless acceptance layer, 2021; a validate-and-queue platform API, 2020), with its in-house frameworks named but not described. | source: Research limitation recorded in both briefs after searching Stripe's engineering blogs and Adyen's knowledge hub and tech publication on 17 November 2026: Stripe's review is public only as the 2017 sentence and the 2026 list of check categories; Adyen's only as the 2022 post; the absence audit of 17 November 2026 (knowledge-hub sitemap, documentation sitemap, help center, web search) found two Adyen sources on its API layer: 'Design to Duty' (https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture, 2021-07-28, updated June 2022: the stateless Payments Acceptance Layer through which all payments pass; 'Instead of keeping the state in our edge layer, we decided to process modifications asynchronously, which keeps the edge layer stateless') and 'we design for 20x' (https://www.adyen.com/knowledge-hub/the-adyen-way-of-engineering--we-design-for-20x, Miguel Gonzalez, 2020-10-22: the Adyen for Platforms API validates, queues and answers before processing); the 2022 post says 'we have created our own frameworks' and does not describe them; no design guide, review criteria or reviewers found for either company. | `contrast`: What has been published, with dates. → What has not. |\n\n### Stripe and Adyen: Where They Differ\n\n**Controlling idea** (`comparison`, id `where-they-differ`): The two providers differ in the shape of the API, the identifier, whether a payment can be read back, how a refusal is encoded, how related data is requested and how much each has published about design; they do not differ in supplying an identifier, a vocabulary and a stated line.\n\n**Advances the thesis** (C3, C4): Sets the documented facts of the earlier sections side by side and reads them for an integrator.\n\n**Transition in:** `conclusion_summary`: The documented elements, shapes and design practice of each provider. → The same facts in one table, with the author's reading of each difference.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p36 | comparison | On six aspects the public record shows a difference, and the last column of the table is the author's inference from it. | table: Aspect / Stripe / Adyen / what the difference suggests. (1) Shape: one host, one object model, two namespaces /v1 and /v2 / several API families with their own version counters and, in most cases, hosts; three pagination styles and two error formats among them. (2) Payment identifier: type-prefixed object ID (pi_…) / 16-character PSP reference per request, plus the integrator's required reference. (3) Reading a payment back: GET by identifier returns the object with its status / Checkout API v72 has three GET operations of 31, none for a payment. (4) A refused card on the wire: HTTP 4xx (402) with error type card_error and a decline_code / HTTP 200 with resultCode Refused and a refusalReasonCode. (5) Related data: expand per request in v1, include in v2 / additionalData switched on per account. (6) Published design practice: method (2020), review paragraph (2017), automated checks (2026); design guide not public / one post naming an API Review group (2022); design guide not public. Sources as cited in the sections above. |  |\n| p37 | recommendation | An integrator on Stripe can treat the provider's object as the record to re-read and must branch on the error type, not the HTTP status; on Adyen it must write its own record before each request, branch on the result code inside a 200, and learn later states from webhooks and reports; on both it stores its own reference with every payment. | reasoning: Follows from rows 2 to 5 of the table; the author's recommendation. Consistency ruling 12: 'fetch the object' advice applies to Stripe; on Adyen the confirming record is the webhook plus the settlement report. | `cause_effect`: Differences in identifier, read-back and refusal encoding. → What an integrator does differently on each provider. |\n\n### In Practice at Larkfield: An Adapter That Hides Two Vocabularies and Shows One Difference\n\n**Controlling idea** (`example`, id `in-practice`): Larkfield's rebuilt payment-service interface gives its callers one identifier, one set of outcomes and reasons and one meaning of 'not yet known' for both providers, and adds a confirm call that says where its answer came from.\n\n**Advances the thesis** (C5): Applies the thesis to a worked design: what is normalized, what is stored, and the one difference left visible.\n\n**Transition in:** `example`: What an integrator does differently on each provider. → One system that has to do both behind a single interface.\n\n**Order of paragraphs** (`prerequisite_order`): The interface first, then a payment that succeeds through it, then one that is refused, then the read that differs by provider.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p38 | description | The interface Tom Hendriks and Femke de Graaf settle on has four parts: Larkfield's own payment identifier written before any provider is called, a small set of outcomes, a normalized reason with the provider's raw value kept beside it, and a confirm call. | table: Larkfield's internal interface (illustrative). Columns: element / what callers see / on Stripe / on Adyen. Identifier: Larkfield payment ID / sent as metadata, pi_ ID stored on return / sent as reference, PSP reference stored on return. Outcome of a request: approved, refused, action_needed, received, rejected, unknown / from PaymentIntent status or error type / from resultCode or HTTP status. Reason: Larkfield reason plus raw value / decline_code / refusalReasonCode. Confirm: state plus source / the retrieved object / own record from verified webhooks, later the settlement report. Scenario ledger: K1 (every money-moving call goes through the payment service), K2, the payment record store's five states and raw references. |  |\n| p39 | example | For Mila's €120.00 class pass on Adyen the payment service writes its attempt record first, sends Larkfield's identifier as the reference, stores the PSP reference from the response, and leaves the record pending until the webhook confirms it. | scenario: Mila's class pass (scenario ledger): 9 March 2027, 19:42, Studio Noord on Adyen, approved and captured automatically. payment-state-machines: the row stays pending and becomes paid when the AUTHORISATION webhook arrives with success true. Adyen's documented advice not to use the result code to update the order system (cited above). | `example`: The interface in the abstract. → The book's recurring payment passing through it. |\n| p40 | example | Mila's membership renewal of 1 April 2027 is refused for insufficient funds, and the adapter returns the same outcome, refused with reason insufficient_funds, whether the wire carried Adyen's HTTP 200 or what would have been Stripe's HTTP 402. | scenario: Scenario ledger: the €49.00 renewal of 1 April 2027 is declined for insufficient funds, reported by Adyen as refusal reason 12 'Not enough balance', and retried on 4 April as scheduled attempt 2 with its own idempotency key (K1); K5: the renewal job retries 'on a schedule tied to decline codes'. Had Studio Noord been on Stripe: a card_error with decline_code insufficient_funds (documented above). | `contrast`: A payment that was approved. → One that was refused, and what the two wire forms have in common. |\n| p41 | explanation | The confirm call is the one place the two providers show through: it returns the state together with its source, the provider's object on Stripe and Larkfield's own verified events on Adyen, so a caller that needs certainty can see which it got. | scenario: Keel K2 (scenario ledger) and consistency ruling 12. On Stripe confirm retrieves the PaymentIntent; on Adyen it returns the record store's state marked as built from webhooks, and marked as report-confirmed once the reconciliation job has matched the settlement report line (payment-reconciliation-and-reporting). Had this existed on 14 September 2026, the check-in screen could have asked Stripe directly for the 3,200 memberships. | `contrast`: What the adapter makes identical. → What it deliberately does not. |\n\n### When It Goes Wrong: Lost Responses, Unknown Codes and Models That Leak\n\n**Controlling idea** (`process`, id `when-it-goes-wrong`): An object model fails its integrator in four recognizable ways (a response that never arrives, a value the code has never seen, a refusal handled as a failure, and a convenience that changes behavior under load), and each has a detection and a repair at the adapter.\n\n**Advances the thesis** (C5, C2): Shows the failure, detection and recovery for each element of the model, including the case the next chapter resolves.\n\n**Transition in:** `contrast`: The adapter working as designed. → The same elements when one of them fails.\n\n**Order of paragraphs** (`order_of_importance`): The failure that can cost money twice first, then the ones that misclassify, then the one that only slows or misleads a read.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p42 | process | When the response to a create request never arrives, the integrator holds no provider identifier, and what it can do next depends on the model: on Stripe the object may exist and be found through its metadata on a later event, and on Adyen only the reference it sent ties any later webhook to the attempt. | fact: Stripe's guidance to 'include a local identifier in its metadata so you can match an object received through a webhook to your local records' (https://docs.stripe.com/error-low-level, n.d., accessed 2026-11); Adyen's webhooks carry merchantReference beside pspReference (as verified in the research brief from the webhook reference); scenario ledger addition from the authorization chapter: under Keel, pending also covers 'request sent, no answer yet'. |  |\n| p43 | process | Providers add and rename values, so an adapter will meet a status, result code or decline code it has no mapping for, and the safe default is to store the raw value, treat it as the most cautious outcome, and count it. | fact: 'Versions of the API before 2019-02-11 show requires_source instead of requires_payment_method' (https://docs.stripe.com/payments/paymentintents/lifecycle, n.d., accessed 2026-11, as verified in the research brief); Stripe's August 2026 release added 'standardized error codes for authentication failures, expired payment methods, incorrect postal codes, and restricted payment methods' (https://docs.stripe.com/changelog/dahlia, 2026-08-26, as verified in the research brief). Larkfield's rule is illustrative: an unknown status changes no state and is raised for review (as the payment-state-machines ledger line requires); an unknown refusal reason is a refusal that is not retried until mapped. | `additional_support`: A response that is missing. → A response that is present and not understood. |\n| p44 | process | A refusal handled as a failed request is resent at once, which repeats a declined payment against the same card, and it shows up as several attempts for one business event within seconds. | reasoning: A generic HTTP client treats any 4xx or 5xx as failure and many retry libraries resend on failure; on Stripe a refusal arrives as a 4xx. Card networks limit reattempts (authorization-optimization). Detection: more than one attempt per business event and attempt number. Repair: classify at the adapter before any retry logic sees the response. | `cause_effect`: Values the code cannot classify. → A value classified wrongly, and what follows. |\n| p45 | process | Conveniences of the model change behavior under load or on a newer namespace: deep expansion slows list calls, a newer list may not yet show an object just written, and a result code used as the final word is sometimes overtaken. | fact: Stripe: 'Performing deep expansions on numerous list requests might result in slower processing times' (https://docs.stripe.com/api/expanding_objects, n.d., accessed 2026-11); in /v2 'Lists are eventually consistent by default' (https://docs.stripe.com/api-v2-overview, n.d., accessed 2026-11). Adyen: 'The status of a payment can sometimes change after you get the result code' (result-codes page, n.d., accessed 2026-11). Repair: read single objects by identifier on the paths that decide money, and keep expansion and lists for back-office reads. | `additional_support`: Failures of classification. → Failures of performance and freshness that the documentation warns of. |\n\n## Conclusion: What to Take Away\n\n**Synthesis:** The elements of an object model are all answers to one question, what the provider will remember for you and let you ask about again, and the two providers differ less in what they tell you than in whether you can ask twice. That is why the same three dependencies (identifier, vocabulary, the line) work on both, and why the integrator's own record is optional insurance on one and the only readable copy on the other.\n\n**So what:** An evaluator reads an API reference for what its own system must store, and an adapter author normalizes names and reasons while leaving the source of each state visible to callers.\n\n**Callback:** The 'get payment' call that never asked a provider anything. The rebuilt interface keeps one call for both providers and adds what the old one lacked: the answer says whether it came from the provider's object or from Larkfield's own record of events.\n\n**Takeaway** (`course_of_action`): For each provider, list from its API reference what you can read back by identifier and what you cannot; for every item you cannot, name the record of your own that holds it and the message that updates it.\n\n**Hand-off** to [Exactly Once, Over a Network That Does Not Allow It: Idempotency and Retries](idempotency-and-retries.html): `problem_solution`: The object model, in which a create request returns an identifier. → What the integrator holds when that response never arrives, and the idempotency key as its way to resend the same intention.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p46 | synthesis (list) | Established: both providers supply a stable identifier, a normalized refusal vocabulary and a documented line between response and later result; they encode a refusal on opposite sides of HTTP success; Stripe's payment can be fetched by identifier and Adyen's Checkout API has no such call; both generate libraries from a published specification. |  |  |\n| p47 | synthesis (list) | Depends on context: whether a fetchable object or a reference with events suits you depends on whether you already keep a reliable record of your own; whether several families are a burden depends on whether you use generated libraries; whether to adopt a newer namespace depends on what it covers. |  | `contrast`: What the documentation establishes. → What changes with the integrator's own system. |\n| p48 | recommendation (list) | The author's synthesis: judge an API by what your own system must remember, not by the uniformity of its style; an adapter over two providers should hide the vocabularies and show where each state was read. |  | `additional_support`: What is established and what depends. → The author's own position. |\n| p49 | recommendation (list) | Eight questions let the reader test a provider's object model, or an adapter over one, in a design review. |  | `sequence`: The author's position. → Questions that apply it. |\n| p50 | transition | Every element of the object model assumed the response arrived; when a create request times out the integrator holds its own record and no answer, and the next chapter gives it a way to say that a second send is the same intention as the first. |  | `problem_solution`: An object model in which a create request returns an identifier. → The case in which the response carrying it never arrives. |\n\n## Non-goals\n\n- The payment state machines themselves and how to mirror them (PaymentIntent statuses, Adyen result codes, modifications, the history from Charges to PaymentIntents in detail). See [One Object, Many Outcomes: The Payment State Machine](payment-state-machines.html).\n- Idempotency keys, retries and the unknown outcome. See [Exactly Once, Over a Network That Does Not Allow It: Idempotency and Retries](idempotency-and-retries.html).\n- API versions, version pinning, deprecation and how SDK versions follow API versions. See [Changing the API Without Breaking a Million Integrations: Versioning](payment-api-versioning.html).\n- Webhook and event contracts, snapshot versus thin events. See [The Provider Calls You: Webhooks and Events](payment-webhooks-and-events.html).\n- API keys, test environments, rate limits, request logs and other tooling. See [Keys, Sandboxes and Limits: The Developer Platform Around the API](payment-developer-platform.html).\n- What to do with each decline code: retry strategy and network retry limits. See [Raising the Approval Rate: Retries, Tokens and Optimization](authorization-optimization.html).\n- The Terminal API and the nexo protocol beyond one table row. See [The Card in the Room: Terminals and Unified Commerce](in-person-payments.html).\n- Merchant-side API contract design in general. See [Promises Between Systems: API Contracts, Webhooks and Versioning](../commerce-platform-architecture/api-contracts-and-versioning.html).\n\n## Modalities\n\nArticle only.\n\n## Open questions\n\n- Neither company has published its API design guide, its review criteria or who reviews; the chapter says so and infers nothing further.\n- Whether and when Stripe will move payment objects to the /v2 namespace: no public statement found; a complete index of /v2 resources was not found either.\n- Why Adyen's Checkout API has no read call for a payment, and why its families differ in convention: not published; the chapter labels its reading as inference.\n- The Checkout API v72 resultCode enum lists 14 values including 'Success', while the result-codes documentation page groups 13; the chapter gives no count.\n- That Stripe returns HTTP 402 for a declined card was first assembled from the errors reference (the 402 row, the 4xx examples and the card_error type). The verification pass of 17 November 2026 found one sentence that says so, in Stripe's guide to 3-D Secure ('The request failed with a 402 HTTP status code, meaning that the payment was unsuccessful', https://docs.stripe.com/payments/3d-secure/authentication-flow, n.d., accessed 2026-11); the article now cites it.\n\n## Decision log\n\n- **2026-11-17** — Where payment state lives is stated in one paragraph with a link to payment-state-machines, per consistency ruling 1; the chapter spends its space on identifiers, vocabulary, the error model and the line between response and later. Rejected: Re-teaching the PaymentIntent and result-code state machines.\n- **2026-11-17** — The Larkfield scene uses a local detail (the 2024 interface's single read call returned Larkfield's own record on both providers) and ties it to the Silent Webhook without changing that incident's ledger facts; the detail is appended to the scenario ledger. Rejected: Inventing a new incident for this chapter.\n- **2026-11-17** — The reason for the difference in style between Adyen's API families is given only as a labeled inference. Rejected: Stating that the Checkout API descends from an older generation of Adyen APIs as fact.\n- **2026-11-17** — Stripe's API v2 is described from the overview page and the 2026 engineering post; the list of v2 resources is not enumerated because no index was found. Rejected: Listing v2 resources assembled from changelog rows as if complete.\n- **2026-11-17** — Flow rubric notes acted on in wording only: the lists paragraph names the /v1 and /v2 paths and Adyen's separate APIs in plain words before the section that defines namespace and API family, and the state paragraph glosses result code and names the Checkout API as Adyen's API for online payments. Notes not acted on, left for the author: move the lists paragraph into the two-shapes section; move metadata directly after identifiers; merge the two paragraphs on Stripe's review and Adyen's review group. Rejected: Reordering units after a 'sound with notes' verdict without the author's decision.\n- **2026-11-17** — Pagination conventions are covered in one paragraph and one table column; the Terminal API in one table row with a link. Rejected: A section per Adyen API family.\n\n## Sources\n\n- **Internal**\n  - PLAN.md, chapter contract 17 — Scope, owned terms (resource model, expandable object, error model, API family), the Larkfield thread.\n  - _research/brief-stripe-payments-and-api.md, Parts 1 and 2 and section 6.5 — Verified quotations on object conventions, the error model, design practice, API v2 and SDK generation; the list of what is not public.\n  - _research/brief-adyen-payments-and-api.md, sections 1.3, 1.4, 2.1 and Part 3 — Verified facts on result codes, the absence of a payment GET, API families and their conventions, OpenAPI and generated libraries, the 2022 API-first post.\n  - _research/consistency-issues.md, rulings 1, 12 and 15 — Ownership of 'where state lives'; fetch-the-object advice applies to Stripe only.\n  - _research/scenario-ledger.md — The payment service, the payment record store, the Silent Webhook, Keel K1, K2 and K5, Mila's class pass and declined renewal, the cast.\n- **External**\n  - https://stripe.dev/blog/payment-api-design (2020-12-15) — Growth of the Charge resource, the design method, the cost of PaymentIntents to the simple case.\n  - https://stripe.dev/blog/how-api-changes-flow-into-stripes-developer-products (2026-06-15) — Automated design checks, the v2 namespace, OpenAPI and SDK generation.\n  - https://stripe.com/blog/api-versioning (2017-08-05) — The one public paragraph on API review.\n  - docs.stripe.com: api/errors, api/expanding_objects, api/pagination, api/metadata, api-v2-overview, api/payment_intents (object, retrieve), declines/codes, error-low-level — Stripe's documented conventions, re-fetched for this chapter.\n  - https://www.adyen.com/knowledge-hub/api-first-adyen (2022-09-27) and https://www.adyen.com/knowledge-hub/adyen-api-libraries (2023-03-28) — API families, the API Review group, generated libraries.\n  - https://github.com/Adyen/adyen-openapi: CheckoutService-v72, ManagementService-v3, BalancePlatformService-v2, TransferService-v4 — Operation counts, identifiers, pagination parameters, error schemas, metadata limits; parsed for this chapter.\n  - docs.adyen.com: development-resources/response-handling, refusal-reasons, versioning; online-payments/build-your-integration/payment-result-codes; adyen-glossary — Adyen's documented response handling, refusal reasons and PSP reference, re-fetched for this chapter.\n\n## Changelog\n\n- **2026-11-17** — First version, written from the chapter contract, the Stripe and Adyen API research briefs and the scenario ledger; intent, thesis and role copied from the journal spec.\n- **2026-11-17** — Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes).\n- **2026-11-17** — Verification pass: 96 claims checked (87 confirmed, 3 corrected, 6 hedged, 0 unsupported and removed or relabeled, 0 unreachable); the Silent Webhook is now Monday 14 September 2026 (ruling 20), the Asjes article is attributed to a Stripe developer advocate on DEV and no longer to a personal account, and the 18-version claim now notes that Adyen withdrew support for Checkout API v37 in September 2026.\n- **2026-11-17** — Reconciliation after verification (17 November 2026): intent and supporting claim C3 no longer say every Adyen API family has its own host, pagination and error format (two platform APIs share a host; three APIs share an error format).\n- **2026-11-17** — Absence audit: 8 statements of absence re-tested with a wide search (documentation sitemaps, help centers, company sites, engineering posts, web search). Overturned: 'nothing found on how Adyen's API layer is built' (Adyen posts of 2021 and 2020 describe a stateless acceptance layer and a validate-and-queue platform API). Narrowed: 'Adyen has not published the reason' (the 2021 post gives the reason for asynchronous modifications; none found for the difference between families or the missing payment read); Adyen's design guide (the 2022 post says a style guide exists and is linted; the guide is not public). Others hold and now say where they were searched. Paragraph p35 controlling idea and evidence updated; two sources added.\n- **2026-11-17** — Visual layer: 3 figures generated and inspected (article-illustrator).\n"}]}]}</script>
+<script>
+    (function () {
+        const data = JSON.parse(document.getElementById('data').textContent);
+        const root = document.getElementById('content');
+
+        const postId = (data.meta && data.meta.id) ? String(data.meta.id) : '';
+        const postStatusRaw = (data.meta && data.meta.status) ? String(data.meta.status) : '';
+        if (postId || postStatusRaw) {
+            const header = document.getElementById('post-header');
+            let sectionEl = header.querySelector('p.section');
+            if (!sectionEl) {
+                sectionEl = document.createElement('p');
+                sectionEl.className = 'section';
+                header.insertBefore(sectionEl, header.firstChild);
+            }
+            // Status pill goes first, then a " / " separator before the existing
+            // content (section name and/or id).
+            if (postStatusRaw) {
+                const parts = postStatusRaw.split(':');
+                const statusName = parts[0].trim();
+                const statusColor = (parts[1] || '').trim();
+                const wrap = document.createElement('span');
+                wrap.className = 'post-status';
+                const dot = document.createElement('span');
+                dot.className = 'status-dot';
+                if (statusColor) dot.style.background = statusColor;
+                wrap.appendChild(dot);
+                wrap.appendChild(document.createTextNode(statusName));
+                if (sectionEl.firstChild) {
+                    sectionEl.insertBefore(document.createTextNode(' • '), sectionEl.firstChild);
+                    sectionEl.insertBefore(wrap, sectionEl.firstChild);
+                } else {
+                    sectionEl.appendChild(wrap);
+                }
+            }
+            if (postId) {
+                if (sectionEl.firstChild) sectionEl.appendChild(document.createTextNode(' • '));
+                sectionEl.appendChild(document.createTextNode(postId));
+            }
+        }
+
+        const tagsHost = document.getElementById('tags');
+        (data.tags || []).forEach(function (t) {
+            const span = document.createElement('span');
+            span.className = 'tag';
+            span.textContent = t;
+            tagsHost.appendChild(span);
+        });
+
+        // Minimal markdown renderer. Supports: ATX headings, paragraphs, blockquotes,
+        // unordered/ordered lists, fenced code, inline code, bold/italic/strikethrough, links, images, hr.
+        // Sufficient for the posts in this repo; replace with a fuller parser if needed.
+        function renderMarkdown(src) {
+            const lines = src.replace(/\r\n/g, '\n').split('\n');
+            const out = [];
+            let i = 0;
+
+            const bullet = /^(\s*)([-*])\s+(.*)$/;
+            const ordered = /^(\s*)(\d+)\.\s+(.*)$/;
+            const tableRow = /^\s*\|(.+)\|\s*$/;
+            const tableSep = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+
+            function splitRow(s) {
+                let t = s.trim();
+                if (t.startsWith('|')) t = t.slice(1);
+                if (t.endsWith('|')) t = t.slice(0, -1);
+                return t.split('|').map(c => c.trim());
+            }
+
+            function inline(s) {
+                // Posts are trusted content, so raw HTML passes through unescaped
+                // (some posts embed inline <blockquote>, <div>, etc.).
+                // Stray ampersands still get fixed up.
+                s = s.replace(/&(?![a-zA-Z]+;|#\d+;)/g, '&amp;');
+                s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<a class="image-link" href="$2" target="_blank" rel="noopener noreferrer"><img alt="$1" src="$2"></a>');
+                s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+                s = s.replace(/`([^`]+)`/g, function (_, c) {
+                    return '<code>' + c.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
+                });
+                // Bold/italic, including nested combinations: ***x***,
+                // **a *b*** / ***a* b** (shared delimiters), and **a *b* c**.
+                s = s.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+                s = s.replace(/\*\*([^*\n]+)\*([^*\n]+)\*\*\*/g, '<strong>$1<em>$2</em></strong>');
+                s = s.replace(/\*\*\*([^*\n]+)\*([^*\n]+)\*\*/g, '<strong><em>$1</em>$2</strong>');
+                s = s.replace(/\*\*((?:[^*\n]|\*(?!\*)[^*\n]+\*(?!\*))+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+                s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+                return s;
+            }
+
+            while (i < lines.length) {
+                const line = lines[i];
+                if (!line.trim()) {
+                    i++;
+                    continue;
+                }
+
+                const fence = line.match(/^```(\w*)\s*$/);
+                if (fence) {
+                    i++;
+                    const buf = [];
+                    while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+                        buf.push(lines[i]);
+                        i++;
+                    }
+                    i++;
+                    const escaped = buf.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const cls = fence[1] ? ' class="lang-' + fence[1] + '"' : '';
+                    out.push('<pre><code' + cls + '>' + escaped + '</code></pre>');
+                    continue;
+                }
+
+                const h = line.match(/^(#{1,6})\s+(.*)$/);
+                if (h) {
+                    out.push('<h' + h[1].length + '>' + inline(h[2]) + '</h' + h[1].length + '>');
+                    i++;
+                    continue;
+                }
+
+                if (/^\s*(?:-\s*){3,}\s*$/.test(line) || /^\s*\*{3,}\s*$/.test(line)) {
+                    out.push('<hr>');
+                    i++;
+                    continue;
+                }
+
+                if (/^>\s?/.test(line)) {
+                    const buf = [];
+                    while (i < lines.length && /^>\s?/.test(lines[i])) {
+                        buf.push(lines[i].replace(/^>\s?/, ''));
+                        i++;
+                    }
+                    out.push('<blockquote>' + renderMarkdown(buf.join('\n')) + '</blockquote>');
+                    continue;
+                }
+
+                if (tableRow.test(line) && i + 1 < lines.length && tableSep.test(lines[i + 1])) {
+                    const headers = splitRow(line);
+                    const aligns = splitRow(lines[i + 1]).map(function (c) {
+                        c = c.trim();
+                        const left = c.startsWith(':'), right = c.endsWith(':');
+                        return left && right ? 'center' : right ? 'num' : '';
+                    });
+                    const cellOpen = function (tag, idx) {
+                        return aligns[idx] ? '<' + tag + ' class="' + aligns[idx] + '">' : '<' + tag + '>';
+                    };
+                    i += 2;
+                    const rows = [];
+                    while (i < lines.length && tableRow.test(lines[i])) {
+                        rows.push(splitRow(lines[i]));
+                        i++;
+                    }
+                    let html = '<div class="table-wrap"><table><thead><tr>';
+                    headers.forEach((h, idx) => {
+                        html += cellOpen('th', idx) + inline(h) + '</th>';
+                    });
+                    html += '</tr></thead><tbody>';
+                    rows.forEach(r => {
+                        html += '<tr>';
+                        r.forEach((c, idx) => {
+                            html += cellOpen('td', idx) + inline(c) + '</td>';
+                        });
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                    out.push(html);
+                    continue;
+                }
+
+                if (bullet.test(line) || ordered.test(line)) {
+                    // Indent of the first bullet defines this list's base level.
+                    // Deeper-indented bullets become nested lists (rendered by
+                    // recursing into renderMarkdown). Same-or-less indent at a
+                    // bullet starts a sibling item (or ends the list).
+                    const firstMatch = line.match(bullet) || line.match(ordered);
+                    const baseIndent = firstMatch[1].length;
+                    const isOrdered = ordered.test(line);
+                    const items = [];
+                    let hasTask = false;
+                    while (i < lines.length) {
+                        const cur = lines[i];
+                        if (!cur.trim()) {
+                            // blank line breaks the list (matches CommonMark-ish behaviour)
+                            i++;
+                            break;
+                        }
+                        const mBul = cur.match(bullet);
+                        const mOrd = cur.match(ordered);
+                        const m = mBul || mOrd;
+                        if (!m) break;
+                        if (m[1].length < baseIndent) break;
+                        if (m[1].length > baseIndent) break; // shouldn't happen at top of loop
+                        // Same-type check: switching between -/* and 1. closes the list
+                        if (isOrdered !== !!mOrd) break;
+
+                        const itemBuf = [m[3]];
+                        const nestedBuf = [];
+                        i++;
+                        while (i < lines.length) {
+                            const nxt = lines[i];
+                            if (!nxt.trim()) break;
+                            const nBul = nxt.match(bullet);
+                            const nOrd = nxt.match(ordered);
+                            const nm = nBul || nOrd;
+                            if (nm) {
+                                if (nm[1].length > baseIndent) {
+                                    // nested list line — dedent and stash
+                                    nestedBuf.push(nxt.slice(baseIndent + 2));
+                                    i++;
+                                    continue;
+                                }
+                                // sibling or end of list
+                                break;
+                            }
+                            // Plain continuation text
+                            if (nestedBuf.length) {
+                                // continuation inside the nested block
+                                nestedBuf.push(nxt.slice(baseIndent + 2));
+                            } else {
+                                itemBuf.push(nxt.trim());
+                            }
+                            i++;
+                        }
+
+                        // GitHub-style task items: "- [ ] text" / "- [x] text"
+                        // render as (clickable, unpersisted) checkboxes.
+                        const itemText = itemBuf.join('\n');
+                        const task = !isOrdered && itemText.match(/^\[( |x|X)\]\s+/);
+                        let liHtml = inline(task ? itemText.slice(task[0].length) : itemText);
+                        if (task) {
+                            hasTask = true;
+                            liHtml = '<input type="checkbox"' + (task[1] === ' ' ? '' : ' checked') + '>' + liHtml;
+                        }
+                        if (nestedBuf.length) {
+                            liHtml += renderMarkdown(nestedBuf.join('\n'));
+                        }
+                        items.push(task ? '<li class="task">' + liHtml + '</li>' : '<li>' + liHtml + '</li>');
+                    }
+                    out.push((isOrdered ? '<ol>' : (hasTask ? '<ul class="task-list">' : '<ul>')) + items.join('') + (isOrdered ? '</ol>' : '</ul>'));
+                    continue;
+                }
+
+                const buf = [line];
+                i++;
+                while (i < lines.length && lines[i].trim() && !/^#{1,6}\s/.test(lines[i]) && !/^>\s?/.test(lines[i]) && !bullet.test(lines[i]) && !ordered.test(lines[i]) && !/^```/.test(lines[i]) && !tableRow.test(lines[i])) {
+                    buf.push(lines[i]);
+                    i++;
+                }
+                out.push('<p>' + inline(buf.join(' ')) + '</p>');
+            }
+            return out.join('\n');
+        }
+
+        // Block dispatcher. New block types plug in here.
+        const renderers = {
+            markdown: function (block) {
+                const div = document.createElement('div');
+                div.innerHTML = renderMarkdown(block.content);
+                return div;
+            },
+            mermaid: function (block) {
+                // Mermaid scans elements with class "mermaid" whose textContent
+                // is the diagram source. We collect these nodes and run
+                // mermaid.run() once after all blocks are in the DOM.
+                const div = document.createElement('div');
+                div.className = 'mermaid';
+                div.textContent = block.content;
+                return div;
+            },
+            'force-graph': function (block) {
+                // build.py emits parsed JSON: {nodes:[{id,size}], links:[{source,target}]}.
+                // We instantiate force-graph after the container is in the DOM
+                // so it can measure its own width.
+                const div = document.createElement('div');
+                div.className = 'force-graph';
+                const data = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.ForceGraph) return;
+                    const maxSize = data.nodes.reduce((m, n) => Math.max(m, n.size || 1), 1);
+                    window.ForceGraph()(div)
+                        .graphData(data)
+                        .width(div.clientWidth)
+                        .height(div.clientHeight)
+                        .nodeRelSize(4)
+                        .nodeVal(n => Math.max(20 * (n.size || 1) / maxSize, 0.001))
+                        .nodeLabel(n => n.id + ' (' + (n.size || 1) + ')')
+                        .nodeColor(() => 'rgba(135, 206, 235, 0.7)')
+                        .linkColor(() => 'rgba(60, 60, 60, 0.4)')
+                        .linkDirectionalArrowLength(4)
+                        .linkDirectionalArrowRelPos(1)
+                        .linkWidth(1);
+                });
+                return div;
+            },
+            'bubble-chart': function (block) {
+                // build.py emits {nodes:[{name,size}]}. Renders a D3 circle-pack
+                // SVG (same shape as the obren.io reference, just inline).
+                const wrap = document.createElement('div');
+                wrap.className = 'bubble-chart';
+                const payload = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.d3) return;
+                    const diameter = 480;
+                    const fill = '#c0deed';
+                    const textColor = '#111111';
+                    const fontSize = 12;
+
+                    const svg = window.d3.select(wrap).append('svg')
+                        .attr('viewBox', '0 0 ' + diameter + ' ' + diameter)
+                        .attr('width', diameter)
+                        .attr('height', diameter);
+
+                    const root = window.d3.hierarchy({children: payload.nodes})
+                        .sum(d => d.size || 0)
+                        .sort((a, b) => b.value - a.value);
+
+                    window.d3.pack().size([diameter, diameter]).padding(2)(root);
+
+                    const node = svg.selectAll('g')
+                        .data(root.leaves())
+                        .enter().append('g')
+                        .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+
+                    node.append('title').text(d => d.data.name + ': ' + d.value);
+                    node.append('circle').attr('r', d => d.r).style('fill', fill);
+                    node.append('text')
+                        .attr('dy', '.3em')
+                        .style('text-anchor', 'middle')
+                        .style('fill', textColor)
+                        .style('font-size', fontSize + 'px')
+                        .text(d => d.data.name.substring(0, Math.max(0, Math.floor(d.r / 3))));
+                });
+                return wrap;
+            }
+        };
+
+        // Render one modality's blocks into a host element. Mermaid runs
+        // scoped to just the nodes created here, so lazily rendered tabs get
+        // their diagrams on first activation.
+        let mermaidInitialized = false;
+        function renderBlocksInto(blocks, host) {
+            const mermaidNodes = [];
+            blocks.forEach(function (block) {
+                const r = renderers[block.type];
+                if (!r) {
+                    const pre = document.createElement('pre');
+                    pre.textContent = '[unknown block type: ' + block.type + ']';
+                    host.appendChild(pre);
+                    return;
+                }
+                const node = r(block);
+                if (node instanceof Node) {
+                    host.appendChild(node);
+                    if (block.type === 'mermaid') mermaidNodes.push(node);
+                }
+            });
+            if (mermaidNodes.length && window.mermaid) {
+                if (!mermaidInitialized) {
+                    window.mermaid.initialize({startOnLoad: false, theme: 'default'});
+                    mermaidInitialized = true;
+                }
+                window.mermaid.run({nodes: mermaidNodes});
+            }
+            markScrollableTables(host);
+        }
+
+        // A table wider than its wrapper scrolls sideways. Mark those wrappers
+        // so the CSS can show a cue, and make them focusable so keyboard users
+        // can reach and scroll them. Hidden panes measure 0 and are re-marked
+        // when activated or when the window is resized.
+        function markScrollableTables(host) {
+            host.querySelectorAll('.table-wrap').forEach(function (wrap) {
+                const scrolls = wrap.scrollWidth > wrap.clientWidth + 1;
+                wrap.classList.toggle('is-scrollable', scrolls);
+                if (scrolls) {
+                    wrap.setAttribute('tabindex', '0');
+                    wrap.setAttribute('role', 'region');
+                    wrap.setAttribute('aria-label', 'Table that scrolls sideways');
+                } else {
+                    wrap.removeAttribute('tabindex');
+                    wrap.removeAttribute('role');
+                    wrap.removeAttribute('aria-label');
+                }
+            });
+        }
+
+        // Modality tabs. One <article class="pane"> per modality; panes are
+        // rendered lazily on first activation (force-graph / D3 / mermaid
+        // need a visible, measurable container). With a single modality the
+        // tab bar stays hidden and the page looks exactly like before.
+        const mods = data.modalities;
+        const tabBar = document.getElementById('modality-tabs');
+        const panes = {};
+        const tabButtons = {};
+        const renderedPanes = {};
+
+        // With several modalities each pane is a tabpanel labelled by its
+        // tab (W3C APG tabs pattern); tabindex=0 lets keyboard users move
+        // from the tab list straight into the active content.
+        mods.forEach(function (m) {
+            const pane = document.createElement('article');
+            pane.className = 'pane';
+            pane.dataset.key = m.key;
+            pane.hidden = true;
+            if (mods.length > 1) {
+                pane.id = 'pane-' + m.key;
+                pane.setAttribute('role', 'tabpanel');
+                pane.setAttribute('aria-labelledby', 'tab-' + m.key);
+                pane.setAttribute('tabindex', '0');
+            }
+            root.appendChild(pane);
+            panes[m.key] = pane;
+        });
+
+        const defaultKey = mods.some(m => m.key === 'index') ? 'index' : mods[0].key;
+
+        function activate(key, updateHash) {
+            mods.forEach(function (m) {
+                const isActive = m.key === key;
+                panes[m.key].hidden = !isActive;
+                if (tabButtons[m.key]) {
+                    tabButtons[m.key].classList.toggle('active', isActive);
+                    tabButtons[m.key].setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    // Roving tabindex: only the selected tab is in the Tab
+                    // order; the arrow keys move between tabs.
+                    tabButtons[m.key].setAttribute('tabindex', isActive ? '0' : '-1');
+                }
+            });
+            // Unhide first, then render: the chart libraries measure widths.
+            if (!renderedPanes[key]) {
+                renderBlocksInto(mods.find(m => m.key === key).blocks, panes[key]);
+                renderedPanes[key] = true;
+            } else {
+                markScrollableTables(panes[key]);
+            }
+            if (updateHash) {
+                history.replaceState(null, '',
+                    key === defaultKey ? location.pathname + location.search : '#' + key);
+            }
+        }
+
+        if (mods.length > 1) {
+            mods.forEach(function (m) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = m.label;
+                btn.id = 'tab-' + m.key;
+                btn.dataset.key = m.key;
+                btn.setAttribute('role', 'tab');
+                btn.setAttribute('aria-controls', 'pane-' + m.key);
+                btn.addEventListener('click', function () { activate(m.key, true); });
+                tabBar.appendChild(btn);
+                tabButtons[m.key] = btn;
+            });
+            // Keyboard support per the W3C APG tabs pattern (automatic
+            // activation): Left/Right move between tabs and wrap, Home/End
+            // jump to the first/last tab, and the focused tab is selected.
+            tabBar.addEventListener('keydown', function (ev) {
+                const keys = mods.map(function (m) { return m.key; });
+                const focused = document.activeElement;
+                const current = focused && focused.dataset ? keys.indexOf(focused.dataset.key) : -1;
+                if (current < 0) return;
+                let next = null;
+                if (ev.key === 'ArrowRight') next = (current + 1) % keys.length;
+                else if (ev.key === 'ArrowLeft') next = (current - 1 + keys.length) % keys.length;
+                else if (ev.key === 'Home') next = 0;
+                else if (ev.key === 'End') next = keys.length - 1;
+                if (next === null) return;
+                ev.preventDefault();
+                activate(keys[next], true);
+                tabButtons[keys[next]].focus();
+            });
+            tabBar.hidden = false;
+        }
+
+        // The hash selects a tab only when it matches a modality key, so
+        // existing anchors keep working.
+        const initialHash = location.hash.slice(1);
+        activate(mods.some(m => m.key === initialHash) ? initialHash : defaultKey, false);
+        window.addEventListener('hashchange', function () {
+            const k = location.hash.slice(1);
+            if (mods.some(m => m.key === k)) activate(k, false);
+        });
+        window.addEventListener('resize', function () { markScrollableTables(root); });
+    })();
+</script>
+</body>
+</html>

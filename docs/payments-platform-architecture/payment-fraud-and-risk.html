@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Deciding in Milliseconds: Fraud and Risk Systems</title>
+    <meta name="description" content="How does a provider decide, during an authorization, whether a payment is fraud? It cannot know: it estimates the chance of a later fraud dispute, blocks above a threshold before the bank is asked, and learns weeks afterwards whether it was right, so the threshold is a price the merchant sets and pays.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SETTLED: Architecting Payments and Revenue Infrastructure">
+    <meta property="og:title" content="Deciding in Milliseconds: Fraud and Risk Systems">
+    <meta property="og:description" content="How does a provider decide, during an authorization, whether a payment is fraud? It cannot know: it estimates the chance of a later fraud dispute, blocks above a threshold before the bank is asked, and learns weeks afterwards whether it was right, so the threshold is a price the merchant sets and pays.">
+    <meta property="og:url" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/payment-fraud-and-risk.html">
+    <meta property="og:image" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/assets/images/24-fraud-and-risk-systems/logo.jpeg">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="site.css">
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-129891352-1"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+        dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'UA-129891352-1');
+</script>
+    <style>
+        body {
+            line-height: 1.65;
+        }
+
+        main {
+            padding-top: 32px;
+        }
+
+        nav.post-nav {
+            font-size: 14px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: baseline;
+            flex-wrap: wrap;
+        }
+
+        nav.post-nav a {
+            color: var(--muted);
+            text-decoration: none;
+        }
+
+        nav.post-nav a:hover {
+            color: var(--accent);
+        }
+
+        nav.post-nav .nav-right {
+            margin-left: auto;
+            display: inline-flex;
+            gap: 4px;
+            align-items: baseline;
+        }
+
+        nav.post-nav .nav-sep {
+            color: var(--muted);
+        }
+
+        footer nav.post-nav {
+            margin-top: 24px;
+            margin-bottom: 0;
+        }
+
+        header.post {
+            margin-bottom: 32px;
+        }
+
+        header.post .section {
+            color: var(--muted);
+            font-size: 13px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin: 0 0 -6px;
+        }
+
+        header.post .section a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        header.post .section a:hover {
+            color: var(--accent);
+        }
+
+        header.post .section .post-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        header.post .section .post-status .status-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        header.post .logo {
+            display: block;
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            border: 1px solid lightgrey;
+
+        }
+
+        header.post .logo-credit {
+            color: var(--muted);
+            font-size: 12px;
+            margin: -4px 0 24px;
+            text-align: right;
+        }
+
+        header.post h1 {
+            font-size: 52px;
+            line-height: 1.2;
+            margin: 0 0 2px;
+            padding: 0;
+            letter-spacing: -0.01em;
+            font-weight: normal;
+        }
+
+        header.post .byline {
+            color: var(--muted);
+            font-size: 15px;
+            margin: 0;
+        }
+
+        header.post .byline .spec-link {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        header.post .byline .spec-link:hover {
+            text-decoration: underline;
+        }
+
+        header.post .byline .spec-link-drifted {
+            color: #b8650f;
+        }
+
+        header.post .byline .spec-link-superseded {
+            color: var(--muted);
+        }
+
+        header.post .ai-credit {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 4px 0 0;
+        }
+
+        header.post .ai-credit a {
+            color: inherit;
+        }
+
+        header.post .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 10px 0 10px;
+        }
+
+        header.post .tags .tag {
+            font-size: 14px;
+            padding: 1px 8px;
+            border: 1px solid deepskyblue;
+            color: blue;
+            border-radius: 999px;
+            background-color: var(--tag-bg);
+        }
+
+        nav.modality-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--rule);
+            margin: 0 0 28px;
+            flex-wrap: wrap;
+        }
+
+        nav.modality-tabs button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font: inherit;
+            font-size: 14px;
+            color: var(--muted);
+            padding: 8px 14px;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            letter-spacing: 0.02em;
+        }
+
+        nav.modality-tabs button:hover {
+            color: var(--accent);
+        }
+
+        nav.modality-tabs button.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        #content .pane[hidden] {
+            display: none;
+        }
+
+        #content .pane:focus {
+            outline: none;
+        }
+
+        #content .pane:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 6px;
+        }
+
+        article h2 {
+            font-size: 26px;
+            margin: 40px 0 12px;
+            letter-spacing: -0.01em;
+        }
+
+        article h3 {
+            font-size: 20px;
+            margin: 28px 0 8px;
+        }
+
+        article h4 {
+            font-size: 17px;
+            margin: 20px 0 6px;
+        }
+
+        article p {
+            margin: 0 0 16px;
+        }
+
+        article a {
+            color: var(--accent);
+        }
+
+        article a.image-link {
+            display: inline-block;
+            line-height: 0;
+        }
+
+        article img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        article a.image-link img {
+            display: block;
+        }
+
+        article ul, article ol {
+            padding-left: 24px;
+            margin: 0 0 16px;
+        }
+
+        article li {
+            margin-bottom: 6px;
+        }
+
+        article ul.task-list {
+            list-style: none;
+            padding-left: 4px;
+        }
+
+        article ul.task-list li.task > input[type="checkbox"] {
+            margin-right: 8px;
+            accent-color: var(--accent);
+        }
+
+        article hr {
+            border: none;
+            border-top: 1px solid var(--rule);
+            margin: 32px 0;
+        }
+
+        article blockquote {
+            margin: 16px 0;
+            padding: 12px 18px;
+            background: var(--quote-bg);
+            border-left: 3px solid var(--accent);
+            color: #333;
+        }
+
+        article blockquote p:last-child {
+            margin-bottom: 0;
+        }
+
+        article code {
+            background: var(--code-bg);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 0.92em;
+        }
+
+        article pre {
+            background: var(--code-bg);
+            padding: 14px 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        article pre code {
+            background: none;
+            padding: 0;
+        }
+
+        article .table-wrap {
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+
+        article table {
+            border-collapse: collapse;
+            margin: 16px 0;
+            width: 100%;
+            font-size: 15px;
+        }
+
+        article .table-wrap table {
+            margin: 0;
+        }
+
+        /* Wide tables scroll on narrow screens instead of crushing their columns.
+           A table wrapped in <div class="table-compact"> opts out: it has few,
+           short columns and wraps its cells to fit the screen instead. */
+        @media (max-width: 640px) {
+            article .table-wrap table {
+                min-width: 560px;
+            }
+            article .table-compact .table-wrap table {
+                min-width: 0;
+            }
+        }
+
+        /* Tables that actually overflow get a visible cue and keyboard focus
+           (markScrollableTables() sets the class and attributes). */
+        article .table-wrap.is-scrollable::before {
+            content: "Scroll sideways to see the whole table";
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        article .table-wrap.is-scrollable:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        article th, article td {
+            border: 1px solid var(--rule);
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        article th {
+            background: var(--code-bg);
+            font-weight: 600;
+        }
+
+        /* GFM column alignment from the separator row. Right-aligned columns
+           hold numbers; their cells never wrap, so a sign, a currency symbol
+           and its amount stay on one line while label columns still wrap. */
+        article th.num, article td.num {
+            text-align: right;
+        }
+
+        article td.num {
+            white-space: nowrap;
+        }
+
+        article th.center, article td.center {
+            text-align: center;
+        }
+
+        article .mermaid {
+            text-align: center;
+            margin: 24px 0;
+        }
+
+        article .force-graph {
+            margin: 24px 0;
+            border: 1px solid var(--rule);
+            border-radius: 6px;
+            background: #fff;
+            height: 480px;
+            overflow: hidden;
+        }
+
+        article .bubble-chart {
+            margin: 24px 0;
+            text-align: center;
+        }
+
+        article .bubble-chart svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <nav class="post-nav"><a class="nav-back" href="index.html">SETTLED: Architecting Payments and Revenue Infrastructure</a><span class="nav-right"><a class="nav-prev" href="network-tokens.html" title="The Card Number's Replacement: Network Tokens and Credential Lifecycle">← Previous</a><span class="nav-sep">&nbsp;|&nbsp;</span><a class="nav-next" href="three-d-secure-and-sca.html" title="Proving It Is You: 3-D Secure and Strong Customer Authentication">Next →</a></span></nav>
+    <header class="post" id="post-header">
+        <p class="section">Part V — TRUST: Card Data, Fraud, Authentication and Compliance</p>
+        <h1>Deciding in Milliseconds: Fraud and Risk Systems</h1>
+        <p class="byline">Željko Obrenović  ·  2026-11-17  ·  28 min read · <a class="spec-link" href="payment-fraud-and-risk.spec.html">View spec</a></p>
+        <p class="ai-credit">AI-assisted: researched and written with Claude Code; illustrations generated with Gemini. <a href="https://zeljkoobrenovic.github.io/book-factory/foundations/ai-mediated-authoring.html">How this works</a></p>
+        <div class="tags" id="tags"></div>
+        <a href="assets/images/24-fraud-and-risk-systems/logo.jpeg" target="_blank" rel="noopener noreferrer" aria-label="Open header illustration at full size"><img class="logo" src="assets/images/24-fraud-and-risk-systems/logo.jpeg" alt=""></a>
+        <p class="logo-credit">Image generated by Google Gemini (gemini-3-pro-image-preview)</p>
+    </header>
+    <nav class="modality-tabs" id="modality-tabs" hidden role="tablist" aria-label="Reading formats"></nav>
+    <div id="content"></div>
+    <footer>
+        <nav class="post-nav"><a class="nav-back" href="index.html">SETTLED: Architecting Payments and Revenue Infrastructure</a><span class="nav-right"><a class="nav-prev" href="network-tokens.html" title="The Card Number's Replacement: Network Tokens and Credential Lifecycle">← Previous</a><span class="nav-sep">&nbsp;|&nbsp;</span><a class="nav-next" href="three-d-secure-and-sca.html" title="Proving It Is You: 3-D Secure and Strong Customer Authentication">Next →</a></span></nav>
+    </footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/force-graph"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script id="data" type="application/json">{"meta": {"title": "Deciding in Milliseconds: Fraud and Risk Systems", "date": "2026-11-17", "author": "Željko Obrenović", "excerpt": "How does a provider decide, during an authorization, whether a payment is fraud? It cannot know: it estimates the chance of a later fraud dispute, blocks above a threshold before the bank is asked, and learns weeks afterwards whether it was right, so the threshold is a price the merchant sets and pays.", "permalink": "payment-fraud-and-risk", "timetoread": "28 min read", "icon": "assets/icons/24-fraud-and-risk-systems.png", "logo": "assets/images/24-fraud-and-risk-systems/logo.jpeg", "logo_credit": "Image generated by Google Gemini (gemini-3-pro-image-preview)"}, "tags": [], "modalities": [{"key": "index", "label": "Article", "meta": {}, "blocks": [{"type": "markdown", "content": "> **IN THIS CHAPTER, YOU WILL:** Learn where a provider's fraud decision sits, what its score estimates, why the evidence arrives weeks late, and how to price a block threshold.\n\n> **KEY POINTS:**\n>\n> * **A risk score is a forecast of a dispute, not a finding of fraud.** Stripe and Adyen both decide before the cardholder's bank sees the payment and again after it answers. Adyen's documentation defines its risk level as the likelihood of \"a fraudulent dispute\", an event that has not happened yet.\n> * **The evidence arrives weeks later, or never.** Stripe's 2026 figures show 41% of fraud disputes reported by day 14 and 86% by day 60, and a blocked payment never gets an outcome at all. No rule or model change can be judged on its first two weeks. Adyen lets a few payments through whatever their risk to keep measuring, and Stripe documents a similar device.\n> * **The threshold is a price, and card testing is outside it.** The merchant pays for fraud it accepts and for good customers it refuses, so it has to set the threshold from its own margins. Card testing leaves no dispute to learn from and has to be stopped before authorization, by limits on the endpoint.\n\n> **[FAILURE PATTERNS THIS CHAPTER ADDRESSES](where-payment-systems-go-wrong.html):**\n>\n> * **The Open Till** — a public booking page that can start a payment without a login or a limit is what bots use to test stolen cards.\n> * **The Borrowed Blueprint** — a default threshold or a vendor's network-wide false-positive figure is taken as right for a business whose margins it was never set for.\n> * **The Phantom Payment** — a payment the provider blocked, or passed with \"unknown risk\", is recorded as if the bank had judged it.\n\n<br>\nAt 03:14 on a Saturday a €1 payment arrives at a studio's booking page. The card number is real, the expiry date is right and the three-digit code matches. Nothing was stolen from the studio, its platform or its payment provider; the number was taken somewhere else, months ago. Stripe's documentation (n.d., accessed November 2026) defines the problem: \"A payment is considered fraudulent when the cardholder didn't authorize it. Most fraudulent payments are made using stolen cards or card numbers.\" The European Banking Authority and the European Central Bank report that theft of card details made up \"more than 56% of the total value\" of fraud on online card payments in 2024. The vault and the network token of the last two chapters protect a stored card; they do nothing here. **The only person who knows this payment is fraud is the cardholder**, who is asleep and will find out from a bank statement some weeks from now.\n\nSo a provider does not detect fraud during an authorization (the real-time request to the cardholder's bank, the **issuer**, to approve a payment). It **estimates how likely the payment is to be disputed as fraud later**, and blocks it above a threshold before the issuer is asked. It learns weeks afterwards whether it was right, and only for the payments it let through. The threshold is therefore **a price with two costs**, fraud accepted and good customers refused, and both fall on the merchant.\n\n**Where we are in the payment's journey.** When Mila Janssen buys her €120.00 class pass at 19:42 on Tuesday 9 March 2027, the risk decision sits between Larkfield's request to Adyen and the authorization request to her bank ([The First Promise: Authorization](payment-authorization.html)). She pays from her phone's wallet, which checked her fingerprint, and nothing is blocked. The payment this chapter is mostly about looks like the one that set up her €49.00 membership on 12 January: a card number typed into a web page.\n\nThe chapter starts at Larkfield, the fictional studio-software platform this book follows, with the Card-Testing Weekend. It then covers the kinds of fraud and how the evidence for each arrives, where the decision sits in the authorization path, and how the models learn from disputes that come late. Next come the threshold as a price, card testing, and risk in the merchant being paid. The comparison of Stripe and Adyen follows, then what Larkfield changed, and the ways a risk system fails.\n\n## Setting the Scene at Larkfield: The Card-Testing Weekend\n\nOn the weekend of 8–9 August 2026 bots sent **61,000 one-euro payments**, each with a different stolen card number, through the public booking widget of one Larkfield studio. The widget sold €1 trial drop-ins to guests who had no account, so anyone could start a payment from it. Of the 61,000 attempts, about 38,400 were blocked by the provider before they reached a bank, 19,700 were declined by the issuers and 2,900 were approved *(the split is an illustrative assumption; the total is Larkfield's)*.\n\nThe result was a bill without a theft. Larkfield stored none of those card numbers and lost no data. It refunded the 2,900 approved payments at once, because each one left alone could have come back as a dispute with a fee of €15.00 *(illustrative)*. With provider fees on the attempts and the refunds, the weekend cost Larkfield **€4,100** *(about €2,900 in refunds and €1,200 in fees; the split is an assumption)*. An engineer switched off the studio's online payments to stop the attack, and the studio could not sell online for **31 hours**.\n\nIn February 2027 Femke de Graaf, Head of Payments Engineering, reviews the weekend with Jonas Weber, who leads risk and compliance. Three questions remain. What does the provider's risk system decide, and when? Why did a system built to catch fraud not treat 61,000 stolen cards as fraud? And who chooses how strict it is?\n\n## Five Kinds of Fraud, and How the Evidence for Each Arrives\n\nThe payment system learns of card fraud in one way: the cardholder tells the issuer, and the issuer files a **dispute** (a chargeback: the bank takes the money back from the merchant; see [Money Flowing Backward: Refunds, Reversals and Disputes](refunds-reversals-and-disputes.html)). The loss lands on the merchant. Stripe's documentation says that when such a dispute is decided for the cardholder \"the business suffers a loss equal to the amount of the payment, and the cost of any goods or services already provided. The business is also subject to a dispute fee.\" Fraud is also an online problem. In the EBA and ECB report for 2024 the card fraud rate by value was 0.091% for remote payments against 0.007% for payments with the card present, \"13 times higher in value\". Fraud is rare, then, and concentrated where a number can be typed in.\n\n\"Fraud\" covers five different things, and for a system builder the useful difference is how the evidence arrives. The quoted definitions are Stripe's (it files the last one under \"marketplace fraud\"); account takeover is absent from both companies' risk-product documentation, so its row follows Adyen's payment-fraud guide (2025): \"when fraudsters get access to shoppers’ accounts\". Fraud between the users of a marketplace (fake listings, scams) is a separate subject, covered in [Scams, Fakes and Account Takeovers: Fraud Prevention for Listings](../listing-systems-architecture/fraud-prevention.html).\n\n| Kind | What happens | How the evidence arrives | Who carries the loss by default |\n| --- | --- | --- | --- |\n| **Stolen-card fraud** | Someone pays with a card number that is not theirs | A dispute, weeks later | The merchant |\n| **Card testing** | \"testing a card (or multiple cards) on one site to see if it's still valid before using it on another site\" | No evidence per payment; most attempts are declined and few are ever disputed | The tested merchant pays fees; a later merchant takes the fraud |\n| **Account takeover** | A criminal logs in as a real customer and pays with the stored card | A dispute or a complaint from the customer | The merchant |\n| **Friendly fraud** | \"a legitimate cardholder makes a purchase, but then disputes it at a later date\" | The same dispute as real fraud | The merchant, unless it wins the dispute |\n| **Merchant fraud** | \"a fraudulent business takes payments without providing the services or goods\" | Many disputes against one account | The platform or the provider, if the seller's funds are gone |\n\nOnly the first row produces clean evidence tied to one payment, and it comes late. That has two consequences. A single verdict on a payment hides at least three prediction problems: a late dispute, an attack with no per-payment evidence, and a property of an account *(my reading, not a vendor's)*. And because fraud is rare, the commonest error is a **false positive**: a legitimate payment refused. Take the same report's remote rate by number of payments, 0.068%: about 7 payments in every 10,000. A detector that is wrong about only 1% of legitimate payments refuses about 100 good payments in those 10,000, some fifteen for every fraudulent one it could catch *(my arithmetic)*.\n\n## Where the Decision Sits: Before the Issuer, and Again After\n\nThe first decision is made before the card network (Visa or Mastercard, which carries the request between the banks) and the issuer see the payment. Stripe's documentation (n.d., accessed November 2026) shows the record of a payment blocked for risk: `\"network_status\": \"not_sent_to_network\"`, `\"type\": \"blocked\"`, `\"reason\": \"highest_risk_level\"`. Adyen's documentation (n.d., accessed November 2026) describes the same placement and gives the reason: \"Pre-authorization: the risk rule conditions are assessed before the payment is authorized. This saves issuer and scheme fees compared to blocking after authorization.\" (\"Scheme\" is Adyen's word for a card network.) A blocked payment is one the bank was never asked about, which is why [Raising the Approval Rate: Retries, Tokens and Optimization](authorization-optimization.html) kept it out of the issuer's decline count.\n\n![Flow from merchant to provider, card network and issuer with two decision gates inside the provider, one before the network and one after the issuer's answer.](assets/images/24-fraud-and-risk-systems/24-two-decision-points.jpeg)\n**Figure 1:** *The risk decision is made twice: before the bank is asked, where a block never reaches the bank, and again after the bank answers.*\n\nA second decision follows the issuer's answer, because some signals exist only then. Adyen's documentation says that in post-authorization rules \"the risk evaluation can take extra signals into account that are only available after authorization. For example authentication results, CVC/CVV codes, or AVS responses\" (the issuer's check of the three-digit security code and of the billing address). Stripe documents built-in rules that \"block certain payments that the card issuer approved\". Review by a person comes later still. Stripe: \"Payments placed into review are typically already successfully processed, unless you capture authorized payments later\" (capture is the separate instruction that takes the money an authorization has reserved). Adyen, if capture is delayed for review, gives \"up to seven calendar days to reject a transaction\". By then the cardholder's money is already reserved.\n\nBoth decisions use a **risk score**: the provider's estimate of how likely this payment is to end in a fraud dispute. Adyen's documentation says so in those terms. Its fraud-risk rule, a premium feature of its risk engine, assigns a level \"ranging from **Very Low** to **Very High**\", which \"indicates the likelihood that a transaction will result in a fraudulent dispute\", and \"By default, the block threshold for this rule is set to high risk and above.\" Stripe's product, Radar, attaches \"a risk score that ranges from 0–99\": \"By default, a score of 65 or above indicates elevated risk, while a score of 75 or above indicates high risk.\" Radar blocks the highest level by default and allows elevated-risk payments, which go to a review queue on plans that have one. As of November 2026 the number itself is returned only on the Plus and Pro plans, the upper two of Radar's four. Two cautions apply. Stripe's page on risk settings calls this score \"the probability that a payment results in a fraudulent dispute or early fraud warning\" (an early fraud warning is an issuer's notice that a cardholder has reported fraud), but neither company documents how a score or a level maps to a percentage, so I read a score of 65 as a rank and not as a 65% chance *(my reading)*. And the same page says Radar \"is deprecating\" the block rule built on this score in favor of \"risk settings, which use separate models to block payments\", with separate scores from 0 to 99 for fraudulent disputes, early fraud warnings and fraudulent payments.\n\nThe estimate has to fit inside the payment call. Stripe's 2023 engineering post said Radar \"makes this decision, accurately, in less than 100 milliseconds\" **(Evidence age: 3.6 years; the current system may differ.)** Its 2024 post on the system that serves model inputs adds that \"the time required to retrieve features directly impacts the overall payment API latency\", and its October 2026 post says only that the model \"scores payments in milliseconds\". Adyen publishes no figure for the whole risk decision. A January 2025 Adyen engineering post gives its model-serving service \"a p50 of 20 ms and p99 of 100 ms\" per request; a transaction passes \"between 2 and 5\" such endpoints.\n\n| Requirement | Stripe | Adyen |\n| --- | --- | --- |\n| How fast | \"less than 100 milliseconds\" (2023) | 20 ms median, 100 ms at the 99th percentile, per model endpoint (2025); whole decision not published |\n| How consistent | A retry of the same payment gets the same treatment under a partly rolled-out rule (documentation) | Not documented |\n| How available | Not documented | Not documented |\n| On failure | \"an error might cause risk evaluation to fail. If this happens, Stripe reports the payment as having unknown risk\"; the documented example is authorized | Not documented |\n\n> **INFERENCE, NOT DOCUMENTED:** A step that runs inside every card payment needs a hard time limit and a decided behavior when the limit passes. Stripe's documented \"unknown risk\" outcome on an authorized payment suggests that on an error it lets the payment through. Whether the same holds for a slow evaluation, and what Adyen does in either case, is not in the public record.\n\nThe inputs to the estimate are called **fraud signals**, and most of their value comes from the provider seeing many merchants. Stripe's 2026 post: \"a credit card that is new and untrusted to one business might have years of history elsewhere on Stripe that proves it's OK or an IP address may link activity across several cards and accounts.\" Adyen's documentation says its models \"can detect recent fraud on a shopper's email address or recognize a good shopper because of a recent in-person payment on a card on the Adyen platform\". Other signals are collected in the browser. Adyen \"collects data about how shoppers interact with and use the payment form\", and Stripe's card-testing guidance marks \"Advanced fraud detection\", the device and activity signals its JavaScript library gathers in the browser, as \"Highest impact\" among the data a merchant can send to its card-testing models. So the way you collect card data ([Never Touch the Card: Tokenization, Vaults and PCI Scope](tokenization-vaulting-and-pci.html)) also decides how much the fraud model can see.\n\n## Learning Weeks Later: Labels, Delay and the Payments Nobody Sees\n\nA model learns from **labels**: the after-the-fact record that a given payment was fraud. For card fraud the label is the dispute, and it is slow. Stripe's October 2026 engineering post: \"For a payment made with a stolen card, it could take weeks for the cardholder to notice and report it to their bank. When Stripe receives the fraudulent dispute, we gain a fraud label for a payment we scored weeks earlier.\" The description of its chart puts numbers on the wait: the share of fraud disputes reported reaches \"41% by day 14, 66% by day 30, and 86% by day 60 after the payment\". Two weeks after any change, more than half of the evidence about it does not exist yet.\n\n![Rising curve of fraud reports over time with markers at 41%, 66% and 86% for days 14, 30 and 60.](assets/images/24-fraud-and-risk-systems/24-label-arrival-curve.jpeg)\n**Figure 2:** *Fraud disputes arrive slowly: 41% by day 14, 66% by day 30 and 86% by day 60, so a verdict at two weeks sees less than half of them.*\n\nThat delay can reverse a verdict. The same post describes a larger version of Radar's model that \"looked better in offline tests and in early results of a production experiment. But, as more fraud reports arrived, its measured performance fell below the earlier model's, and we had to roll back\". The cause was the delay itself: training on recent payments without sampling had added \"more fraudulent examples labeled as legitimate, about 20 times more\", because their disputes had not arrived. If a company with Stripe's volume of data misjudged a change on early results, a merchant judging a new rule after two weeks has less to go on.\n\nWorse, a blocked payment never gets a label, because nobody finds out what it would have been. The remedy is a **holdout**: a small share of payments let through whatever their score, so that their outcomes can be seen. Adyen documents one and calls it control traffic: \"A very small percentage of all transactions is randomly selected to be part of control traffic. Control traffic transactions are settled regardless of their risk evaluation.\" (Settled here means processed and paid like any other payment.) Adyen limits the cost by excluding, among others, \"Transactions with an amount of EUR 2000 or higher\". Stripe's documentation has one sentence: \"For a small subset of payments, Stripe modifies the reported risk score so we can measure the performance of our models and obtain data for subsequent model development.\" It does not say that payments which would have been blocked are let through. A Stripe manager's 2018 talk (InfoQ transcript) described letting \"a small fraction of them go through uniformly at random\" **(Evidence age: 8 years.)** That Radar does this today is my inference. A fraud system without a holdout cannot count the good customers it refuses.\n\nTogether the two gaps make a **feedback loop**: the system's own decisions determine which outcomes it will later see. Merchants are part of the loop. On Stripe, refunding a payment with the reason `fraudulent` adds its card fingerprint (Stripe's identifier for a card number) and email address to the default block lists, and the documentation says \"Our AI models respond to feedback you share with us\". That is a faster label than a dispute. The labels are also noisy, since friendly fraud arrives through the same dispute as a stolen card *(my judgement)*.\n\nHow much is known about the model inside this loop differs sharply between the two companies. Stripe's 2023 post traced Radar from \"relatively simple ML models (e.g., logistic regression)\" through an ensemble of a tree-based model (XGBoost) and a deep neural network to, \"in mid-2022\", \"a pure DNN-only model\" **(Evidence age: 3.6 years; the 2026 post links back to this one and describes a neural-network architecture.)** The 2026 post names the transaction-fraud model Shield, gives \"roughly 800 million transactions in its training set\", and says a new training configuration \"improved recall by over 8%\" in a controlled comparison (recall is the share of fraud caught). The version trained on more data \"grew to roughly 30 million parameters, three times its previous size\"; that is the version the post says was rolled back, and it does not give the size of the model now in production. It speaks of \"regular retraining\" and gives no interval; a 2019 Stripe engineering post said Radar's models were trained and deployed \"on a daily cadence\" **(Evidence age: 7 years.)** For Adyen's fraud-risk model the documentation says only that the premium features offer \"Machine learning powered fraud detection using global transaction data\". An August 2024 Adyen engineering post adds that the fraud models are \"currently based on tree-based ensembling models\", retrained \"on a default weekly cadence\" **(Evidence age: 2 years.)**\n\n## The Threshold Is a Price: Refused Customers against Fraud Losses\n\nWherever the threshold sits, it trades two errors: fraud allowed, and good customers refused. The merchant pays for both. A refused customer is a lost sale. For accepted fraud, Stripe's documentation is plain: \"you're ultimately responsible for payments you choose to accept, including those that are later disputed or found to be fraudulent.\" The provider makes the estimate; the loss stays with you. Stripe's 2023 post said \"Radar incorrectly blocks just 0.1%\" of legitimate payments **(Evidence age: 3.6 years.)** That is a vendor's network average, not your rate.\n\n![A slider labeled Threshold between a stack of costs from refused customers and a stack of costs from accepted fraud, both connected to a bill the merchant pays.](assets/images/24-fraud-and-risk-systems/24-threshold-as-price.jpeg)\n**Figure 3:** *One dial, two costs: a stricter threshold refuses more good customers, a looser one accepts more fraud, and the merchant pays for both.*\n\nThe trade can be priced. Block a payment only when its chance of fraud times the cost of a fraud case is greater than its chance of being legitimate times the cost of refusing a good customer. The break-even chance is the cost of a refused customer divided by the sum of the two costs. Take a €200 item that cost the retailer €160, with a €15 dispute fee *(illustrative)*. A fraud case loses €175 and a refused customer loses the €40 margin, so the break-even is 40 ÷ (40 + 175) = 19%. Adyen's documentation says the same in words: \"The optimal blocking threshold ... depends on your business model and the difference in cost between a fraud case and a false decline.\" It recommends a low or medium threshold to thin-margin retailers and a high or very high one to sellers of digital goods, for whom \"the cost of a false decline (potential loss of lifetime value) mostly outweighs the cost of a fraud case\". The right threshold depends on your margins. The model does not know them.\n\nA merchant can act on that price in four ways, each with more control and more cost.\n\n| Configuration | What you control | What it costs you | When it is right |\n| --- | --- | --- | --- |\n| **Provider default** | Nothing: Stripe blocks its highest level, Adyen's premium tier blocks at High and above | A threshold set for nobody in particular | Low volume and no one to own fraud |\n| **Your own threshold** | The cut-off: Radar's risk settings (Plus and Pro plans), Adyen's blocking threshold per risk profile | You must know your two costs | Margins far from average, in either direction |\n| **Model plus rules and lists** | Conditions on what only you know (product, customer history), and lists of values to allow or block | Upkeep, and every allow rule overrides the model | You hold information the provider cannot see |\n| **Plus manual review** | A person's decision on the uncertain middle | Staff time and delay; on Adyen up to seven days before capture | Orders large enough to repay a look |\n\nRules deserve the most care. A rule is your own condition evaluated on every payment, and its action is allow, block or, between the two, review by a person or a request for **3-D Secure** (asking the issuer to check who is paying). Stripe's example of that last action is `Request 3D Secure if :risk_level: != 'normal' and :amount_in_usd: > 25`. Rules are explainable and they are yours, but apart from the provider's risk level they work on your own data. Their danger is the allow rule. Stripe: \"Implement any allow rules minimally, because they override the Stripe default rules, along with any other custom rules that match the same criteria.\" Adyen: \"**Allow** rules have the highest priority within a risk profile.\" One broad allow rule switches the model off for everything it matches. Stripe caps an account at \"200 transaction rules and 100 account rules\".\n\nTest every change to a threshold or rule before and during rollout. Both providers document the tools. Stripe's rule tester \"runs a simulation on the last 6 months of charges\", and its traffic allocation applies a custom rule to a chosen percentage of matching payments; at 0% the rule is evaluated without acting, and \"Radar assigns all attempts for the same transaction to the same allocation bucket, so each retry receives the same outcome as the original attempt.\" Adyen's premium tier lets you backtest custom rules and run experiments that \"A/B test two risk profiles against each other\" on \"real transactions\". A backtest and a control group are the only places a merchant can see what a rule refuses. And the verdict waits until the labels are in.\n\n## Card Testing: Fraud That Leaves No Label\n\n**Card testing** uses a merchant's checkout to find out which stolen or guessed card numbers work. Adyen's engineering post of October 2026 separates two forms: \"verification, where bots iterate through lists of stolen credentials using low-amount transactions to identify active cards; and enumeration, where scripts systematically guess missing fields, such as CVVs or expiry dates, within specific BIN ranges\" (a BIN is the first digits of a card number, which identify the issuing bank). The merchant is the tool and not the target. A validated card is worth money: Visa's release of May 2024, on its own data for fiscal year 2023, says \"Thirty three percent of enumerated accounts experienced fraud within five days\", and puts enumeration at \"$1.1B annually in fraud losses\".\n\nA model trained on disputes is slow to see this, because no single attempt carries evidence. The Adyen post: \"Unlike chargeback fraud ... card testing offers no explicit transaction-level signal.\" Attackers also hide from simple counters: \"Rotational attacks: Fraudsters continuously rotate details—such as IP addresses—to stay well below baseline velocity thresholds.\" The evidence is in the shape of traffic over minutes. Adyen describes computing features over \"subslices\" of traffic, such as one range of card numbers at one merchant. A feature language is compiled to Apache Spark for training and to Apache Kafka and Flink for live scoring; \"Flink writes these streaming metrics to an Apache Cassandra feature store, where the risk engine fetches the latest subslice values to make real-time block/allow decisions before sending transactions to the issuer.\" It is the only substantial description of one of its fraud models that I found from Adyen.\n\n![Left: one harmless-looking one-euro payment under a magnifying glass. Right: a traffic chart where a sudden cluster of one-euro payments rises far above the normal level.](assets/images/24-fraud-and-risk-systems/24-card-testing-traffic-shape.jpeg)\n**Figure 4:** *Each €1 attempt looks ordinary on its own; the attack is visible only in the shape of one slice of traffic over minutes.*\n\nIt is tempting to let the issuers decline the attempts. But declined attempts still cost the merchant. Stripe's documentation lists the effects: extra fees, and \"A high decline rate might damage the reputation of your business with card issuers and card networks, which makes all of your transactions appear riskier\". The networks count them too. Visa's Acquirer Monitoring Program fact sheet (2025) defines an enumeration ratio as \"[Count of Enumerated Authorization Transactions (Approved + Declined)] ÷ [Count of Authorization Transactions (Approved+ Declined)]\", with thresholds of 2,000 basis points (20%) and 300,000 enumerated transactions in a month, and says the program \"requires acquirers to take proactive steps to prevent merchants from exceeding enumeration thresholds\". An acquirer is the licensed party that connects a merchant to the network ([Plugging Into the Networks: Acquiring, Licences and Connectivity](acquiring-and-network-connectivity.html)). A decline at the issuer comes too late.\n\nSo card testing has to be stopped before authorization, in two layers. The first is yours: limits in front of any endpoint that can start a payment. Stripe warns that \"simple firewall rules or filters based on a single heuristic such as IP addresses are usually not sufficient\" and recommends CAPTCHA, a login before the payment form, and rate limits. The second is the provider's blocking before the network. Stripe includes card-testing prevention in every Radar plan. Adyen's \"Machine learning: bot attack risk\" rule, in its basic tier, \"detects and blocks transactions that come in at an unusually fast rate with suspicious payment properties ... This rule mostly prevents large scale attacks\". Both publish results. Stripe (May 2025): \"While attacks are up industry-wide, they are down 80% on Stripe.\" Adyen (October 2026): \"increasing blocked card testing attacks by 28% on average, with zero impact on legitimate shoppers\". These are vendor claims with no baseline, period or method, and they cannot be compared.\n\n## Risk Beyond the Payment: When the Merchant Is the Risk\n\nThe same structure, an estimate now and the facts later, applies to the business being paid. A provider pays a merchant days after a sale, while customers can dispute for months. If the merchant has vanished by then, the provider is left with the loss. This is its **credit exposure** to that account. Stripe's October 2026 engineering post on risk assessment lists the questions it asks: \"Is the business trustworthy? ... Has this business become suddenly popular, or is it under attack? Should we adjust a business' credit reserves?\" (a reserve is part of a merchant's sales held back). To platforms Stripe exposes an account risk score that \"correlates to the probability that an account would cause losses to your platform\". Adyen documents a held amount it calls the deposit: \"Adyen calculates the deposit requirement for your account daily, based on variables such as your processing volume and the number of chargebacks and refunds\". If exposure exceeds coverage \"by more than **EUR10,000**, then Adyen automatically withholds funds from your next payout\".\n\nAdyen's deposit page describes the calculation in outline: exposure (orders paid but not yet delivered, plus chargebacks and refunds predicted from \"the past 180 days of data\") is set against coverage (the merchant's balances and funds or instruments held by Adyen), and the risk Adyen accepts for a merchant is \"determined on a case-by-case basis\". It gives no numbers behind those terms. Stripe's support site names the factors behind a reserve (\"industry conditions, payment activity, dispute rate, refund rate, and financial stability\") and gives no formula or amounts. Each company lists the businesses it prohibits; neither publishes the credit criteria or models by which it accepts a merchant. What a platform needs to know is who is left with a seller's loss. Stripe's documentation says \"responsibility for your connected accounts' negative balances can belong to your platform or to Stripe\". Under Larkfield's terms a studio carries a lost dispute, and if its balance cannot cover it, the loss falls on Larkfield. [Know Your Customer, Watch the Money: Compliance as a System](payment-compliance-and-regulation.html) picks up what a provider must know about the businesses it pays, and [One Payment, Three Parties: Platform and Marketplace Models](platform-payment-models.html) who carries their losses.\n\n## Stripe and Adyen: Where They Differ\n\nThe table sets side by side facts already cited in this chapter, all from documentation accessed in November 2026 unless a year is given. The last column is my inference.\n\n| Aspect | Stripe | Adyen | What the difference suggests |\n| --- | --- | --- | --- |\n| Decision before the network | A risk block is recorded as `not_sent_to_network`; built-in rules can also block after the issuer approves | Risk rules run pre-authorization or post-authorization; blocking before \"saves issuer and scheme fees\" | No material difference in placement; Adyen states the timing as a property of each rule |\n| Exposed score and default block | 0–99; elevated from 65, high from 75; highest level blocked; the number only on Plus and Pro plans; the block rule on this score is being deprecated in favor of risk settings | Five levels, Very Low to Very High; default block at \"high risk and above\" (premium) | Stripe offers a finer dial; neither documents how a score or level maps to a percentage |\n| Holdout | Score modified for \"a small subset of payments\" | \"Control traffic\", settled regardless of risk; excludes EUR 2000 and above | Probably the same device (for Stripe that is my reading of one sentence); Adyen documents its limits |\n| Testing a change | Simulation on the last 6 months of charges; per-rule traffic allocation, including 0% | Backtest of custom rules; live A/B experiment between two risk profiles (premium) | Stripe tests rule by rule, Adyen profile against profile |\n| Card-testing control | In every Radar plan; merchant guidance published | Bot-attack rule in the basic tier, no configuration; engineering description (October 2026) | Stripe tells you what to add yourself; Adyen tells you how its model works |\n| Published model detail | Lineage to a neural-network-only model (2023); Shield's training-set size and the label delay (October 2026) | Bot-attack feature pipeline (October 2026); fraud-risk model: tree-based ensembles, weekly retraining by default (2024) | The models cannot be compared, only what each chose to publish |\n| Published latency | \"less than 100 milliseconds\" (2023) | 20 ms median per model endpoint (2025); whole decision not published | The figures measure different things |\n\nOn Stripe, read the outcome of every payment (level, reason, whether it was sent to the network), and use the rule tester and traffic allocation before a rule acts. On Adyen, decide for each rule whether it should run before or after authorization, check which features need the premium tier, and use control traffic and experiments to measure.\n\nThe blanks in the table are gaps in the public record, not differences in practice. As of 17 November 2026 I found nothing in either company's documentation, help center, site or engineering posts on:\n\n- Adyen's fraud-risk model beyond its family and weekly retraining: its size and training data.\n- Merchant underwriting at either company: credit criteria and models, and the amounts behind Stripe's named reserve factors and Adyen's deposit calculation.\n- The size of the Shield model now in production: the 30 million parameters belong to a version that was rolled back.\n- How often Radar is retrained now: daily in 2019; the 2026 post says \"regular retraining\" and no more.\n- A latency figure for Adyen's whole risk decision.\n- What either system does when the evaluation is slow.\n- How the payments foundation model Stripe announced in May 2025, which it says it uses against card testing, relates to Shield, which its October 2026 engineering post describes without mentioning it.\n\n## In Practice at Larkfield: Closing the Open Till and Pricing Two Thresholds\n\nLarkfield's answer to the weekend was not a stricter fraud model. It put three limits in front of the public booking widget. A guest who pays without logging in must pass a CAPTCHA. The payment service, through which decision K1 of the Keel program sends every money-moving call, caps payment attempts per studio at a multiple of that studio's busiest recorded hour. And an alert fires when a studio's declined and blocked attempts in ten minutes exceed its usual hourly total. The providers' own blocking before the network stays on. These are the two layers of the previous section, placed where Larkfield owns the endpoint.\n\nThen Femke prices the threshold, per product. A studio's class seat costs almost nothing extra to provide, so a fraud case costs the studio the €15.00 dispute fee *(illustrative)* and little else. A refused customer costs far more for some products than others. Assume a new member stays eight months, worth 8 × €49 = €392 *(assumption)*. For a first membership payment the break-even is 392 ÷ (392 + 15) = **96%**. For a €16 guest drop-in it is 16 ÷ (16 + 15) = **52%**. One studio and one model need two thresholds, because a refused member costs more than twenty times a refused guest. The arithmetic has a limit, which the last section returns to: card networks cap dispute rates whatever a dispute costs you.\n\nIn March 2027 Jonas proposes a rule for the studios on Stripe, `Block if :risk_level: = 'elevated'`, and points to a two-week trial on a few studios in which disputes fell. (On Stripe Connect, Stripe's product for platforms, whose Radar rules apply to a payment, the platform's or the studio's connected account's, depends on the charge type; see [One Payment, Three Parties: Platform and Marketplace Models](platform-payment-models.html).) Femke asks for the two things that result cannot show. Most disputes on those payments have not been filed yet, and nobody has counted the good members the rule refused. So the rule runs at 0% traffic allocation, where Stripe evaluates it without acting, and goes through the simulation on six months of charges. Any verdict is set for sixty days after rollout, when Stripe's curve says about 86% of fraud disputes are in. On the Adyen studios the threshold stays at the default, and control traffic supplies the comparison.\n\n## When It Goes Wrong\n\nThe rarest failure is documented: the evaluation itself does not run. Stripe's documentation says \"In unusual cases, an error might cause risk evaluation to fail. If this happens, Stripe reports the payment as having unknown risk\", and the example outcome carries `\"reason\": \"unknown_risk_level\"` with `\"type\": \"authorized\"`. The payment went through unjudged. Count those outcomes and review them; do not read the absence of a block as a pass. Adyen documents no equivalent state, so on Adyen there is nothing to count.\n\nThe second failure you configure yourself. A broad allow rule or a stale entry on an allow list turns the model off for whatever it matches. Stripe's documentation warns that \"Allowlists can allow fraudsters to operate without restrictions and bypass controls\", and limits entries on its default fingerprint allow lists to \"a maximum lifespan of 30 days\". A related fault is a rule that answers a retry differently from the first attempt, which Stripe's pinning of retries to one allocation bucket prevents. Review allow rules and lists on a calendar, with an owner.\n\nThe commonest failure raises no error. A threshold or rule that refuses good customers shows up only as sales that did not happen. The detectors are the ones this chapter has named: the holdout or control group, and the count of payments each rule blocked. The opposite mistake surfaces months later. Visa's monitoring program counts fraud reports and disputes against settled transactions, and its fact sheet says the \"Excessive Merchant threshold reduced to >=150bps\" (1.5%) in the EU, the US, Canada and Asia-Pacific on 1 April 2026. Watch the dispute rate by the month the payments were made, and read a month only after sixty days.\n\n## What to Take Away\n\n**Established.**\n\n- Both providers decide before the card network sees a payment and again after the issuer answers; a risk block never reaches the bank (Stripe and Adyen documentation, accessed November 2026).\n- The score estimates a later fraud dispute. It is not a finding, and neither company documents how a score or level maps to a percentage.\n- Labels are late and incomplete: 41% of fraud disputes by day 14 and 86% by day 60 (Stripe, October 2026), and none for blocked payments, which is why Adyen documents a holdout and Stripe appears to run one.\n- The merchant is responsible for what it accepts (Stripe documentation), and card testing is counted against it even when the attempts are declined (Visa fact sheet, 2025).\n\n**Depends on context.**\n\n- Where to set the threshold: high when a refused customer costs much more than a fraud case (memberships, digital goods), low when goods are costly and margins thin.\n- Whether rules and manual review repay their cost: only if you know something the provider cannot see, or orders are large enough for a person to look.\n- Which limits an endpoint needs: a logged-in checkout needs less than a public form that can start a payment.\n- Whether you can test a change: a small merchant cannot measure a rule's effect and should stay close to the defaults.\n\n**The author's synthesis.**\n\n- Every risk decision is made before its evidence exists. A risk product moves the decision to the provider and leaves the price with me, so I own the threshold, the control-group measurement and the endpoint limits myself.\n- I date every verdict on a model or rule sixty days out. The €1 payment at 03:14 could not be known to be fraud by anyone in its path; what could be known was the shape of the traffic around it, and the control that mattered was a limit on the endpoint.\n\n## Questions to Ask\n\n1. For each product we sell, what does a refused good customer cost and what does a fraud case cost, and what break-even chance of fraud follows?\n2. Which threshold is in force on each provider today, who set it, and was it ever changed from the default?\n3. How many payments did each rule block last month, and how do we estimate how many of them were good customers?\n4. Does our provider keep a holdout or control group, and can we see its results?\n5. When we change a rule or threshold, on what date do we judge it, and is that at least sixty days after rollout?\n6. Which of our endpoints can start a payment without a login, and what limit sits in front of each?\n7. Which allow rules and allow-list entries exist, who owns them, and when were they last reviewed?\n8. What does our integration record when the provider blocks a payment or returns an unknown risk level?\n\nBetween allow and block a risk rule has a third course, \"request 3-D Secure\", and on every payment allowed without it the merchant carries the fraud loss. [Proving It Is You: 3-D Secure and Strong Customer Authentication](three-d-secure-and-sca.html) takes up what that request is: handing the question of who is paying to the issuer, and the conditions under which the issuer then takes the loss as well.\n\n## Sources and Evidence\n\n*Company, product and investor sources*\n\n- [Transaction risk prevention](https://docs.stripe.com/radar/transaction-risk-prevention), Stripe documentation, n.d., accessed 2026-11 — blocked-payment outcome, score range and thresholds, the holdout, unknown risk, merchant feedback, responsibility for accepted payments.\n- [Fraud prevention rules](https://docs.stripe.com/radar/rules), Stripe documentation, n.d., accessed 2026-11 — built-in rules, rule actions and precedence, rule limits, the six-month simulation, traffic allocation.\n- [Risk setting and risk controls](https://docs.stripe.com/radar/risk-settings), Stripe documentation, n.d., accessed 2026-11 — the risk score described as a probability, the deprecation of the block rule built on it, the separate scores.\n- [Review payments](https://docs.stripe.com/radar/transaction-reviews), Stripe documentation, n.d., accessed 2026-11 — review happens after processing.\n- [Lists](https://docs.stripe.com/radar/lists), Stripe documentation, n.d., accessed 2026-11 — allow and block lists, the 30-day limit on entries in the default fingerprint allow lists.\n- [How Radar works](https://docs.stripe.com/radar/how-radar-works), Stripe documentation, n.d., accessed 2026-11 — the four plans and which features each includes.\n- [Protect yourself from card testing](https://docs.stripe.com/disputes/prevention/card-testing), Stripe documentation, n.d., accessed 2026-11 — consequences, symptoms, recommended controls, signal impact.\n- [Advanced fraud detection](https://docs.stripe.com/disputes/prevention/advanced-fraud-detection), Stripe documentation, n.d., accessed 2026-11 — the device and activity signals Stripe's JavaScript library collects.\n- [Common types of online fraud](https://docs.stripe.com/disputes/prevention/fraud-types), Stripe documentation, n.d., accessed 2026-11 — definitions of fraud, card testing, friendly fraud and marketplace fraud.\n- [Account fraud prevention](https://docs.stripe.com/radar/account-fraud-prevention), Stripe documentation, n.d., accessed 2026-11 — account risk score for platforms.\n- [Use Radar with Connect](https://docs.stripe.com/connect/radar), Stripe documentation, n.d., accessed 2026-11 — which account's Radar rules apply to direct and transferred charges.\n- [Risk and liability management with Connect](https://docs.stripe.com/connect/risk-management), Stripe documentation, n.d., accessed 2026-11 — who is responsible for connected accounts' negative balances.\n- [How we built it: Stripe Radar](https://stripe.dev/blog/how-we-built-it-stripe-radar), Ryan Drapeau, Stripe, 2023-03-29 — model lineage, \"less than 100 milliseconds\", the 0.1% figure (evidence age: 3.6 years).\n- [Shepherd: How Stripe adapted Chronon to scale ML feature development](https://stripe.dev/blog/shepherd-how-stripe-adapted-chronon-to-scale-ml-feature-development), Ben Mears, Stripe, 2024-04-15 — feature retrieval as part of payment latency.\n- [Scaling Radar: Fighting fraud with agent-assisted machine learning](https://stripe.dev/blog/scaling-radar-fighting-fraud-with-agent-assisted-machine-learning), Ryan Drapeau and Sai Samant, Stripe, 2026-10-19 — the label-delay curve, the rollback of the larger model, Shield's training set, network signals.\n- [Fine-tuning LLMs for risk assessment](https://stripe.dev/blog/training-llms-for-risk-assessment), Hangzhi Guo and others, Stripe, 2026-10-09 — the list of risk decisions about businesses.\n- [Counterfactual Evaluation of Machine Learning Models](https://www.infoq.com/presentations/stripe-ml-models-fraud), Michael Manapat, Stripe, talk at QCon.ai, transcript published 2018-05-10 — letting through a random fraction of blocked payments (evidence age: 8 years).\n- [Railyard: how we rapidly train machine learning models with Kubernetes](https://stripe.com/blog/railyard-training-models), Rob Story, Stripe, 2019-05-07 — daily retraining of Radar's models (evidence age: 7 years).\n- [Reserves - Frequently Asked Questions](https://support.stripe.com/questions/reserves-frequently-asked-questions), Stripe support, n.d., accessed 2026-11 — reserve factors.\n- [Prohibited and Restricted Businesses](https://stripe.com/legal/restricted-businesses), Stripe, last updated 2026-09-22 — businesses Stripe refuses.\n- [Using AI to optimize payments performance with the Payments Intelligence Suite](https://stripe.com/blog/using-ai-optimize-payments-performance-payments-intelligence-suite), Stripe, 2025-05-15 — the card-testing claim and the foundation-model announcement (vendor claim).\n- [Risk management](https://docs.adyen.com/risk-management), Adyen documentation, n.d., accessed 2026-11 — basic and premium tiers, cross-channel signal.\n- [Configure your risk profile](https://docs.adyen.com/risk-management/configure-your-risk-profile), Adyen documentation, n.d., accessed 2026-11 — pre- and post-authorization rules, actions, precedence of allow rules.\n- [Machine learning rules](https://docs.adyen.com/risk-management/configure-your-risk-profile/machine-learning-rules), Adyen documentation, n.d., accessed 2026-11 — risk levels, default threshold, threshold guidance, the bot-attack rule.\n- [Control traffic](https://docs.adyen.com/risk-management/control-traffic), Adyen documentation, n.d., accessed 2026-11 — the holdout and its exclusions.\n- [Case management](https://docs.adyen.com/risk-management/case-management), Adyen documentation, n.d., accessed 2026-11 — the seven-day review window.\n- [Run A/B test experiments](https://docs.adyen.com/risk-management/run-ab-test-experiments), Adyen documentation, n.d., accessed 2026-11 — live experiments between two risk profiles.\n- [Data collection to detect fraud](https://docs.adyen.com/risk-management/fraud-data-collection), Adyen documentation, n.d., accessed 2026-11 — client-side collection of interaction data.\n- [Deposit](https://docs.adyen.com/account/balances/deposit), Adyen documentation, n.d., accessed 2026-11 — daily deposit requirement, the outline of the exposure and coverage calculation, the EUR 10,000 exposure rule.\n- [How Adyen does AI](https://www.adyen.com/knowledge-hub/how-adyen-does-ai), Andreu Mora, Adyen, 2024-08-16 — tree-based fraud models, weekly retraining (evidence age: 2 years).\n- [The AI behind Uplift](https://www.adyen.com/knowledge-hub/the-ai-behind-uplift), Andreu Mora, Adyen, 2025-01-17 — model-serving latency.\n- [Payment fraud: What is it and how to protect your business](https://www.adyen.com/knowledge-hub/payment-fraud), Adyen, 2025-12-08 — account takeover defined.\n- [Prohibited and Restricted Products and Services](https://www.adyen.com/legal/list-restricted-prohibited), Adyen, last updated 2025-11-13 — businesses Adyen refuses.\n- [Catching card testing at scale with real-time features](https://www.adyen.com/knowledge-hub/catching-card-testing-at-scale), Jaap Stefels, Adyen, 2026-10-04 — verification and enumeration, absence of labels, subslice features, the streaming pipeline, the 28% claim.\n\n*Standards, regulation and official documentation*\n\n- [2025 Report on payment fraud](https://www.ecb.europa.eu/press/intro/publications/pdf/ecb.ebaecb202512.en.pdf), European Banking Authority and European Central Bank (EBA/REP/2025/40), 2025-12 — EEA card fraud rates for 2024, remote against non-remote, share from theft of card details.\n- [Visa Acquirer Monitoring Program Overview](https://corporate.visa.com/content/dam/VCOM/corporate/visa-perspectives/security-and-trust/documents/visa-acquirer-monitoring-program-fact-sheet-2025.pdf), Visa fact sheet, 2025 — enumeration ratio and thresholds, the 150 basis-point merchant threshold from 1 April 2026.\n- [Visa Announces Generative AI-Powered Fraud Solution to Combat Account Attacks](https://usa.visa.com/about-visa/newsroom/press-releases.releaseId.20661.html), Visa press release, 2024-05-07 — enumeration losses and the five-day figure (Visa's own data for fiscal year 2023).\n\n*Research and practitioner sources*\n\n- None.\n\nLarkfield is fictional; architectural recommendations, labeled inferences and labeled assumptions are the author's judgement.\n"}]}]}</script>
+<script>
+    (function () {
+        const data = JSON.parse(document.getElementById('data').textContent);
+        const root = document.getElementById('content');
+
+        const postId = (data.meta && data.meta.id) ? String(data.meta.id) : '';
+        const postStatusRaw = (data.meta && data.meta.status) ? String(data.meta.status) : '';
+        if (postId || postStatusRaw) {
+            const header = document.getElementById('post-header');
+            let sectionEl = header.querySelector('p.section');
+            if (!sectionEl) {
+                sectionEl = document.createElement('p');
+                sectionEl.className = 'section';
+                header.insertBefore(sectionEl, header.firstChild);
+            }
+            // Status pill goes first, then a " / " separator before the existing
+            // content (section name and/or id).
+            if (postStatusRaw) {
+                const parts = postStatusRaw.split(':');
+                const statusName = parts[0].trim();
+                const statusColor = (parts[1] || '').trim();
+                const wrap = document.createElement('span');
+                wrap.className = 'post-status';
+                const dot = document.createElement('span');
+                dot.className = 'status-dot';
+                if (statusColor) dot.style.background = statusColor;
+                wrap.appendChild(dot);
+                wrap.appendChild(document.createTextNode(statusName));
+                if (sectionEl.firstChild) {
+                    sectionEl.insertBefore(document.createTextNode(' • '), sectionEl.firstChild);
+                    sectionEl.insertBefore(wrap, sectionEl.firstChild);
+                } else {
+                    sectionEl.appendChild(wrap);
+                }
+            }
+            if (postId) {
+                if (sectionEl.firstChild) sectionEl.appendChild(document.createTextNode(' • '));
+                sectionEl.appendChild(document.createTextNode(postId));
+            }
+        }
+
+        const tagsHost = document.getElementById('tags');
+        (data.tags || []).forEach(function (t) {
+            const span = document.createElement('span');
+            span.className = 'tag';
+            span.textContent = t;
+            tagsHost.appendChild(span);
+        });
+
+        // Minimal markdown renderer. Supports: ATX headings, paragraphs, blockquotes,
+        // unordered/ordered lists, fenced code, inline code, bold/italic/strikethrough, links, images, hr.
+        // Sufficient for the posts in this repo; replace with a fuller parser if needed.
+        function renderMarkdown(src) {
+            const lines = src.replace(/\r\n/g, '\n').split('\n');
+            const out = [];
+            let i = 0;
+
+            const bullet = /^(\s*)([-*])\s+(.*)$/;
+            const ordered = /^(\s*)(\d+)\.\s+(.*)$/;
+            const tableRow = /^\s*\|(.+)\|\s*$/;
+            const tableSep = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+
+            function splitRow(s) {
+                let t = s.trim();
+                if (t.startsWith('|')) t = t.slice(1);
+                if (t.endsWith('|')) t = t.slice(0, -1);
+                return t.split('|').map(c => c.trim());
+            }
+
+            function inline(s) {
+                // Posts are trusted content, so raw HTML passes through unescaped
+                // (some posts embed inline <blockquote>, <div>, etc.).
+                // Stray ampersands still get fixed up.
+                s = s.replace(/&(?![a-zA-Z]+;|#\d+;)/g, '&amp;');
+                s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<a class="image-link" href="$2" target="_blank" rel="noopener noreferrer"><img alt="$1" src="$2"></a>');
+                s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+                s = s.replace(/`([^`]+)`/g, function (_, c) {
+                    return '<code>' + c.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
+                });
+                // Bold/italic, including nested combinations: ***x***,
+                // **a *b*** / ***a* b** (shared delimiters), and **a *b* c**.
+                s = s.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+                s = s.replace(/\*\*([^*\n]+)\*([^*\n]+)\*\*\*/g, '<strong>$1<em>$2</em></strong>');
+                s = s.replace(/\*\*\*([^*\n]+)\*([^*\n]+)\*\*/g, '<strong><em>$1</em>$2</strong>');
+                s = s.replace(/\*\*((?:[^*\n]|\*(?!\*)[^*\n]+\*(?!\*))+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+                s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+                return s;
+            }
+
+            while (i < lines.length) {
+                const line = lines[i];
+                if (!line.trim()) {
+                    i++;
+                    continue;
+                }
+
+                const fence = line.match(/^```(\w*)\s*$/);
+                if (fence) {
+                    i++;
+                    const buf = [];
+                    while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+                        buf.push(lines[i]);
+                        i++;
+                    }
+                    i++;
+                    const escaped = buf.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const cls = fence[1] ? ' class="lang-' + fence[1] + '"' : '';
+                    out.push('<pre><code' + cls + '>' + escaped + '</code></pre>');
+                    continue;
+                }
+
+                const h = line.match(/^(#{1,6})\s+(.*)$/);
+                if (h) {
+                    out.push('<h' + h[1].length + '>' + inline(h[2]) + '</h' + h[1].length + '>');
+                    i++;
+                    continue;
+                }
+
+                if (/^\s*(?:-\s*){3,}\s*$/.test(line) || /^\s*\*{3,}\s*$/.test(line)) {
+                    out.push('<hr>');
+                    i++;
+                    continue;
+                }
+
+                if (/^>\s?/.test(line)) {
+                    const buf = [];
+                    while (i < lines.length && /^>\s?/.test(lines[i])) {
+                        buf.push(lines[i].replace(/^>\s?/, ''));
+                        i++;
+                    }
+                    out.push('<blockquote>' + renderMarkdown(buf.join('\n')) + '</blockquote>');
+                    continue;
+                }
+
+                if (tableRow.test(line) && i + 1 < lines.length && tableSep.test(lines[i + 1])) {
+                    const headers = splitRow(line);
+                    const aligns = splitRow(lines[i + 1]).map(function (c) {
+                        c = c.trim();
+                        const left = c.startsWith(':'), right = c.endsWith(':');
+                        return left && right ? 'center' : right ? 'num' : '';
+                    });
+                    const cellOpen = function (tag, idx) {
+                        return aligns[idx] ? '<' + tag + ' class="' + aligns[idx] + '">' : '<' + tag + '>';
+                    };
+                    i += 2;
+                    const rows = [];
+                    while (i < lines.length && tableRow.test(lines[i])) {
+                        rows.push(splitRow(lines[i]));
+                        i++;
+                    }
+                    let html = '<div class="table-wrap"><table><thead><tr>';
+                    headers.forEach((h, idx) => {
+                        html += cellOpen('th', idx) + inline(h) + '</th>';
+                    });
+                    html += '</tr></thead><tbody>';
+                    rows.forEach(r => {
+                        html += '<tr>';
+                        r.forEach((c, idx) => {
+                            html += cellOpen('td', idx) + inline(c) + '</td>';
+                        });
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                    out.push(html);
+                    continue;
+                }
+
+                if (bullet.test(line) || ordered.test(line)) {
+                    // Indent of the first bullet defines this list's base level.
+                    // Deeper-indented bullets become nested lists (rendered by
+                    // recursing into renderMarkdown). Same-or-less indent at a
+                    // bullet starts a sibling item (or ends the list).
+                    const firstMatch = line.match(bullet) || line.match(ordered);
+                    const baseIndent = firstMatch[1].length;
+                    const isOrdered = ordered.test(line);
+                    const items = [];
+                    let hasTask = false;
+                    while (i < lines.length) {
+                        const cur = lines[i];
+                        if (!cur.trim()) {
+                            // blank line breaks the list (matches CommonMark-ish behaviour)
+                            i++;
+                            break;
+                        }
+                        const mBul = cur.match(bullet);
+                        const mOrd = cur.match(ordered);
+                        const m = mBul || mOrd;
+                        if (!m) break;
+                        if (m[1].length < baseIndent) break;
+                        if (m[1].length > baseIndent) break; // shouldn't happen at top of loop
+                        // Same-type check: switching between -/* and 1. closes the list
+                        if (isOrdered !== !!mOrd) break;
+
+                        const itemBuf = [m[3]];
+                        const nestedBuf = [];
+                        i++;
+                        while (i < lines.length) {
+                            const nxt = lines[i];
+                            if (!nxt.trim()) break;
+                            const nBul = nxt.match(bullet);
+                            const nOrd = nxt.match(ordered);
+                            const nm = nBul || nOrd;
+                            if (nm) {
+                                if (nm[1].length > baseIndent) {
+                                    // nested list line — dedent and stash
+                                    nestedBuf.push(nxt.slice(baseIndent + 2));
+                                    i++;
+                                    continue;
+                                }
+                                // sibling or end of list
+                                break;
+                            }
+                            // Plain continuation text
+                            if (nestedBuf.length) {
+                                // continuation inside the nested block
+                                nestedBuf.push(nxt.slice(baseIndent + 2));
+                            } else {
+                                itemBuf.push(nxt.trim());
+                            }
+                            i++;
+                        }
+
+                        // GitHub-style task items: "- [ ] text" / "- [x] text"
+                        // render as (clickable, unpersisted) checkboxes.
+                        const itemText = itemBuf.join('\n');
+                        const task = !isOrdered && itemText.match(/^\[( |x|X)\]\s+/);
+                        let liHtml = inline(task ? itemText.slice(task[0].length) : itemText);
+                        if (task) {
+                            hasTask = true;
+                            liHtml = '<input type="checkbox"' + (task[1] === ' ' ? '' : ' checked') + '>' + liHtml;
+                        }
+                        if (nestedBuf.length) {
+                            liHtml += renderMarkdown(nestedBuf.join('\n'));
+                        }
+                        items.push(task ? '<li class="task">' + liHtml + '</li>' : '<li>' + liHtml + '</li>');
+                    }
+                    out.push((isOrdered ? '<ol>' : (hasTask ? '<ul class="task-list">' : '<ul>')) + items.join('') + (isOrdered ? '</ol>' : '</ul>'));
+                    continue;
+                }
+
+                const buf = [line];
+                i++;
+                while (i < lines.length && lines[i].trim() && !/^#{1,6}\s/.test(lines[i]) && !/^>\s?/.test(lines[i]) && !bullet.test(lines[i]) && !ordered.test(lines[i]) && !/^```/.test(lines[i]) && !tableRow.test(lines[i])) {
+                    buf.push(lines[i]);
+                    i++;
+                }
+                out.push('<p>' + inline(buf.join(' ')) + '</p>');
+            }
+            return out.join('\n');
+        }
+
+        // Block dispatcher. New block types plug in here.
+        const renderers = {
+            markdown: function (block) {
+                const div = document.createElement('div');
+                div.innerHTML = renderMarkdown(block.content);
+                return div;
+            },
+            mermaid: function (block) {
+                // Mermaid scans elements with class "mermaid" whose textContent
+                // is the diagram source. We collect these nodes and run
+                // mermaid.run() once after all blocks are in the DOM.
+                const div = document.createElement('div');
+                div.className = 'mermaid';
+                div.textContent = block.content;
+                return div;
+            },
+            'force-graph': function (block) {
+                // build.py emits parsed JSON: {nodes:[{id,size}], links:[{source,target}]}.
+                // We instantiate force-graph after the container is in the DOM
+                // so it can measure its own width.
+                const div = document.createElement('div');
+                div.className = 'force-graph';
+                const data = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.ForceGraph) return;
+                    const maxSize = data.nodes.reduce((m, n) => Math.max(m, n.size || 1), 1);
+                    window.ForceGraph()(div)
+                        .graphData(data)
+                        .width(div.clientWidth)
+                        .height(div.clientHeight)
+                        .nodeRelSize(4)
+                        .nodeVal(n => Math.max(20 * (n.size || 1) / maxSize, 0.001))
+                        .nodeLabel(n => n.id + ' (' + (n.size || 1) + ')')
+                        .nodeColor(() => 'rgba(135, 206, 235, 0.7)')
+                        .linkColor(() => 'rgba(60, 60, 60, 0.4)')
+                        .linkDirectionalArrowLength(4)
+                        .linkDirectionalArrowRelPos(1)
+                        .linkWidth(1);
+                });
+                return div;
+            },
+            'bubble-chart': function (block) {
+                // build.py emits {nodes:[{name,size}]}. Renders a D3 circle-pack
+                // SVG (same shape as the obren.io reference, just inline).
+                const wrap = document.createElement('div');
+                wrap.className = 'bubble-chart';
+                const payload = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.d3) return;
+                    const diameter = 480;
+                    const fill = '#c0deed';
+                    const textColor = '#111111';
+                    const fontSize = 12;
+
+                    const svg = window.d3.select(wrap).append('svg')
+                        .attr('viewBox', '0 0 ' + diameter + ' ' + diameter)
+                        .attr('width', diameter)
+                        .attr('height', diameter);
+
+                    const root = window.d3.hierarchy({children: payload.nodes})
+                        .sum(d => d.size || 0)
+                        .sort((a, b) => b.value - a.value);
+
+                    window.d3.pack().size([diameter, diameter]).padding(2)(root);
+
+                    const node = svg.selectAll('g')
+                        .data(root.leaves())
+                        .enter().append('g')
+                        .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+
+                    node.append('title').text(d => d.data.name + ': ' + d.value);
+                    node.append('circle').attr('r', d => d.r).style('fill', fill);
+                    node.append('text')
+                        .attr('dy', '.3em')
+                        .style('text-anchor', 'middle')
+                        .style('fill', textColor)
+                        .style('font-size', fontSize + 'px')
+                        .text(d => d.data.name.substring(0, Math.max(0, Math.floor(d.r / 3))));
+                });
+                return wrap;
+            }
+        };
+
+        // Render one modality's blocks into a host element. Mermaid runs
+        // scoped to just the nodes created here, so lazily rendered tabs get
+        // their diagrams on first activation.
+        let mermaidInitialized = false;
+        function renderBlocksInto(blocks, host) {
+            const mermaidNodes = [];
+            blocks.forEach(function (block) {
+                const r = renderers[block.type];
+                if (!r) {
+                    const pre = document.createElement('pre');
+                    pre.textContent = '[unknown block type: ' + block.type + ']';
+                    host.appendChild(pre);
+                    return;
+                }
+                const node = r(block);
+                if (node instanceof Node) {
+                    host.appendChild(node);
+                    if (block.type === 'mermaid') mermaidNodes.push(node);
+                }
+            });
+            if (mermaidNodes.length && window.mermaid) {
+                if (!mermaidInitialized) {
+                    window.mermaid.initialize({startOnLoad: false, theme: 'default'});
+                    mermaidInitialized = true;
+                }
+                window.mermaid.run({nodes: mermaidNodes});
+            }
+            markScrollableTables(host);
+        }
+
+        // A table wider than its wrapper scrolls sideways. Mark those wrappers
+        // so the CSS can show a cue, and make them focusable so keyboard users
+        // can reach and scroll them. Hidden panes measure 0 and are re-marked
+        // when activated or when the window is resized.
+        function markScrollableTables(host) {
+            host.querySelectorAll('.table-wrap').forEach(function (wrap) {
+                const scrolls = wrap.scrollWidth > wrap.clientWidth + 1;
+                wrap.classList.toggle('is-scrollable', scrolls);
+                if (scrolls) {
+                    wrap.setAttribute('tabindex', '0');
+                    wrap.setAttribute('role', 'region');
+                    wrap.setAttribute('aria-label', 'Table that scrolls sideways');
+                } else {
+                    wrap.removeAttribute('tabindex');
+                    wrap.removeAttribute('role');
+                    wrap.removeAttribute('aria-label');
+                }
+            });
+        }
+
+        // Modality tabs. One <article class="pane"> per modality; panes are
+        // rendered lazily on first activation (force-graph / D3 / mermaid
+        // need a visible, measurable container). With a single modality the
+        // tab bar stays hidden and the page looks exactly like before.
+        const mods = data.modalities;
+        const tabBar = document.getElementById('modality-tabs');
+        const panes = {};
+        const tabButtons = {};
+        const renderedPanes = {};
+
+        // With several modalities each pane is a tabpanel labelled by its
+        // tab (W3C APG tabs pattern); tabindex=0 lets keyboard users move
+        // from the tab list straight into the active content.
+        mods.forEach(function (m) {
+            const pane = document.createElement('article');
+            pane.className = 'pane';
+            pane.dataset.key = m.key;
+            pane.hidden = true;
+            if (mods.length > 1) {
+                pane.id = 'pane-' + m.key;
+                pane.setAttribute('role', 'tabpanel');
+                pane.setAttribute('aria-labelledby', 'tab-' + m.key);
+                pane.setAttribute('tabindex', '0');
+            }
+            root.appendChild(pane);
+            panes[m.key] = pane;
+        });
+
+        const defaultKey = mods.some(m => m.key === 'index') ? 'index' : mods[0].key;
+
+        function activate(key, updateHash) {
+            mods.forEach(function (m) {
+                const isActive = m.key === key;
+                panes[m.key].hidden = !isActive;
+                if (tabButtons[m.key]) {
+                    tabButtons[m.key].classList.toggle('active', isActive);
+                    tabButtons[m.key].setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    // Roving tabindex: only the selected tab is in the Tab
+                    // order; the arrow keys move between tabs.
+                    tabButtons[m.key].setAttribute('tabindex', isActive ? '0' : '-1');
+                }
+            });
+            // Unhide first, then render: the chart libraries measure widths.
+            if (!renderedPanes[key]) {
+                renderBlocksInto(mods.find(m => m.key === key).blocks, panes[key]);
+                renderedPanes[key] = true;
+            } else {
+                markScrollableTables(panes[key]);
+            }
+            if (updateHash) {
+                history.replaceState(null, '',
+                    key === defaultKey ? location.pathname + location.search : '#' + key);
+            }
+        }
+
+        if (mods.length > 1) {
+            mods.forEach(function (m) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = m.label;
+                btn.id = 'tab-' + m.key;
+                btn.dataset.key = m.key;
+                btn.setAttribute('role', 'tab');
+                btn.setAttribute('aria-controls', 'pane-' + m.key);
+                btn.addEventListener('click', function () { activate(m.key, true); });
+                tabBar.appendChild(btn);
+                tabButtons[m.key] = btn;
+            });
+            // Keyboard support per the W3C APG tabs pattern (automatic
+            // activation): Left/Right move between tabs and wrap, Home/End
+            // jump to the first/last tab, and the focused tab is selected.
+            tabBar.addEventListener('keydown', function (ev) {
+                const keys = mods.map(function (m) { return m.key; });
+                const focused = document.activeElement;
+                const current = focused && focused.dataset ? keys.indexOf(focused.dataset.key) : -1;
+                if (current < 0) return;
+                let next = null;
+                if (ev.key === 'ArrowRight') next = (current + 1) % keys.length;
+                else if (ev.key === 'ArrowLeft') next = (current - 1 + keys.length) % keys.length;
+                else if (ev.key === 'Home') next = 0;
+                else if (ev.key === 'End') next = keys.length - 1;
+                if (next === null) return;
+                ev.preventDefault();
+                activate(keys[next], true);
+                tabButtons[keys[next]].focus();
+            });
+            tabBar.hidden = false;
+        }
+
+        // The hash selects a tab only when it matches a modality key, so
+        // existing anchors keep working.
+        const initialHash = location.hash.slice(1);
+        activate(mods.some(m => m.key === initialHash) ? initialHash : defaultKey, false);
+        window.addEventListener('hashchange', function () {
+            const k = location.hash.slice(1);
+            if (mods.some(m => m.key === k)) activate(k, false);
+        });
+        window.addEventListener('resize', function () { markScrollableTables(root); });
+    })();
+</script>
+</body>
+</html>

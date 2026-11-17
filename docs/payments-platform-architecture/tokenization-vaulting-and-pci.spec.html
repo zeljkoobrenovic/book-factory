@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Spec: Never Touch the Card: Tokenization, Vaults and PCI Scope</title>
+    <meta name="description" content="How do payment providers keep card numbers out of everyone's systems, including most of their own? They collect the number in a frame they serve, hand back a token and lock the number in an isolated vault, which leaves the merchant its payment page and stored cards it holds only as tokens.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SETTLED: Architecting Payments and Revenue Infrastructure">
+    <meta property="og:title" content="Spec: Never Touch the Card: Tokenization, Vaults and PCI Scope">
+    <meta property="og:description" content="How do payment providers keep card numbers out of everyone's systems, including most of their own? They collect the number in a frame they serve, hand back a token and lock the number in an isolated vault, which leaves the merchant its payment page and stored cards it holds only as tokens.">
+    <meta property="og:url" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/tokenization-vaulting-and-pci.spec.html">
+    <meta property="og:image" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/assets/images/22-tokenization-vaulting-and-pci/logo.jpeg">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="site.css">
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-129891352-1"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+        dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'UA-129891352-1');
+</script>
+    <style>
+        body {
+            line-height: 1.65;
+        }
+
+        main {
+            padding-top: 32px;
+        }
+
+        nav.post-nav {
+            font-size: 14px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: baseline;
+            flex-wrap: wrap;
+        }
+
+        nav.post-nav a {
+            color: var(--muted);
+            text-decoration: none;
+        }
+
+        nav.post-nav a:hover {
+            color: var(--accent);
+        }
+
+        nav.post-nav .nav-right {
+            margin-left: auto;
+            display: inline-flex;
+            gap: 4px;
+            align-items: baseline;
+        }
+
+        nav.post-nav .nav-sep {
+            color: var(--muted);
+        }
+
+        footer nav.post-nav {
+            margin-top: 24px;
+            margin-bottom: 0;
+        }
+
+        header.post {
+            margin-bottom: 32px;
+        }
+
+        header.post .section {
+            color: var(--muted);
+            font-size: 13px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin: 0 0 -6px;
+        }
+
+        header.post .section a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        header.post .section a:hover {
+            color: var(--accent);
+        }
+
+        header.post .section .post-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        header.post .section .post-status .status-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        header.post .logo {
+            display: block;
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            border: 1px solid lightgrey;
+
+        }
+
+        header.post .logo-credit {
+            color: var(--muted);
+            font-size: 12px;
+            margin: -4px 0 24px;
+            text-align: right;
+        }
+
+        header.post h1 {
+            font-size: 52px;
+            line-height: 1.2;
+            margin: 0 0 2px;
+            padding: 0;
+            letter-spacing: -0.01em;
+            font-weight: normal;
+        }
+
+        header.post .byline {
+            color: var(--muted);
+            font-size: 15px;
+            margin: 0;
+        }
+
+        header.post .byline .spec-link {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        header.post .byline .spec-link:hover {
+            text-decoration: underline;
+        }
+
+        header.post .byline .spec-link-drifted {
+            color: #b8650f;
+        }
+
+        header.post .byline .spec-link-superseded {
+            color: var(--muted);
+        }
+
+        header.post .ai-credit {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 4px 0 0;
+        }
+
+        header.post .ai-credit a {
+            color: inherit;
+        }
+
+        header.post .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 10px 0 10px;
+        }
+
+        header.post .tags .tag {
+            font-size: 14px;
+            padding: 1px 8px;
+            border: 1px solid deepskyblue;
+            color: blue;
+            border-radius: 999px;
+            background-color: var(--tag-bg);
+        }
+
+        nav.modality-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--rule);
+            margin: 0 0 28px;
+            flex-wrap: wrap;
+        }
+
+        nav.modality-tabs button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font: inherit;
+            font-size: 14px;
+            color: var(--muted);
+            padding: 8px 14px;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            letter-spacing: 0.02em;
+        }
+
+        nav.modality-tabs button:hover {
+            color: var(--accent);
+        }
+
+        nav.modality-tabs button.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        #content .pane[hidden] {
+            display: none;
+        }
+
+        #content .pane:focus {
+            outline: none;
+        }
+
+        #content .pane:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 6px;
+        }
+
+        article h2 {
+            font-size: 26px;
+            margin: 40px 0 12px;
+            letter-spacing: -0.01em;
+        }
+
+        article h3 {
+            font-size: 20px;
+            margin: 28px 0 8px;
+        }
+
+        article h4 {
+            font-size: 17px;
+            margin: 20px 0 6px;
+        }
+
+        article p {
+            margin: 0 0 16px;
+        }
+
+        article a {
+            color: var(--accent);
+        }
+
+        article a.image-link {
+            display: inline-block;
+            line-height: 0;
+        }
+
+        article img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        article a.image-link img {
+            display: block;
+        }
+
+        article ul, article ol {
+            padding-left: 24px;
+            margin: 0 0 16px;
+        }
+
+        article li {
+            margin-bottom: 6px;
+        }
+
+        article ul.task-list {
+            list-style: none;
+            padding-left: 4px;
+        }
+
+        article ul.task-list li.task > input[type="checkbox"] {
+            margin-right: 8px;
+            accent-color: var(--accent);
+        }
+
+        article hr {
+            border: none;
+            border-top: 1px solid var(--rule);
+            margin: 32px 0;
+        }
+
+        article blockquote {
+            margin: 16px 0;
+            padding: 12px 18px;
+            background: var(--quote-bg);
+            border-left: 3px solid var(--accent);
+            color: #333;
+        }
+
+        article blockquote p:last-child {
+            margin-bottom: 0;
+        }
+
+        article code {
+            background: var(--code-bg);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 0.92em;
+        }
+
+        article pre {
+            background: var(--code-bg);
+            padding: 14px 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        article pre code {
+            background: none;
+            padding: 0;
+        }
+
+        article .table-wrap {
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+
+        article table {
+            border-collapse: collapse;
+            margin: 16px 0;
+            width: 100%;
+            font-size: 15px;
+        }
+
+        article .table-wrap table {
+            margin: 0;
+        }
+
+        /* Wide tables scroll on narrow screens instead of crushing their columns.
+           A table wrapped in <div class="table-compact"> opts out: it has few,
+           short columns and wraps its cells to fit the screen instead. */
+        @media (max-width: 640px) {
+            article .table-wrap table {
+                min-width: 560px;
+            }
+            article .table-compact .table-wrap table {
+                min-width: 0;
+            }
+        }
+
+        /* Tables that actually overflow get a visible cue and keyboard focus
+           (markScrollableTables() sets the class and attributes). */
+        article .table-wrap.is-scrollable::before {
+            content: "Scroll sideways to see the whole table";
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        article .table-wrap.is-scrollable:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        article th, article td {
+            border: 1px solid var(--rule);
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        article th {
+            background: var(--code-bg);
+            font-weight: 600;
+        }
+
+        /* GFM column alignment from the separator row. Right-aligned columns
+           hold numbers; their cells never wrap, so a sign, a currency symbol
+           and its amount stay on one line while label columns still wrap. */
+        article th.num, article td.num {
+            text-align: right;
+        }
+
+        article td.num {
+            white-space: nowrap;
+        }
+
+        article th.center, article td.center {
+            text-align: center;
+        }
+
+        article .mermaid {
+            text-align: center;
+            margin: 24px 0;
+        }
+
+        article .force-graph {
+            margin: 24px 0;
+            border: 1px solid var(--rule);
+            border-radius: 6px;
+            background: #fff;
+            height: 480px;
+            overflow: hidden;
+        }
+
+        article .bubble-chart {
+            margin: 24px 0;
+            text-align: center;
+        }
+
+        article .bubble-chart svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <nav class="post-nav"><a class="nav-back" href="tokenization-vaulting-and-pci.html">← Never Touch the Card: Tokenization, Vaults and PCI Scope</a><span class="nav-right"></span></nav>
+    <header class="post" id="post-header">
+        <p class="section"><span>SPEC</span> • <span class="post-status"><span class="status-dot" style="background:green"></span>accepted</span> • <span>revised 2026-11-17</span></p>
+        <h1>Spec: Never Touch the Card: Tokenization, Vaults and PCI Scope</h1>
+        <p class="byline"></p>
+        
+        <div class="tags" id="tags"></div>
+        
+    </header>
+    <nav class="modality-tabs" id="modality-tabs" hidden role="tablist" aria-label="Reading formats"></nav>
+    <div id="content"></div>
+    <footer>
+        <nav class="post-nav"><a class="nav-back" href="tokenization-vaulting-and-pci.html">← Never Touch the Card: Tokenization, Vaults and PCI Scope</a><span class="nav-right"></span></nav>
+    </footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/force-graph"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script id="data" type="application/json">{"meta": {}, "tags": [], "modalities": [{"key": "spec", "label": "Spec", "meta": {}, "blocks": [{"type": "markdown", "content": "## Intent\n\n**After reading, the reader should:**\n\n- **Know:** How PCI DSS scope is determined by the path a card number takes, and which self-assessment questionnaire follows from which integration at Stripe and at Adyen.\n- **Know:** What a provider token is, what a vault is, and what Stripe and Adyen have each published about theirs.\n- **Know:** How stored cards are moved between providers: import, export and forwarding.\n- **Believe:** Choosing how card data is collected is a compliance decision first and a user-interface decision second.\n- **Believe:** A hosted card field reduces the merchant's scope without removing the merchant's page from the attack.\n- **Be able to:** Given an integration, say whether card numbers reach the merchant's systems and which self-assessment questionnaire applies.\n- **Be able to:** List what a merchant still owns after moving to hosted fields: the scripts on the payment page and a plan for moving stored cards.\n- **Be able to:** Say, for a statement about either company's vault, whether it is documented or not public.\n\n**Acceptance criteria**\n\n| Id | Criterion | Check | Method | Severity |\n| --- | --- | --- | --- | --- |\n| AC-1 | Given a merchant that uses hosted card fields and claims it has no remaining card-data risk, the reader names the remaining exposure and the control for it. *Probe:* A ticket seller collects cards through its provider's hosted fields (card inputs served inside the provider's iframe) and loads a tag manager and a chat widget on the same checkout page. It tells its board: 'We file SAQ A, the shortest PCI self-assessment, so card data is not our risk.' What is wrong with that statement, and what should the seller do? | `custom` | cold_reader | major |\n| AC-2 | Given three ways of collecting a card, the reader orders them by how much PCI scope the merchant keeps and names the questionnaire for each. *Probe:* Three shops take cards: one redirects to the provider's hosted payment page; one embeds the provider's card fields in an iframe; one has its own form and posts the card number from its server to the provider's API. Order them by how much of the PCI standard the shop must answer for, and name the self-assessment form each would file. | `custom` | cold_reader | major |\n| AC-3 | Every statement about how Stripe's or Adyen's vault works is a dated quotation or citation of the company's own page, or is marked as not public; the chapter says in plain words where the public record stops. | `custom` | rubric | blocker |\n\n## Thesis\n\n**Question:** How do providers keep card numbers out of everyone's systems, including most of their own?\n\n> **Claim:** Providers keep card numbers out by collecting them in a page or frame the provider serves, giving the merchant a token that works only with that provider, and confining the real numbers to a vault kept apart from the rest of the provider's own systems (Stripe documents one that shares no credentials with its other services); this moves PCI scope to the provider and leaves the merchant two things it still owns: the page that hosts the card fields, and stored cards it holds only as that provider's tokens.\n\n**Disputed by:** The view that a merchant filing SAQ A has handed card-data security to its provider entirely, and that its stored cards can follow it to another provider whenever it chooses.\n\n**So what:** The integration choice (redirect, hosted fields, encrypted own form, raw API) should be made as a compliance decision before it is made as a design decision, the payment page needs a script inventory even under SAQ A, and a merchant should know how its stored cards would leave a provider before it needs to move them.\n\n**How and why:** PCI DSS applies to every system that stores, processes or transmits card numbers or can affect their security, so scope follows the data path. A field served from the provider's domain takes the merchant's servers off that path; the page that embeds it stays on it, which is why the SAQ A revised from 31 March 2025 asks merchants to confirm their page cannot be used for a script attack. On the provider's side, Stripe's security page (n.d., accessed November 2026) describes a card data vault in separate hosting that shares no credentials with its other services, with AES-256 encryption and keys on separate machines; Adyen names the Adyen Vault and regional storage and publishes no comparable description. Neither publishes a vault design, and the chapter stops there. Two documented differences remain: Adyen accepts card data encrypted in the browser and passed through the merchant's server as SAQ A, where Stripe's own-form paths mean SAQ A-EP or D; and Stripe documents an export of card data to another Level 1 processor, while Adyen's help center lists an export article whose procedure could not be read in November 2026. A token is an identifier in the provider's database, so moving stored cards is a provider-to-provider transfer that takes weeks, not an API call.\n\n**Supporting claims**\n\n- **S1** — PCI DSS scope follows the path the card number takes, so the way a merchant collects cards fixes the questionnaire it files: a redirect or hosted fields lead to SAQ A and raw card numbers to SAQ D, at both companies.\n- **S2** — Hosted fields take the merchant's servers off that path: the provider collects the number in a frame it serves (Stripe) or as ciphertext the merchant cannot read (Adyen) and hands back a token that works only with that provider.\n- **S3** — Inside the provider the numbers are confined to a vault kept apart from the provider's other systems; Stripe documents one that shares no credentials with its other services, Adyen names its vault and publishes less, and neither publishes a design.\n- **S4** — The page that hosts the card fields stays the merchant's: a script on it can cover the provider's frame with a copy, and since 31 March 2025 a merchant filing SAQ A must confirm its page cannot be used that way.\n- **S5** — Stored cards exist for the merchant only as that provider's tokens; moving them is a provider-to-provider transfer that takes weeks, with export documented by Stripe and, for Adyen, an export article listed in its help center whose procedure could not be read.\n\n## Role in the part\n\nEstablishes the first relocation, of card numbers and PCI scope to the provider, and the vocabulary (scope, hosted field, provider token, vault) that the next three chapters build on. Supports P5-1 of part `part-5`.\n\n## Flow\n\n**Pattern:** `prerequisite_order` (also `problem_solution` in scene to mechanism: the unsigned line, the rule behind it, the mechanism that answers the rule; `comparison` in designs, where-they-differ; `grouping` in page and exit: the two things that stay with the merchant; when-it-goes-wrong mirrors them)\n\nThe reader is an engineer who has never met PCI. The Larkfield scene gives a reason to care; the scope rule must come before the mechanism because hosted fields are only interesting as a way to shorten a path; the token must come before the vault because the vault is defined as what the token points into, and the vault follows the token directly because it completes the answer to Femke's second question (what is held instead of the number, and where the number is kept) and the third of the claim's three moves; the four designs depend only on the scope rule and the mechanism, and come after the vault so that the three moves are complete before the reader chooses among integrations. Only then can the two remainders be argued, the page (which needs the frame) and the stored cards (which need the token and the vault). The comparison of the two companies collects facts already given and precedes Larkfield's worked example because that example runs on both providers and uses the differences, and the failures come last because each is the failure of something an earlier section built. Putting the designs first, as a decision guide, would ask the reader to choose between forms they cannot yet read.\n\n## Introduction\n\n**Hook** (`puzzling_scenario`): On the weekend of 8-9 August 2026, 61,000 stolen card numbers were typed into the card fields of Larkfield's booking widget. Not one of them reached a Larkfield server, log or database. Six months later Larkfield still could not sign one line of the shortest PCI form there is.\n\n**Bridge:** An engineer protects sensitive data by encrypting it, restricting access and auditing, and expects that a system holding no sensitive data has nothing left to answer for. → Payments reached the stronger conclusion long ago, never let the card number in, and then found what that leaves: the page where the number is typed is still yours, and so is the dependency on whoever holds the number for you.\n\n**Thesis statement** (KEY POINTS callout and paragraph p02): Providers keep card numbers out by collecting them in a page or frame they serve, handing the merchant a token that works only with them, and confining the numbers to a vault apart from the rest of their own systems. That moves PCI scope to the provider and leaves the merchant two things: the page around the card fields, and stored cards it holds only as tokens.\n\n**Roadmap** (IN THIS CHAPTER callout and paragraph p04):\n\n- Start from the line of the self-assessment form that Larkfield cannot sign, and return to Larkfield to sign it. *Kept in:* scene, in-practice.\n- Explain how PCI scope is determined by the path a card number takes and which questionnaire measures it. *Kept in:* scope.\n- Show how a card number reaches the provider without passing through the merchant and comes back as a token. *Kept in:* mechanism.\n- Report what Stripe and Adyen have each published about their vaults and where the public record stops. *Kept in:* vault.\n- Compare the four ways to collect a card and the questionnaire each leads to. *Kept in:* designs.\n- Argue the two things that stay with the merchant: the page around the card fields, and stored cards held only as tokens. *Kept in:* page, exit.\n- Set Stripe and Adyen side by side. *Kept in:* where-they-differ.\n- Go through the ways the design fails. *Kept in:* when-it-goes-wrong.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p01 | context | In the Card-Testing Weekend 61,000 stolen card numbers were typed into Larkfield's booking widget and none reached a Larkfield server, which raises two questions: how a company that takes a billion euros a year holds no card numbers, and whether holding none means card data is no longer its risk. | scenario: The Card-Testing Weekend, 8-9 August 2026: 61,000 stolen card numbers tested through one studio's public booking widget with EUR 1 drop-in payments; Larkfield stored none of them. 2026 payment volume EUR 1.12 billion. |  |\n| p02 | claim | Providers keep card numbers out with three moves (they collect the number in a page or frame they serve, hand the merchant a token that works only with them, and confine the numbers to a vault apart from their own other systems), and the merchant is left owning the page around the card fields and stored cards it holds only as tokens. |  | `problem_solution`: The two questions the weekend raises. → The chapter's answer: three moves that relocate the card number and PCI scope, and the two things they leave behind. |\n| p03 | context | In the journey of Mila's payments this chapter covers the moment a card number is typed: 12 January 2027, when she set up her membership, eight weeks before the class pass that the book follows. | scenario: Mila's membership: EUR 49.00 a month at Studio Noord (on Adyen), set up on 12 January 2027 by typing in her Dutch Visa debit card; the EUR 120.00 class pass of 9 March 2027 at 19:42 was paid from her phone's wallet. | `place`: The claim that the number is collected by the provider and never by the merchant. → Where that happens in the recurring example: the membership set-up of 12 January 2027, not the wallet payment of 9 March. |\n| p04 | transition | The chapter goes from Larkfield's self-assessment form, through how PCI scope is determined, how a card number reaches the provider and comes back as a token, what the two companies publish about their vaults, the four ways to collect a card, the two things that stay with the merchant (the page and the stored cards), the comparison of Stripe and Adyen, Larkfield's own inventory, and the failures. |  | `sequence`: Where the chapter sits in the payment's journey. → The order of the sections. |\n\n## Sections\n\n### Setting the Scene at Larkfield: One New Line on the Shortest Form\n\n**Controlling idea** (`example`, id `scene`): Larkfield has never stored a card number and files the shortest PCI questionnaire, and in 2027 it still cannot sign one line of that form, because nobody knows what the scripts on its payment page do.\n\n**Advances the thesis** (S4): Poses the chapter's dispute on a company the reader knows: scope has moved to the providers, and something is visibly left.\n\n**Transition in:** `example`: The claim that tokenization leaves the merchant its page. → A company that did everything right for ten years and is stopped by a question about its page.\n\n**Order of paragraphs** (`problem_solution`): The settled state first (no card numbers, the short form), then the line that cannot be signed, then the questions it raises. Starting with the questions would leave them without a case.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p05 | context | Larkfield has collected cards only through its providers' hosted card fields since 2017, stores tokens and no card numbers, and each year confirms this to both providers on the shortest self-assessment form, SAQ A. | scenario: Larkfield: Stripe since 2017, Adyen since 2024; Keel decision K4, 'Card numbers never touch Larkfield. Hosted fields and provider tokens only; network tokens for stored cards; a script inventory for the booking widget.' New local fact: hosted fields from the start in 2017; Jonas Weber, Risk and Compliance Lead, completes the form each January. |  |\n| p06 | example | In January 2027 the form asks Larkfield to confirm that its site is not susceptible to script attacks, and an afternoon's inspection finds 17 third-party scripts from 9 domains on the booking widget's payment step, four of them with no known owner. | quotation: PCI SSC, 30 January 2025: SAQ A merchants must 'confirm their site is not susceptible to attacks from scripts that could affect the merchant's e-commerce system(s)'.; scenario: Larkfield, illustrative: 17 third-party scripts from 9 domains on the payment step of the booking widget, including a tag manager through which marketing adds scripts without a deploy; 4 with no known owner. | `contrast`: A company that holds no card numbers and files the short form. → The one line of that form it cannot sign, and why. |\n| p07 | claim | Femke de Graaf turns the unsigned line into three questions that order the chapter: which path a card number takes and what that makes Larkfield answer for, what Larkfield holds instead of the number and where the number is kept, and what on its page and in its plans is still Larkfield's. |  | `cause_effect`: The line that cannot be signed. → Three questions that the following sections answer in order. |\n\n### PCI Scope Follows the Path the Card Number Takes\n\n**Controlling idea** (`explanation`, id `scope`): PCI DSS applies to every system that stores, processes or transmits a card number or can affect the security of one that does, so the work a merchant owes is set by the path the number takes, and the self-assessment questionnaire it files is a measure of that path.\n\n**Advances the thesis** (S1): Supplies the rule (scope follows the data path) from which the rest of the chapter derives who answers for what.\n\n**Transition in:** `elaboration`: Femke's first question: which path a card number takes and what that makes Larkfield answer for. → The standard that turns a path into obligations.\n\n**Order of paragraphs** (`prerequisite_order`): The standard and whom it binds, then what scope means, then who checks, then the forms. Each paragraph uses a term the previous one defined: the forms are meaningless before scope, and scope before the standard.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p08 | definition | The Payment Card Industry Data Security Standard (PCI DSS) is the card brands' security standard for the card number, the primary account number or PAN, and it binds every entity that stores, processes or transmits one or could affect the security of a system that does. | quotation: PCI SSC: PCI DSS applies to 'Entities that store, process, or transmit cardholder data (CHD) and/or sensitive authentication data (SAD) or could impact the security of the cardholder data environment (CDE)'.; fact: Version 4.0.1 was published on 11 June 2024 as 'a limited revision'; v4.0 was retired on 31 December 2024, leaving v4.0.1 the only active version. The council was formed in 2006 by Visa, Mastercard, American Express, Discover and JCB (Stripe's summary). |  |\n| p09 | explanation | Scope is the set of systems the standard reaches, the cardholder data environment plus anything that can affect it, so the cheapest security control is to shorten the path a card number travels through your systems, ideally to nothing. | quotation: Stripe's PCI guide: a business that handles card data 'might be required to meet each of the 300+ security controls in PCI DSS', documented in 'more than 1,800 pages of official documentation'.; reasoning: Every server, queue, log and support tool a card number passes through joins the environment; a system the number never reaches does not. | `elaboration`: The standard's reach: systems that touch the card number or can affect those that do. → The word 'scope', and why reducing it is a matter of where the number travels. |\n| p10 | explanation | The standards council does not enforce the standard: the card brands, acquirers and payment facilitators do, which in practice means a merchant's provider tells it which document to file, and the largest merchants are audited instead of self-assessing. | quotation: PCI SSC, 30 January 2025: 'Compliance validation requirements are set by brands, acquirers, payment facilitators, etc., which are often referred to as compliance enforcing entities'.; fact: Stripe's PCI guide: Level 1 is more than 6 million Visa or Mastercard transactions (or 2.5 million American Express) a year and requires an annual Report on Compliance by a Qualified Security Assessor; 'Level 1 businesses can't use a Self-Assessment Questionnaire (SAQ)'; Levels 2-4 file an SAQ whose type depends on the integration. Adyen's guide: its requirements 'are based on Adyen's acceptable risk profile for each integration type. These may differ from what other acquirers require.' | `sequence`: What scope is. → Who checks it, and with which document. |\n| p11 | definition | For online payments three questionnaires matter, and they order merchants by how much of the card number's path they own: SAQ A when the path is wholly outsourced, SAQ A-EP when the merchant's own page handles the number in the browser, and SAQ D for everything else. | quotation: PCI SSC, 30 January 2025: SAQ A covers 'merchants with account data functions completely outsourced to PCI DSS validated and compliant third parties', who 'do not store, process, or transmit any account data in electronic form on their systems or premises'.; table: Table: SAQ A / A-EP / D, each with the condition as the two providers' guides apply it and what it implies about the path. A-EP: the merchant's own page hosts the form and passes card data from the browser (Stripe: legacy Stripe.js v2). D: the catch-all, including raw card numbers sent to the provider's API (Adyen: 'the most extensive form of self-certification'). The in-person forms (B-IP, P2PE, C) are named and left to the in-person chapter. | `elaboration`: The self-assessment questionnaire as the document a smaller merchant files. → The three types that apply online, read as three lengths of path. |\n\n### How a Card Number Reaches the Provider Without Passing Through You\n\n**Controlling idea** (`process`, id `mechanism`): A hosted field takes the merchant's servers off the card number's path by collecting it in a frame the provider serves, and the provider answers with a token: an identifier that stands for the stored card and works only with that provider.\n\n**Advances the thesis** (S2): Shows the first two of the three moves: collection by the provider, and the token handed back.\n\n**Transition in:** `problem_solution`: The rule that scope follows the path, and SAQ A as the form for a path that avoids the merchant. → The mechanism that makes such a path possible on a page the merchant still designs.\n\n**Order of paragraphs** (`chronological`): The order of the data: the number is typed, it travels to the provider (directly at Stripe, encrypted through the merchant at Adyen), a token comes back, and the section closes on what that token does and does not give the merchant. The token cannot be defined before the reader has seen what it replaces.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p12 | definition | A hosted field is a card input inside an iframe that the provider serves from its own domain, so the merchant's page displays the field without being able to read what is typed into it, and at Stripe the frame sends the number straight to Stripe. | quotation: Stripe's PCI guide: 'Checkout and Stripe.js and Elements host all card data collection inputs within an iframe served from Stripe's domain (not yours), so your customers' card information never touches your servers.' Stripe's security guide: its integrations 'securely collect and transmit payment information directly to Stripe without it passing through your servers'.; reasoning: The browser's same-origin policy stops a script on the parent page from reading inside a frame served from another origin (general web platform behavior, known to the reader).; figure: Figure (structure): the card number's path from browser to provider vault, bypassing the merchant server, with a token coming back to the merchant. |  |\n| p13 | comparison | Adyen's fields work on a second principle: the card data is encrypted inside the component in the shopper's browser with a key the merchant does not hold, and the ciphertext then travels through the merchant's server to Adyen, which Adyen treats as off the card number's path because the merchant cannot decrypt it. | quotation: Adyen's PCI guide, web Drop-in and Components: 'The content of the embedded elements is isolated from your web page, and the cardholder data is encrypted on your shopper's browser. You do not have access to decryption keys'. Mobile: 'Cardholder data is encrypted in the app, sent to your server, and then transmitted to Adyen.'; fact: Adyen's Card Component documentation shows the merchant's server calling /payments with fields named encryptedCardNumber, encryptedExpiryMonth, encryptedExpiryYear and encryptedSecurityCode. | `contrast`: Stripe's frame, which sends the number directly to Stripe. → A design in which the number does pass through the merchant, unreadable. |\n| p14 | definition | What comes back is a provider token, an identifier for the stored card that only this provider can turn back into a card number; at Stripe the reusable form is a PaymentMethod attached to a Customer, returned in the API response. | quotation: Stripe: tokenization 'replaces sensitive PAN information with Stripe tokens, a nonsensitive string that can be used only by the business that collected the card'. Tokens API: 'You can't store or use tokens more than once. To store card or bank account information for later use, create Customer objects'. Payment Methods guide: 'A PaymentMethod contains reusable payment details'.; fact: Stripe's card object carries a fingerprint that 'Uniquely identifies this particular card number. You can use this attribute to check whether two customers who've signed up with you are using the same card number'. | `sequence`: The number has reached the provider. → What the provider hands back in its place. |\n| p15 | comparison | Adyen's token is a storedPaymentMethodId that is valid only together with the merchant's own customer identifier, the shopperReference, is read from a webhook after the payment (the payment response carries it only for some payment methods), and by default works with one merchant account. | quotation: Adyen: 'When you store a shopper's payment details, you must store the token with a unique shopper reference'; after authorization, 'get the unique identifier and other information about the token from the recurring.token.created webhook'; 'By default, shopper references and tokens can only be used with one merchant account', unless Token Groups are enabled. | `contrast`: Stripe's token, an object attached to a customer record that Stripe holds. → Adyen's token, a pair of identifiers one of which the merchant chooses. |\n| p16 | analysis | A provider token promises that the merchant can charge the card again without holding its number and may keep a few harmless facts about it; it does not promise to work at another provider, to mean anything to the card's issuer, or to stop anyone typing a stolen number into the field. | quotation: Stripe's security guide: 'the card type, the last four digits of the card, and the expiration date. This information isn't subject to PCI compliance, so you can store any of these properties in your database.'; table: Table: 'What a provider token promises / What it does not promise' (charge again without the number; display last four and expiry; a database breach exposes no numbers / work at another provider; reach the issuer; stop a stolen number being typed). | `conclusion_summary`: The two companies' tokens. → What any provider token does and does not give the merchant. |\n\n### The Vault: What Stripe and Adyen Have Published, and Where the Record Stops\n\n**Controlling idea** (`evidence`, id `vault`): The real card numbers sit in a vault that the provider isolates from its own other systems; Stripe documents that isolation in one section of its security page, Adyen names its vault and publishes less, and neither company publishes a design.\n\n**Advances the thesis** (S3): Establishes the third move, confinement inside the provider, from the companies' own pages, and marks exactly where documentation ends (acceptance criterion AC-3).\n\n**Transition in:** `elaboration`: The token, which only the provider can turn back into a card number. → The place where that exchange happens, and how much of it each company has described.\n\n**Order of paragraphs** (`assertion_evidence_reasoning`): The pattern is stated, then each company's published statement is quoted in descending order of detail (Stripe, then Adyen), then the limit of the record. The limit comes last because the reader can only see what is missing after seeing what is there.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p17 | definition | A vault is the system that holds the real card numbers and the mapping from tokens to them, and the design goal is that it be the smallest possible part of the provider that can ever see a number, with everything else working on references. | reasoning: Industry practice, stated as such: the scope rule of the previous sections applies inside the provider too, so a provider shortens the path within its own estate for the same reason a merchant does. |  |\n| p18 | evidence | Stripe states that its card data vault runs in separate hosting infrastructure that shares no credentials with the rest of Stripe, in an isolated cloud environment run by a dedicated team with access reviewed quarterly. | quotation: Stripe security page: 'The Stripe infrastructure for storing, decrypting, and transmitting primary account numbers (PANs), such as credit card numbers, runs in a separate hosting infrastructure and doesn't share any credentials with the rest of our services, including our API and website.' 'A dedicated team manages our CDV in an isolated Amazon Web Services (AWS) environment that's separate from the rest of the Stripe infrastructure. We restrict access to this separate environment to a small number of specially trained engineers and review access quarterly.'; fact: Stripe: a PCI-certified auditor 'certified us to PCI Service Provider Level 1... This audit includes both the Stripe Card Data Vault (CDV) and the secure software development of our integration code'. | `example`: The pattern of a small isolated system. → The most detailed public statement of it, Stripe's. |\n| p19 | evidence | Stripe also states that the rest of Stripe is itself a token holder: card numbers are encrypted at rest with keys on separate machines, internal services cannot obtain a plaintext number, and a number leaves the vault only toward a destination on a fixed list. | quotation: Stripe security page: 'All card numbers are encrypted at rest with AES-256. Decryption keys are stored on separate machines. We tokenize PANs internally, isolating raw numbers from the rest of our infrastructure. None of the Stripe internal servers and daemons can obtain plaintext card numbers, but they can request that cards are sent to a service provider on a static allowlist.'; figure: Figure (structure): a provider's estate with a small vault enclosure, internal services holding tokens, and one guarded exit toward allowlisted destinations such as card networks. | `additional_support`: Isolation of the vault's infrastructure and credentials. → What happens to the numbers inside it and how they leave. |\n| p20 | evidence | Adyen publishes a name, a location rule and one sentence on keys: payment details are stored in the Adyen Vault, tokens are stored per region, and keys are 'managed in a secure and compliant manner'; it makes no public statement comparable to Stripe's on isolation or encryption. | quotation: Adyen tokenization page: 'we store payment details in the Adyen Vault'; 'We use client-side encryption (CSE) and end-to-end encryption to ensure that sensitive data is never exposed. All cryptographic keys are managed in a secure and compliant manner'. Forward page: 'Make sure that your live endpoint region matches your Adyen token vault storage region.' PCI guide: 'After Adyen receives your shoppers' cardholder data, the data is contained in a PCI DSS Level 1 Service Provider Cardholder Data Environment.' | `contrast`: Stripe's section on its vault. → Adyen's shorter public statement. |\n| p21 | analysis | The public record stops there for both companies: no key-management design, no statement on hardware security modules for card data, no rotation policy, no description of how internal services exchange a token for a number, and no engineering article or talk on either card vault was found. | fact: Searched: stripe.com/blog, stripe.dev, Adyen's knowledge hub and documentation. The one Adyen engineering article on tokenization (Sriram Kunjathur, 1 October 2019) concerns personal data (it lists 'credit card details' among its examples) in the data platform behind Adyen's reports and does not say it is the store behind payment tokens: incoming data 'passes through our Tokenization system, which encrypts the data with a key from the HSM-backed vault key manager'. Evidence age: 7 years.; reasoning: INFERENCE, NOT DOCUMENTED (callout): both vaults probably follow the pattern Stripe describes, since both pass the same Level 1 audit against the same standard; the audit attests controls and does not publish a design. | `conclusion_summary`: What each company has published. → What neither has, listed. |\n\n### Four Ways to Collect a Card, and the Questionnaire Each Leads To\n\n**Controlling idea** (`comparison`, id `designs`): There are four realistic ways to collect a card (a redirect to the provider's page, hosted fields, the merchant's own form with encryption in the browser, and raw card numbers sent to the API), and each fixes the path of the number and therefore the form the merchant files, which is why the choice is a compliance decision before it is a design decision.\n\n**Advances the thesis** (S1, S2): Applies the scope rule and the mechanism to the choice the reader actually makes, and gives the mapping from integration to questionnaire at each company.\n\n**Transition in:** `cause_effect`: The mechanism of hosted fields and tokens, and the vault behind them. → The designs a merchant can choose between, ordered by how much scope each leaves it.\n\n**Order of paragraphs** (`small_to_large`): From the design in which the merchant owns the least of the path to the one in which it owns all of it, so that each step adds one thing the merchant must answer for. The comparison table and the recommendation come last because they need all four.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p22 | claim | The four designs differ in one respect that matters to an assessor, how much of the card number's path runs through things the merchant controls, and they trade that against control over the look and behavior of the form. | figure: Figure (conceptual): four lanes from browser to provider, each showing where the card number travels and a bar for the merchant's remaining scope, from shortest (redirect) to longest (raw API). |  |\n| p23 | description | In a redirect the customer leaves the merchant's site and types the card on a page the provider hosts, which leaves the merchant SAQ A, no script criterion, and one residual risk: an attacker who controls the merchant's site can point the redirect somewhere else. | quotation: PCI SSC FAQ 1588: the script criterion 'does not apply to e-commerce merchants with a webpage that redirects customers'. Adyen's PCI guide, Hosted Checkout, risk 'Low': 'An attacker could gain access to your website and change the redirect from an Adyen-hosted payment page to a fraudulent payment website'.; fact: Stripe's Checkout can 'redirect customers to a Stripe-hosted payment page'; Adyen calls its equivalent Hosted Checkout; both ask for SAQ A. | `sequence`: The ordering of the four designs. → The first: the provider's own page. |\n| p24 | description | Hosted fields keep the customer on the merchant's page and put only the card inputs in the provider's frame, which also leaves SAQ A but adds the script criterion (the line of the form that asks the merchant to confirm its page cannot be used for a script attack), because the page that embeds the frame is now part of what the customer trusts. | quotation: PCI SSC FAQ 1588: the criterion 'only applies to e-commerce merchants with a webpage that includes a TPSP's/payment processor's embedded payment page/form (for example, one or more inline frame(s) (iframes))'. Adyen's guide rates Drop-in and Components 'Low-Medium'.; fact: Stripe: Checkout or Elements, SAQ A; official mobile SDK components, SAQ A. Adyen: Drop-in, Components and plugins, SAQ A; mobile Drop-in and Components, SAQ A. | `contrast`: The redirect, where the merchant's page shows no card field. → Fields embedded in the merchant's page. |\n| p25 | comparison | A merchant that wants its own form can, at Adyen, encrypt the card data in the browser with a third-party library and pass the ciphertext through its server while still filing SAQ A, at a risk label (Adyen's own rating of each integration) of Medium; Stripe's guide lists no equivalent, and its own-form path from the browser means SAQ A-EP. | quotation: Adyen's PCI guide, JSON Web Encryption: 'Cardholder data is encrypted on your shopper's browser using a third-party JWE library, sent to your server, and then transmitted to Adyen'; risk 'Medium'; 'the integration could still be scoped on the Self Assessment Questionnaire A (SAQ A) for PCI DSS compliance because once encrypted, you cannot decrypt the data'. Its older client-side encryption library: 'The Client-Side Encryption (CSE) Web integrations are being phased out'.; quotation: Stripe's PCI guide: 'Using Stripe.js v2 to pass card data entered in a form hosted on your own site requires completing the SAQ A-EP annually'. | `contrast`: Fields the provider serves. → A form the merchant serves, with the provider's encryption in it. |\n| p26 | description | Sending raw card numbers from the merchant's server to the provider's API puts the merchant's systems on the path, which means SAQ D at both companies, and at Stripe it also means losing the fraud product that depends on client-side collection. | quotation: Stripe's PCI guide: 'When you pass card information directly to Stripe's API, your integration is directly handling that data, and you're required to annually prove your PCI compliance using the SAQ D - the most demanding of the SAQs'; 'Radar, our fraud prevention tool that includes risk evaluation and rules, is only available when using any of our methods for client-side tokenization.'; quotation: Adyen's PCI guide, API only, risk 'High': 'your system receives, transmits, and potentially stores and processes cardholder data'. | `sequence`: Three designs in which the merchant cannot read the number. → The one in which it can. |\n| p27 | recommendation | Set side by side, the designs show that the form field is the visible part of a compliance decision, so I choose the integration by the questionnaire and the remaining risk I am willing to own, and only then by how the form should look. | table: Table: design / where the card number travels / questionnaire at Stripe / questionnaire at Adyen / what the merchant still answers for / when it fits. Rows: redirect; hosted fields; own form with browser encryption; raw API.; reasoning: Reversing the choice later means a different questionnaire and possibly an assessor; the conditions under which the raw API is right (a merchant that already runs an audited card environment, for example to hold its own vault) are stated. | `conclusion_summary`: The four designs one by one. → The comparison and the author's rule for choosing. |\n\n### What Stays Yours: The Page Around the Card Fields\n\n**Controlling idea** (`explanation`, id `page`): A hosted field removes the merchant's servers from the card number's path and leaves the merchant's page on it: a script on that page can cover the provider's frame with a copy and collect what is typed, and since 31 March 2025 a merchant filing SAQ A has to confirm that its page cannot be used that way.\n\n**Advances the thesis** (S4): Argues the first remainder of the thesis from the standard's own change and Adyen's own description of the attack.\n\n**Transition in:** `contrast`: Hosted fields as the default design, filed under SAQ A. → What that design does not cover: the page the frame sits in.\n\n**Order of paragraphs** (`problem_solution`): The attack, then the rule that responded to it, then the two ways of meeting the rule, then the controls. The rule would read as paperwork if the attack did not come first.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p28 | explanation | A script running on the page that embeds the card fields cannot read into the provider's frame, but it can replace the frame or lay its own over it, so the customer types into the attacker's copy while the payment still appears to work. | quotation: Adyen's PCI guide, on its own iframe integration: 'attackers can create alternative content for the Drop-in or Components, or drop an iframe over the already existing iframe. In this scenario, the payment may still be completed, but a copy of the cardholder data is sent to the attacker.'; quotation: Stripe's security guide: 'Including JavaScript from other sites makes your security dependent on theirs and poses a security risk. If they're ever compromised, an attacker could execute arbitrary code on your page.'; figure: Figure (conceptual): a payment page with the provider's card frame, and a third-party script laying a look-alike field over it that copies the digits elsewhere. |  |\n| p29 | evidence | PCI DSS answered this attack with two requirements on payment-page scripts, effective 31 March 2025, and for SAQ A merchants replaced them in January 2025 with a single eligibility criterion that leaves the obligation in place. | quotation: Requirement 6.4.3, as restated by Adyen: for every payment page script, 'A method is implemented to confirm that each script is authorized', 'A method is implemented to assure the integrity of each script', and 'An inventory of all scripts is maintained with written justification as to why each is necessary'. Requirement 11.6.1 asks for a mechanism that detects unauthorized changes to the page's scripts and security headers.; quotation: PCI SSC, 30 January 2025: the council removed 6.4.3, 11.6.1 and 12.3.1 from SAQ A and added the criterion to 'confirm their site is not susceptible to attacks from scripts that could affect the merchant's e-commerce system(s)'; the changes 'do not remove or diminish the underlying requirements within PCI DSS'. The new SAQ A took effect on 31 March 2025. | `cause_effect`: The overlay attack. → The standard's response and its date. |\n| p30 | comparison | A merchant can meet the criterion in two ways, by applying script controls itself or by obtaining its provider's confirmation that the integration protects the page, and the two companies document this differently: Adyen with a page on the requirements, Stripe with the browser policy directives and no mention of the requirements by number. | quotation: PCI SSC FAQ 1588: confirm by 'Using techniques such as, but not limited to, those detailed in PCI DSS Requirements 6.4.3 and 11.6.1', or by 'Obtaining confirmation from the merchant's PCI DSS compliant TPSP/payment processor... that, when implemented according to the TPSP's/payment processor's instructions, the TPSP's/payment processor's solution includes techniques that protect the merchant's payment page from script attacks'.; fact: Adyen publishes 'Script security for ecommerce', recommending a Content Security Policy and Subresource Integrity, and says 6.4.3 and 11.6.1 'remain applicable to merchants that are required to submit PCI DSS Self-Assessment Questionnaire D (SAQ D) and merchants that are required to present an Attestation of Compliance (AoC) for onsite assessment'. Stripe's security guide lists the Content Security Policy directives for Checkout, Stripe.js, Connect embedded components and Link; neither it nor Stripe's PCI guide contains '6.4.3' or '11.6.1' (both pages searched on 17 November 2026). | `elaboration`: The eligibility criterion. → How it is met, and what each provider supplies. |\n| p31 | recommendation | The controls I would put in place are an inventory of every script on the payment step with a reason and an owner, a content security policy that allows only those, and a payment step with as few third-party scripts as the business can bear, starting with removing the tag manager. | reasoning: A content security policy restricts where scripts load from and where frames and requests may go; it does not help if an allowed script is itself compromised, which is why the list should be short. A tag manager is a script whose job is to load other scripts without a code review. | `cause_effect`: The two routes to meeting the criterion. → What I would actually do, whichever route is on the form. |\n\n### What Else Stays Yours: Stored Cards You Hold Only as Tokens\n\n**Controlling idea** (`explanation`, id `exit`): A merchant's stored cards exist for it only as one provider's tokens, so moving them is a transfer between two providers' vaults that takes weeks: both companies document importing, Stripe documents exporting and its conditions, Adyen's help center lists an export article whose procedure could not be read, and both offer forwarding one request at a time.\n\n**Advances the thesis** (S5): Argues the second remainder of the thesis from the companies' migration pages.\n\n**Transition in:** `additional_support`: The first thing hosted fields leave with the merchant, its page. → The second: stored cards that it cannot move by itself.\n\n**Order of paragraphs** (`chronological`): In the order a merchant meets them: why it cannot move cards itself, how cards arrive at a provider, how they leave one, what can be done without moving them, and how to plan the move.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p32 | claim | Because the merchant never held the card numbers, it cannot copy its stored cards to another provider; a token is a key into the first provider's vault, and this dependency is The Vault Hostage. | reasoning: The design that keeps numbers out of the merchant's systems is the same design that makes the provider the only party able to move them. Where a vault can sit when there are several providers is covered in payment-routing-and-orchestration. |  |\n| p33 | process | Both companies document taking cards in from a previous provider as a file transfer between the two providers: encrypted with the receiver's key, delivered over SFTP, and answered with a mapping from old identifiers to new tokens. | quotation: Stripe import page: the previous processor 'encrypts your data with the Stripe PGP key and uploads it'; 'Processors can take anywhere from a few days to several months to produce a final export'; Stripe returns a mapping file.; quotation: Adyen import page: 'Because of technical and compliance complexity, migrating payment data usually takes 10 days or more.' | `sequence`: Cards cannot be moved by the merchant. → How they are moved: provider to provider, inbound first. |\n| p34 | comparison | Stripe documents the outbound direction as policy with conditions, and for Adyen an export article is listed in the help center but its procedure could not be read. | quotation: Stripe export page: 'We believe our customers own the sensitive data they entrust to Stripe. We make sure that you have access to this data - even if you're moving elsewhere.' 'we can only transfer your card data to another PCI DSS Level 1-compliant payment processor'; the recipient must prove that status. Not exported: 'payment history, subscriptions, or other objects', and 'any credentials saved through Link'.; fact: No Adyen documentation page describing an export was found on 17 November 2026; a help-centre article on token export appears in search results and its address now redirects to the tokenization documentation. | `contrast`: Importing, which both document. → Exporting, which one documents. |\n| p35 | description | Short of moving the cards, both providers will forward a stored card to a third party one request at a time, which lets a second provider charge a card without holding it and leaves the first provider in the path of every such payment. | quotation: Stripe: the Vault and Forward API is 'available only to businesses with a dedicated Stripe account team'. Adyen: 'You can forward payment details that you stored with Adyen to a PCI compliant third party, like a payment service provider (PSP). We support forwarding card details, and network tokens'; Adyen's support team enables it. | `additional_support`: Bulk transfer in and out. → A way to use a card elsewhere without transferring it. |\n| p36 | recommendation | I plan a move of stored cards as a project of weeks in three stages (new sign-ups to the new provider first, then the import, then the switch of existing customers) and I ask each provider, before signing, how cards leave, how long it takes and what does not travel. | fact: Adyen's import page recommends 'dividing the migration into three stages', beginning with 'Switch all new tokenizations/sign-ups to Adyen, but keep the recurring charges for old customers at your old provider', and warns that 'New tokens may still be created with your current provider while you are migrating'.; reasoning: What does not travel, by Stripe's page: payment history, subscriptions, wallet credentials saved through Link. Whether network tokens travel is not said on either company's export pages (Adyen's service description offers a separate Network Token Sharing service) and is taken up in the next chapter. | `cause_effect`: Import, export and forwarding as documented. → What a merchant should do with that knowledge before it needs it. |\n\n### Stripe and Adyen: Where They Differ\n\n**Controlling idea** (`comparison`, id `where-they-differ`): On card data the two companies agree on the model and differ in five documented respects: whether ciphertext may cross the merchant's server under SAQ A, the shape of the reusable token, how much each says about its vault, how each documents script security, and whether an export procedure is public.\n\n**Advances the thesis** (S3, S5): Collects the documented differences that the earlier sections established one by one, with the author's reading kept in its own column.\n\n**Transition in:** `conclusion_summary`: Collection, tokens, vaults, scripts and portability as each section described them. → The two companies side by side.\n\n**Order of paragraphs** (`comparison`): The table's rows follow the order in which the chapter established them (collection, token, vault, page, exit) so each row points back to a section; the advice follows the table because it depends on all rows. The section precedes Larkfield's because the worked example uses both providers and relies on these differences.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p37 | comparison | Both companies are audited PCI Level 1 service providers that keep card numbers out of the merchant's systems in the same way, and the differences the public record shows are five, set out in a table whose last column is my reading and not documentation. | table: Table 'Aspect / Stripe / Adyen / What the difference suggests': (1) own form with encrypted card data; (2) reusable token; (3) published description of the vault; (4) script-security guidance; (5) export of stored cards; (6) forwarding (no material difference). Every Stripe and Adyen cell is a fact cited earlier in the chapter or 'Not public'. |  |\n| p38 | recommendation | An integrator on Stripe should treat the token as part of a customer record that Stripe holds and can rely on a documented export; an integrator on Adyen keys tokens on its own customer identifiers, can keep its own card form under SAQ A at a higher risk label, and should get the export procedure in writing. |  | `cause_effect`: The table's rows. → What to do differently on each provider. |\n\n### In Practice at Larkfield: SAQ A on Two Providers and a Script Inventory\n\n**Controlling idea** (`example`, id `in-practice`): Larkfield answers Femke's three questions with one path for every card number (browser to provider), one identifier per stored card in its own records, and a payment step cut from 17 third-party scripts to 3 scripts it can explain, which is what lets Jonas Weber sign the form.\n\n**Advances the thesis** (S2, S4, S5): Works the whole argument on ledger facts: the path of Mila's card, the script inventory, and the exit sheet for stored cards.\n\n**Transition in:** `example`: The differences between the two providers. → One company living with both.\n\n**Order of paragraphs** (`chronological`): The order of Larkfield's work in early 2027: trace one card, clean the page, write down the exit, sign. The signature comes last because it depends on the other three.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p39 | example | When Mila typed her card on 12 January 2027 the number went from her browser into Adyen's card fields, encrypted, and Larkfield's payment record store kept an Adyen token under her member identifier plus the last four digits and the expiry; each EUR 49.00 renewal charges that token. | scenario: Mila's membership: EUR 49.00 monthly at Studio Noord (Adyen), set up 12 January 2027 by typing her Dutch Visa debit card and passing a 3-D Secure challenge; renewed on the 1st of each month. Had the studio been on Stripe, the record would hold a PaymentMethod identifier attached to a Stripe Customer. |  |\n| p40 | example | The inventory of the booking widget's payment step listed 17 third-party scripts from 9 domains; under Keel decision K4 the payment step moves to its own page with 3 scripts from 2 domains, each with a reason and an owner, behind a content security policy run in report-only mode for two weeks before it is enforced. | table: Table (Larkfield, illustrative): before and after. Before: 17 third-party scripts, 9 domains, 4 without an owner, tag manager present. After: 3 scripts (Larkfield's own bundle and its error reporter from Larkfield's domain; the provider's card library from the provider's domain), tag manager, chat widget and analytics removed from the payment step; owner Tom Hendriks; changes reviewed by the payments team.; fact: Adyen's script-security page recommends starting with 'a report-only CSP HTTP header'. | `sequence`: The path of one card number, which never touches Larkfield. → The page that path starts on. |\n| p41 | example | For stored cards Larkfield writes one exit sheet per provider (how cards leave, in how many weeks, what does not travel), because moving the 1,140 studios that are still on Stripe online to Adyen would be an export from one vault and an import into the other, not a configuration change. | scenario: Ledger: 1,140 studios onboarded before 2024 in NL and DE are still on Stripe for online payments; about 940,000 membership renewals a month are charged against stored credentials; K8's rehearsed switch covers new card payments, and chapter 10 records that card transfer is 'never part of the switch'. | `additional_support`: The page, the first remainder. → The stored cards, the second. |\n| p42 | analysis | Jonas Weber signs the script line on the strength of Larkfield's own controls, the first of the council's two routes, and K4 names what stayed with Larkfield and who owns it. | scenario: K4: 'Card numbers never touch Larkfield. Hosted fields and provider tokens only; network tokens for stored cards; a script inventory for the booking widget.' Owners (local detail): the script inventory, Tom Hendriks; the exit sheets, Femke de Graaf; the form, Jonas Weber. | `cause_effect`: The inventory and the exit sheets. → The signature they make possible. |\n\n### When It Goes Wrong\n\n**Controlling idea** (`cause_effect`, id `when-it-goes-wrong`): The three failures of this design are card numbers that arrive by a path nobody designed, a payment page script that is compromised while payments keep working, and a migration that loses cards between two vaults.\n\n**Advances the thesis** (S1, S4, S5): Shows each remainder failing and how it is detected and recovered, plus the failure of the scope rule itself.\n\n**Transition in:** `contrast`: Larkfield's design working as intended. → The ways the same design fails.\n\n**Order of paragraphs** (`grouping`): One failure per thing the chapter says can go wrong: the path (scope), the page, the stored cards, in the order the chapter introduced them.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p43 | cause_effect | The Card in the Log is a card number that reaches a system by a path nobody designed, such as a support chat, an email or a free-text field, and by the scope rule of the second section every system it lands in joins the cardholder data environment, silently, until someone searches for it. | scenario: Larkfield, illustrative: members paste card numbers into the support chat that Aylin Demir's team runs when a payment fails. Industry practice, stated as such: scan inbound text for card-number patterns, mask on entry, and purge what is found. |  |\n| p44 | cause_effect | A compromised script on the payment page is hard to detect because the payment still completes, so detection has to come from the page itself: policy violation reports, and an alert when the set of scripts or the security headers change. | quotation: Adyen's PCI guide: 'the payment may still be completed, but a copy of the cardholder data is sent to the attacker'. Requirement 11.6.1 as restated by Adyen: a mechanism 'alerts personnel about unauthorized modification (including indicators of compromise, changes, additions, and deletions) to the security impacting HTTP headers and the script contents of payment pages'. | `sequence`: A number arriving outside the form. → A number stolen at the form. |\n| p45 | cause_effect | A migration of stored cards fails quietly in the gap between the export and the switch: cards saved at the old provider after the file was cut, identifiers that do not map, and things that were never in the file. | quotation: Adyen's import page: 'New tokens may still be created with your current provider while you are migrating and switching recurring to Adyen. If so, contact your provider and request the tokens created in the interim.' Stripe's import process ends with a validation summary the merchant approves and a mapping file. | `sequence`: Failures of the path and the page. → The failure of the exit. |\n\n## Conclusion: What to Take Away\n\n**Synthesis:** Scope, the token, the vault, the page and the export are one design seen from five sides: the card number is given exactly one home, and every other party, including the merchant and most of the provider, is handed a reference. The reference is what makes the merchant safe and what makes it dependent, and the one place the design cannot reach is the screen where the number is typed, which belongs to whoever serves the page.\n\n**So what:** A team that accepts this stops treating SAQ A as the end of the matter. It chooses its integration by the form it leads to, keeps a script inventory for the payment step with an owner, and has in writing how its stored cards would leave each provider before it needs them to.\n\n**Callback:** The 61,000 stolen numbers typed into Larkfield's booking widget, none of which reached Larkfield, and the line of the form it could not sign. The reader now sees both halves in one event: the numbers bypassed Larkfield because a frame served by the provider collected them, and they were typed on a page Larkfield served, which is exactly what the unsigned line asks about.\n\n**Takeaway** (`course_of_action`): Write down three things for your own integration: the path a card number takes and the questionnaire that follows from it; every script on the payment step with a reason and an owner; and, per provider, how stored cards leave, in how many weeks, and what does not travel.\n\n**Hand-off** to [The Card Number's Replacement: Network Tokens and Credential Lifecycle](network-tokens.html): `contrast`: The provider token: an identifier that means something only inside one provider's vault and that the issuer never sees. → A token issued by the card network, which travels through the acquirer to the issuer in place of the card number and stays valid when the card behind it changes.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p46 | synthesis (list) | Established: PCI DSS scope follows the card number's path; redirect and hosted fields lead to SAQ A and raw numbers to SAQ D at both companies; since 31 March 2025 SAQ A with embedded fields carries a script criterion; Stripe documents an isolated vault and Adyen names one. |  |  |\n| p47 | synthesis (list) | Depends on context: redirect or hosted fields, whether an own encrypted form is worth its risk label, which route to take for the script criterion, and when to plan for portability. |  | `contrast`: What is established. → What holds only under stated conditions. |\n| p48 | recommendation (list) | The author's synthesis: tokenization is a relocation with a remainder, so every SAQ A merchant keeps two owned artifacts, a script inventory and an exit sheet for stored cards, and takes vault claims only as far as they are published. |  | `contrast`: Conditional recommendations. → The author's own position. |\n| p49 | recommendation (list) | Seven questions let the reader test an integration or a provider on scope, the payment page, the vault and the exit. |  | `cause_effect`: The positions. → The questions that apply them in a design review or a provider evaluation. |\n| p50 | transition | The 61,000 numbers of the Card-Testing Weekend passed through a frame on a page Larkfield served and never through Larkfield, and the provider token that results from such a frame means something only inside one provider's vault; the next chapter replaces it with a token the card network issues. |  | `contrast`: A token that only one provider can use and the issuer never sees. → A token issued by the card network, which travels to the issuer and stays valid when the card changes. |\n\n## Non-goals\n\n- Network tokens, token requestors, cryptograms and what happens to a stored card when it is reissued. See [The Card Number's Replacement: Network Tokens and Credential Lifecycle](network-tokens.html).\n- In-person scope: terminals, end-to-end and point-to-point encryption, SAQ B-IP, P2PE and C. See [The Card in the Room: Terminals and Unified Commerce](in-person-payments.html).\n- Where the vault sits in a multi-provider design, orchestrators and independent vaults. See [More Than One Provider: Routing and Orchestration](payment-routing-and-orchestration.html).\n- Card testing and fraud scoring; why tokenization does not stop a stolen number being used. See [Deciding in Milliseconds: Fraud and Risk Systems](payment-fraud-and-risk.html).\n- 3-D Secure scripts and authentication flows. See [Proving It Is You: 3-D Secure and Strong Customer Authentication](three-d-secure-and-sca.html).\n- General web and application security of a commerce site. See [Protecting the Shop: Card Data, Account Takeover, Bots and Skimmers](../commerce-platform-architecture/commerce-security.html).\n- The full list of PCI DSS requirements, and wallets as device tokens.\n\n## Modalities\n\nArticle only.\n\n## Open questions\n\n- Adyen's export procedure for stored cards (conditions, timeline, fees): no public page found; a former help-centre article now redirects.\n- Vault design at both companies beyond the quoted statements: key management, hardware security modules for card data, rotation, regions, how the allowlist is enforced.\n- Whether Stripe gives SAQ A merchants a written confirmation that its integration protects the page from script attacks (the second route of PCI SSC FAQ 1588): not found on the two Stripe pages read; other Stripe material was not searched exhaustively.\n- PCI SSC's own SAQ documents were not readable (licence page); SAQ wording comes from the council's blog and FAQ and from the two providers' guides.\n- Which merchant level applies to a platform whose sellers are the merchants: set by the providers and brands; the chapter does not rule on it.\n\n## Decision log\n\n- **2026-11-17** — Open with the Card-Testing Weekend seen from the card-data side (no number reached Larkfield) because the part introduction hands it over, and use the unsigned SAQ A line as the Larkfield scene. Rejected: Opening on a historical breach at a real company (no sourced case in the briefs); Opening on a definition of PCI DSS\n- **2026-11-17** — Split 'what stays with the merchant' into two sections, the page and the stored cards, each arguing one half of the thesis's remainder; give portability a short section and point to payment-routing-and-orchestration for vault placement, which that chapter already covers. Rejected: One combined section on what remains; Repeating the forwarding and export detail of chapter 10 in full\n- **2026-11-17** — Keep in-person scope to one clause and a link; the in-person chapter already compares E2EE and P2PE at both companies. Rejected: A section on terminal encryption\n- **2026-11-17** — State Adyen's export as 'not public' and Stripe's script-requirement silence as an absence on two named pages, not as a claim about either company's practice. Rejected: Citing the search excerpt of Adyen's withdrawn help article as fact\n- **2026-11-17** — Larkfield's script counts (17 scripts, 9 domains, 4 without owner; 3 scripts, 2 domains afterwards) are new illustrative ledger facts. Rejected: Leaving the inventory without numbers\n\n## Sources\n\n- **Internal**\n  - _journals/payments-platform-architecture/PLAN.md, contract 22 — Scope, the Larkfield thread (SAQ A, the booking widget's script inventory) and the terms the chapter owns.\n  - _journals/payments-platform-architecture/journal-spec.json, entry tokenization-vaulting-and-pci — Intent, acceptance criteria, thesis and role, copied unchanged; the hand-off to network-tokens.\n  - _journals/payments-platform-architecture/_research/brief-card-data-tokens-and-authentication.md, Parts 1 and 2 — The tagged claims on PCI DSS, SAQ mapping, vault statements, token types and portability; load-bearing pages re-fetched on 17 November 2026.\n  - _journals/payments-platform-architecture/_research/scenario-ledger.md — Larkfield facts: K4, the Card-Testing Weekend, Mila's membership, the 1,140 studios.\n- **External**\n  - Stripe documentation 'Security at Stripe', 'Integration security guide', PCI guide, export, import and Vault and Forward pages, n.d., accessed 2026-11-17 — Stripe's vault statement, SAQ mapping, script warning, portability.\n  - Adyen documentation: PCI DSS compliance guide, SAQ A eligibility, script security, tokenization, create tokens, forward, import (all n.d.), accessed 2026-11-17 — Adyen's SAQ mapping and risk labels, the overlay attack, vault naming, token shape, portability.\n  - PCI SSC blog posts of 2024-06-11 and 2025-01-30, FAQ 1588 and the PCI DSS standard page — Applicability, version dates, the SAQ A change and how the script criterion is met.\n\n## Changelog\n\n- **2026-11-17** — Verification pass: 96 claims checked (84 confirmed, 9 corrected, 3 hedged, 0 unsupported and removed or relabeled, 0 unreachable); the claim that Adyen's token does not arrive in the payment response was corrected (Adyen: the response includes it for some payment methods and recommends the webhook), and 'last modified' stamps were replaced by 'n.d.' under ruling 30.\n- **2026-11-17** — While drafting, to stay under the length limit: the question list cut from eight to seven and four evidence details dropped (import completion time, the export key length, Adyen's no-charge sentence, one row of the token table). No unit added, dropped or reordered.\n- **2026-11-17** — Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes).\n- **2026-11-17** — After the flow rubric (sound with notes): the ciphertext clause added to the Adyen collection paragraph, the script criterion glossed and the risk label introduced in the designs section, the Card in the Log tied to the scope rule, the comparison table ordered as the chapter, and the flow reasons for the mechanism, the comparison and the chapter corrected. Not acted on, for the author: moving the vault section to just before the stored-cards section (kept after the token, to follow Femke's three questions and the order of the claim).\n- **2026-11-17** — First version, written from PLAN contract 22, the journal-spec entry and the card-data brief.\n- **2026-11-17** — Reconciliation after verification (17 November 2026): Adyen's export of stored cards is worded as ruling 31(a) requires (an export article is listed but its procedure could not be read) in thesis how_why, claim and two controlling ideas.\n- **2026-11-17** — Absence audit (17 November 2026): eight statements of absence re-tested with a wide search (documentation sitemaps, help and support centers, company sites, engineering posts, web searches restricted to the providers' domains). All hold; no vault design, key-management statement or engineering article on either card vault was found, and Adyen's export article still redirects (ruling 31a). The sentence on network tokens is scoped to the export pages.\n- **2026-11-24** — Sweep of rulings 46-48: the staging paragraph now points to Adyen's Network Token Sharing Service (Additional Services Terms, 13 June 2025) as chapter 23 documents it (ruling 48d); one connective sentence trimmed to stay within max_words; source added. Page read top to bottom against the spec units after the restoration of 17 November: all 41 paragraph units, 4 placeholders and both tables present and in order.\n- **2026-11-17** — Visual layer: 4 figures generated and inspected (article-illustrator).\n"}]}]}</script>
+<script>
+    (function () {
+        const data = JSON.parse(document.getElementById('data').textContent);
+        const root = document.getElementById('content');
+
+        const postId = (data.meta && data.meta.id) ? String(data.meta.id) : '';
+        const postStatusRaw = (data.meta && data.meta.status) ? String(data.meta.status) : '';
+        if (postId || postStatusRaw) {
+            const header = document.getElementById('post-header');
+            let sectionEl = header.querySelector('p.section');
+            if (!sectionEl) {
+                sectionEl = document.createElement('p');
+                sectionEl.className = 'section';
+                header.insertBefore(sectionEl, header.firstChild);
+            }
+            // Status pill goes first, then a " / " separator before the existing
+            // content (section name and/or id).
+            if (postStatusRaw) {
+                const parts = postStatusRaw.split(':');
+                const statusName = parts[0].trim();
+                const statusColor = (parts[1] || '').trim();
+                const wrap = document.createElement('span');
+                wrap.className = 'post-status';
+                const dot = document.createElement('span');
+                dot.className = 'status-dot';
+                if (statusColor) dot.style.background = statusColor;
+                wrap.appendChild(dot);
+                wrap.appendChild(document.createTextNode(statusName));
+                if (sectionEl.firstChild) {
+                    sectionEl.insertBefore(document.createTextNode(' • '), sectionEl.firstChild);
+                    sectionEl.insertBefore(wrap, sectionEl.firstChild);
+                } else {
+                    sectionEl.appendChild(wrap);
+                }
+            }
+            if (postId) {
+                if (sectionEl.firstChild) sectionEl.appendChild(document.createTextNode(' • '));
+                sectionEl.appendChild(document.createTextNode(postId));
+            }
+        }
+
+        const tagsHost = document.getElementById('tags');
+        (data.tags || []).forEach(function (t) {
+            const span = document.createElement('span');
+            span.className = 'tag';
+            span.textContent = t;
+            tagsHost.appendChild(span);
+        });
+
+        // Minimal markdown renderer. Supports: ATX headings, paragraphs, blockquotes,
+        // unordered/ordered lists, fenced code, inline code, bold/italic/strikethrough, links, images, hr.
+        // Sufficient for the posts in this repo; replace with a fuller parser if needed.
+        function renderMarkdown(src) {
+            const lines = src.replace(/\r\n/g, '\n').split('\n');
+            const out = [];
+            let i = 0;
+
+            const bullet = /^(\s*)([-*])\s+(.*)$/;
+            const ordered = /^(\s*)(\d+)\.\s+(.*)$/;
+            const tableRow = /^\s*\|(.+)\|\s*$/;
+            const tableSep = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+
+            function splitRow(s) {
+                let t = s.trim();
+                if (t.startsWith('|')) t = t.slice(1);
+                if (t.endsWith('|')) t = t.slice(0, -1);
+                return t.split('|').map(c => c.trim());
+            }
+
+            function inline(s) {
+                // Posts are trusted content, so raw HTML passes through unescaped
+                // (some posts embed inline <blockquote>, <div>, etc.).
+                // Stray ampersands still get fixed up.
+                s = s.replace(/&(?![a-zA-Z]+;|#\d+;)/g, '&amp;');
+                s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<a class="image-link" href="$2" target="_blank" rel="noopener noreferrer"><img alt="$1" src="$2"></a>');
+                s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+                s = s.replace(/`([^`]+)`/g, function (_, c) {
+                    return '<code>' + c.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
+                });
+                // Bold/italic, including nested combinations: ***x***,
+                // **a *b*** / ***a* b** (shared delimiters), and **a *b* c**.
+                s = s.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+                s = s.replace(/\*\*([^*\n]+)\*([^*\n]+)\*\*\*/g, '<strong>$1<em>$2</em></strong>');
+                s = s.replace(/\*\*\*([^*\n]+)\*([^*\n]+)\*\*/g, '<strong><em>$1</em>$2</strong>');
+                s = s.replace(/\*\*((?:[^*\n]|\*(?!\*)[^*\n]+\*(?!\*))+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+                s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+                return s;
+            }
+
+            while (i < lines.length) {
+                const line = lines[i];
+                if (!line.trim()) {
+                    i++;
+                    continue;
+                }
+
+                const fence = line.match(/^```(\w*)\s*$/);
+                if (fence) {
+                    i++;
+                    const buf = [];
+                    while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+                        buf.push(lines[i]);
+                        i++;
+                    }
+                    i++;
+                    const escaped = buf.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const cls = fence[1] ? ' class="lang-' + fence[1] + '"' : '';
+                    out.push('<pre><code' + cls + '>' + escaped + '</code></pre>');
+                    continue;
+                }
+
+                const h = line.match(/^(#{1,6})\s+(.*)$/);
+                if (h) {
+                    out.push('<h' + h[1].length + '>' + inline(h[2]) + '</h' + h[1].length + '>');
+                    i++;
+                    continue;
+                }
+
+                if (/^\s*(?:-\s*){3,}\s*$/.test(line) || /^\s*\*{3,}\s*$/.test(line)) {
+                    out.push('<hr>');
+                    i++;
+                    continue;
+                }
+
+                if (/^>\s?/.test(line)) {
+                    const buf = [];
+                    while (i < lines.length && /^>\s?/.test(lines[i])) {
+                        buf.push(lines[i].replace(/^>\s?/, ''));
+                        i++;
+                    }
+                    out.push('<blockquote>' + renderMarkdown(buf.join('\n')) + '</blockquote>');
+                    continue;
+                }
+
+                if (tableRow.test(line) && i + 1 < lines.length && tableSep.test(lines[i + 1])) {
+                    const headers = splitRow(line);
+                    const aligns = splitRow(lines[i + 1]).map(function (c) {
+                        c = c.trim();
+                        const left = c.startsWith(':'), right = c.endsWith(':');
+                        return left && right ? 'center' : right ? 'num' : '';
+                    });
+                    const cellOpen = function (tag, idx) {
+                        return aligns[idx] ? '<' + tag + ' class="' + aligns[idx] + '">' : '<' + tag + '>';
+                    };
+                    i += 2;
+                    const rows = [];
+                    while (i < lines.length && tableRow.test(lines[i])) {
+                        rows.push(splitRow(lines[i]));
+                        i++;
+                    }
+                    let html = '<div class="table-wrap"><table><thead><tr>';
+                    headers.forEach((h, idx) => {
+                        html += cellOpen('th', idx) + inline(h) + '</th>';
+                    });
+                    html += '</tr></thead><tbody>';
+                    rows.forEach(r => {
+                        html += '<tr>';
+                        r.forEach((c, idx) => {
+                            html += cellOpen('td', idx) + inline(c) + '</td>';
+                        });
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                    out.push(html);
+                    continue;
+                }
+
+                if (bullet.test(line) || ordered.test(line)) {
+                    // Indent of the first bullet defines this list's base level.
+                    // Deeper-indented bullets become nested lists (rendered by
+                    // recursing into renderMarkdown). Same-or-less indent at a
+                    // bullet starts a sibling item (or ends the list).
+                    const firstMatch = line.match(bullet) || line.match(ordered);
+                    const baseIndent = firstMatch[1].length;
+                    const isOrdered = ordered.test(line);
+                    const items = [];
+                    let hasTask = false;
+                    while (i < lines.length) {
+                        const cur = lines[i];
+                        if (!cur.trim()) {
+                            // blank line breaks the list (matches CommonMark-ish behaviour)
+                            i++;
+                            break;
+                        }
+                        const mBul = cur.match(bullet);
+                        const mOrd = cur.match(ordered);
+                        const m = mBul || mOrd;
+                        if (!m) break;
+                        if (m[1].length < baseIndent) break;
+                        if (m[1].length > baseIndent) break; // shouldn't happen at top of loop
+                        // Same-type check: switching between -/* and 1. closes the list
+                        if (isOrdered !== !!mOrd) break;
+
+                        const itemBuf = [m[3]];
+                        const nestedBuf = [];
+                        i++;
+                        while (i < lines.length) {
+                            const nxt = lines[i];
+                            if (!nxt.trim()) break;
+                            const nBul = nxt.match(bullet);
+                            const nOrd = nxt.match(ordered);
+                            const nm = nBul || nOrd;
+                            if (nm) {
+                                if (nm[1].length > baseIndent) {
+                                    // nested list line — dedent and stash
+                                    nestedBuf.push(nxt.slice(baseIndent + 2));
+                                    i++;
+                                    continue;
+                                }
+                                // sibling or end of list
+                                break;
+                            }
+                            // Plain continuation text
+                            if (nestedBuf.length) {
+                                // continuation inside the nested block
+                                nestedBuf.push(nxt.slice(baseIndent + 2));
+                            } else {
+                                itemBuf.push(nxt.trim());
+                            }
+                            i++;
+                        }
+
+                        // GitHub-style task items: "- [ ] text" / "- [x] text"
+                        // render as (clickable, unpersisted) checkboxes.
+                        const itemText = itemBuf.join('\n');
+                        const task = !isOrdered && itemText.match(/^\[( |x|X)\]\s+/);
+                        let liHtml = inline(task ? itemText.slice(task[0].length) : itemText);
+                        if (task) {
+                            hasTask = true;
+                            liHtml = '<input type="checkbox"' + (task[1] === ' ' ? '' : ' checked') + '>' + liHtml;
+                        }
+                        if (nestedBuf.length) {
+                            liHtml += renderMarkdown(nestedBuf.join('\n'));
+                        }
+                        items.push(task ? '<li class="task">' + liHtml + '</li>' : '<li>' + liHtml + '</li>');
+                    }
+                    out.push((isOrdered ? '<ol>' : (hasTask ? '<ul class="task-list">' : '<ul>')) + items.join('') + (isOrdered ? '</ol>' : '</ul>'));
+                    continue;
+                }
+
+                const buf = [line];
+                i++;
+                while (i < lines.length && lines[i].trim() && !/^#{1,6}\s/.test(lines[i]) && !/^>\s?/.test(lines[i]) && !bullet.test(lines[i]) && !ordered.test(lines[i]) && !/^```/.test(lines[i]) && !tableRow.test(lines[i])) {
+                    buf.push(lines[i]);
+                    i++;
+                }
+                out.push('<p>' + inline(buf.join(' ')) + '</p>');
+            }
+            return out.join('\n');
+        }
+
+        // Block dispatcher. New block types plug in here.
+        const renderers = {
+            markdown: function (block) {
+                const div = document.createElement('div');
+                div.innerHTML = renderMarkdown(block.content);
+                return div;
+            },
+            mermaid: function (block) {
+                // Mermaid scans elements with class "mermaid" whose textContent
+                // is the diagram source. We collect these nodes and run
+                // mermaid.run() once after all blocks are in the DOM.
+                const div = document.createElement('div');
+                div.className = 'mermaid';
+                div.textContent = block.content;
+                return div;
+            },
+            'force-graph': function (block) {
+                // build.py emits parsed JSON: {nodes:[{id,size}], links:[{source,target}]}.
+                // We instantiate force-graph after the container is in the DOM
+                // so it can measure its own width.
+                const div = document.createElement('div');
+                div.className = 'force-graph';
+                const data = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.ForceGraph) return;
+                    const maxSize = data.nodes.reduce((m, n) => Math.max(m, n.size || 1), 1);
+                    window.ForceGraph()(div)
+                        .graphData(data)
+                        .width(div.clientWidth)
+                        .height(div.clientHeight)
+                        .nodeRelSize(4)
+                        .nodeVal(n => Math.max(20 * (n.size || 1) / maxSize, 0.001))
+                        .nodeLabel(n => n.id + ' (' + (n.size || 1) + ')')
+                        .nodeColor(() => 'rgba(135, 206, 235, 0.7)')
+                        .linkColor(() => 'rgba(60, 60, 60, 0.4)')
+                        .linkDirectionalArrowLength(4)
+                        .linkDirectionalArrowRelPos(1)
+                        .linkWidth(1);
+                });
+                return div;
+            },
+            'bubble-chart': function (block) {
+                // build.py emits {nodes:[{name,size}]}. Renders a D3 circle-pack
+                // SVG (same shape as the obren.io reference, just inline).
+                const wrap = document.createElement('div');
+                wrap.className = 'bubble-chart';
+                const payload = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.d3) return;
+                    const diameter = 480;
+                    const fill = '#c0deed';
+                    const textColor = '#111111';
+                    const fontSize = 12;
+
+                    const svg = window.d3.select(wrap).append('svg')
+                        .attr('viewBox', '0 0 ' + diameter + ' ' + diameter)
+                        .attr('width', diameter)
+                        .attr('height', diameter);
+
+                    const root = window.d3.hierarchy({children: payload.nodes})
+                        .sum(d => d.size || 0)
+                        .sort((a, b) => b.value - a.value);
+
+                    window.d3.pack().size([diameter, diameter]).padding(2)(root);
+
+                    const node = svg.selectAll('g')
+                        .data(root.leaves())
+                        .enter().append('g')
+                        .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+
+                    node.append('title').text(d => d.data.name + ': ' + d.value);
+                    node.append('circle').attr('r', d => d.r).style('fill', fill);
+                    node.append('text')
+                        .attr('dy', '.3em')
+                        .style('text-anchor', 'middle')
+                        .style('fill', textColor)
+                        .style('font-size', fontSize + 'px')
+                        .text(d => d.data.name.substring(0, Math.max(0, Math.floor(d.r / 3))));
+                });
+                return wrap;
+            }
+        };
+
+        // Render one modality's blocks into a host element. Mermaid runs
+        // scoped to just the nodes created here, so lazily rendered tabs get
+        // their diagrams on first activation.
+        let mermaidInitialized = false;
+        function renderBlocksInto(blocks, host) {
+            const mermaidNodes = [];
+            blocks.forEach(function (block) {
+                const r = renderers[block.type];
+                if (!r) {
+                    const pre = document.createElement('pre');
+                    pre.textContent = '[unknown block type: ' + block.type + ']';
+                    host.appendChild(pre);
+                    return;
+                }
+                const node = r(block);
+                if (node instanceof Node) {
+                    host.appendChild(node);
+                    if (block.type === 'mermaid') mermaidNodes.push(node);
+                }
+            });
+            if (mermaidNodes.length && window.mermaid) {
+                if (!mermaidInitialized) {
+                    window.mermaid.initialize({startOnLoad: false, theme: 'default'});
+                    mermaidInitialized = true;
+                }
+                window.mermaid.run({nodes: mermaidNodes});
+            }
+            markScrollableTables(host);
+        }
+
+        // A table wider than its wrapper scrolls sideways. Mark those wrappers
+        // so the CSS can show a cue, and make them focusable so keyboard users
+        // can reach and scroll them. Hidden panes measure 0 and are re-marked
+        // when activated or when the window is resized.
+        function markScrollableTables(host) {
+            host.querySelectorAll('.table-wrap').forEach(function (wrap) {
+                const scrolls = wrap.scrollWidth > wrap.clientWidth + 1;
+                wrap.classList.toggle('is-scrollable', scrolls);
+                if (scrolls) {
+                    wrap.setAttribute('tabindex', '0');
+                    wrap.setAttribute('role', 'region');
+                    wrap.setAttribute('aria-label', 'Table that scrolls sideways');
+                } else {
+                    wrap.removeAttribute('tabindex');
+                    wrap.removeAttribute('role');
+                    wrap.removeAttribute('aria-label');
+                }
+            });
+        }
+
+        // Modality tabs. One <article class="pane"> per modality; panes are
+        // rendered lazily on first activation (force-graph / D3 / mermaid
+        // need a visible, measurable container). With a single modality the
+        // tab bar stays hidden and the page looks exactly like before.
+        const mods = data.modalities;
+        const tabBar = document.getElementById('modality-tabs');
+        const panes = {};
+        const tabButtons = {};
+        const renderedPanes = {};
+
+        // With several modalities each pane is a tabpanel labelled by its
+        // tab (W3C APG tabs pattern); tabindex=0 lets keyboard users move
+        // from the tab list straight into the active content.
+        mods.forEach(function (m) {
+            const pane = document.createElement('article');
+            pane.className = 'pane';
+            pane.dataset.key = m.key;
+            pane.hidden = true;
+            if (mods.length > 1) {
+                pane.id = 'pane-' + m.key;
+                pane.setAttribute('role', 'tabpanel');
+                pane.setAttribute('aria-labelledby', 'tab-' + m.key);
+                pane.setAttribute('tabindex', '0');
+            }
+            root.appendChild(pane);
+            panes[m.key] = pane;
+        });
+
+        const defaultKey = mods.some(m => m.key === 'index') ? 'index' : mods[0].key;
+
+        function activate(key, updateHash) {
+            mods.forEach(function (m) {
+                const isActive = m.key === key;
+                panes[m.key].hidden = !isActive;
+                if (tabButtons[m.key]) {
+                    tabButtons[m.key].classList.toggle('active', isActive);
+                    tabButtons[m.key].setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    // Roving tabindex: only the selected tab is in the Tab
+                    // order; the arrow keys move between tabs.
+                    tabButtons[m.key].setAttribute('tabindex', isActive ? '0' : '-1');
+                }
+            });
+            // Unhide first, then render: the chart libraries measure widths.
+            if (!renderedPanes[key]) {
+                renderBlocksInto(mods.find(m => m.key === key).blocks, panes[key]);
+                renderedPanes[key] = true;
+            } else {
+                markScrollableTables(panes[key]);
+            }
+            if (updateHash) {
+                history.replaceState(null, '',
+                    key === defaultKey ? location.pathname + location.search : '#' + key);
+            }
+        }
+
+        if (mods.length > 1) {
+            mods.forEach(function (m) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = m.label;
+                btn.id = 'tab-' + m.key;
+                btn.dataset.key = m.key;
+                btn.setAttribute('role', 'tab');
+                btn.setAttribute('aria-controls', 'pane-' + m.key);
+                btn.addEventListener('click', function () { activate(m.key, true); });
+                tabBar.appendChild(btn);
+                tabButtons[m.key] = btn;
+            });
+            // Keyboard support per the W3C APG tabs pattern (automatic
+            // activation): Left/Right move between tabs and wrap, Home/End
+            // jump to the first/last tab, and the focused tab is selected.
+            tabBar.addEventListener('keydown', function (ev) {
+                const keys = mods.map(function (m) { return m.key; });
+                const focused = document.activeElement;
+                const current = focused && focused.dataset ? keys.indexOf(focused.dataset.key) : -1;
+                if (current < 0) return;
+                let next = null;
+                if (ev.key === 'ArrowRight') next = (current + 1) % keys.length;
+                else if (ev.key === 'ArrowLeft') next = (current - 1 + keys.length) % keys.length;
+                else if (ev.key === 'Home') next = 0;
+                else if (ev.key === 'End') next = keys.length - 1;
+                if (next === null) return;
+                ev.preventDefault();
+                activate(keys[next], true);
+                tabButtons[keys[next]].focus();
+            });
+            tabBar.hidden = false;
+        }
+
+        // The hash selects a tab only when it matches a modality key, so
+        // existing anchors keep working.
+        const initialHash = location.hash.slice(1);
+        activate(mods.some(m => m.key === initialHash) ? initialHash : defaultKey, false);
+        window.addEventListener('hashchange', function () {
+            const k = location.hash.slice(1);
+            if (mods.some(m => m.key === k)) activate(k, false);
+        });
+        window.addEventListener('resize', function () { markScrollableTables(root); });
+    })();
+</script>
+</body>
+</html>

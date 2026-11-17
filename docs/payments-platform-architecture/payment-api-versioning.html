@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Changing the API Without Breaking a Million Integrations: Versioning</title>
+    <meta name="description" content="How do you evolve an API that customers integrated years ago and never want to touch? The provider lets each integration keep the version it was built against, which moves the cost of change without removing it: the provider maintains old versions, and the integrator who never upgrades builds up a gap it will one day cross in a single step.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SETTLED: Architecting Payments and Revenue Infrastructure">
+    <meta property="og:title" content="Changing the API Without Breaking a Million Integrations: Versioning">
+    <meta property="og:description" content="How do you evolve an API that customers integrated years ago and never want to touch? The provider lets each integration keep the version it was built against, which moves the cost of change without removing it: the provider maintains old versions, and the integrator who never upgrades builds up a gap it will one day cross in a single step.">
+    <meta property="og:url" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/payment-api-versioning.html">
+    <meta property="og:image" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/assets/images/19-api-versioning/logo.jpeg">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="site.css">
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-129891352-1"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+        dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'UA-129891352-1');
+</script>
+    <style>
+        body {
+            line-height: 1.65;
+        }
+
+        main {
+            padding-top: 32px;
+        }
+
+        nav.post-nav {
+            font-size: 14px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: baseline;
+            flex-wrap: wrap;
+        }
+
+        nav.post-nav a {
+            color: var(--muted);
+            text-decoration: none;
+        }
+
+        nav.post-nav a:hover {
+            color: var(--accent);
+        }
+
+        nav.post-nav .nav-right {
+            margin-left: auto;
+            display: inline-flex;
+            gap: 4px;
+            align-items: baseline;
+        }
+
+        nav.post-nav .nav-sep {
+            color: var(--muted);
+        }
+
+        footer nav.post-nav {
+            margin-top: 24px;
+            margin-bottom: 0;
+        }
+
+        header.post {
+            margin-bottom: 32px;
+        }
+
+        header.post .section {
+            color: var(--muted);
+            font-size: 13px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin: 0 0 -6px;
+        }
+
+        header.post .section a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        header.post .section a:hover {
+            color: var(--accent);
+        }
+
+        header.post .section .post-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        header.post .section .post-status .status-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        header.post .logo {
+            display: block;
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            border: 1px solid lightgrey;
+
+        }
+
+        header.post .logo-credit {
+            color: var(--muted);
+            font-size: 12px;
+            margin: -4px 0 24px;
+            text-align: right;
+        }
+
+        header.post h1 {
+            font-size: 52px;
+            line-height: 1.2;
+            margin: 0 0 2px;
+            padding: 0;
+            letter-spacing: -0.01em;
+            font-weight: normal;
+        }
+
+        header.post .byline {
+            color: var(--muted);
+            font-size: 15px;
+            margin: 0;
+        }
+
+        header.post .byline .spec-link {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        header.post .byline .spec-link:hover {
+            text-decoration: underline;
+        }
+
+        header.post .byline .spec-link-drifted {
+            color: #b8650f;
+        }
+
+        header.post .byline .spec-link-superseded {
+            color: var(--muted);
+        }
+
+        header.post .ai-credit {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 4px 0 0;
+        }
+
+        header.post .ai-credit a {
+            color: inherit;
+        }
+
+        header.post .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 10px 0 10px;
+        }
+
+        header.post .tags .tag {
+            font-size: 14px;
+            padding: 1px 8px;
+            border: 1px solid deepskyblue;
+            color: blue;
+            border-radius: 999px;
+            background-color: var(--tag-bg);
+        }
+
+        nav.modality-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--rule);
+            margin: 0 0 28px;
+            flex-wrap: wrap;
+        }
+
+        nav.modality-tabs button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font: inherit;
+            font-size: 14px;
+            color: var(--muted);
+            padding: 8px 14px;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            letter-spacing: 0.02em;
+        }
+
+        nav.modality-tabs button:hover {
+            color: var(--accent);
+        }
+
+        nav.modality-tabs button.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        #content .pane[hidden] {
+            display: none;
+        }
+
+        #content .pane:focus {
+            outline: none;
+        }
+
+        #content .pane:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 6px;
+        }
+
+        article h2 {
+            font-size: 26px;
+            margin: 40px 0 12px;
+            letter-spacing: -0.01em;
+        }
+
+        article h3 {
+            font-size: 20px;
+            margin: 28px 0 8px;
+        }
+
+        article h4 {
+            font-size: 17px;
+            margin: 20px 0 6px;
+        }
+
+        article p {
+            margin: 0 0 16px;
+        }
+
+        article a {
+            color: var(--accent);
+        }
+
+        article a.image-link {
+            display: inline-block;
+            line-height: 0;
+        }
+
+        article img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        article a.image-link img {
+            display: block;
+        }
+
+        article ul, article ol {
+            padding-left: 24px;
+            margin: 0 0 16px;
+        }
+
+        article li {
+            margin-bottom: 6px;
+        }
+
+        article ul.task-list {
+            list-style: none;
+            padding-left: 4px;
+        }
+
+        article ul.task-list li.task > input[type="checkbox"] {
+            margin-right: 8px;
+            accent-color: var(--accent);
+        }
+
+        article hr {
+            border: none;
+            border-top: 1px solid var(--rule);
+            margin: 32px 0;
+        }
+
+        article blockquote {
+            margin: 16px 0;
+            padding: 12px 18px;
+            background: var(--quote-bg);
+            border-left: 3px solid var(--accent);
+            color: #333;
+        }
+
+        article blockquote p:last-child {
+            margin-bottom: 0;
+        }
+
+        article code {
+            background: var(--code-bg);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 0.92em;
+        }
+
+        article pre {
+            background: var(--code-bg);
+            padding: 14px 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        article pre code {
+            background: none;
+            padding: 0;
+        }
+
+        article .table-wrap {
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+
+        article table {
+            border-collapse: collapse;
+            margin: 16px 0;
+            width: 100%;
+            font-size: 15px;
+        }
+
+        article .table-wrap table {
+            margin: 0;
+        }
+
+        /* Wide tables scroll on narrow screens instead of crushing their columns.
+           A table wrapped in <div class="table-compact"> opts out: it has few,
+           short columns and wraps its cells to fit the screen instead. */
+        @media (max-width: 640px) {
+            article .table-wrap table {
+                min-width: 560px;
+            }
+            article .table-compact .table-wrap table {
+                min-width: 0;
+            }
+        }
+
+        /* Tables that actually overflow get a visible cue and keyboard focus
+           (markScrollableTables() sets the class and attributes). */
+        article .table-wrap.is-scrollable::before {
+            content: "Scroll sideways to see the whole table";
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        article .table-wrap.is-scrollable:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        article th, article td {
+            border: 1px solid var(--rule);
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        article th {
+            background: var(--code-bg);
+            font-weight: 600;
+        }
+
+        /* GFM column alignment from the separator row. Right-aligned columns
+           hold numbers; their cells never wrap, so a sign, a currency symbol
+           and its amount stay on one line while label columns still wrap. */
+        article th.num, article td.num {
+            text-align: right;
+        }
+
+        article td.num {
+            white-space: nowrap;
+        }
+
+        article th.center, article td.center {
+            text-align: center;
+        }
+
+        article .mermaid {
+            text-align: center;
+            margin: 24px 0;
+        }
+
+        article .force-graph {
+            margin: 24px 0;
+            border: 1px solid var(--rule);
+            border-radius: 6px;
+            background: #fff;
+            height: 480px;
+            overflow: hidden;
+        }
+
+        article .bubble-chart {
+            margin: 24px 0;
+            text-align: center;
+        }
+
+        article .bubble-chart svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <nav class="post-nav"><a class="nav-back" href="index.html">SETTLED: Architecting Payments and Revenue Infrastructure</a><span class="nav-right"><a class="nav-prev" href="idempotency-and-retries.html" title="Exactly Once, Over a Network That Does Not Allow It: Idempotency and Retries">← Previous</a><span class="nav-sep">&nbsp;|&nbsp;</span><a class="nav-next" href="payment-webhooks-and-events.html" title="The Provider Calls You: Webhooks and Events">Next →</a></span></nav>
+    <header class="post" id="post-header">
+        <p class="section">Part IV — INTERFACE: The API as the Product</p>
+        <h1>Changing the API Without Breaking a Million Integrations: Versioning</h1>
+        <p class="byline">Željko Obrenović  ·  2026-11-17  ·  27 min read · <a class="spec-link" href="payment-api-versioning.spec.html">View spec</a></p>
+        <p class="ai-credit">AI-assisted: researched and written with Claude Code; illustrations generated with Gemini. <a href="https://zeljkoobrenovic.github.io/book-factory/foundations/ai-mediated-authoring.html">How this works</a></p>
+        <div class="tags" id="tags"></div>
+        <a href="assets/images/19-api-versioning/logo.jpeg" target="_blank" rel="noopener noreferrer" aria-label="Open header illustration at full size"><img class="logo" src="assets/images/19-api-versioning/logo.jpeg" alt=""></a>
+        <p class="logo-credit">Image generated by Google Gemini (gemini-3-pro-image-preview)</p>
+    </header>
+    <nav class="modality-tabs" id="modality-tabs" hidden role="tablist" aria-label="Reading formats"></nav>
+    <div id="content"></div>
+    <footer>
+        <nav class="post-nav"><a class="nav-back" href="index.html">SETTLED: Architecting Payments and Revenue Infrastructure</a><span class="nav-right"><a class="nav-prev" href="idempotency-and-retries.html" title="Exactly Once, Over a Network That Does Not Allow It: Idempotency and Retries">← Previous</a><span class="nav-sep">&nbsp;|&nbsp;</span><a class="nav-next" href="payment-webhooks-and-events.html" title="The Provider Calls You: Webhooks and Events">Next →</a></span></nav>
+    </footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/force-graph"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script id="data" type="application/json">{"meta": {"title": "Changing the API Without Breaking a Million Integrations: Versioning", "date": "2026-11-17", "author": "Željko Obrenović", "excerpt": "How do you evolve an API that customers integrated years ago and never want to touch? The provider lets each integration keep the version it was built against, which moves the cost of change without removing it: the provider maintains old versions, and the integrator who never upgrades builds up a gap it will one day cross in a single step.", "permalink": "payment-api-versioning", "timetoread": "27 min read", "icon": "assets/icons/19-api-versioning.png", "logo": "assets/images/19-api-versioning/logo.jpeg", "logo_credit": "Image generated by Google Gemini (gemini-3-pro-image-preview)"}, "tags": [], "modalities": [{"key": "index", "label": "Article", "meta": {}, "blocks": [{"type": "markdown", "content": "> **IN THIS CHAPTER, YOU WILL:** Learn how Stripe and Adyen change their APIs without breaking integrations, where your version is actually set, and how to upgrade on your own schedule.\n\n> **KEY POINTS:**\n>\n> * **A pinned version moves the cost of change; it does not remove it.** The provider keeps serving the shape your integration was built against, and pays for that in code. You pay later: every release you skip adds to the distance of the upgrade you will eventually make.\n> * **The two providers pin differently, and only one publishes a due date.** Stripe uses one dated version for its whole API, set by account default, by header or, since 2023, by SDK release, with two named breaking releases a year since October 2024. Adyen puts a number in the URL of each API and gives a deprecated Checkout API version two years before end-of-life.\n> * **Your version is set in several places, and the webhook endpoint is one of them.** Find every place, give each an owner and a date, and upgrade on a calendar. An upgrade you scheduled crosses one release; an upgrade something else forced crosses all of them at once.\n\n> **[FAILURE PATTERNS THIS CHAPTER ADDRESSES](where-payment-systems-go-wrong.html):**\n>\n> * **The Version Cliff** — an integration left on an old version until a library upgrade or an end-of-life date moves it across years of changes in one step is this chapter's central case.\n> * **The Trusted Doorbell** — webhook payloads have a version of their own, so a handler that assumes events look like API responses breaks when only one of the two is upgraded.\n> * **The Borrowed Blueprint** — Stripe's machinery for serving every old version answers a problem of scale that an API with a handful of known consumers does not have.\n\n<br>\nThe previous chapter ended with something the provider remembers for you. An idempotency key, the identifier that lets a provider recognize a repeated request, is kept for hours or days so that one request can be sent twice ([Exactly Once, Over a Network That Does Not Allow It: Idempotency and Retries](idempotency-and-retries.html)). The **API version** is a second thing the provider remembers on your behalf, and it remembers it for years, so that an integration written long ago keeps working while the API changes around it. It raises the same question the key did: what happens when that memory ends?\n\nLarkfield, the fictional studio-software platform this book follows, found out in March 2026. An engineer upgraded one client library to get one feature. No request failed and no alert fired. For six days the subscription revenue reports were wrong, because the upgrade had quietly moved every request of the billing integration across three years of API changes.\n\nThat incident shows both halves of this chapter's claim. **A provider evolves its API by letting each integration keep seeing the version it was built against** while the provider's own code moves on. This moves the cost of change without removing it. The provider maintains every version it still serves. The integrator who never upgrades **accumulates a gap that some later change forces it to cross in one step**.\n\n**Where we are in the payment's journey.** This chapter is not a step on the payment's path; it concerns the wording of every step. When Mila Janssen buys her €120.00 class pass on Tuesday 9 March 2027, Larkfield's payment service sends a request to one version of Adyen's Checkout API and reads an answer in that version's shape. Every message in the book's recurring payment has a version in this sense.\n\nThe chapter starts with Larkfield's library upgrade. It then explains why a payment API cannot simply change, compares three ways to version one, and reports how Stripe described its mechanism in 2017 and what changed in 2023 and 2024. Adyen's documented model follows, then the places a version is set, the comparison of the two providers, Larkfield's upgrade calendar and the ways an upgrade goes wrong.\n\n## Setting the Scene at Larkfield: One Library Upgrade, Six Days of Wrong Reports\n\nLarkfield bills its studios with Stripe Billing ([Charging Again and Again: Subscriptions and the Billing Engine](subscriptions-and-billing-engines.html)). The code that does this, the billing integration, then belonged to the growth team and not to the payments team. Until March 2026 it sent no version with its requests, and it used a Stripe client library old enough to carry none. So every request ran on the **account's default version**, a setting stored at Stripe. Someone had last moved it in early 2023, to `2022-11-15`, the version current at that time in Stripe's changelog. The version lived in the provider's record of the account, not in Larkfield's code, and nobody owned it.\n\nIn March 2026 the growth team needed a feature that only a newer release of the library offered. Stripe's documentation (n.d., accessed November 2026) says what such a release brings with it: “When you use a server-side SDK, your API calls to Stripe use the API version that was current when the SDK was released.” The new library carried `2026-02-25.clover`. Every request moved across four dated versions and three named major releases, and one of those releases, `2025-03-31.basil`, had removed the `subscription` field from the Invoice object. Larkfield's finance export used that field to tie each invoice to its subscription. It found nothing, raised no error, and filed the invoices as one-off sales. Subscription revenue reports were wrong for six days. The webhook endpoint, meanwhile, stayed on the account default, so the event handlers saw nothing unusual.\n\nIn 2027 Femke de Graaf, who leads the Keel program, has decision K7 to carry out: versions are upgraded on a calendar. She turned it into three questions that this chapter answers. **Where is each of our API versions set, who owns it, and on what date do we next move it on purpose?**\n\n## Why a Payment API Cannot Simply Change, and Cannot Only Add\n\nThe field Larkfield lost is an example of a **breaking change**: a change to an API after which client code that was correct can fail or misbehave without having been modified. Adyen's versioning page (n.d., accessed November 2026) lists what it counts as breaking: adding a required request field, removing an endpoint or a field, renaming a field, changing a field's type, changing an HTTP status code or an error code, and “Changing the behavior in a way that requires API consumers to change their integration for it to work properly.”\n\nSuch a change costs more in payments than in most software, because a payment integration is written once and then runs unattended for years. Nobody is watching when the response changes shape. The result is not a broken page but failed charges or, as at Larkfield, wrong books. Stripe's 2017 engineering post on versioning put the provider's obligation this way: “Just like a power company shouldn't change its voltage every two years, we believe that our users should be able to trust that a web API will be as stable as possible.” **(Evidence age: 9 years; the current system may differ.)**\n\nThe obvious way out is to never break anything: add fields and endpoints, never remove or reshape one, and versions are not needed. Both companies make additive changes without forcing an upgrade: Adyen applies them to the versions already in use, and Stripe ships them in monthly versions to which, its versioning reference (n.d., accessed November 2026) says, you can upgrade “without updating your code.” Both also record changes that are not additive. Stripe's 2017 post counted “almost a hundred backwards-incompatible upgrades over the past six years.” Its release page for the major version Basil (31 March 2025) says “This version introduces a significant number of breaking changes.” Adyen's release notes for Checkout API v72 (15 April 2026) have a “Breaking Changes” heading and state that “Previously deprecated parameters have been removed.” Across nine years of records, adding alone has not been enough for either.\n\nThere is a second problem with “only add”: what counts as additive is itself declared by the provider. Adyen's versioning page distinguishes its newer APIs, such as Checkout, from four older “classic” ones: “in new Adyen APIs, adding an optional field to a response body is a non-breaking change, while in classic APIs this change is considered breaking and therefore requires a new API version.” Stripe's Basil release, described later in this chapter, marks the row “Adds expired status for Issuing Authorizations” as breaking (Issuing is Stripe's product for creating payment cards): a new value of a status field in responses, with nothing new required in what a client sends. Whether a change is safe depends on what clients were told they may assume, so the provider must publish the rule and the integrator must code to it.\n\n## Three Ways to Version an API, and Who Pays in Each\n\nAn API that may not break its clients and cannot stay frozen needs versions, and the designs differ in who pays for a breaking change and when. The oldest design is a small number of large versions (v1, v2, v3), each a redesign, with the old one switched off at a deadline. The integrator pays, all at once, on the provider's date. Stripe's 2017 post (evidence age: 9 years) rejected this design because such changes are “so big and so impactful for users that it's almost as painful as re-integrating from scratch”, and because providers end up “retiring API versions and by extension cutting those users off, or maintaining the old versions forever at considerable cost.”\n\nThe opposite design makes versions small and frequent and holds each integration at the one it was built against. This is **version pinning**: fixing the version of the API that one integration sees, so that the provider's changes reach it only when it asks for a newer version. Here the provider pays, by continuing to serve every version that some integration is still pinned to.\n\nA middle design combines the two. The provider applies additive changes to every existing version, reserves a new version number for breaking changes, and publishes a **deprecation policy**: a lifecycle that ends old versions after a stated notice period. The pin holds, and it also has a date on which it runs out. The cost is shared and scheduled.\n\nAll three designs share one property, and it is the one that hurt Larkfield. The provider keeps the old shape alive, and meanwhile the distance to the current shape grows on the integrator's side. **A pin works like a loan**: it buys time, and the amount owed grows with every release. The table sets out the three allocations; it is my analysis, not a documented classification.\n\n| Design | Who pays when the API changes | What the integrator must do | Fits when |\n| --- | --- | --- | --- |\n| Large versions with a switch-off date | The integrator, all at once, on the provider's date | Re-integrate before the deadline | Integrators are few, or a redesign cannot be delivered any other way |\n| Small versions pinned per integration, no stated end | The provider, for as long as it serves each version; the integrator later, by choice or by accident | Know where the pin is set and choose its own upgrade dates | Integrators are too many to coordinate |\n| Additive changes on every version, numbered versions for breaks, a published lifecycle | Both, on a schedule | Parse leniently and upgrade inside the notice period | Old versions must end, for security or regulatory reasons |\n\n![A staircase of releases with a pinned system on the lowest step; a green path climbs step by step and an orange path is one tall cliff to the top.](assets/images/19-api-versioning/19-pin-is-a-loan.jpeg)\n**Figure 1:** *A pin is a loan: each release adds a step to the gap, which is crossed either one step at a time on a calendar or all at once when something forces it.*\n\n## How Stripe Described Its Mechanism in 2017: Version-Change Modules\n\nOf the two providers, only Stripe has published how it pays for pinning. Everything in this section comes from Stripe's engineering post “APIs as infrastructure: future-proofing Stripe with versioning”, dated 5 August 2017. **(Evidence age: 9 years; the current system may differ. The next section says which parts current documentation confirms.)** In that account each version is named by its release date: “we implement versioning with rolling versions that are named with the date they're released (for example, 2017-05-24).” An account is pinned at its first request: “The first time a user makes an API request, their account is automatically pinned to the most recent version available, and from then on, every API call they make is assigned that version implicitly.” A single request can override the pin by sending a `Stripe-Version` header.\n\nThe post then explains how one code base answers in every version. The server builds each response in the shape of the current version. For each incompatible change there is a **version-change module**: “we encapsulate it in a version change module which defines documentation about the change, a transformation, and the set of API resource types that are eligible to be modified.” Having found the caller's version, from the header, an authorized application or the account's pin, the server “walks back through time and applies each version change module that finds along the way until that target version is reached.” Old versions are therefore produced by a chain of small transformations, not by old code paths, and the core code handles one shape only.\n\n![A response document leaves the core code in its current shape and passes leftward through three module boxes, arriving at the integration in the shape of its pinned version.](assets/images/19-api-versioning/19-walking-back-through-versions.jpeg)\n**Figure 2:** *As Stripe described it in 2017, a response is built once in the current shape and walked back through version-change modules until it matches the version the caller is pinned to.*\n\nNot every change fits inside such a transformation. A change in behavior, as opposed to a change in the shape of a response, cannot be undone by rewriting the response afterwards. The 2017 post describes modules marked as having side effects, whose presence the core code has to check for directly, and it is frank about them: “This reduced encapsulation makes changes with side effects more complex to maintain, so we try to avoid them.”\n\nThe result is a cost that grows with every version, and the 2017 post says so: “Providing extensive backwards compatibility isn't free; every new version is more code to understand and maintain.” Checks that cannot be encapsulated end up “littered throughout the project, making it slower, less readable, and more brittle.” At that time Stripe had kept every version alive (“we've maintained compatibility with every version of our API since the company's inception in 2011”) and did not expect to do so forever: “we expect to eventually start retiring our older API versions.”\n\nWhether to copy this machinery is a separate question, and my answer for most readers is no. Its cost is permanent and grows per version. Its benefit is proportional to the number of clients that their provider cannot change. For an internal API with a handful of known consumers, the expand-contract pattern is cheaper: add the new form beside the old, move the consumers, then remove the old. Adyen's versioning page names that pattern for its own additive changes. [Promises Between Systems: API Contracts, Webhooks and Versioning](../commerce-platform-architecture/api-contracts-and-versioning.html) in ORDERED covers versioning between a company's own services.\n\n## What Changed at Stripe in 2023 and 2024, and What Nobody Has Re-Described\n\nThe 2017 account is nine years old, and Stripe has documented two changes to it since. The first is in the sentence that caught Larkfield. Stripe's upgrade guide (n.d., accessed November 2026) says a server-side SDK uses “the API version that was current when the SDK was released.” The same page dates the change through the SDK changelog entries it links to: versions of stripe-node before v12 (6 April 2023), and of stripe-ruby before v9, stripe-python before v6 and stripe-php before v11 (all 16 August 2023), “use your account's default API version.” For Java, Go and .NET the version “is *fixed*” to the SDK release. For SDK users the pin has moved from the account to the dependency, and **an SDK upgrade is an API upgrade**. Stripe now advises: “Make sure that you specify the API version that you're integrating against in your code instead of relying on your account's default API version.”\n\nThe second change is the rhythm. A Stripe post of 1 October 2024 describes the old practice: “Historically, we've released new API features as soon as they're ready for production—regardless of whether they're backward-compatible or not.” Since then, “Each semiannual major release—like Acacia—includes breaking changes and is named after a plant”, and “Each monthly release adds new features without breaking changes.” A footnote keeps an exception: “We may introduce an out-of-cycle breaking change if we determine that your integration would be severely impacted without it.” The changelog shows five majors so far: `2024-09-30.acacia`, `2025-03-31.basil`, `2025-09-30.clover`, `2026-03-25.dahlia` and `2026-09-30.endive`. As of November 2026 the current version is `2026-10-28.endive`. An integrator now has two dates a year to plan around.\n\nBasil shows what one such release holds. Among its changes, the page “Invoicing resources now specify how they were generated” (31 March 2025) lists `quote`, `subscription`, `subscription_details` and `subscription_proration_date` as removed from the Invoice object, and instructs: “Use `invoice.parent.subscription_details.subscription` (verify `invoice.parent.type` is `subscription_details`) instead of `invoice.subscription`.” That is the field Larkfield's export read. An integration that stayed pinned before Basil kept the old shape; one that crossed Basil had to change code.\n\nWith both changes in hand, the 2017 post's claims sort into three groups: confirmed by current documentation, replaced, and not re-described by anyone since. The only later statement I found about keeping old versions correct is in a Stripe post of 15 June 2026 on its API tooling. It says that “Due to the historical architecture of the v1 platform, it's not trivial to regenerate descriptions for non-current API versions”, and that for the newer v2 namespace ([Objects, Commands and Events: How Payment APIs Are Designed](payment-api-design.html)) “we also detect and display changes to past API versions (if applicable).” Neither sentence describes how responses are served.\n\n| Claim in the 2017 post | Status in November 2026 | Source |\n| --- | --- | --- |\n| Versions are named by release date | Confirmed; since 2024 the release name is appended (`2026-10-28.endive`) | Versioning reference, n.d. |\n| An account has a pinned default version, set at its first request | Confirmed: “Your default API version gets set the first time you make an API request” | “How API versioning works”, n.d. |\n| A `Stripe-Version` header overrides it per request | Confirmed | Versioning reference, n.d. |\n| Each dated version carries a small set of incompatible changes | Replaced in October 2024 by two named major releases a year | Release-process post, 2024 |\n| The account is the pin | Replaced for SDK users in 2023 by the SDK release; Stripe advises setting the version in code | Upgrade guide, n.d. |\n| Responses are walked back through version-change modules | Not re-described since 2017 | None found |\n| Every version since 2011 is still served; retirement is expected | No later statement found | None found |\n\nThat leaves a real gap in the public record. No Stripe source I could find (documentation, support site and engineering posts, November 2026) says whether Stripe has retired any dated version, how many versions it serves, or whether version-change modules still produce the responses of its v1 API. The versioning reference, the page “How API versioning works”, the upgrade guide, the changelog and the release-process post contain no retirement policy and no sunset notice. Stripe's webhook documentation (n.d., accessed November 2026) still uses an account “set to an older API version, such as 2015-02-16” as its example. So the size of Stripe's compatibility cost today is not known outside the company.\n\n> **INFERENCE, NOT DOCUMENTED:** Very old dated versions are plausibly still served by Stripe, given the 2015 example in current documentation and the absence of any retirement notice. This is a reading of what the documentation omits. It is not a guarantee, and the 2017 post itself said retirement was expected.\n\n## Adyen's Documented Model: A Number in Each URL and a Published Lifecycle\n\nAdyen's model differs from Stripe's at the first step: the caller writes the version into every request. Its versioning page (n.d., accessed November 2026) says: “Each API URL contains a version suffix starting with either \"v\" or \"V\" character followed by a whole number to indicate the API version. We increment the number for every version, but we may skip numbers when needed.” There is no account default to fall back on. Each API also counts on its own: “Most integrations use multiple Adyen APIs”, and “Each API has a different version.” The page's examples show a Checkout URL at `v68`, an account API at `v6` and the Balance Platform API at `v1`. An integration that uses several Adyen APIs holds several version numbers at once.\n\nA version number at Adyen does not freeze the payload. “We implement non-breaking changes in all versions of an API, so that you benefit from it without having to upgrade your API version”, the page says, and only “When we introduce a breaking or incompatible change, we release a new API version.” For Checkout, “we only release major versions.” The consequence for the integrator is stated on Adyen's webhook-types page (n.d., accessed November 2026): “you should set up your server to be able to accept webhooks of more types and receive more event type values than are listed below.” On the newer APIs, a new response field can appear on the version you already call. **Code that rejects what it does not recognize will fail on a change Adyen has declared safe.**\n\nWhat Adyen adds, and Stripe does not publish, is how long a version lasts. Its upgrade page (n.d., accessed November 2026) gives every major version of the Checkout API four lifecycle states and a reason: “We deprecate older versions to protect your data and maintain compliance with financial regulations.”\n\n| State | What Adyen's upgrade page says of a Checkout API version in this state |\n| --- | --- |\n| Active | “The latest major version of Checkout API.” |\n| Inactive | It “only receives bug fixes and changes required to comply with new regulations.” |\n| Deprecated | No features or fixes. “After a version reaches this state, you have 2 years to upgrade” |\n| End-of-Life | “you no longer receive support from Adyen and payment processing can be suspended anytime.” |\n\nThe lifecycle is applied in practice. Adyen's release notes of 18 September 2026 list under “Removed”: “Checkout API v37 is no longer supported. If your integration still uses v37, you must upgrade your integration to the latest available version.” The general versioning page reads more softly: “if you decide stay in your current version, you can continue to do so. We maintain older versions of our APIs that you can continue to use until you are ready to upgrade.” The documentation does not reconcile the two statements. I treat the lifecycle page as the rule for Checkout, because it is the more specific and the release note agrees with it. New versions are rare: v71 is dated 1 November 2023 and v72 15 April 2026.\n\nOn its own side of the interface Adyen has published almost nothing. I found no engineering source, in its knowledge hub or elsewhere, on how one platform serves its many Checkout versions. A 2022 article on Adyen's API practice says only that deprecation is flagged in the specifications and documentation “while the deprecated elements are deleted only after one or more versions” **(evidence age: 4 years)**. Adyen's upgrade page says the lifecycle state of each version is shown in its API Explorer, an interactive reference. The copy of its Checkout page that I fetched in November 2026 listed 17 versions from v40 to v72 and marked v72 “latest”, but showed no lifecycle state, so check there for the version you call. The provider's cost of versioning has public evidence from Stripe alone.\n\n## Where a Version Is Set: Requests, Libraries and Webhook Endpoints\n\nBoth models leave a practical question: in how many places does one integration hold a version? At Stripe a request version can come from three places. The versioning reference (n.d., accessed November 2026) names two: “Requests made with curl use your Stripe account's default API version (controlled in Workbench) unless you override it by setting the `Stripe-Version` header.” The SDK release is the third. Stripe's page “How API versioning works” (n.d., accessed November 2026) lists all three in order: the header if you set one, the version pinned by your SDK if you use one, and the account default otherwise. The most specific setting wins, and only the header and the SDK are visible in the integrator's code. Workbench, Stripe's developer dashboard ([Keys, Sandboxes and Limits: The Developer Platform Around the API](payment-developer-platform.html)), shows “which API versions your integration uses”, which is the way to find out what is in effect.\n\nThe events Stripe sends you are versioned separately. An event is the provider's notice that something happened, delivered to a webhook endpoint ([The Provider Calls You: Webhooks and Events](payment-webhooks-and-events.html)). “Webhook events also use your account's default API version unless you set an API version during endpoint creation”, the reference says. The shape is fixed when the event is created. The webhook documentation gives the case of an account on an old version where one request overrides it: the event “generated and sent to your destination is still based on the 2015-02-16 API version. You can't change Event objects after creation.” **So after an SDK upgrade your requests can be on one version and your event handlers on another.**\n\nBecause an endpoint's version is set only when the endpoint is created, Stripe's upgrade guide documents a cut-over with two endpoints. You create a second endpoint with the same URL plus a query parameter and the target version. Then “every event is sent twice: once with the old API version and once with the new one.” You process one copy and acknowledge the other, then switch. After the switch the guide recommends answering the old endpoint with a 400 status, so that if you must revert “Stripe automatically resends all the events”, and finally disabling it. Stripe's newer *thin events*, which carry identifiers and no versioned payload, need none of this: “Thin event payloads are unversioned.”\n\nAdyen's places correspond. The version is in the URL of each API. Its server libraries hide that: they let you call the APIs “without needing to know the API versions. Instead, you need to consider the library version”, so the library release is where the version is really set. Each webhook configuration has a setting named “Version”, described only as “The webhook version.” I found no statement in its documentation or help center on how long old webhook versions are delivered. And Adyen's client-side checkout libraries, Drop-in and Components, require a minimum server version: “Web Drop-in/Components v5.0.0 is only compatible with Checkout API v68 or later.” Those libraries have their own lifecycle, with one year from Deprecated to End-of-Life. A front-end upgrade can therefore force a back-end one.\n\nThe inventory worth keeping is one table of every place a version is set, with one extra column: does it move when a dependency is upgraded? The rows marked “Yes” are the ones that move without anyone deciding.\n\n| Where a version is set | Stripe | Adyen | Moves when a dependency is upgraded? |\n| --- | --- | --- | --- |\n| Account default at the provider | Used by requests that state no version and by endpoints created without one | None; the caller states the version | No |\n| The request itself | `Stripe-Version` header or a client option | Version segment in each API's URL | Only if a library sets it |\n| Server library release | Since 2023 carries the version current at its release; fixed in Java, Go and .NET | Each release wraps specific API versions, named in its release notes | Yes |\n| Client-side checkout library | Stripe.js has named versions, released twice a year, chosen in the script URL or the npm package | Drop-in/Components requires a minimum Checkout API version | Yes; at Adyen it can force the server's |\n| Webhook endpoint or configuration | Set at endpoint creation, else the account default; thin events are unversioned | A “Version” setting per configuration | No |\n\n![An integration with four version dials; a library upgrade turns the library and request dials while the account default and webhook endpoint dials stay where they were.](assets/images/19-api-versioning/19-where-the-version-is-set.jpeg)\n**Figure 3:** *One integration holds its version in several places; a library upgrade moves the requests and leaves the account default and the webhook endpoint where they were.*\n\n## Stripe and Adyen: Where They Differ\n\nTaken together, the documented models differ on six aspects. The Stripe and Adyen columns repeat facts cited in the preceding sections, from documentation accessed in November 2026 unless a year is given; the last column is my inference from the difference.\n\n| Aspect | Stripe | Adyen | What the difference suggests |\n| --- | --- | --- | --- |\n| Where the version lives | Account default, `Stripe-Version` header or SDK release; one dated version spans the whole API | In the URL of each API, an integer per API; no default | Stripe's version can be invisible in your code; Adyen's is in every request line, once per API |\n| Additive changes | Monthly releases that add features “without breaking changes” (2024); the documentation advises ignoring “unfamiliar fields and event types” | Applied to “all versions of an API” | Adyen says outright that a version you already call gains fields; parse leniently on both |\n| Breaking changes | Two named major releases a year since October 2024, with an out-of-cycle exception reserved | A new version number per API; Checkout v71 in 2023, v72 in 2026 | Stripe gives a rhythm to plan against; Adyen gives rarer and larger steps |\n| Published end of a version | Not public; the 2017 post expected retirements | Checkout: two years from Deprecated to End-of-Life; v37 no longer supported (2026) | Adyen sets the due date; on Stripe you must set your own |\n| Webhook payload version | Per endpoint, fixed at creation, else the account default; thin events unversioned | A “Version” setting per webhook configuration; how long old versions are delivered is not public | At both it is a separate setting to track |\n| Published mechanism for serving old versions | Version-change modules (2017; evidence age 9 years), not re-described since | Not public | The provider's cost is evidenced only from Stripe, and only as of 2017 |\n\nThese differences change what an integrator does. On Stripe, set the version in code, treat every SDK upgrade as an API upgrade, and plan around the two major releases a year, since no notice will arrive to prompt you. On Adyen, make your parsers ignore unknown fields and event types, track the lifecycle state of each API version you call, and upgrade each API separately, because each has its own counter.\n\n## In Practice at Larkfield: Upgrading on a Calendar\n\nAt Larkfield, K7 began with a **version register**: one row for each place a version is set, with its current value, an owner and the date it was last moved. In 2027 the register has rows for the Stripe requests of the payment service and of the billing integration (now owned by the payments team), each set explicitly in code. It has the Stripe webhook receiver's endpoint version, the Adyen Checkout version in the payment service's URLs (v71, the latest when Larkfield integrated in 2024), the Adyen webhook configuration, and the client libraries in the booking app. The register is the previous section's inventory, filled in for one company.\n\nThe Stripe row moves once per half-year, in May and November, some weeks after the major releases that have landed in March and September. Tom Hendriks, the senior engineer who built the payment service, runs the same sequence each time. He reads the changelog entries tagged as breaking between the two versions, against a list of every field the code and the finance exports read. He replays recorded requests in a Stripe sandbox, an isolated test account, at the target version, and compares the responses field by field with the recorded ones. Then the version in code changes, in a pull request that changes nothing else. Each upgrade crosses one major release, so the list to read is one release long.\n\nThe webhook endpoint moves as a second change, a week later, by Stripe's two-endpoint procedure. The Stripe receiver is older than the payment service, and its handlers and the exports that read stored events have to be checked against the new payload shape on their own. For that week every event arrives in both shapes, and Larkfield compares them before switching which one it processes.\n\nThe Adyen row behaves differently. Checkout versions arrive years apart, so the half-yearly slot is more often a check than a move. By the documented lifecycle the Active state belongs to the latest major version, which has been v72 since April 2026, so v71 is no longer Active. Whether it is Inactive or Deprecated in 2027 is something this chapter cannot state; Larkfield reads it in the API Explorer at each slot and records it in the register. It also confirms that its parsers ignore unknown fields, and it upgrades one Adyen API at a time.\n\nThe calendar costs Larkfield about three to five engineer-days per provider per half-year *(assumption)*. In return, each upgrade crosses one release's changes while nothing else changes. The March 2026 upgrade crossed four dated versions and three major releases inside a feature change, and cost six days of wrong revenue reports plus the work of correcting them. [Changing the Engine in Flight: Deploys, Migrations and Incidents](payment-safe-change.html) takes up the general discipline of changing a payment system safely.\n\n## When It Goes Wrong: Split Versions, Silent Nulls and Forced Jumps\n\nUpgrades that fail usually fail quietly. The first quiet failure is a split: after a library upgrade the requests are on a new version while webhook payloads stay on the old one. Each works alone. The fault appears only in code that compares or merges the two, such as a handler that updates a record first written from an API response. Stripe's versioning reference advises closing the split, for example “match your webhook endpoint API version to the version pinned by your `stripe-ruby` version”. To detect it, store the API version with every response and every event you keep, and alert when the two differ for longer than a planned cut-over.\n\nThe second is the silent null, which is what Larkfield had. In a dynamically typed client a removed field does not raise an error; it reads as empty, and the failure surfaces days later in a report. Stripe's upgrade guide notes the opposite behavior for strongly typed SDKs, where a mismatched version can “result in request failures”: typed clients fail loudly. The defense in either case is a test that asserts the presence of every field an export or a ledger posting reads, run against the target version before the upgrade.\n\nThe third runs the other way, and belongs to additive change. A client that rejects unknown fields, unknown status values or unknown event types breaks on a change the provider has declared non-breaking. Adyen says it applies such changes to every version, so a pinned Adyen version is not a frozen payload. Stripe's page “How API versioning works” counts “Adding new properties to existing API responses” and “Adding new event types” as backward-compatible and advises: “Design your integration to ignore unfamiliar fields and event types.” It does not say in so many words that such changes reach older versions; I assume they can. Strict deserialization of a provider's responses is a fault waiting for a release.\n\nThe last case is the forced upgrade, set off by an end-of-life date or by a feature that needs a newer library. It is where the first three tend to arrive together. My recommendation is to cross the gap in stages where the provider allows it: first pin the old version explicitly, then upgrade the library with the pin in place, then raise the version one major release at a time. Stripe's dynamically typed SDKs accept an explicit version per client or per request, so this works there. For Java, Go and .NET the version is fixed to the SDK release, and staging means stepping through SDK releases instead. Adyen's upgrade guides are written step by step (to v69 from v68, to v70 from v69, to v72 from v70 or v71), which gives the same staging.\n\n## What to Take Away\n\n**Established.**\n\n- Breaking changes happen at both providers and are documented as such: Stripe's 2017 post (nine years old) counted almost a hundred in six years, and Adyen's Checkout v72 release notes (2026) list removed parameters.\n- Stripe pins one dated version across its API by account default, by header or, since 2023, by SDK release, and since October 2024 ships breaking changes in two named major releases a year.\n- Adyen puts an integer version in the URL of each API, applies non-breaking changes to every version, and gives a deprecated Checkout API version two years before end-of-life (documentation accessed November 2026).\n- Webhook payloads carry a version of their own at both providers, set separately from the request version.\n\n**Depends on context.**\n\n- How often to upgrade: twice a year suits Stripe's release rhythm and an integration that reads many fields; a small integration that reads few can go yearly, at the price of crossing two major releases at once.\n- Whether to build version-pinning machinery for your own API: it pays with many external integrators you cannot upgrade; with a few known consumers, expand, migrate and contract.\n- Whether thin events spare you the webhook cut-over: on Stripe they do, where your handlers fetch the object instead of reading the payload; the object you fetch is still versioned like any other response ([The Provider Calls You: Webhooks and Events](payment-webhooks-and-events.html)).\n\n**The author's synthesis.**\n\n- Stripe's dated pin and Adyen's numbered URL look like opposite designs and allocate the same debt: the provider carries the old shapes, you carry the distance to the new one. They differ in who announces the due date. Adyen publishes one. On Stripe I set my own, because otherwise a dependency upgrade sets it for me.\n- I treat the API version as a dependency with an owner and a date. The cheapest upgrade I know is the one nothing forced.\n\n## Questions to Ask\n\n1. In which places is our API version set on each provider, and which of them are outside our repository?\n2. Which version do our webhook payloads use, and is it the same as the version of our requests?\n3. If we upgraded the provider's library tomorrow, to which API version would our requests move?\n4. Which response fields do our exports, ledger postings and reports read, and does a test fail when one is absent?\n5. Do our parsers ignore fields, status values and event types they do not know?\n6. What end has the provider published for the version we call, and who watches for the notice?\n7. When was each version last moved on purpose, who owns the next move, and on what date?\n8. What has the provider published about how it serves old versions, how old is that account, and what would we do if a version we rely on were retired?\n\nFor three chapters the integrator has called and the provider has answered, and the pinned version has fixed the shape of the answers. As the webhook endpoint showed, the same pin also fixes the shape of what the provider sends when it is the one that calls. That reversed direction has its own rules for acknowledgement, retry, order and authenticity, and [The Provider Calls You: Webhooks and Events](payment-webhooks-and-events.html) covers them.\n\n## Sources and Evidence\n\n*Company, product and investor sources*\n\n- [APIs as infrastructure: future-proofing Stripe with versioning](https://stripe.com/blog/api-versioning), Brandur Leach, Stripe, 2017-08-05 — rolling dated versions, account pinning, the header override, version-change modules, changes with side effects, the stated cost, expected retirement (evidence age: 9 years).\n- [Introducing Stripe's new API release process](https://stripe.com/blog/introducing-stripes-new-api-release-process), Michael Glukhovsky and Wissam Abirached, Stripe, 2024-10-01 — the earlier practice, two named major releases a year, monthly releases without breaking changes, the out-of-cycle exception.\n- [How API changes flow into Stripe's developer products](https://stripe.dev/blog/how-api-changes-flow-into-stripes-developer-products), Mikael Mello and Anna Mason, Stripe, 2026-06-15 — the difficulty of regenerating descriptions of non-current v1 versions; detection of changes to past versions for v2.\n- [Versioning](https://docs.stripe.com/api/versioning), Stripe API reference, n.d., accessed 2026-11 — the release process in brief, monthly releases adopted without code changes, the current version, the account default, the header, webhook versions, matching the endpoint version to the SDK.\n- [How API versioning works](https://docs.stripe.com/api-versions), Stripe, n.d., accessed 2026-11 — the default version set at the first request, the three sources of a request's version, the list of backward-compatible changes, the advice to ignore unfamiliar fields and event types.\n- [Upgrade your integration](https://docs.stripe.com/upgrades), Stripe, n.d., accessed 2026-11 — SDK releases carrying an API version and the dates this began, fixed versions in Java, Go and .NET, the advice to set the version in code, Workbench, the two-endpoint webhook cut-over, unversioned thin events.\n- [Receive Stripe events in your webhook endpoint](https://docs.stripe.com/webhooks), Stripe, n.d., accessed 2026-11 — the event's version fixed at creation, with the 2015-02-16 example.\n- [Stripe.js versioning and support policy](https://docs.stripe.com/sdks/stripejs-versioning), Stripe, n.d., accessed 2026-11 — named Stripe.js versions released twice a year, set in the script URL or the npm package.\n- [Changelog](https://docs.stripe.com/changelog), Stripe, accessed 2026-11 — the list of dated versions from 2022-11-15 and of named releases from Acacia to Endive.\n- [Basil](https://docs.stripe.com/changelog/basil), Stripe changelog, 2025-03-31 — “a significant number of breaking changes”; the Issuing status row marked breaking.\n- [Invoicing resources now specify how they were generated](https://docs.stripe.com/changelog/basil/2025-03-31/adds-new-parent-field-to-invoicing-objects), Stripe changelog, 2025-03-31 — removal of `subscription` and related fields from the Invoice object and their replacement by `parent`.\n- [Versioning](https://docs.adyen.com/development-resources/versioning), Adyen, n.d., accessed 2026-11 — the version in the URL, one counter per API, breaking and non-breaking changes for new and classic APIs, non-breaking changes on all versions, expand-contract, library versions.\n- [Upgrade your integration](https://docs.adyen.com/online-payments/upgrade-your-integration), Adyen, n.d., accessed 2026-11 — the four lifecycle states for Checkout API and Drop-in/Components, the two-year and one-year periods, the reason for deprecation, minimum Checkout versions, upgrade guides per version step.\n- [Release notes](https://docs.adyen.com/online-payments/release-notes), Adyen, entries of 2023-11-01, 2026-04-15 and 2026-09-18 — Checkout API v71 and v72, the v72 breaking changes, v37 no longer supported.\n- [Configure and manage webhooks](https://docs.adyen.com/development-resources/webhooks/configure-and-manage), Adyen, n.d., accessed 2026-11 — the “Version” setting of a webhook configuration.\n- [Webhook structure and types](https://docs.adyen.com/development-resources/webhooks/webhook-types), Adyen, n.d., accessed 2026-11 — the instruction to accept more webhook and event types than are listed.\n- [Checkout API overview](https://docs.adyen.com/api-explorer/Checkout/latest/overview), Adyen API Explorer, n.d., accessed 2026-11 — the list of Checkout API versions from v40 to v72, with v72 marked latest; no lifecycle state in the fetched page.\n- [API-first approach at Adyen platform](https://www.adyen.com/knowledge-hub/api-first-adyen), Adyen, 2022-09-27 — the one published sentence on deleting deprecated elements (evidence age: 4 years).\n\n*Standards, regulation and official documentation*\n\n- None.\n\n*Research and practitioner sources*\n\n- [Promises Between Systems: API Contracts, Webhooks and Versioning](../commerce-platform-architecture/api-contracts-and-versioning.html) in ORDERED — versioning contracts between a company's own services, where expand, migrate and contract usually suffices.\n\nLarkfield is fictional; architectural recommendations, labeled inferences and labeled assumptions are the author's judgement.\n"}]}]}</script>
+<script>
+    (function () {
+        const data = JSON.parse(document.getElementById('data').textContent);
+        const root = document.getElementById('content');
+
+        const postId = (data.meta && data.meta.id) ? String(data.meta.id) : '';
+        const postStatusRaw = (data.meta && data.meta.status) ? String(data.meta.status) : '';
+        if (postId || postStatusRaw) {
+            const header = document.getElementById('post-header');
+            let sectionEl = header.querySelector('p.section');
+            if (!sectionEl) {
+                sectionEl = document.createElement('p');
+                sectionEl.className = 'section';
+                header.insertBefore(sectionEl, header.firstChild);
+            }
+            // Status pill goes first, then a " / " separator before the existing
+            // content (section name and/or id).
+            if (postStatusRaw) {
+                const parts = postStatusRaw.split(':');
+                const statusName = parts[0].trim();
+                const statusColor = (parts[1] || '').trim();
+                const wrap = document.createElement('span');
+                wrap.className = 'post-status';
+                const dot = document.createElement('span');
+                dot.className = 'status-dot';
+                if (statusColor) dot.style.background = statusColor;
+                wrap.appendChild(dot);
+                wrap.appendChild(document.createTextNode(statusName));
+                if (sectionEl.firstChild) {
+                    sectionEl.insertBefore(document.createTextNode(' • '), sectionEl.firstChild);
+                    sectionEl.insertBefore(wrap, sectionEl.firstChild);
+                } else {
+                    sectionEl.appendChild(wrap);
+                }
+            }
+            if (postId) {
+                if (sectionEl.firstChild) sectionEl.appendChild(document.createTextNode(' • '));
+                sectionEl.appendChild(document.createTextNode(postId));
+            }
+        }
+
+        const tagsHost = document.getElementById('tags');
+        (data.tags || []).forEach(function (t) {
+            const span = document.createElement('span');
+            span.className = 'tag';
+            span.textContent = t;
+            tagsHost.appendChild(span);
+        });
+
+        // Minimal markdown renderer. Supports: ATX headings, paragraphs, blockquotes,
+        // unordered/ordered lists, fenced code, inline code, bold/italic/strikethrough, links, images, hr.
+        // Sufficient for the posts in this repo; replace with a fuller parser if needed.
+        function renderMarkdown(src) {
+            const lines = src.replace(/\r\n/g, '\n').split('\n');
+            const out = [];
+            let i = 0;
+
+            const bullet = /^(\s*)([-*])\s+(.*)$/;
+            const ordered = /^(\s*)(\d+)\.\s+(.*)$/;
+            const tableRow = /^\s*\|(.+)\|\s*$/;
+            const tableSep = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+
+            function splitRow(s) {
+                let t = s.trim();
+                if (t.startsWith('|')) t = t.slice(1);
+                if (t.endsWith('|')) t = t.slice(0, -1);
+                return t.split('|').map(c => c.trim());
+            }
+
+            function inline(s) {
+                // Posts are trusted content, so raw HTML passes through unescaped
+                // (some posts embed inline <blockquote>, <div>, etc.).
+                // Stray ampersands still get fixed up.
+                s = s.replace(/&(?![a-zA-Z]+;|#\d+;)/g, '&amp;');
+                s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<a class="image-link" href="$2" target="_blank" rel="noopener noreferrer"><img alt="$1" src="$2"></a>');
+                s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+                s = s.replace(/`([^`]+)`/g, function (_, c) {
+                    return '<code>' + c.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
+                });
+                // Bold/italic, including nested combinations: ***x***,
+                // **a *b*** / ***a* b** (shared delimiters), and **a *b* c**.
+                s = s.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+                s = s.replace(/\*\*([^*\n]+)\*([^*\n]+)\*\*\*/g, '<strong>$1<em>$2</em></strong>');
+                s = s.replace(/\*\*\*([^*\n]+)\*([^*\n]+)\*\*/g, '<strong><em>$1</em>$2</strong>');
+                s = s.replace(/\*\*((?:[^*\n]|\*(?!\*)[^*\n]+\*(?!\*))+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+                s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+                return s;
+            }
+
+            while (i < lines.length) {
+                const line = lines[i];
+                if (!line.trim()) {
+                    i++;
+                    continue;
+                }
+
+                const fence = line.match(/^```(\w*)\s*$/);
+                if (fence) {
+                    i++;
+                    const buf = [];
+                    while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+                        buf.push(lines[i]);
+                        i++;
+                    }
+                    i++;
+                    const escaped = buf.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const cls = fence[1] ? ' class="lang-' + fence[1] + '"' : '';
+                    out.push('<pre><code' + cls + '>' + escaped + '</code></pre>');
+                    continue;
+                }
+
+                const h = line.match(/^(#{1,6})\s+(.*)$/);
+                if (h) {
+                    out.push('<h' + h[1].length + '>' + inline(h[2]) + '</h' + h[1].length + '>');
+                    i++;
+                    continue;
+                }
+
+                if (/^\s*(?:-\s*){3,}\s*$/.test(line) || /^\s*\*{3,}\s*$/.test(line)) {
+                    out.push('<hr>');
+                    i++;
+                    continue;
+                }
+
+                if (/^>\s?/.test(line)) {
+                    const buf = [];
+                    while (i < lines.length && /^>\s?/.test(lines[i])) {
+                        buf.push(lines[i].replace(/^>\s?/, ''));
+                        i++;
+                    }
+                    out.push('<blockquote>' + renderMarkdown(buf.join('\n')) + '</blockquote>');
+                    continue;
+                }
+
+                if (tableRow.test(line) && i + 1 < lines.length && tableSep.test(lines[i + 1])) {
+                    const headers = splitRow(line);
+                    const aligns = splitRow(lines[i + 1]).map(function (c) {
+                        c = c.trim();
+                        const left = c.startsWith(':'), right = c.endsWith(':');
+                        return left && right ? 'center' : right ? 'num' : '';
+                    });
+                    const cellOpen = function (tag, idx) {
+                        return aligns[idx] ? '<' + tag + ' class="' + aligns[idx] + '">' : '<' + tag + '>';
+                    };
+                    i += 2;
+                    const rows = [];
+                    while (i < lines.length && tableRow.test(lines[i])) {
+                        rows.push(splitRow(lines[i]));
+                        i++;
+                    }
+                    let html = '<div class="table-wrap"><table><thead><tr>';
+                    headers.forEach((h, idx) => {
+                        html += cellOpen('th', idx) + inline(h) + '</th>';
+                    });
+                    html += '</tr></thead><tbody>';
+                    rows.forEach(r => {
+                        html += '<tr>';
+                        r.forEach((c, idx) => {
+                            html += cellOpen('td', idx) + inline(c) + '</td>';
+                        });
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                    out.push(html);
+                    continue;
+                }
+
+                if (bullet.test(line) || ordered.test(line)) {
+                    // Indent of the first bullet defines this list's base level.
+                    // Deeper-indented bullets become nested lists (rendered by
+                    // recursing into renderMarkdown). Same-or-less indent at a
+                    // bullet starts a sibling item (or ends the list).
+                    const firstMatch = line.match(bullet) || line.match(ordered);
+                    const baseIndent = firstMatch[1].length;
+                    const isOrdered = ordered.test(line);
+                    const items = [];
+                    let hasTask = false;
+                    while (i < lines.length) {
+                        const cur = lines[i];
+                        if (!cur.trim()) {
+                            // blank line breaks the list (matches CommonMark-ish behaviour)
+                            i++;
+                            break;
+                        }
+                        const mBul = cur.match(bullet);
+                        const mOrd = cur.match(ordered);
+                        const m = mBul || mOrd;
+                        if (!m) break;
+                        if (m[1].length < baseIndent) break;
+                        if (m[1].length > baseIndent) break; // shouldn't happen at top of loop
+                        // Same-type check: switching between -/* and 1. closes the list
+                        if (isOrdered !== !!mOrd) break;
+
+                        const itemBuf = [m[3]];
+                        const nestedBuf = [];
+                        i++;
+                        while (i < lines.length) {
+                            const nxt = lines[i];
+                            if (!nxt.trim()) break;
+                            const nBul = nxt.match(bullet);
+                            const nOrd = nxt.match(ordered);
+                            const nm = nBul || nOrd;
+                            if (nm) {
+                                if (nm[1].length > baseIndent) {
+                                    // nested list line — dedent and stash
+                                    nestedBuf.push(nxt.slice(baseIndent + 2));
+                                    i++;
+                                    continue;
+                                }
+                                // sibling or end of list
+                                break;
+                            }
+                            // Plain continuation text
+                            if (nestedBuf.length) {
+                                // continuation inside the nested block
+                                nestedBuf.push(nxt.slice(baseIndent + 2));
+                            } else {
+                                itemBuf.push(nxt.trim());
+                            }
+                            i++;
+                        }
+
+                        // GitHub-style task items: "- [ ] text" / "- [x] text"
+                        // render as (clickable, unpersisted) checkboxes.
+                        const itemText = itemBuf.join('\n');
+                        const task = !isOrdered && itemText.match(/^\[( |x|X)\]\s+/);
+                        let liHtml = inline(task ? itemText.slice(task[0].length) : itemText);
+                        if (task) {
+                            hasTask = true;
+                            liHtml = '<input type="checkbox"' + (task[1] === ' ' ? '' : ' checked') + '>' + liHtml;
+                        }
+                        if (nestedBuf.length) {
+                            liHtml += renderMarkdown(nestedBuf.join('\n'));
+                        }
+                        items.push(task ? '<li class="task">' + liHtml + '</li>' : '<li>' + liHtml + '</li>');
+                    }
+                    out.push((isOrdered ? '<ol>' : (hasTask ? '<ul class="task-list">' : '<ul>')) + items.join('') + (isOrdered ? '</ol>' : '</ul>'));
+                    continue;
+                }
+
+                const buf = [line];
+                i++;
+                while (i < lines.length && lines[i].trim() && !/^#{1,6}\s/.test(lines[i]) && !/^>\s?/.test(lines[i]) && !bullet.test(lines[i]) && !ordered.test(lines[i]) && !/^```/.test(lines[i]) && !tableRow.test(lines[i])) {
+                    buf.push(lines[i]);
+                    i++;
+                }
+                out.push('<p>' + inline(buf.join(' ')) + '</p>');
+            }
+            return out.join('\n');
+        }
+
+        // Block dispatcher. New block types plug in here.
+        const renderers = {
+            markdown: function (block) {
+                const div = document.createElement('div');
+                div.innerHTML = renderMarkdown(block.content);
+                return div;
+            },
+            mermaid: function (block) {
+                // Mermaid scans elements with class "mermaid" whose textContent
+                // is the diagram source. We collect these nodes and run
+                // mermaid.run() once after all blocks are in the DOM.
+                const div = document.createElement('div');
+                div.className = 'mermaid';
+                div.textContent = block.content;
+                return div;
+            },
+            'force-graph': function (block) {
+                // build.py emits parsed JSON: {nodes:[{id,size}], links:[{source,target}]}.
+                // We instantiate force-graph after the container is in the DOM
+                // so it can measure its own width.
+                const div = document.createElement('div');
+                div.className = 'force-graph';
+                const data = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.ForceGraph) return;
+                    const maxSize = data.nodes.reduce((m, n) => Math.max(m, n.size || 1), 1);
+                    window.ForceGraph()(div)
+                        .graphData(data)
+                        .width(div.clientWidth)
+                        .height(div.clientHeight)
+                        .nodeRelSize(4)
+                        .nodeVal(n => Math.max(20 * (n.size || 1) / maxSize, 0.001))
+                        .nodeLabel(n => n.id + ' (' + (n.size || 1) + ')')
+                        .nodeColor(() => 'rgba(135, 206, 235, 0.7)')
+                        .linkColor(() => 'rgba(60, 60, 60, 0.4)')
+                        .linkDirectionalArrowLength(4)
+                        .linkDirectionalArrowRelPos(1)
+                        .linkWidth(1);
+                });
+                return div;
+            },
+            'bubble-chart': function (block) {
+                // build.py emits {nodes:[{name,size}]}. Renders a D3 circle-pack
+                // SVG (same shape as the obren.io reference, just inline).
+                const wrap = document.createElement('div');
+                wrap.className = 'bubble-chart';
+                const payload = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.d3) return;
+                    const diameter = 480;
+                    const fill = '#c0deed';
+                    const textColor = '#111111';
+                    const fontSize = 12;
+
+                    const svg = window.d3.select(wrap).append('svg')
+                        .attr('viewBox', '0 0 ' + diameter + ' ' + diameter)
+                        .attr('width', diameter)
+                        .attr('height', diameter);
+
+                    const root = window.d3.hierarchy({children: payload.nodes})
+                        .sum(d => d.size || 0)
+                        .sort((a, b) => b.value - a.value);
+
+                    window.d3.pack().size([diameter, diameter]).padding(2)(root);
+
+                    const node = svg.selectAll('g')
+                        .data(root.leaves())
+                        .enter().append('g')
+                        .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+
+                    node.append('title').text(d => d.data.name + ': ' + d.value);
+                    node.append('circle').attr('r', d => d.r).style('fill', fill);
+                    node.append('text')
+                        .attr('dy', '.3em')
+                        .style('text-anchor', 'middle')
+                        .style('fill', textColor)
+                        .style('font-size', fontSize + 'px')
+                        .text(d => d.data.name.substring(0, Math.max(0, Math.floor(d.r / 3))));
+                });
+                return wrap;
+            }
+        };
+
+        // Render one modality's blocks into a host element. Mermaid runs
+        // scoped to just the nodes created here, so lazily rendered tabs get
+        // their diagrams on first activation.
+        let mermaidInitialized = false;
+        function renderBlocksInto(blocks, host) {
+            const mermaidNodes = [];
+            blocks.forEach(function (block) {
+                const r = renderers[block.type];
+                if (!r) {
+                    const pre = document.createElement('pre');
+                    pre.textContent = '[unknown block type: ' + block.type + ']';
+                    host.appendChild(pre);
+                    return;
+                }
+                const node = r(block);
+                if (node instanceof Node) {
+                    host.appendChild(node);
+                    if (block.type === 'mermaid') mermaidNodes.push(node);
+                }
+            });
+            if (mermaidNodes.length && window.mermaid) {
+                if (!mermaidInitialized) {
+                    window.mermaid.initialize({startOnLoad: false, theme: 'default'});
+                    mermaidInitialized = true;
+                }
+                window.mermaid.run({nodes: mermaidNodes});
+            }
+            markScrollableTables(host);
+        }
+
+        // A table wider than its wrapper scrolls sideways. Mark those wrappers
+        // so the CSS can show a cue, and make them focusable so keyboard users
+        // can reach and scroll them. Hidden panes measure 0 and are re-marked
+        // when activated or when the window is resized.
+        function markScrollableTables(host) {
+            host.querySelectorAll('.table-wrap').forEach(function (wrap) {
+                const scrolls = wrap.scrollWidth > wrap.clientWidth + 1;
+                wrap.classList.toggle('is-scrollable', scrolls);
+                if (scrolls) {
+                    wrap.setAttribute('tabindex', '0');
+                    wrap.setAttribute('role', 'region');
+                    wrap.setAttribute('aria-label', 'Table that scrolls sideways');
+                } else {
+                    wrap.removeAttribute('tabindex');
+                    wrap.removeAttribute('role');
+                    wrap.removeAttribute('aria-label');
+                }
+            });
+        }
+
+        // Modality tabs. One <article class="pane"> per modality; panes are
+        // rendered lazily on first activation (force-graph / D3 / mermaid
+        // need a visible, measurable container). With a single modality the
+        // tab bar stays hidden and the page looks exactly like before.
+        const mods = data.modalities;
+        const tabBar = document.getElementById('modality-tabs');
+        const panes = {};
+        const tabButtons = {};
+        const renderedPanes = {};
+
+        // With several modalities each pane is a tabpanel labelled by its
+        // tab (W3C APG tabs pattern); tabindex=0 lets keyboard users move
+        // from the tab list straight into the active content.
+        mods.forEach(function (m) {
+            const pane = document.createElement('article');
+            pane.className = 'pane';
+            pane.dataset.key = m.key;
+            pane.hidden = true;
+            if (mods.length > 1) {
+                pane.id = 'pane-' + m.key;
+                pane.setAttribute('role', 'tabpanel');
+                pane.setAttribute('aria-labelledby', 'tab-' + m.key);
+                pane.setAttribute('tabindex', '0');
+            }
+            root.appendChild(pane);
+            panes[m.key] = pane;
+        });
+
+        const defaultKey = mods.some(m => m.key === 'index') ? 'index' : mods[0].key;
+
+        function activate(key, updateHash) {
+            mods.forEach(function (m) {
+                const isActive = m.key === key;
+                panes[m.key].hidden = !isActive;
+                if (tabButtons[m.key]) {
+                    tabButtons[m.key].classList.toggle('active', isActive);
+                    tabButtons[m.key].setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    // Roving tabindex: only the selected tab is in the Tab
+                    // order; the arrow keys move between tabs.
+                    tabButtons[m.key].setAttribute('tabindex', isActive ? '0' : '-1');
+                }
+            });
+            // Unhide first, then render: the chart libraries measure widths.
+            if (!renderedPanes[key]) {
+                renderBlocksInto(mods.find(m => m.key === key).blocks, panes[key]);
+                renderedPanes[key] = true;
+            } else {
+                markScrollableTables(panes[key]);
+            }
+            if (updateHash) {
+                history.replaceState(null, '',
+                    key === defaultKey ? location.pathname + location.search : '#' + key);
+            }
+        }
+
+        if (mods.length > 1) {
+            mods.forEach(function (m) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = m.label;
+                btn.id = 'tab-' + m.key;
+                btn.dataset.key = m.key;
+                btn.setAttribute('role', 'tab');
+                btn.setAttribute('aria-controls', 'pane-' + m.key);
+                btn.addEventListener('click', function () { activate(m.key, true); });
+                tabBar.appendChild(btn);
+                tabButtons[m.key] = btn;
+            });
+            // Keyboard support per the W3C APG tabs pattern (automatic
+            // activation): Left/Right move between tabs and wrap, Home/End
+            // jump to the first/last tab, and the focused tab is selected.
+            tabBar.addEventListener('keydown', function (ev) {
+                const keys = mods.map(function (m) { return m.key; });
+                const focused = document.activeElement;
+                const current = focused && focused.dataset ? keys.indexOf(focused.dataset.key) : -1;
+                if (current < 0) return;
+                let next = null;
+                if (ev.key === 'ArrowRight') next = (current + 1) % keys.length;
+                else if (ev.key === 'ArrowLeft') next = (current - 1 + keys.length) % keys.length;
+                else if (ev.key === 'Home') next = 0;
+                else if (ev.key === 'End') next = keys.length - 1;
+                if (next === null) return;
+                ev.preventDefault();
+                activate(keys[next], true);
+                tabButtons[keys[next]].focus();
+            });
+            tabBar.hidden = false;
+        }
+
+        // The hash selects a tab only when it matches a modality key, so
+        // existing anchors keep working.
+        const initialHash = location.hash.slice(1);
+        activate(mods.some(m => m.key === initialHash) ? initialHash : defaultKey, false);
+        window.addEventListener('hashchange', function () {
+            const k = location.hash.slice(1);
+            if (mods.some(m => m.key === k)) activate(k, false);
+        });
+        window.addEventListener('resize', function () { markScrollableTables(root); });
+    })();
+</script>
+</body>
+</html>

@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Spec: Proving the Money: Reconciliation Inside the Provider and Out</title>
+    <meta name="description" content="How does a payment provider prove its own books against the networks and banks, and what does it give customers to prove theirs? It matches every movement its ledger expects against a record it did not write and ages what stays unmatched, then hands customers the same proof one level down as scheduled reports: by payout at Stripe, by payable batch at Adyen.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SETTLED: Architecting Payments and Revenue Infrastructure">
+    <meta property="og:title" content="Spec: Proving the Money: Reconciliation Inside the Provider and Out">
+    <meta property="og:description" content="How does a payment provider prove its own books against the networks and banks, and what does it give customers to prove theirs? It matches every movement its ledger expects against a record it did not write and ages what stays unmatched, then hands customers the same proof one level down as scheduled reports: by payout at Stripe, by payable batch at Adyen.">
+    <meta property="og:url" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/payment-reconciliation-and-reporting.spec.html">
+    <meta property="og:image" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/assets/images/15-payment-reconciliation-and-reporting/logo.jpeg">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="site.css">
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-129891352-1"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+        dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'UA-129891352-1');
+</script>
+    <style>
+        body {
+            line-height: 1.65;
+        }
+
+        main {
+            padding-top: 32px;
+        }
+
+        nav.post-nav {
+            font-size: 14px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+            align-items: baseline;
+            flex-wrap: wrap;
+        }
+
+        nav.post-nav a {
+            color: var(--muted);
+            text-decoration: none;
+        }
+
+        nav.post-nav a:hover {
+            color: var(--accent);
+        }
+
+        nav.post-nav .nav-right {
+            margin-left: auto;
+            display: inline-flex;
+            gap: 4px;
+            align-items: baseline;
+        }
+
+        nav.post-nav .nav-sep {
+            color: var(--muted);
+        }
+
+        footer nav.post-nav {
+            margin-top: 24px;
+            margin-bottom: 0;
+        }
+
+        header.post {
+            margin-bottom: 32px;
+        }
+
+        header.post .section {
+            color: var(--muted);
+            font-size: 13px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin: 0 0 -6px;
+        }
+
+        header.post .section a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        header.post .section a:hover {
+            color: var(--accent);
+        }
+
+        header.post .section .post-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        header.post .section .post-status .status-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        header.post .logo {
+            display: block;
+            width: 100%;
+            max-height: 400px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-bottom: 6px;
+            border: 1px solid lightgrey;
+
+        }
+
+        header.post .logo-credit {
+            color: var(--muted);
+            font-size: 12px;
+            margin: -4px 0 24px;
+            text-align: right;
+        }
+
+        header.post h1 {
+            font-size: 52px;
+            line-height: 1.2;
+            margin: 0 0 2px;
+            padding: 0;
+            letter-spacing: -0.01em;
+            font-weight: normal;
+        }
+
+        header.post .byline {
+            color: var(--muted);
+            font-size: 15px;
+            margin: 0;
+        }
+
+        header.post .byline .spec-link {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        header.post .byline .spec-link:hover {
+            text-decoration: underline;
+        }
+
+        header.post .byline .spec-link-drifted {
+            color: #b8650f;
+        }
+
+        header.post .byline .spec-link-superseded {
+            color: var(--muted);
+        }
+
+        header.post .ai-credit {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 4px 0 0;
+        }
+
+        header.post .ai-credit a {
+            color: inherit;
+        }
+
+        header.post .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 10px 0 10px;
+        }
+
+        header.post .tags .tag {
+            font-size: 14px;
+            padding: 1px 8px;
+            border: 1px solid deepskyblue;
+            color: blue;
+            border-radius: 999px;
+            background-color: var(--tag-bg);
+        }
+
+        nav.modality-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--rule);
+            margin: 0 0 28px;
+            flex-wrap: wrap;
+        }
+
+        nav.modality-tabs button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font: inherit;
+            font-size: 14px;
+            color: var(--muted);
+            padding: 8px 14px;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            letter-spacing: 0.02em;
+        }
+
+        nav.modality-tabs button:hover {
+            color: var(--accent);
+        }
+
+        nav.modality-tabs button.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        #content .pane[hidden] {
+            display: none;
+        }
+
+        #content .pane:focus {
+            outline: none;
+        }
+
+        #content .pane:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 6px;
+        }
+
+        article h2 {
+            font-size: 26px;
+            margin: 40px 0 12px;
+            letter-spacing: -0.01em;
+        }
+
+        article h3 {
+            font-size: 20px;
+            margin: 28px 0 8px;
+        }
+
+        article h4 {
+            font-size: 17px;
+            margin: 20px 0 6px;
+        }
+
+        article p {
+            margin: 0 0 16px;
+        }
+
+        article a {
+            color: var(--accent);
+        }
+
+        article a.image-link {
+            display: inline-block;
+            line-height: 0;
+        }
+
+        article img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        article a.image-link img {
+            display: block;
+        }
+
+        article ul, article ol {
+            padding-left: 24px;
+            margin: 0 0 16px;
+        }
+
+        article li {
+            margin-bottom: 6px;
+        }
+
+        article ul.task-list {
+            list-style: none;
+            padding-left: 4px;
+        }
+
+        article ul.task-list li.task > input[type="checkbox"] {
+            margin-right: 8px;
+            accent-color: var(--accent);
+        }
+
+        article hr {
+            border: none;
+            border-top: 1px solid var(--rule);
+            margin: 32px 0;
+        }
+
+        article blockquote {
+            margin: 16px 0;
+            padding: 12px 18px;
+            background: var(--quote-bg);
+            border-left: 3px solid var(--accent);
+            color: #333;
+        }
+
+        article blockquote p:last-child {
+            margin-bottom: 0;
+        }
+
+        article code {
+            background: var(--code-bg);
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-size: 0.92em;
+        }
+
+        article pre {
+            background: var(--code-bg);
+            padding: 14px 16px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        article pre code {
+            background: none;
+            padding: 0;
+        }
+
+        article .table-wrap {
+            overflow-x: auto;
+            margin: 16px 0;
+        }
+
+        article table {
+            border-collapse: collapse;
+            margin: 16px 0;
+            width: 100%;
+            font-size: 15px;
+        }
+
+        article .table-wrap table {
+            margin: 0;
+        }
+
+        /* Wide tables scroll on narrow screens instead of crushing their columns.
+           A table wrapped in <div class="table-compact"> opts out: it has few,
+           short columns and wraps its cells to fit the screen instead. */
+        @media (max-width: 640px) {
+            article .table-wrap table {
+                min-width: 560px;
+            }
+            article .table-compact .table-wrap table {
+                min-width: 0;
+            }
+        }
+
+        /* Tables that actually overflow get a visible cue and keyboard focus
+           (markScrollableTables() sets the class and attributes). */
+        article .table-wrap.is-scrollable::before {
+            content: "Scroll sideways to see the whole table";
+            display: block;
+            font-size: 12px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        article .table-wrap.is-scrollable:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        article th, article td {
+            border: 1px solid var(--rule);
+            padding: 8px 12px;
+            text-align: left;
+            vertical-align: top;
+        }
+
+        article th {
+            background: var(--code-bg);
+            font-weight: 600;
+        }
+
+        /* GFM column alignment from the separator row. Right-aligned columns
+           hold numbers; their cells never wrap, so a sign, a currency symbol
+           and its amount stay on one line while label columns still wrap. */
+        article th.num, article td.num {
+            text-align: right;
+        }
+
+        article td.num {
+            white-space: nowrap;
+        }
+
+        article th.center, article td.center {
+            text-align: center;
+        }
+
+        article .mermaid {
+            text-align: center;
+            margin: 24px 0;
+        }
+
+        article .force-graph {
+            margin: 24px 0;
+            border: 1px solid var(--rule);
+            border-radius: 6px;
+            background: #fff;
+            height: 480px;
+            overflow: hidden;
+        }
+
+        article .bubble-chart {
+            margin: 24px 0;
+            text-align: center;
+        }
+
+        article .bubble-chart svg {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <nav class="post-nav"><a class="nav-back" href="payment-reconciliation-and-reporting.html">← Proving the Money: Reconciliation Inside the Provider and Out</a><span class="nav-right"></span></nav>
+    <header class="post" id="post-header">
+        <p class="section"><span>SPEC</span> • <span class="post-status"><span class="status-dot" style="background:green"></span>accepted</span> • <span>revised 2026-11-17</span></p>
+        <h1>Spec: Proving the Money: Reconciliation Inside the Provider and Out</h1>
+        <p class="byline"></p>
+        
+        <div class="tags" id="tags"></div>
+        
+    </header>
+    <nav class="modality-tabs" id="modality-tabs" hidden role="tablist" aria-label="Reading formats"></nav>
+    <div id="content"></div>
+    <footer>
+        <nav class="post-nav"><a class="nav-back" href="payment-reconciliation-and-reporting.html">← Proving the Money: Reconciliation Inside the Provider and Out</a><span class="nav-right"></span></nav>
+    </footer>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/force-graph"></script>
+<script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+<script id="data" type="application/json">{"meta": {}, "tags": [], "modalities": [{"key": "spec", "label": "Spec", "meta": {}, "blocks": [{"type": "markdown", "content": "## Intent\n\n**After reading, the reader should:**\n\n- **Know:** What provider-side reconciliation, a clearing file, a settlement report and exception aging are.\n- **Know:** What Stripe (2024) and Adyen (2021, five years old) have published about reconciling their own books, and that neither publishes matching rules, file formats or exception volumes.\n- **Know:** The reports and data products each exposes, the unit each reconciles on (the payout at Stripe; the payable batch at Adyen, with a daily report per balance account for platforms) and what each says about timing.\n- **Believe:** A provider's figures are not true because the provider processed the payments; they are true where an outside record agrees with them.\n- **Believe:** Reports and webhooks are different contracts: a report is complete and late, a webhook is prompt and may be missing.\n- **Be able to:** Build a daily close that books from the provider's reports, waits for them to be available and uses webhooks only as prompts.\n- **Be able to:** Hold an unmatched amount as an open item with an age and an owner instead of adjusting a total to make it tie.\n- **Be able to:** Choose the matching key for each provider when reconciling bank credits across two of them.\n\n**Audience:** An engineer or architect new to payments who integrates or operates on a payment provider and has to make its books agree with the provider and the bank.\n\n**Already knows:**\n\n- APIs, databases, queues, webhooks and data warehouses.\n- Double-entry ledgers, immutable entries and clearing accounts (payment-ledgers).\n- Pending and available balances, reserves and Adyen's pre-financing (balances-and-funds-flows).\n- Payouts, payout returns and that 'paid' means sent (payouts-and-money-movement).\n- Capture, clearing and net settlement in outline (clearing-and-settlement).\n\n**Does not yet know:**\n\n- Reconciliation as a provider-side process, clearing file, exception, exception aging.\n- Which report each provider offers, its unit and its timing.\n\n**Acceptance criteria**\n\n| Id | Criterion | Check | Method | Severity |\n| --- | --- | --- | --- | --- |\n| AC-1 | Given a bank credit that differs from the sum of the day's payment notifications, the reader names the record to book from, what the difference is probably made of, and how to treat it while it is unexplained. *Probe:* A finance team books sales each night from the 'payment succeeded' notifications it received that day. On Thursday the bank credit from the provider is €1,930 lower than the sum of those notifications. Using only this chapter: which record should the team have booked from, what is the €1,930 probably made of, and what should happen to it until it is explained? | `custom` | cold_reader | blocker |\n| AC-2 | The reader can state the difference between the two providers' settlement reports in unit and in published timing. *Probe:* You reconcile bank credits from both providers. What does one line of the main reconciliation report correspond to at each, and what does each say about when the report is ready? | `custom` | cold_reader | major |\n| AC-3 | The chapter states where the public record on each provider's own reconciliation stops and does not describe matching internals that no source documents; it is short where the evidence is thin. | `custom` | rubric | blocker |\n\n## Thesis\n\n**Question:** How does a provider prove its own books against the networks and banks, and what does it give customers to prove theirs?\n\n> **Claim:** A provider proves its books by matching each movement its ledger expects against a record it did not write, a network's file or a bank's statement, and by putting an age and an owner on whatever stays unmatched. What it gives customers is the same proof one level down: scheduled reports itemized per payout at Stripe and per payable batch at Adyen (for a platform, also per day and balance account), which are complete where webhooks are only prompt.\n\n**Disputed by:** The view that a ledger whose entries balance is already proven, so that matching it against outside files is a finance formality, and that a customer can keep its books from the webhook stream and treat reports as an optional export.\n\n**So what:** A customer's close has to book from reports, wait until they are available and keep open items with an age, and a platform on both providers needs two matching keys, because one reconciles on a bank credit and the other on a day of sales.\n\n**How and why:** A ledger can only show that its own entries balance; whether an expected movement happened is known only to the party that carried it out. Stripe's 2024 post puts 'reconciling money movement with third-party reporting' inside its fund flows and reports unresolved balances by age with tickets assigned to teams. Adyen's 2021 post (five years old) describes parsing partner files and matching them to transactions in two steps across its accounting clusters, and its reports distinguish a payment sent for settlement from one whose funds Adyen has received. For customers, Stripe documents reports computed daily and normally ready within 12 hours, warns that 'a payout might arrive before its reconciliation data is ready', and sells query and warehouse access to the data; Adyen generates its settlement details report when the payable batch closes, says to expect it within 3 hours after the batch closes and publishes a daily window for scheduled reports, and for platforms requires a daily Balance Platform Accounting Report. Neither publishes its matching rules, file formats, match rates or exception volumes, so the chapter describes the principle, the published fragments and the customer-facing reports, and says that the internals are not public.\n\n**Supporting claims**\n\n- **C1** — A ledger whose entries balance is consistent, not proven: whether an expected movement happened is known only from a record the other party wrote, a network's file or a bank's statement.\n- **C2** — What does not match is an exception, and it is controlled by giving it an age and an owner, not by adjusting a total.\n- **C3** — Stripe (2024) and Adyen (2021) have each published a fragment of their own reconciliation, and neither publishes matching rules, file formats, match rates or exception volumes.\n- **C4** — What customers receive is the same proof one level down: scheduled reports itemized per payout at Stripe, with a published processing time, and per payable batch at Adyen, tied to the batch closing.\n- **C5** — Reports and webhooks are different contracts, so a close books from reports, waits for them and keeps open items, with a different matching key on each provider.\n\n## Role in the part\n\nResolves what the first three chapters leave open: when the provider's record and an outside record disagree, how the disagreement is found, and what a customer receives to repeat the proof. Supports P3-4 of part `part-3`.\n\n## Flow\n\n**Pattern:** `problem_solution` (also `large_to_small` in balanced-not-proven, what-providers-publish, reports-customers-get: the principle, the provider proving its own books, then the customer proving theirs with the provider's report; `comparison` in reports-customers-get, ways-to-close, where-they-differ; `prerequisite_order` in reports-vs-webhooks before ways-to-close before in-practice: the rule, the designs that follow or break it, then the worked close)\n\nThe reader meets a close that balanced and was wrong before any vocabulary, so reconciliation arrives as the answer to a felt problem. The principle comes before the companies because the published fragments are only readable as parts of it. The provider's own reconciliation comes before the customer reports because the report is that reconciliation passed down a level; reversing them would present reports as an export feature. Reports are described before they are contrasted with webhooks, since the contrast needs their unit and timing. The comparison table comes after all documented material so every cell is already cited, and the worked close comes after it because it uses the two keys the table yields. Failures come last because they are failures of the recommended design.\n\n## Introduction\n\n**Hook** (`puzzling_scenario`): A payout is 'paid' in the provider's record and absent from the payee's bank: the bank returned it. Two records of the same money disagree, and the provider's ledger, which balances, cannot say which is right.\n\n**Bridge:** An engineer trusts a system whose internal invariants hold: the entries balance, the tests pass. → In payments an invariant that holds inside one system proves nothing about money another party moved, so proof has to come from comparing records with different writers.\n\n**Thesis statement** (KEY POINTS callout, first two bullets, and paragraph p02): A provider proves its books by matching each movement its ledger expects against a record it did not write and by aging what stays unmatched; what it gives customers is the same proof one level down, as scheduled reports itemized per payout at Stripe and per payable batch at Adyen (for a platform, also per day and balance account), which are complete where webhooks are only prompt.\n\n**Roadmap** (IN THIS CHAPTER callout and paragraph p04):\n\n- Start from Larkfield's close that covered one provider and what it cost. *Kept in:* scene.\n- Explain why a balanced ledger is not a proven one, with the terms reconciliation, clearing file, exception and aging. *Kept in:* balanced-not-proven.\n- Report what Stripe and Adyen have published about reconciling their own books, and where the record stops. *Kept in:* what-providers-publish.\n- Describe the reports and data products each gives customers, their unit and their timing. *Kept in:* reports-customers-get.\n- Show why reports and webhooks are different contracts and compare three ways to run a close. *Kept in:* reports-vs-webhooks, ways-to-close.\n- Compare the two providers. *Kept in:* where-they-differ.\n- Close 9 March 2027 at Larkfield on both providers, and go through the ways a close fails. *Kept in:* in-practice, when-it-goes-wrong.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p01 | context | A payout that the provider recorded as paid and the receiving bank returned leaves two records of the same money that disagree, and nothing inside either record says which is right. | scenario: The previous chapter's returned payout: 'paid' at the provider, nothing at the payee's bank, and Larkfield's 412 returned payouts worth €386,000 that sat unreconciled for three weeks in June 2026 (scenario ledger, the Payout That Bounced). |  |\n| p02 | claim | A provider proves its books by matching each movement its ledger expects against a record it did not write and by putting an age and an owner on what stays unmatched, and what it gives customers is the same proof one level down: scheduled reports, itemized per payout at Stripe and per payable batch at Adyen. |  | `problem_solution`: Two records that disagree with nothing in the ledger to settle it. → The standing answer: match every expected movement against the other party's record, age what does not match, and hand customers reports to do the same. |\n| p03 | context | In the journey of Mila's class pass this chapter covers the days after the sale of Tuesday 9 March 2027, when the provider, the network, the banks and Larkfield each hold a record of her €120 and the records are compared. | scenario: Mila's class pass: €120.00 on 9 March 2027 at 19:42 at Studio Noord, on Adyen; the studio's payout that includes it arrives on Thursday 11 March (scenario ledger). | `example`: The claim that proof is a match between records. → Where that match happens for the book's recurring payment. |\n| p04 | transition | The chapter goes from Larkfield's one-provider close, through why a balanced ledger is not a proven one, what the two companies have published about their own reconciliation, the reports customers get, why reports and webhooks are different contracts, three ways to run a close, the comparison of the two providers, a worked close of 9 March and the ways a close fails. |  | `sequence`: Where the chapter sits in the payment's journey. → The order of the sections. |\n\n## Sections\n\n### Setting the Scene at Larkfield: A Close That Covered One Provider\n\n**Controlling idea** (`example`, id `scene`): At the start of 2027 Larkfield reconciled its Adyen side against reports and kept its Stripe side from notifications, and the question Femke de Graaf asks is which record the books should be written from.\n\n**Advances the thesis** (C1, C5): Poses the chapter's question in a company whose books balanced and were still wrong by €412,000.\n\n**Transition in:** `example`: The claim that proof is a match against an outside record. → A company that had the match on one provider and not on the other.\n\n**Order of paragraphs** (`chronological`): The state before Keel, what it cost at year-end 2025, then the question asked in 2027.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p05 | context | Until the Keel program, Larkfield's nightly reconciliation job compared provider reports with its own records for Adyen only, while the Stripe side of its ledger was fed by webhooks. | scenario: Scenario ledger: the reconciliation job 'covered only Adyen until Keel'; the payment record store is fed by webhooks through an inbox table; Stripe carried 44% of 2026 member payment volume (€493M). |  |\n| p06 | evidence | The €412,000 difference at year-end 2025 was made of movements that no 'payment succeeded' notification carries: refunds after payout, chargeback fees and a currency-conversion rounding rule. | case: The Unexplained €0.4 Million (scenario ledger): the ledger's 'owed to studios' balance differed from the two providers' balances by €412,000; three weeks of work traced it to refunds after payout, chargeback fees and a currency-conversion rounding rule; an audit finding for Priya Raman, the finance controller. | `cause_effect`: Books fed by notifications on one provider. → What that produced at year-end. |\n| p07 | claim | Femke de Graaf's question for the Keel decision K3 is which record Larkfield books from on each provider, and what it does with an amount that the two sides do not explain. | scenario: Keel K3 (scenario ledger): 'A ledger entry for every movement... clearing accounts must return to zero; the reconciliation job covers both providers, one run per provider, started when that provider's reports are ready.' K2: the provider's record is the truth; 'the settlement report where it does not' let Larkfield read the object. | `problem_solution`: A difference found once, at year-end, by hand. → The design question that prevents the next one. |\n\n### Why a Balanced Ledger Is Not Yet a Proven One\n\n**Controlling idea** (`explanation`, id `balanced-not-proven`): A ledger shows that its own entries balance; whether an expected movement happened is known only to the party that carried it out, so proof needs that party's record and a way to handle what does not match.\n\n**Advances the thesis** (C1, C2): Establishes the principle and the vocabulary (reconciliation, clearing file, bank statement, exception, aging) the rest of the chapter uses.\n\n**Transition in:** `elaboration`: Larkfield's question: which record to book from. → Why the provider faces the same question about its own ledger, and the terms for answering it.\n\n**Order of paragraphs** (`prerequisite_order`): The limit of double entry first, then the activity that addresses it, then why it is hard, then the treatment of what is left over; each term is used by the next paragraph.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p08 | claim | Double entry proves that every recorded movement has two sides, not that the movement took place, because both sides were written by the same party. | reasoning: A ledger entry 'expect €120 from the card network' balances whether or not the network ever pays; only the network's file and the bank's statement can confirm it. The ledger chapter's clearing account is where the expectation waits (payment-ledgers). |  |\n| p09 | definition | Reconciliation is proving that two independently written records of the same money agree and explaining every difference; provider-side reconciliation compares the provider's ledger with the card networks' clearing files and the banks' statements. | table: Three records of one payment: the provider's ledger (written by the provider, one entry per movement, at the time of the event); the network clearing file (written by the card network or acquirer, one line per transaction it processed, typically daily); the bank statement (written by the bank, one line per credit or debit, often a net amount for many transactions). Industry practice, not a description of either company. | `elaboration`: Proof needs a record written by someone else. → The name of the activity and the three records it compares at a provider. |\n| p10 | explanation | The match is hard because the three records use different identifiers, different grains and different clocks: a bank line is one net amount for thousands of payments, less fees, on a later day. | reasoning: Net settlement (clearing-and-settlement): the network pays one amount per settlement cycle after deducting interchange and fees; a refund or chargeback from an earlier day reduces today's amount. Industry practice. | `cause_effect`: Three records with different writers, grains and timing. → Why comparing them cannot be a comparison of totals. |\n| p11 | definition | An item that does not match is an exception, and exception aging means tracking how long each one has been open and who owns it, because an unexplained amount gets harder to recover and more likely to be a loss as it gets older. | reasoning: Most exceptions are timing (the other record has not arrived yet) and close by themselves; the ones that stay open are missing files, duplicates, wrong amounts or money that never came. Industry practice; the author's judgement on why age is the useful measure. | `sequence`: Matching at the level of the item. → What happens to the items that do not match. |\n\n### What Stripe and Adyen Have Published About Proving Their Own Books\n\n**Controlling idea** (`evidence`, id `what-providers-publish`): Stripe (2024) describes the control around its reconciliation and Adyen (2021) describes one piece of the matching; neither publishes matching rules, file formats, match rates or exception volumes.\n\n**Advances the thesis** (C2, C3): Gives the dated public fragments for each company and states where the record stops.\n\n**Transition in:** `example`: The principle: match against outside records and age the exceptions. → What each of the two companies has said in public about doing so.\n\n**Order of paragraphs** (`grouping`): Stripe's fragments together, then Adyen's, each from engineering post to current documentation, then the limit of both.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p12 | evidence | Stripe's 2024 engineering post puts reconciliation with outside reports inside the fund flows its Ledger models, and names bad partner reports as a failure it has to absorb. | quotation: A fund flow 'requires moving funds between banks, reconciling money movement with third-party reporting, and matching regulatory reporting with financial reporting'; 'We witness basic and obvious failures like malformed reports or propagated errors from banking or network partners'; detection query 'Find the clearing Accounts with nonzero balance.' https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement (Ilya Ganelin, Stripe, published 2024-02-16) |  |\n| p13 | evidence | The same post describes exceptions as aged and owned: unresolved balances are scored by age, tickets are generated for the owning team, and an item caused by a third party can be reassigned. | quotation: 'the 50% score for Aging Balances means that some clearing issues have persisted over time'; 'auto-generated tickets'; 'the root cause is related to an infrastructure or third-party incident outside their control—they can reassign ownership'; '99.99% of our dollar volume is fully ingested and verified within four days... the remaining long-tail is reliably handled through manual analysis.' https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement (Ilya Ganelin, Stripe, published 2024-02-16) | `additional_support`: Outside reports as an input to Stripe's Ledger. → What Stripe says happens to what does not clear. |\n| p14 | evidence | For pooled bank accounts Stripe's documentation states the ledger-to-bank comparison in one sentence. | quotation: For an FBO-backed financial account: 'Stripe records how much of the total balance belongs to your business and reconciles that record against the funds held at the bank.' https://docs.stripe.com/treasury.md (n.d., accessed 2026-11) | `additional_support`: The engineering account of 2024. → A statement in current documentation of the comparison with the bank. |\n| p15 | evidence | Adyen's 2021 post, now five years old, describes matching partners' files to accounting records in two steps across its sharded accounting clusters, and says the work is specific to each integration. | quotation: 'if we received reports on processed transactions from our partners, we needed to match them to transactions in different clusters... we introduced a two-step framework that would first parse a file and then split it into the relevant parts for each cluster. The second step was to match the relevant transactions within the clusters'; 'the reconciliation needs to happen for a lot of different very custom integrations so this was a real team effort.' https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2 (Willem Pino, Adyen, published 2021-08-23; evidence age 5 years) | `contrast`: Stripe's account of the control around reconciliation. → Adyen's older account of the matching step itself. |\n| p16 | evidence | Adyen's current reports show the result of that matching to merchants: a payment sent for settlement and a payment whose funds Adyen has received are different records, and an amount not received within 30 days is reversed. | quotation: Payment accounting report record types: 'SentForSettle: Request to transfer the payment sent to the financial institution'; 'Settled: Payment has been settled, and the funds have been received by Adyen'; 'SettledReversed: Payment has not been settled because Adyen has not received the funds 30 days after capture.' https://docs.adyen.com/reporting/invoice-reconciliation/payment-accounting-report.md (n.d., accessed 2026-11). 'Prefinancing is capped at 30 days.' https://docs.adyen.com/account/sales-day-payout/upgrade-to-sdp.md (n.d., accessed 2026-11) | `additional_support`: The 2021 engineering account. → What current documentation shows of the same process. |\n| p17 | analysis | The public record stops there: neither company publishes its matching rules, the formats of the files it receives, its match rates or its exception volumes, so any fuller picture of provider-side reconciliation is inference. | reasoning: Research brief, open question 6: file formats, match rates, exception volumes and tooling beyond Stripe's data-quality description are not public; the same holds for Adyen beyond the 2021 two-step description. The three-way picture (ledger, network file, bank statement, with clearing accounts holding the expectation) is a reference-architecture inference and is labeled so in an INFERENCE block. | `contrast`: What the two have published. → What neither has. |\n\n### What Customers Get: Reports Itemized by Payout and by Batch\n\n**Controlling idea** (`description`, id `reports-customers-get`): Each provider hands customers a scheduled report that itemizes every movement behind an amount it paid: Stripe organizes it by payout and publishes a processing time, Adyen organizes it by payable batch and ties it to the batch closing.\n\n**Advances the thesis** (C4): Describes the customer-facing proof at each provider: its unit, its contents, its timing and the other reports around it.\n\n**Transition in:** `similarity`: The provider matching its ledger against records it did not write. → The customer in the same position one level down, with the provider's report as the outside record.\n\n**Order of paragraphs** (`comparison`): The shared need, then Stripe (content, timing, data access), then Adyen on the same points (content, timing, other reports), so the two can be compared on unit and timing.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p18 | claim | A customer is to its provider what the provider is to the network: it holds its own record and needs the other party's itemized record to prove it, and that record is a report, not a balance or a notification. | reasoning: The bank shows the customer one net credit; only the provider knows which payments, refunds, disputes and fees it nets. The provider's report is to the customer what the clearing file is to the provider. |  |\n| p19 | description | Stripe's payout reconciliation report is organized by payout: for each automatic payout it lists every balance transaction the payout settles, and it does not exist for payouts whose timing the customer controls. | quotation: The report 'helps you match the payouts you receive in your bank account with the batches of payments and other transactions that they relate to'; the itemized download lets you 'review every payment, refund, dispute, fee, and other balance transaction included in the payout'; 'only available for users with automatic payouts enabled'; for instant payouts 'Stripe can’t identify which transactions are included in each payout. You’re responsible for reconciling'. Columns include automatic_payout_id and balance_transaction_id. An 'Ending balance reconciliation' section lists 'transactions that hadn’t been settled as of the report’s end date'. https://docs.stripe.com/reports/payout-reconciliation.md (n.d., accessed 2026-11). The balance summary report 'works like a bank statement' and 'doesn’t associate payouts with payment transactions'. https://docs.stripe.com/reports/balance.md (n.d., accessed 2026-11) | `example`: The need for an itemized outside record. → Stripe's report and its unit. |\n| p20 | description | Stripe publishes a processing time for these reports, 12 hours after the day ends, and says plainly that the money can arrive before the report. | quotation: Data availability: 'Within 12 hours'; 'Stripe computes all your data on a daily basis beginning at 12:00 am... A day’s report is normally available by 12:00 pm on the following day'; 'SLAs indicate when the reports are available for download. Webhook notifications might take additional time'; the 12-hour figure does not apply to first automatic payouts after manual or after a 180-day gap. https://docs.stripe.com/reports/options.md (n.d., accessed 2026-11). 'Report data follows a separate processing schedule, so a payout might arrive before its reconciliation data is ready.' https://docs.stripe.com/reports/payout-reconciliation.md (n.d., accessed 2026-11). 'Stripe publishes reporting.report_type.updated events... twice per day (at 00:00 and 12:00 UTC)'; not sent to Connect webhook endpoints. https://docs.stripe.com/reports/v1-api.md (n.d., accessed 2026-11) | `additional_support`: What the Stripe report contains. → When it is ready. |\n| p21 | description | Stripe also sells direct access to the underlying data: SQL over it in the Dashboard (Sigma) and scheduled delivery to the customer's warehouse (Data Pipeline), each with a stated freshness of hours. | quotation: Sigma: 'an interactive SQL environment in the Stripe Dashboard'; 'All data is read-only'; 'Sigma makes most of your Stripe transaction data available to query within three hours'; the balance_transactions table 'is the canonical record of changes to your Stripe balance'. https://docs.stripe.com/data/how-sigma-works.md (first two quotations) and https://docs.stripe.com/data/data-freshness.md (three hours; the canonical-record comment in an example query) (n.d., accessed 2026-11). Data Pipeline: Snowflake, Amazon Redshift, Databricks, BigQuery or Parquet files to cloud storage; 'delivering a full load of data every 3 hours'; 'Data delivery varies from customer to customer and is largely determined by the data sizes.' https://docs.stripe.com/data/access-data-in-warehouse.md and https://docs.stripe.com/data/data-pipeline/data-freshness.md (n.d., accessed 2026-11). Bank reconciliation 'is currently only available for users with direct US-based Stripe accounts using an automated payout schedule'. https://docs.stripe.com/bank-reconciliation.md (n.d., accessed 2026-11) | `additional_support`: Stripe's scheduled reports. → The same data offered as tables to query. |\n| p22 | description | Adyen's settlement details report is organized by payable batch: for each merchant account and batch it lists every entry credited or debited, down to the payout itself with a reference that also appears on the bank statement. | quotation: 'The Settlement details report includes the details of payments that have been settled and paid out to you by Adyen'; 'The default setting is to generate the report per merchant account, per batch'; entry types: transactions, transaction fees, deposit corrections, invoice deductions, payouts; journal types include Settled, Refunded, Chargeback, DepositCorrection, InvoiceDeduction and MerchantPayout, whose modification reference is 'a description containing Account code, batch number, and the unique payout reference (TX...XT), which can also be found on the bank statement'. https://docs.adyen.com/reporting/settlement-reconciliation/transaction-level/settlement-details-report.md (n.d., accessed 2026-11). Sales day payout: 'You get all the funds from a particular sales day in a single payout batch'; 'Refunds, chargebacks, and other adjustments are added to the payable batch as they occur and are not related to the sales day of the original transaction.' https://docs.adyen.com/account/sales-day-payout.md (n.d., accessed 2026-11) | `contrast`: Stripe's unit, the payout. → Adyen's unit, the payable batch. |\n| p23 | description | Adyen ties the report's timing to an event, the closing of the batch, and says to expect the report within 3 hours after the batch closes; it also publishes a 02:00 to 10:00 CET window for scheduled daily reports and says a manually generated report may take several hours. | quotation: 'When the payable batch closes, we create a Settlement details report.' https://docs.adyen.com/account/getting-paid.md (n.d., accessed 2026-11). 'For Sales day payout, the payable batch always closes two hours after your sales day closing time... After the payable batch closes we create a bank instruction to pay out to you. Additionally, if you configured to generate reports automatically we'll start generating your Settlement details report.' https://docs.adyen.com/account/sales-day-payout.md (n.d., accessed 2026-11). 'When a new report has been generated, you will receive a REPORT_AVAILABLE webhook.' https://docs.adyen.com/reporting/automatically-get-reports.md (n.d., accessed 2026-11). Adyen publishes when scheduled daily reports are generated (between 02:00 and 10:00 CET) and that a manual report 'may take several hours'. 'If you have configured automatic generation of the Settlement details report at batch closure, you can expect the report to be generated within 3 hours after the batch closes.' https://docs.adyen.com/reporting/time-zone-setting.md (n.d., accessed 2026-11). | `additional_support`: What the Adyen report contains. → When it is created. |\n| p24 | description | Around the settlement details report Adyen provides reports at other grains, and a platform needs the balance platform's own daily report as well. | table: Report / provider / what one line is / what it is for: Stripe payout reconciliation (one balance transaction, grouped by payout); Stripe balance summary (one balance transaction in a period, no link to payouts); Adyen settlement details (one journal entry in a payable batch); Adyen aggregate settlement details (totals per batch, payment method and journal type, to match the bank statement; 'BankInstructionReturned' for a returned payout); Adyen payment accounting (one row per lifecycle status of a payment, used with the monthly invoice); Adyen Balance Platform Accounting Report ('a daily report that tracks all balance changes on all balance accounts in your balance platform', by day in Central European Time). Sources: https://docs.adyen.com/reporting/settlement-reconciliation/batch-level/aggregate-settlement-details-report.md, https://docs.adyen.com/account/getting-paid.md, https://docs.adyen.com/platforms/reports-and-fees.md, https://docs.adyen.com/marketplaces/reports-and-fees/balance-platform-accounting-report.md (n.d., accessed 2026-11) | `additional_support`: Adyen's main reconciliation report. → The other reports at each provider and the grain of each. |\n\n### Reports and Webhooks Are Different Contracts\n\n**Controlling idea** (`comparison`, id `reports-vs-webhooks`): A webhook promises to tell you soon that something happened and does not promise to arrive; a report promises every movement behind an amount and does not promise to be early, so a close books from reports and uses webhooks as prompts.\n\n**Advances the thesis** (C5): Argues the belief the chapter exists for and answers the view that books can be kept from the event stream.\n\n**Transition in:** `contrast`: Reports as the provider's itemized record. → The other channel customers already receive, and why it cannot stand in for the report.\n\n**Order of paragraphs** (`assertion_evidence_reasoning`): The opposing practice stated fairly, the documented difference between the channels, what the difference is made of in money, then the rule.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p25 | counterargument | Keeping the books from webhooks is attractive because the events arrive within seconds, carry amounts and are already being consumed to update payment state. | scenario: Larkfield's Stripe side before Keel: the payment record store fed by webhooks through an inbox table, used as the source for the ledger (scenario ledger). |  |\n| p26 | refutation | The two channels make different promises, and the providers say so: Stripe separates report availability from webhook timing, and Adyen sends some balance-changing events only if the customer has switched them on. | table: What it promises / what it does not promise. Webhook: prompt notice of one event; not delivery, order or completeness (payment-webhooks-and-events). Report: every movement behind a payout or batch, with fees and adjustments, as of a cut-off; not speed. Stripe: 'SLAs indicate when the reports are available for download. Webhook notifications might take additional time' https://docs.stripe.com/reports/options.md (n.d., accessed 2026-11). Adyen: the SETTLED_REVERSED and REFUND_NOT_CLEARED event types 'apply to all payment methods and are disabled by default' https://docs.adyen.com/account/sales-day-payout.md (n.d., accessed 2026-11); the Balance Platform Accounting Report is to 'Confirm the balance changes that you are informed of through webhooks' https://docs.adyen.com/platforms/reports-and-fees.md (n.d., accessed 2026-11) | `contrast`: Why booking from events is attractive. → What each channel does and does not promise. |\n| p27 | explanation | A day's 'payment succeeded' notifications and the bank credit differ for reasons that are in the report and not in those notifications: fees, refunds, chargebacks, changes in a reserve or deposit, and sales that belong to a different payout or batch. | reasoning: Stripe's itemized report lists 'every payment, refund, dispute, fee, and other balance transaction included in the payout'; Adyen's batch includes transaction fees, DepositCorrection, InvoiceDeduction and adjustments added 'as they occur'. A payment notified on Wednesday can sit in Thursday's or Friday's payout. Illustrative case: a bank credit €1,930 lower than the day's notifications. | `cause_effect`: Two channels with different promises. → What goes missing when the prompt one is used as the complete one. |\n| p28 | recommendation | Book from the report, wait for the provider's signal that the report data is available, use webhooks to update state and to prompt a check, and hold any amount the report does not explain as an open item with an age and an owner. | reasoning: Keel K2 (scenario ledger): 'The provider's record is the truth; the webhook is the doorbell.' The signals: Stripe's reporting.report_type.updated event and data_available_end; Adyen's REPORT_AVAILABLE webhook, and balancePlatform.report.created for balance platform reports. The author's recommendation; it does not hold for a decision that cannot wait for a report, such as granting access after a payment, which belongs to payment state (payment-state-machines). | `cause_effect`: What the event stream leaves out. → The rule that follows for the books. |\n\n### Three Ways to Run a Close on Provider Data\n\n**Controlling idea** (`comparison`, id `ways-to-close`): A close can be fed by events, driven by reports per payout or batch, or run as queries over provider data in a warehouse; they differ in what proves completeness and in how soon a difference is seen.\n\n**Advances the thesis** (C5): Sets out the realistic designs and when each is right.\n\n**Transition in:** `elaboration`: The rule: book from reports. → The designs a team actually chooses between, including the one the rule argues against.\n\n**Order of paragraphs** (`comparison`): Three designs on the same two criteria, weakest proof of completeness first, then the choice.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p29 | comparison | An event-fed close posts every webhook to the books as it arrives: it is the earliest and the cheapest, and nothing in it can show that an event is missing. | reasoning: Completeness in this design rests on delivery; a movement that has no event, or whose event was not enabled or was lost, never reaches the books. Industry practice and the author's judgement. |  |\n| p30 | comparison | A report-driven close books each payout or batch from its itemized report and matches the report's total to the bank line: completeness comes from the provider's own cut-off, at the cost of a delay of a day or more. | reasoning: Each bank credit is matched to one payout (Stripe) or one batch (Adyen), and each line of the report to one internal entry; what is left on either side is an open item. Industry practice; RECONCILED's payments-to-ledger describes the posting. | `contrast`: A close that trusts delivery. → A close that trusts a cut-off. |\n| p31 | comparison | A warehouse-driven close loads the provider's transaction data into the customer's own warehouse and runs the match as queries, which shortens the delay to hours on Stripe and has to be built from report files on Adyen. | reasoning: Stripe's Data Pipeline delivers a full load every 3 hours and Sigma data is queryable within about three hours (documented above); for Adyen's payment and settlement reports this book found only files documented, so the same design means ingesting each report file; for platforms Adyen also documents a Transfers API query for balance account transactions (https://docs.adyen.com/platforms/transfer-transactions/track-api, n.d., accessed 2026-11). The author's reading. | `additional_support`: Booking per report file. → Booking from the same data held as tables. |\n| p32 | recommendation | I would book from reports per payout or batch, add the warehouse when volume or two providers make file handling the bottleneck, and keep the event-fed figures only as an early estimate that the report later replaces. | table: Design / what proves completeness / delay before a difference is seen / when it is right: event-fed (nothing; seconds, but a missing event is never seen; as an estimate, never as the books); report-driven (the provider's cut-off per payout or batch; a day or more; the default); warehouse-driven (the provider's data set plus your own queries; hours where the provider delivers tables; high volume, several providers or a daily close). The author's judgement. | `conclusion_summary`: Three designs. → Which one the author would choose and under what conditions. |\n\n### Stripe and Adyen: Where They Differ\n\n**Controlling idea** (`comparison`, id `where-they-differ`): The two providers differ in what they have published about their own reconciliation, in the unit of the main report, in whether report timing is a number or an event, and in whether the data is offered as tables.\n\n**Advances the thesis** (C3, C4): Sets the documented facts of the earlier sections side by side and reads them for an integrator.\n\n**Transition in:** `conclusion_summary`: The documented facts about each provider and the designs for a close. → The same facts in one table, with the author's reading of each difference.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p33 | comparison | On five aspects the public record shows a difference, and the last column of the table is the author's inference from it. | table: Aspect / Stripe / Adyen / what the difference suggests. (1) Own reconciliation, published: 2024 Ledger post (clearing accounts, aging scores, tickets, verification within four days) / 2021 post (two-step matching of partner files across accounting clusters; five years old). (2) Unit of the main reconciliation report: the payout / the payable batch, by default a sales day. (3) Timing statement: 'Within 12 hours' after the day ends, payout may arrive first / created when the batch closes, expected within 3 hours after the batch closes, a daily window for scheduled reports (02:00 to 10:00 CET). (4) Signal that data is ready: reporting.report_type.updated twice a day, not sent to Connect endpoints / REPORT_AVAILABLE webhook with a download URL, and balancePlatform.report.created for balance platform reports. (5) Access to the data: Sigma and Data Pipeline, freshness in hours / report files in CSV and other formats, and for platforms the Transfers API's transactions endpoint. Sources as cited in sections what-providers-publish and reports-customers-get. |  |\n| p34 | recommendation | An integrator on Stripe keys its reconciliation on the payout ID and schedules against the 12-hour figure; on Adyen it keys on merchant account and batch number and waits for the report-available webhook; on both it needs two keys and one treatment of open items. | reasoning: Follows from rows 2 to 4 of the table; the author's recommendation. | `cause_effect`: The differences in unit, timing and signal. → What an integrator does differently on each provider. |\n\n### In Practice at Larkfield: Closing Tuesday 9 March on Two Providers\n\n**Controlling idea** (`example`, id `in-practice`): Under Keel K3 Larkfield closes each day from the providers' reports, with the batch as the key on Adyen and the payout as the key on Stripe, and carries what does not match as dated, owned open items.\n\n**Advances the thesis** (C4, C5): Works the close for the day of Mila's class pass on both providers and shows open items with an age and an owner.\n\n**Transition in:** `example`: Two matching keys and one treatment of open items. → Larkfield's close for one day, with Mila's €120 traced through it.\n\n**Order of paragraphs** (`chronological`): The job starts, the matched line on each provider, the unmatched lines, then what the method changes.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p35 | context | Larkfield's reconciliation job now runs per provider on that provider's signal, not at a fixed hour, and writes ledger entries only from report lines. | scenario: Keel K3 and K2 (scenario ledger); local illustrative detail: the Adyen run starts on the REPORT_AVAILABLE webhook for each merchant account's batch and on balancePlatform.report.created for the balance platform's daily report, the Stripe run when the reporting data's availability passes the end of the day. |  |\n| p36 | example | On Adyen, Mila's €120.00 is one line in the batch for the sales day of 9 March, and the balance platform's daily report shows how it was split between Studio Noord and Larkfield. | scenario: Mila's class pass (scenario ledger): €120.00 at 19:42 on 9 March 2027, Studio Noord on Adyen; Larkfield's fee €2.53, the studio receives €117.47; illustrative provider cost €0.61 inside the fee (assumption), leaving Larkfield €1.92; payout arrives Thursday 11 March. Documented behavior used: the batch closes two hours after the sales day closes; split payments appear in the Balance Platform Accounting Report as separate lines with the same PSP reference; fees are by default debited from the platform's liable balance account (https://docs.adyen.com/platforms/reports-and-fees.md, n.d., accessed 2026-11). | `example`: The job's rule: entries only from report lines. → The Adyen side for the recurring payment. |\n| p37 | example | Had Studio Noord been on Stripe, the same €120.00 would be found under the payout that carries it, and the day could not be closed from the bank credit alone because the report may come after the money. | scenario: 'Had Studio Noord been on Stripe' (the scenario ledger's device). Documented behavior used: the itemized payout reconciliation report carries automatic_payout_id and balance_transaction_id on each row; a day's report is normally available by 12:00 pm the next day; 'a payout might arrive before its reconciliation data is ready'; platforms can view the financial reports of connected accounts they control (https://docs.stripe.com/reports/options.md, n.d., accessed 2026-11). | `contrast`: The Adyen side, keyed on the batch. → The Stripe side, keyed on the payout. |\n| p38 | example | What the reports and Larkfield's records do not explain on the day stays on a list of open items, each with an amount, an age and an owner, and nothing is adjusted to make the day tie. | table: Illustrative open items after the close of 9 March (all figures are assumptions for teaching): a €16.00 drop-in marked paid in the payment record store and absent from the batch (captured after the sales day closed; expected in the next batch; owner: the reconciliation job; closes in one day); a €49.00 refund line in the batch with no refund request in Larkfield's records (made in the provider's console; owner: Tom Hendriks; age 1 day); a £0.03 rounding difference on a GBP conversion (owner: Priya Raman; booked to a rounding account under a written rule). Larkfield's rule: an item open for more than five business days goes to Priya Raman's weekly review. | `sequence`: The lines that match. → The lines that do not. |\n| p39 | analysis | Run this way, the three causes of the €412,000 would each have appeared as open items within days, on the day the refund, the fee or the rounding was first reported. | case: The Unexplained €0.4 Million (scenario ledger): refunds after payout, chargeback fees and a currency-conversion rounding rule, found after three weeks at year-end 2025. | `cause_effect`: Open items listed by age and owner each day. → What that would have done to the year-end difference. |\n\n### When It Goes Wrong: Late Reports, Late Reversals and Totals Forced to Tie\n\n**Controlling idea** (`analysis`, id `when-it-goes-wrong`): A report-driven close fails in four ways: the report is late, a movement arrives after the day was closed, the day boundaries of two records differ, and someone adjusts a total to make it tie.\n\n**Advances the thesis** (C2, C5): Gives detection and recovery for each failure of the recommended design.\n\n**Transition in:** `contrast`: A close that worked. → The ways the same close fails, and what to do in each.\n\n**Order of paragraphs** (`order_of_importance`): From the most frequent and least harmful (a late report) to the least visible and most harmful (a total forced to tie).\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p40 | process | When the money arrives before the report, or the report is late, the close for that payout or batch waits; the bank credit is recorded as received and unmatched, not booked as sales. | fact: Stripe: 'a payout might arrive before its reconciliation data is ready'; the 12-hour figure has stated exceptions (https://docs.stripe.com/reports/payout-reconciliation.md and https://docs.stripe.com/reports/options.md, n.d., accessed 2026-11). Adyen says to expect its settlement details report within 3 hours after the batch closes, which is an expectation and not a guarantee (above). |  |\n| p41 | process | When a movement arrives after its day was closed, it is booked as a new entry in the day it is reported and linked to the original; the closed day is not reopened. | fact: Adyen: SettledReversed after 30 days without funds, and 'If Adyen receives the funds after 30 days, you see an additional Settled booking'; adjustments 'are added to the payable batch as they occur' (https://docs.adyen.com/account/sales-day-payout/upgrade-to-sdp.md and https://docs.adyen.com/account/sales-day-payout.md, n.d., accessed 2026-11). Stripe: a payout reported as paid can change to failed within five business days (payouts-and-money-movement). Larkfield's refund after payout: €84.00 on 18 March for a pass paid out on 11 March (scenario ledger). | `sequence`: A report that is late. → A movement that is late. |\n| p42 | process | When two records cut the day at different times, items near midnight appear as differences that reverse the next day, and the fix is to reconcile on the provider's unit and time zone, not on your own calendar day. | fact: Stripe reports can be run in the account's time zone or UTC (https://docs.stripe.com/reports/options.md, n.d., accessed 2026-11); Adyen's settlement details report uses the account's time-zone setting, its Balance Platform Accounting Report covers a day in Central European Time and 'Your invoice is always based on the CET time zone' (https://docs.adyen.com/reporting/settlement-reconciliation/transaction-level/settlement-details-report.md, https://docs.adyen.com/marketplaces/reports-and-fees/balance-platform-accounting-report.md, https://docs.adyen.com/reporting/invoice-reconciliation/payment-processing-invoice.md, n.d., accessed 2026-11). | `additional_support`: Movements that arrive late. → Movements that only appear late because of where the day is cut. |\n| p43 | process | The failure that does lasting damage is adjusting a total so the day ties: the difference disappears from view, keeps its cause and returns larger. | case: The Unexplained €0.4 Million accumulated over a year in which no single day's difference had an owner (scenario ledger; the author's reading). Stripe's post describes the alternative: unresolved balances scored by age with tickets assigned to teams (https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement (Ilya Ganelin, Stripe, published 2024-02-16)). | `emphasis`: Three failures that a waiting state or a new entry handles. → The one that comes from people, and that the others tempt. |\n\n## Conclusion: What to Take Away\n\n**Synthesis:** The provider's reconciliation and the customer's close are the same act at two levels: each holds a ledger that balances by construction and becomes proof only against a record written by the party one step closer to the money, and at each level what turns a mismatch from a loss into a task is its age and its owner. The report is how that proof is passed down a level.\n\n**So what:** A team that books from webhooks has a ledger that agrees with itself; a team that books from reports, waits for them and ages its open items has one that agrees with the provider, and through the provider with the networks and banks. On two providers that takes two keys, the payout and the batch.\n\n**Callback:** The payout recorded as paid that the bank returned, and Larkfield's €412,000. Neither record was entitled to win by itself: the return shows up as a line in a later report, and the difference is closed by matching that line, which is what the year-end search did by hand, a year late.\n\n**Takeaway** (`course_of_action`): For each provider, name the report you book from, the signal you wait for, the key that ties a bank credit to its lines, and the owner and age limit of an unmatched item. Eight questions to ask follow.\n\n**Hand-off** to [Whose Money Is It? Licences, Safeguarding and Where Funds Sit](licences-and-safeguarding.html): `elaboration`: Reconciliation as the comparison of the provider's ledger with a bank's record of the same money. → Whose bank account that is and who is allowed to hold it: the license that decides which accounts must exist and turns the comparison into a legal requirement.\n\n| Id | Function | Controlling idea | Evidence | Transition in |\n| --- | --- | --- | --- | --- |\n| p44 | synthesis (list) | Established: a balanced ledger is not proof until it is matched to outside records; both providers publish itemized reports for that purpose, by payout at Stripe and by batch at Adyen; and both say that reports and notifications run on different schedules. |  |  |\n| p45 | synthesis (list) | Depends on context: whether a file-based or a warehouse-based close is right, how long an open item may age, and whether a daily close is worth its cost. |  | `contrast`: What the documentation and the engineering posts establish. → What changes with volume, the number of providers and the provider's own timing. |\n| p46 | recommendation (list) | The author's synthesis: the report is the provider's reconciliation passed down one level, so book from it, and treat the open-items list, not the tied total, as the output of a close. |  | `additional_support`: What is established and what depends. → The author's own position. |\n| p47 | recommendation (list) | Eight questions let the reader test a close or a provider's reporting in a design review. |  | `sequence`: The author's position. → Questions that apply it. |\n| p48 | transition | Reconciliation compares the provider's ledger with a bank's record; the next chapter asks whose bank account that is, who may hold it, and why the law makes the comparison a duty. |  | `elaboration`: The comparison of ledger and bank account. → The license behind the account. |\n\n## Non-goals\n\n- How a customer posts provider reports to its general ledger and ERP: clearing accounts on the customer's side, the three-way match of order, payment and bank. See [Payments-to-Ledger: Draining the Suspense Swamp](../finance-systems-architecture/payments-to-ledger.html), [Reconciled by Design: Traceability and Audit Across Boundaries](../finance-systems-architecture/traceability-and-reconciliation.html).\n- Ledger design: double entry, immutability, clearing accounts. See [The Book of Record: How Payment Companies Build Ledgers](payment-ledgers.html).\n- Balance states, reserves, pre-financing and who carries its risk. See [Pending, Available, Reserved: Balances and Funds Flows](balances-and-funds-flows.html).\n- Payout rails, payout states and returns. See [Getting Money Out: Payouts and Money Movement](payouts-and-money-movement.html).\n- The webhook receiver's contract: verify, persist, deduplicate, confirm, sweep. See [The Provider Calls You: Webhooks and Events](payment-webhooks-and-events.html).\n- Safeguarding reconciliation as a legal duty. See [Whose Money Is It? Licences, Safeguarding and Where Funds Sit](licences-and-safeguarding.html).\n- Reconciliation across providers as a cost of orchestration. See [More Than One Provider: Routing and Orchestration](payment-routing-and-orchestration.html).\n- Per-seller reporting to connected accounts and sub-merchants. See [Dividing the Money: Splits, Platform Balances and Seller Payouts](splits-balances-and-platform-payouts.html).\n\n## Modalities\n\nArticle only.\n\n## Open questions\n\n- File formats, matching rules, match rates and exception volumes of either provider's reconciliation against networks and banks are not public.\n- No published completion time was found for any Adyen report.\n- Whether Adyen's 2021 two-step matching design is current is unknown; no newer engineering source was found.\n- Whether Adyen offers a documented SQL or warehouse-delivery product comparable to Sigma or Data Pipeline was not established; the chapter says only that none was found documented.\n- The meaning of Stripe's balance transaction type payment_unreconciled is not explained on the object page; the chapter does not use it.\n\n## Decision log\n\n- **2026-11-17** — Network clearing-file formats and scheme reconciliation programs are described only as industry practice in one table; no network documentation was in the research base for this page. Rejected: Describing Visa or Mastercard clearing and settlement report formats from memory.\n- **2026-11-17** — The worked close uses Mila's class pass on Adyen and the ledger's 'had Studio Noord been on Stripe' device; open items in the example are local illustrative details, labeled as assumptions. Rejected: A full numeric tie-out of a studio's batch, which would need invented volumes and provider mechanics the documentation read for this page does not fix.\n- **2026-11-17** — Stripe's payment_unreconciled balance transaction type is left out because its meaning is undocumented. Rejected: Interpreting it as evidence of Stripe's internal reconciliation.\n- **2026-11-17** — Flow rubric notes not acted on, left for the author: move the comparison section before the three designs; move the customer-report evidence of Adyen's Settled/SettledReversed records from the provider section to the reports section; align the opening hook (returned payout) more closely with the scene (the €412,000). The note that the report-available signals should be named before they are relied on is already met: paragraphs p20 and p23 name them. Rejected: Reordering sections after a 'sound with notes' verdict without the author's decision.\n\n## Sources\n\n- **Internal**\n  - PLAN.md, chapter contract 15 — Scope, owned terms, Larkfield thread, links to RECONCILED.\n  - _research/brief-ledgers-and-money-movement.md, Part 4 and sections 1.1, 1.3, 2.4, 2.5, 2.7 — Verified quotations and the list of what is not public.\n  - _research/scenario-ledger.md — Mila's class pass, the Unexplained €0.4 Million, the Payout That Bounced, Keel K2 and K3, the systems landscape, the cast.\n- **External**\n  - https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement (2024-02-16) — Stripe's account of reconciliation inside fund flows, aging and ownership.\n  - https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2 (2021-08-23) — Adyen's two-step matching of partner files.\n  - docs.stripe.com: reports/payout-reconciliation, reports/balance, reports/options, reports/v1-api, payouts/reconciliation, stripe-data pages, bank-reconciliation, treasury (n.d., accessed 2026-11) — Stripe's customer-facing reports, timing and data products.\n  - docs.adyen.com: settlement details report, aggregate settlement details report, payment accounting report, getting-paid, sales-day-payout, upgrade-to-sdp, automatically-get-reports, platforms/reports-and-fees, Balance Platform Accounting Report (n.d., accessed 2026-11) — Adyen's customer-facing reports, journal types, timing and platform reports.\n\n## Changelog\n\n- **2026-11-17** — First version, written from the chapter contract, the ledger research brief and the scenario ledger; intent, thesis and role copied from the journal spec.\n- **2026-11-17** — Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes).\n- **2026-11-17** — Verification pass: 78 claims checked (61 confirmed, 11 corrected, 6 hedged, 0 unsupported and removed or relabeled, 0 unreachable); the claim that Adyen publishes no timing figure for any report was corrected (no time from batch close to the settlement details report, but a published 02:00 to 10:00 CET window for scheduled daily reports), and the balance platform's own report-ready webhook (balancePlatform.report.created) and Transfers API were added. Units unchanged. AC-2's 'no duration is published' is left as copied from the journal spec and needs the author's correction there.\n- **2026-11-17** — Journal-spec entry corrected after verification; intent, thesis and role re-synced ('and is generated when the batch closes; no duration is publi' -> 'and is generated when the batch closes; Adyen publishes when').\n- **2026-11-17** — Journal-spec entry corrected after verification; intent, thesis and role re-synced ('Adyen generates its settlement details report when the payab' -> 'Adyen generates its settlement details report when the payab').\n- **2026-11-17** — Reconciliation after verification: journal-spec entry and spec body brought into line with the verified page and consistency rulings (journal entry thesis.claim (ruling 32c) re-synced; journal entry know[2] (ruling 32c) re-synced; ledger K3 wording; ruling 32a; ruling 32b; ruling 32d). No unit added, dropped, merged or reordered.\n- **2026-11-17** — Absence audit: 4 statements of absence re-tested with a wide search (1 overturned, repeated in four places; 0 narrowed; 3 hold; table in _research/absence-audit/15-payment-reconciliation-and-reporting.md). Overturned: Adyen's 'Time zone setting' page says the settlement details report is expected 'within 3 hours after the batch closes'. p23's controlling idea and evidence, the comparison-table evidence and the late-report evidence updated. thesis.how_why ('no duration from batch close') and AC-2 are journal-spec-locked and now false; reported to the author. Consistency ruling 32(a) needs the same correction.\n- **2026-11-17** — Journal-spec entry corrected after verification; intent, thesis and role re-synced ('publishes a daily window for scheduled reports but no durati' -> 'says to expect it within 3 hours after the batch closes and ').\n- **2026-11-17** — Journal-spec entry corrected after verification; intent, thesis and role re-synced ('Adyen publishes when scheduled daily reports are generated (' -> 'Adyen says to expect it within 3 hours after the batch close').\n- **2026-11-24** — Sweep of rulings 46-48: thesis how_why and the expected answer of acceptance criterion 2 now give Adyen's 'within 3 hours after the batch closes' (Time zone setting page) in place of 'no duration from batch close' (ruling 47f). Prose unchanged.\n- **2026-11-17** — Visual layer: 3 figures generated and inspected (article-illustrator).\n"}]}]}</script>
+<script>
+    (function () {
+        const data = JSON.parse(document.getElementById('data').textContent);
+        const root = document.getElementById('content');
+
+        const postId = (data.meta && data.meta.id) ? String(data.meta.id) : '';
+        const postStatusRaw = (data.meta && data.meta.status) ? String(data.meta.status) : '';
+        if (postId || postStatusRaw) {
+            const header = document.getElementById('post-header');
+            let sectionEl = header.querySelector('p.section');
+            if (!sectionEl) {
+                sectionEl = document.createElement('p');
+                sectionEl.className = 'section';
+                header.insertBefore(sectionEl, header.firstChild);
+            }
+            // Status pill goes first, then a " / " separator before the existing
+            // content (section name and/or id).
+            if (postStatusRaw) {
+                const parts = postStatusRaw.split(':');
+                const statusName = parts[0].trim();
+                const statusColor = (parts[1] || '').trim();
+                const wrap = document.createElement('span');
+                wrap.className = 'post-status';
+                const dot = document.createElement('span');
+                dot.className = 'status-dot';
+                if (statusColor) dot.style.background = statusColor;
+                wrap.appendChild(dot);
+                wrap.appendChild(document.createTextNode(statusName));
+                if (sectionEl.firstChild) {
+                    sectionEl.insertBefore(document.createTextNode(' • '), sectionEl.firstChild);
+                    sectionEl.insertBefore(wrap, sectionEl.firstChild);
+                } else {
+                    sectionEl.appendChild(wrap);
+                }
+            }
+            if (postId) {
+                if (sectionEl.firstChild) sectionEl.appendChild(document.createTextNode(' • '));
+                sectionEl.appendChild(document.createTextNode(postId));
+            }
+        }
+
+        const tagsHost = document.getElementById('tags');
+        (data.tags || []).forEach(function (t) {
+            const span = document.createElement('span');
+            span.className = 'tag';
+            span.textContent = t;
+            tagsHost.appendChild(span);
+        });
+
+        // Minimal markdown renderer. Supports: ATX headings, paragraphs, blockquotes,
+        // unordered/ordered lists, fenced code, inline code, bold/italic/strikethrough, links, images, hr.
+        // Sufficient for the posts in this repo; replace with a fuller parser if needed.
+        function renderMarkdown(src) {
+            const lines = src.replace(/\r\n/g, '\n').split('\n');
+            const out = [];
+            let i = 0;
+
+            const bullet = /^(\s*)([-*])\s+(.*)$/;
+            const ordered = /^(\s*)(\d+)\.\s+(.*)$/;
+            const tableRow = /^\s*\|(.+)\|\s*$/;
+            const tableSep = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/;
+
+            function splitRow(s) {
+                let t = s.trim();
+                if (t.startsWith('|')) t = t.slice(1);
+                if (t.endsWith('|')) t = t.slice(0, -1);
+                return t.split('|').map(c => c.trim());
+            }
+
+            function inline(s) {
+                // Posts are trusted content, so raw HTML passes through unescaped
+                // (some posts embed inline <blockquote>, <div>, etc.).
+                // Stray ampersands still get fixed up.
+                s = s.replace(/&(?![a-zA-Z]+;|#\d+;)/g, '&amp;');
+                s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<a class="image-link" href="$2" target="_blank" rel="noopener noreferrer"><img alt="$1" src="$2"></a>');
+                s = s.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+                s = s.replace(/`([^`]+)`/g, function (_, c) {
+                    return '<code>' + c.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</code>';
+                });
+                // Bold/italic, including nested combinations: ***x***,
+                // **a *b*** / ***a* b** (shared delimiters), and **a *b* c**.
+                s = s.replace(/\*\*\*([^*\n]+)\*\*\*/g, '<strong><em>$1</em></strong>');
+                s = s.replace(/\*\*([^*\n]+)\*([^*\n]+)\*\*\*/g, '<strong>$1<em>$2</em></strong>');
+                s = s.replace(/\*\*\*([^*\n]+)\*([^*\n]+)\*\*/g, '<strong><em>$1</em>$2</strong>');
+                s = s.replace(/\*\*((?:[^*\n]|\*(?!\*)[^*\n]+\*(?!\*))+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+                s = s.replace(/~~([^~\n]+)~~/g, '<del>$1</del>');
+                s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>');
+                return s;
+            }
+
+            while (i < lines.length) {
+                const line = lines[i];
+                if (!line.trim()) {
+                    i++;
+                    continue;
+                }
+
+                const fence = line.match(/^```(\w*)\s*$/);
+                if (fence) {
+                    i++;
+                    const buf = [];
+                    while (i < lines.length && !/^```\s*$/.test(lines[i])) {
+                        buf.push(lines[i]);
+                        i++;
+                    }
+                    i++;
+                    const escaped = buf.join('\n').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const cls = fence[1] ? ' class="lang-' + fence[1] + '"' : '';
+                    out.push('<pre><code' + cls + '>' + escaped + '</code></pre>');
+                    continue;
+                }
+
+                const h = line.match(/^(#{1,6})\s+(.*)$/);
+                if (h) {
+                    out.push('<h' + h[1].length + '>' + inline(h[2]) + '</h' + h[1].length + '>');
+                    i++;
+                    continue;
+                }
+
+                if (/^\s*(?:-\s*){3,}\s*$/.test(line) || /^\s*\*{3,}\s*$/.test(line)) {
+                    out.push('<hr>');
+                    i++;
+                    continue;
+                }
+
+                if (/^>\s?/.test(line)) {
+                    const buf = [];
+                    while (i < lines.length && /^>\s?/.test(lines[i])) {
+                        buf.push(lines[i].replace(/^>\s?/, ''));
+                        i++;
+                    }
+                    out.push('<blockquote>' + renderMarkdown(buf.join('\n')) + '</blockquote>');
+                    continue;
+                }
+
+                if (tableRow.test(line) && i + 1 < lines.length && tableSep.test(lines[i + 1])) {
+                    const headers = splitRow(line);
+                    const aligns = splitRow(lines[i + 1]).map(function (c) {
+                        c = c.trim();
+                        const left = c.startsWith(':'), right = c.endsWith(':');
+                        return left && right ? 'center' : right ? 'num' : '';
+                    });
+                    const cellOpen = function (tag, idx) {
+                        return aligns[idx] ? '<' + tag + ' class="' + aligns[idx] + '">' : '<' + tag + '>';
+                    };
+                    i += 2;
+                    const rows = [];
+                    while (i < lines.length && tableRow.test(lines[i])) {
+                        rows.push(splitRow(lines[i]));
+                        i++;
+                    }
+                    let html = '<div class="table-wrap"><table><thead><tr>';
+                    headers.forEach((h, idx) => {
+                        html += cellOpen('th', idx) + inline(h) + '</th>';
+                    });
+                    html += '</tr></thead><tbody>';
+                    rows.forEach(r => {
+                        html += '<tr>';
+                        r.forEach((c, idx) => {
+                            html += cellOpen('td', idx) + inline(c) + '</td>';
+                        });
+                        html += '</tr>';
+                    });
+                    html += '</tbody></table></div>';
+                    out.push(html);
+                    continue;
+                }
+
+                if (bullet.test(line) || ordered.test(line)) {
+                    // Indent of the first bullet defines this list's base level.
+                    // Deeper-indented bullets become nested lists (rendered by
+                    // recursing into renderMarkdown). Same-or-less indent at a
+                    // bullet starts a sibling item (or ends the list).
+                    const firstMatch = line.match(bullet) || line.match(ordered);
+                    const baseIndent = firstMatch[1].length;
+                    const isOrdered = ordered.test(line);
+                    const items = [];
+                    let hasTask = false;
+                    while (i < lines.length) {
+                        const cur = lines[i];
+                        if (!cur.trim()) {
+                            // blank line breaks the list (matches CommonMark-ish behaviour)
+                            i++;
+                            break;
+                        }
+                        const mBul = cur.match(bullet);
+                        const mOrd = cur.match(ordered);
+                        const m = mBul || mOrd;
+                        if (!m) break;
+                        if (m[1].length < baseIndent) break;
+                        if (m[1].length > baseIndent) break; // shouldn't happen at top of loop
+                        // Same-type check: switching between -/* and 1. closes the list
+                        if (isOrdered !== !!mOrd) break;
+
+                        const itemBuf = [m[3]];
+                        const nestedBuf = [];
+                        i++;
+                        while (i < lines.length) {
+                            const nxt = lines[i];
+                            if (!nxt.trim()) break;
+                            const nBul = nxt.match(bullet);
+                            const nOrd = nxt.match(ordered);
+                            const nm = nBul || nOrd;
+                            if (nm) {
+                                if (nm[1].length > baseIndent) {
+                                    // nested list line — dedent and stash
+                                    nestedBuf.push(nxt.slice(baseIndent + 2));
+                                    i++;
+                                    continue;
+                                }
+                                // sibling or end of list
+                                break;
+                            }
+                            // Plain continuation text
+                            if (nestedBuf.length) {
+                                // continuation inside the nested block
+                                nestedBuf.push(nxt.slice(baseIndent + 2));
+                            } else {
+                                itemBuf.push(nxt.trim());
+                            }
+                            i++;
+                        }
+
+                        // GitHub-style task items: "- [ ] text" / "- [x] text"
+                        // render as (clickable, unpersisted) checkboxes.
+                        const itemText = itemBuf.join('\n');
+                        const task = !isOrdered && itemText.match(/^\[( |x|X)\]\s+/);
+                        let liHtml = inline(task ? itemText.slice(task[0].length) : itemText);
+                        if (task) {
+                            hasTask = true;
+                            liHtml = '<input type="checkbox"' + (task[1] === ' ' ? '' : ' checked') + '>' + liHtml;
+                        }
+                        if (nestedBuf.length) {
+                            liHtml += renderMarkdown(nestedBuf.join('\n'));
+                        }
+                        items.push(task ? '<li class="task">' + liHtml + '</li>' : '<li>' + liHtml + '</li>');
+                    }
+                    out.push((isOrdered ? '<ol>' : (hasTask ? '<ul class="task-list">' : '<ul>')) + items.join('') + (isOrdered ? '</ol>' : '</ul>'));
+                    continue;
+                }
+
+                const buf = [line];
+                i++;
+                while (i < lines.length && lines[i].trim() && !/^#{1,6}\s/.test(lines[i]) && !/^>\s?/.test(lines[i]) && !bullet.test(lines[i]) && !ordered.test(lines[i]) && !/^```/.test(lines[i]) && !tableRow.test(lines[i])) {
+                    buf.push(lines[i]);
+                    i++;
+                }
+                out.push('<p>' + inline(buf.join(' ')) + '</p>');
+            }
+            return out.join('\n');
+        }
+
+        // Block dispatcher. New block types plug in here.
+        const renderers = {
+            markdown: function (block) {
+                const div = document.createElement('div');
+                div.innerHTML = renderMarkdown(block.content);
+                return div;
+            },
+            mermaid: function (block) {
+                // Mermaid scans elements with class "mermaid" whose textContent
+                // is the diagram source. We collect these nodes and run
+                // mermaid.run() once after all blocks are in the DOM.
+                const div = document.createElement('div');
+                div.className = 'mermaid';
+                div.textContent = block.content;
+                return div;
+            },
+            'force-graph': function (block) {
+                // build.py emits parsed JSON: {nodes:[{id,size}], links:[{source,target}]}.
+                // We instantiate force-graph after the container is in the DOM
+                // so it can measure its own width.
+                const div = document.createElement('div');
+                div.className = 'force-graph';
+                const data = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.ForceGraph) return;
+                    const maxSize = data.nodes.reduce((m, n) => Math.max(m, n.size || 1), 1);
+                    window.ForceGraph()(div)
+                        .graphData(data)
+                        .width(div.clientWidth)
+                        .height(div.clientHeight)
+                        .nodeRelSize(4)
+                        .nodeVal(n => Math.max(20 * (n.size || 1) / maxSize, 0.001))
+                        .nodeLabel(n => n.id + ' (' + (n.size || 1) + ')')
+                        .nodeColor(() => 'rgba(135, 206, 235, 0.7)')
+                        .linkColor(() => 'rgba(60, 60, 60, 0.4)')
+                        .linkDirectionalArrowLength(4)
+                        .linkDirectionalArrowRelPos(1)
+                        .linkWidth(1);
+                });
+                return div;
+            },
+            'bubble-chart': function (block) {
+                // build.py emits {nodes:[{name,size}]}. Renders a D3 circle-pack
+                // SVG (same shape as the obren.io reference, just inline).
+                const wrap = document.createElement('div');
+                wrap.className = 'bubble-chart';
+                const payload = JSON.parse(block.content);
+                requestAnimationFrame(function () {
+                    if (!window.d3) return;
+                    const diameter = 480;
+                    const fill = '#c0deed';
+                    const textColor = '#111111';
+                    const fontSize = 12;
+
+                    const svg = window.d3.select(wrap).append('svg')
+                        .attr('viewBox', '0 0 ' + diameter + ' ' + diameter)
+                        .attr('width', diameter)
+                        .attr('height', diameter);
+
+                    const root = window.d3.hierarchy({children: payload.nodes})
+                        .sum(d => d.size || 0)
+                        .sort((a, b) => b.value - a.value);
+
+                    window.d3.pack().size([diameter, diameter]).padding(2)(root);
+
+                    const node = svg.selectAll('g')
+                        .data(root.leaves())
+                        .enter().append('g')
+                        .attr('transform', d => 'translate(' + d.x + ',' + d.y + ')');
+
+                    node.append('title').text(d => d.data.name + ': ' + d.value);
+                    node.append('circle').attr('r', d => d.r).style('fill', fill);
+                    node.append('text')
+                        .attr('dy', '.3em')
+                        .style('text-anchor', 'middle')
+                        .style('fill', textColor)
+                        .style('font-size', fontSize + 'px')
+                        .text(d => d.data.name.substring(0, Math.max(0, Math.floor(d.r / 3))));
+                });
+                return wrap;
+            }
+        };
+
+        // Render one modality's blocks into a host element. Mermaid runs
+        // scoped to just the nodes created here, so lazily rendered tabs get
+        // their diagrams on first activation.
+        let mermaidInitialized = false;
+        function renderBlocksInto(blocks, host) {
+            const mermaidNodes = [];
+            blocks.forEach(function (block) {
+                const r = renderers[block.type];
+                if (!r) {
+                    const pre = document.createElement('pre');
+                    pre.textContent = '[unknown block type: ' + block.type + ']';
+                    host.appendChild(pre);
+                    return;
+                }
+                const node = r(block);
+                if (node instanceof Node) {
+                    host.appendChild(node);
+                    if (block.type === 'mermaid') mermaidNodes.push(node);
+                }
+            });
+            if (mermaidNodes.length && window.mermaid) {
+                if (!mermaidInitialized) {
+                    window.mermaid.initialize({startOnLoad: false, theme: 'default'});
+                    mermaidInitialized = true;
+                }
+                window.mermaid.run({nodes: mermaidNodes});
+            }
+            markScrollableTables(host);
+        }
+
+        // A table wider than its wrapper scrolls sideways. Mark those wrappers
+        // so the CSS can show a cue, and make them focusable so keyboard users
+        // can reach and scroll them. Hidden panes measure 0 and are re-marked
+        // when activated or when the window is resized.
+        function markScrollableTables(host) {
+            host.querySelectorAll('.table-wrap').forEach(function (wrap) {
+                const scrolls = wrap.scrollWidth > wrap.clientWidth + 1;
+                wrap.classList.toggle('is-scrollable', scrolls);
+                if (scrolls) {
+                    wrap.setAttribute('tabindex', '0');
+                    wrap.setAttribute('role', 'region');
+                    wrap.setAttribute('aria-label', 'Table that scrolls sideways');
+                } else {
+                    wrap.removeAttribute('tabindex');
+                    wrap.removeAttribute('role');
+                    wrap.removeAttribute('aria-label');
+                }
+            });
+        }
+
+        // Modality tabs. One <article class="pane"> per modality; panes are
+        // rendered lazily on first activation (force-graph / D3 / mermaid
+        // need a visible, measurable container). With a single modality the
+        // tab bar stays hidden and the page looks exactly like before.
+        const mods = data.modalities;
+        const tabBar = document.getElementById('modality-tabs');
+        const panes = {};
+        const tabButtons = {};
+        const renderedPanes = {};
+
+        // With several modalities each pane is a tabpanel labelled by its
+        // tab (W3C APG tabs pattern); tabindex=0 lets keyboard users move
+        // from the tab list straight into the active content.
+        mods.forEach(function (m) {
+            const pane = document.createElement('article');
+            pane.className = 'pane';
+            pane.dataset.key = m.key;
+            pane.hidden = true;
+            if (mods.length > 1) {
+                pane.id = 'pane-' + m.key;
+                pane.setAttribute('role', 'tabpanel');
+                pane.setAttribute('aria-labelledby', 'tab-' + m.key);
+                pane.setAttribute('tabindex', '0');
+            }
+            root.appendChild(pane);
+            panes[m.key] = pane;
+        });
+
+        const defaultKey = mods.some(m => m.key === 'index') ? 'index' : mods[0].key;
+
+        function activate(key, updateHash) {
+            mods.forEach(function (m) {
+                const isActive = m.key === key;
+                panes[m.key].hidden = !isActive;
+                if (tabButtons[m.key]) {
+                    tabButtons[m.key].classList.toggle('active', isActive);
+                    tabButtons[m.key].setAttribute('aria-selected', isActive ? 'true' : 'false');
+                    // Roving tabindex: only the selected tab is in the Tab
+                    // order; the arrow keys move between tabs.
+                    tabButtons[m.key].setAttribute('tabindex', isActive ? '0' : '-1');
+                }
+            });
+            // Unhide first, then render: the chart libraries measure widths.
+            if (!renderedPanes[key]) {
+                renderBlocksInto(mods.find(m => m.key === key).blocks, panes[key]);
+                renderedPanes[key] = true;
+            } else {
+                markScrollableTables(panes[key]);
+            }
+            if (updateHash) {
+                history.replaceState(null, '',
+                    key === defaultKey ? location.pathname + location.search : '#' + key);
+            }
+        }
+
+        if (mods.length > 1) {
+            mods.forEach(function (m) {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.textContent = m.label;
+                btn.id = 'tab-' + m.key;
+                btn.dataset.key = m.key;
+                btn.setAttribute('role', 'tab');
+                btn.setAttribute('aria-controls', 'pane-' + m.key);
+                btn.addEventListener('click', function () { activate(m.key, true); });
+                tabBar.appendChild(btn);
+                tabButtons[m.key] = btn;
+            });
+            // Keyboard support per the W3C APG tabs pattern (automatic
+            // activation): Left/Right move between tabs and wrap, Home/End
+            // jump to the first/last tab, and the focused tab is selected.
+            tabBar.addEventListener('keydown', function (ev) {
+                const keys = mods.map(function (m) { return m.key; });
+                const focused = document.activeElement;
+                const current = focused && focused.dataset ? keys.indexOf(focused.dataset.key) : -1;
+                if (current < 0) return;
+                let next = null;
+                if (ev.key === 'ArrowRight') next = (current + 1) % keys.length;
+                else if (ev.key === 'ArrowLeft') next = (current - 1 + keys.length) % keys.length;
+                else if (ev.key === 'Home') next = 0;
+                else if (ev.key === 'End') next = keys.length - 1;
+                if (next === null) return;
+                ev.preventDefault();
+                activate(keys[next], true);
+                tabButtons[keys[next]].focus();
+            });
+            tabBar.hidden = false;
+        }
+
+        // The hash selects a tab only when it matches a modality key, so
+        // existing anchors keep working.
+        const initialHash = location.hash.slice(1);
+        activate(mods.some(m => m.key === initialHash) ? initialHash : defaultKey, false);
+        window.addEventListener('hashchange', function () {
+            const k = location.hash.slice(1);
+            if (mods.some(m => m.key === k)) activate(k, false);
+        });
+        window.addEventListener('resize', function () { markScrollableTables(root); });
+    })();
+</script>
+</body>
+</html>

@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SETTLED: Architecting Payments and Revenue Infrastructure</title>
+    <meta name="description" content="How payment and revenue infrastructure is actually built: how a payment is authorized, cleared, settled, recorded, paid out and disputed; how the APIs, ledgers, vaults, risk systems and billing engines behind it work; and where Stripe and Adyen made different architectural bets, and why. Written for engineers and architects new to payments, with a fictional running example and dated public evidence. This is a living journal and a work in progress: I revise it as I learn more through my work.">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="SETTLED: Architecting Payments and Revenue Infrastructure">
+    <meta property="og:title" content="SETTLED: Architecting Payments and Revenue Infrastructure">
+    <meta property="og:description" content="How payment and revenue infrastructure is actually built: how a payment is authorized, cleared, settled, recorded, paid out and disputed; how the APIs, ledgers, vaults, risk systems and billing engines behind it work; and where Stripe and Adyen made different architectural bets, and why. Written for engineers and architects new to payments, with a fictional running example and dated public evidence. This is a living journal and a work in progress: I revise it as I learn more through my work.">
+    <meta property="og:url" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/">
+    <meta property="og:image" content="https://zeljkoobrenovic.github.io/book-factory/payments-platform-architecture/assets/images/ccfb-finance-4858797.jpg">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="stylesheet" href="site.css">
+    <!-- Global site tag (gtag.js) - Google Analytics -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=UA-129891352-1"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+
+    function gtag() {
+        dataLayer.push(arguments);
+    }
+
+    gtag('js', new Date());
+
+    gtag('config', 'UA-129891352-1');
+</script>
+    <style>
+        header.site {
+            padding-bottom: 4px;
+            margin-bottom: 2px;
+        }
+
+        header.site .logo {
+            display: block;
+            width: 100%;
+            max-height: 380px;
+            object-fit: cover;
+            margin-bottom: 0;
+            border: 1px solid var(--rule);
+        }
+
+        header.site .logo-credit {
+            color: var(--muted);
+            font-size: 11px;
+            margin: 0;
+            padding-left: 2px;
+            text-align: right;
+        }
+
+        header.site h1 {
+            margin-top: 20px;
+            margin-bottom: 8px;
+            padding: 0;
+            font-size: 51px;
+            font-weight: 500;
+            letter-spacing: -0.01em;
+            line-height: normal;
+        }
+
+        header.site p {
+            margin: 0;
+            color: var(--muted);
+        }
+
+        .book-edition {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0 40px;
+            padding: 4px;
+        }
+
+        .book-edition[hidden] {
+            display: none;
+        }
+
+        .book-edition .book-cover {
+            display: block;
+            flex: 0 0 100px;
+        }
+
+        .book-edition .book-cover img {
+            display: block;
+            width: 100px;
+            height: auto;
+            border-radius: 4px;
+        }
+
+        .book-edition .book-details {
+            flex: 1 1 180px;
+            min-width: 0;
+        }
+
+        .book-edition h2 {
+            margin: 0 0 0px;
+            font-size: 24px;
+            font-weight: 500;
+        }
+
+        .book-edition .book-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .book-edition .book-links a {
+            padding: 8px 14px;
+            border: 1px solid var(--accent);
+            border-radius: 6px;
+            color: var(--accent);
+            background: #fff;
+            font-size: 15px;
+            text-decoration: none;
+        }
+
+        .book-edition .book-links a:hover {
+            color: #fff;
+            background: var(--accent);
+        }
+
+        .book-edition a:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 4px;
+        }
+
+        .search {
+            margin: 0 0 38px;
+        }
+
+        .search input {
+            width: 100%;
+            padding: 12px 14px;
+            font-size: 16px;
+            border: 1px solid var(--rule);
+            border-radius: 6px;
+            background: #fff;
+            font-family: inherit;
+        }
+
+        .search input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .hits {
+            color: var(--muted);
+            font-size: 13px;
+            margin: 0 4px 20px;
+        }
+
+        .tag-filter {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin: 0 0 24px;
+        }
+
+        .tag-filter button {
+            font: inherit;
+            font-size: 13px;
+            padding: 4px 10px;
+            border: 1px solid deepskyblue;
+            border-radius: 999px;
+            background: #fff;
+            color: var(--fg);
+            cursor: pointer;
+        }
+
+        .tag-filter button:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .tag-filter button.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+
+        .tag-filter button .count {
+            color: var(--muted);
+            margin-left: 4px;
+        }
+
+        .tag-filter button.active .count {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        .tag-filter button.hidden {
+            display: none;
+        }
+
+        .tag-filter .tag-toggle {
+            border-style: dashed;
+            border-color: var(--muted);
+            color: var(--muted);
+        }
+
+        .tag-filter .tag-toggle:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .status-filter {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin: 0 0 10px;
+        }
+
+        .status-filter button {
+            font: inherit;
+            font-size: 13px;
+            padding: 4px 10px;
+            border: 1px solid var(--rule);
+            border-radius: 999px;
+            background: #fff;
+            color: var(--fg);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .status-filter button:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .status-filter button.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+
+        .status-filter button .status-dot {
+            display: inline-block;
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        .status-filter button .count {
+            color: var(--muted);
+        }
+
+        .status-filter button.active .count {
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        ul.posts .tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 6px 0 0;
+        }
+
+        ul.posts .tags .tag {
+            font-size: 12px;
+            padding: 1px 8px;
+            border-radius: 999px;
+            border: 1px solid deepskyblue;
+            color: blue;
+            background-color: var(--tag-bg);
+        }
+
+        section.group {
+            margin-bottom: 48px;
+        }
+
+        section.group > h2 {
+            font-size: 32px;
+            margin: 0 0 4px;
+            font-weight: 500;
+            letter-spacing: -0.01em;
+        }
+
+        section.group > .group-desc {
+            color: var(--muted);
+            margin: -8px 0 16px;
+            font-size: 15px;
+        }
+
+        section.group.empty {
+            display: none;
+        }
+
+        ul.posts {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        ul.posts li {
+            display: flex;
+            gap: 14px;
+            padding: 14px 0;
+            border-top: 1px dashed var(--rule);
+        }
+
+        ul.posts li:last-child {
+            border-bottom: 1px solid var(--rule);
+        }
+
+        ul.posts li.hidden {
+            display: none;
+        }
+
+        ul.posts .icon {
+            flex: 0 0 100px;
+            width: 100px;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 7px;
+            border: 1px solid var(--rule);
+        }
+
+        ul.posts .icon img {
+            max-width: 100%;
+            max-height: 100%;
+            border-radius: 10px;
+        }
+
+        ul.posts .icon.placeholder {
+            background: var(--rule);
+            border-radius: 4px;
+        }
+
+        ul.posts .meta {
+            flex: 1;
+            min-width: 0;
+        }
+
+        ul.posts .meta .post-id {
+            color: var(--muted);
+            font-size: 12px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            margin: 0 0 2px;
+        }
+
+        ul.posts .meta .post-status,
+        ul.posts .meta .post-id-text {
+            margin-right: 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        ul.posts .meta .post-status .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        ul.posts .meta .post-id .post-id-sep {
+            margin-right: 8px;
+            color: var(--rule);
+        }
+
+        ul.posts .meta a {
+            color: rgb(23, 86, 169);
+            text-decoration: none;
+            font-weight: normal;
+            font-size: 23px;
+        }
+
+        ul.posts .meta a:hover {
+            color: var(--accent);
+        }
+
+        ul.posts .meta .excerpt {
+            color: var(--muted);
+            margin: 0;
+            font-size: 15px;
+        }
+
+        .empty-msg {
+            color: var(--muted);
+            font-style: italic;
+            display: none;
+        }
+
+        .empty-msg.show {
+            display: block;
+        }
+
+        nav.view-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 1px solid var(--rule);
+            margin: 0 0 24px;
+            flex-wrap: wrap;
+        }
+
+        nav.view-tabs button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font: inherit;
+            font-size: 14px;
+            color: var(--muted);
+            padding: 8px 14px;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -1px;
+            letter-spacing: 0.02em;
+        }
+
+        nav.view-tabs button:hover {
+            color: var(--accent);
+        }
+
+        nav.view-tabs button.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        #visual[hidden] {
+            display: none;
+        }
+
+        .visual-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 18px;
+            margin: 0 0 8px;
+        }
+
+        .visual-card {
+            display: block;
+            text-decoration: none;
+            color: var(--fg);
+        }
+
+        .visual-card.hidden {
+            display: none;
+        }
+
+        .visual-card img {
+            display: block;
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            object-fit: cover;
+            border: 1px solid var(--rule);
+            border-radius: 8px;
+        }
+
+        .visual-toolbar {
+            display: flex;
+            justify-content: flex-end;
+            margin: 0 0 18px;
+        }
+
+        .visual-toolbar button {
+            font: inherit;
+            font-size: 13px;
+            padding: 4px 12px;
+            border: 1px solid var(--rule);
+            border-radius: 999px;
+            background: #fff;
+            color: var(--fg);
+            cursor: pointer;
+        }
+
+        .visual-toolbar button:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .visual-toolbar button.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: #fff;
+        }
+
+        /* Expanded mode: one full-width image per row, uncropped; the image
+           links to the image file itself, the title links to the article. */
+        #visual.expanded .visual-grid {
+            grid-template-columns: 1fr;
+            gap: 32px;
+        }
+
+        #visual.expanded .visual-card img {
+            aspect-ratio: auto;
+            object-fit: contain;
+            max-width: 100%;
+        }
+
+        #visual.expanded .visual-card .visual-title {
+            font-size: 18px;
+        }
+
+        .visual-card .no-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            background: var(--tag-bg, #f2f2f2);
+            border: 1px dashed var(--rule);
+            border-radius: 8px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .visual-card .visual-title {
+            margin: 8px 2px 0;
+            font-size: 15px;
+            line-height: 1.35;
+            color: rgb(23, 86, 169);
+        }
+
+        .visual-card:hover .visual-title {
+            color: var(--accent);
+        }
+    </style>
+</head>
+<body>
+<main>
+    <header class="site">
+        <a href="assets/images/ccfb-finance-4858797.jpg" target="_blank" rel="noopener noreferrer" aria-label="Open header illustration at full size"><img class="logo" src="assets/images/ccfb-finance-4858797.jpg" alt=""></a>
+        <p class="logo-credit">Image by Credit Commerce from Pixabay</p>
+        <div style="padding: 4px;">
+            <h1>SETTLED: Architecting Payments and Revenue Infrastructure</h1>
+            <p>How payment and revenue infrastructure is actually built: how a payment is authorized, cleared, settled, recorded, paid out and disputed; how the APIs, ledgers, vaults, risk systems and billing engines behind it work; and where Stripe and Adyen made different architectural bets, and why. Written for engineers and architects new to payments, with a fictional running example and dated public evidence. This is a living journal and a work in progress: I revise it as I learn more through <a href="https://obren.io">my work</a>.</p>
+        </div>
+    </header>
+
+    <div style="padding: 4px;">
+        <section class="book-edition" id="book-edition" aria-label="Book edition" hidden></section>
+        <nav class="view-tabs" id="view-tabs" role="tablist">
+            <button type="button" id="tab-list" class="active" role="tab" aria-selected="true">Articles</button>
+            <button type="button" id="tab-visual" role="tab" aria-selected="false">Visual Overview</button>
+        </nav>
+        <div class="status-filter" id="status-filter"></div>
+        <div class="tag-filter" id="tag-filter"></div>
+        <div class="search">
+            <input id="q" type="search" placeholder="Search..." autocomplete="off" style="width: calc(100% - 150px)">
+            <span class="hits" id="hits"></span>
+        </div>
+
+        <div id="sections"></div>
+        <div id="visual" hidden></div>
+        <p class="empty-msg" id="empty">No posts match your search.</p>
+    </div>
+</main>
+
+<script id="data" type="application/json">{"sections": [{"title": "Preface", "description": "", "posts": [{"id": "", "status": "", "title": "Introduction: Why Payment Infrastructure Is Hard", "excerpt": "What does this book argue, who is it for, and how should its evidence about Stripe and Adyen be read? It argues that the answer a payment API returns in two seconds is the first of several promises kept over days, and it states about the two companies only what a dated public source says.", "url": "introduction.html", "icon": "assets/icons/introduction.png", "logo": "assets/images/introduction/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "From Cash to Code: How Paying Got This Complicated", "excerpt": "How did paying, once settled on the spot with a coin, come to involve so many parties, records and delays? One good bargain at a time: each new way of paying let someone buy or sell who could not before, at the price of a promise and a wait for the money, and none was ever retired.", "url": "how-payments-got-complicated.html", "icon": "assets/icons/how-payments-got-complicated.png", "logo": "assets/images/how-payments-got-complicated/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Paid Twice, Paid Never: Sixteen Ways Payment Systems Go Wrong", "excerpt": "Payment systems rarely fail through one bug or one provider outage; they charge twice, lose payouts and freeze sellers through recurring patterns that each began as a reasonable shortcut. This guide names sixteen of them in four families, each with its warning sign, mechanism, cost, an example from the book's fictional platform, a remedy direction and the chapters that address it.", "url": "where-payment-systems-go-wrong.html", "icon": "assets/icons/where-payment-systems-go-wrong.png", "logo": "assets/images/where-payment-systems-go-wrong/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Meet Larkfield", "excerpt": "Every chapter in this book tests its argument against the same fictional platform: Larkfield, a Rotterdam software company whose 6,200 fitness and wellness studios took €1.12 billion from their members in 2026 through two providers, Stripe and Adyen. This page introduces its business, its nine systems, its people, the eight incidents the chapters reuse, the Keel program that answers them, and the €120 class pass the whole book follows.", "url": "meet-larkfield.html", "icon": "assets/icons/meet-larkfield.png", "logo": "assets/images/meet-larkfield/logo.jpeg", "tags": []}]}, {"title": "Part I — MONEY: How a Payment Actually Moves", "description": "The payment before the software: who takes part, what an authorization promises, how clearing and settlement move the money days later, how it flows backward through refunds and disputes, and who earns what on the way.", "posts": [{"id": "", "status": "", "title": "Part I — MONEY: How a Payment Actually Moves", "excerpt": "What happens between the moment an app says “Payment successful” and the moment the merchant has money it can keep? A chain of separate promises by different parties on different clocks, none of which makes the payment final, and a fee divided among the same parties.", "url": "part-1.html", "icon": "assets/icons/part-1-intro.png", "logo": "assets/images/part-1-intro/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Follow the Money: What Happens Between “Pay” and “Paid”", "excerpt": "What has to happen, and between which parties, before a card payment is money the merchant can keep? Six steps spread over days and at least five parties, and the provider that answers your API call controls none of the three steps that decide the outcome.", "url": "journey-of-a-payment.html", "icon": "assets/icons/01-journey-of-a-payment.png", "logo": "assets/images/01-journey-of-a-payment/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "The First Promise: Authorization", "excerpt": "What does an approved card payment actually promise, and what should you do when the answer never arrives? An approval is the cardholder's bank promising to honor a claim for a limited number of days, with no money moved, and a timeout is an unknown outcome to resolve, never a “no” to retry.", "url": "payment-authorization.html", "icon": "assets/icons/02-authorization.png", "logo": "assets/images/02-authorization/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "The Slow Truth: Capture, Clearing and Settlement", "excerpt": "How does an approved card payment become money, and why does it take days? Through the merchant's claim, the acquirer's clearing record, the network's daily net settlement and the provider's payout, each on its own clock, which is why “settled” means three different things depending on who says it.", "url": "clearing-and-settlement.html", "icon": "assets/icons/03-clearing-and-settlement.png", "logo": "assets/images/03-clearing-and-settlement/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Money Flowing Backward: Refunds, Reversals and Disputes", "excerpt": "How does money go back, who decides, and why can a payment be undone months after it was paid out? By three routes with three owners: the merchant cancels a promise, the merchant sends a second payment that can fail, or the cardholder’s bank takes the money back under the card network’s rules, on a clock that ignores settlement and payout.", "url": "refunds-reversals-and-disputes.html", "icon": "assets/icons/04-refunds-reversals-and-disputes.png", "logo": "assets/images/04-refunds-reversals-and-disputes/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Who Earns What: Interchange, Scheme Fees and Provider Pricing", "excerpt": "Where does the fee on a card payment go, and why should an engineer care how a provider prices it? It is three payments to three parties, and whether a provider blends them into one rate or passes two of them through decides what you can see, who keeps a saving and what the provider has to build.", "url": "payment-economics.html", "icon": "assets/icons/05-payment-economics.png", "logo": "assets/images/05-payment-economics/logo.jpeg", "tags": []}]}, {"title": "Part II — ACCEPTANCE: Getting to Yes", "description": "How a provider reaches the networks and gets a payment approved: acquiring and licenses, local payment methods, the payment state machine, authorization optimization, routing across providers, and the card in the room.", "posts": [{"id": "", "status": "", "title": "Part II — ACCEPTANCE: Getting to Yes", "excerpt": "What decides whether a payment gets to “yes”, and what can a provider or a merchant do about it? Part II argues that an approval is produced in six layers around the issuer's decision, from the acquirer's license to the terminal on the counter, and that the provider and the merchant both help produce it.", "url": "part-2.html", "icon": "assets/icons/part-2-intro.png", "logo": "assets/images/part-2-intro/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Plugging Into the Networks: Acquiring, Licences and Connectivity", "excerpt": "What does it take to connect to the card networks, and what separates Adyen's route to them from Stripe's? A membership only a licensed entity can hold, so every payment has an acquirer of record per country: Adyen holds it through one banking license, Stripe through its own entities in Europe and named banks in the United States.", "url": "acquiring-and-network-connectivity.html", "icon": "assets/icons/06-acquiring-and-network-connectivity.png", "logo": "assets/images/06-acquiring-and-network-connectivity/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "A Payment Is Not a Card: Local Methods and Real-Time Rails", "excerpt": "How does one API accept a hundred payment methods whose rules differ? It unifies how a payment is started and how its status is reported, and it cannot unify what “succeeded” means, so your own system has to carry a rule per method family.", "url": "local-payment-methods.html", "icon": "assets/icons/07-local-payment-methods.png", "logo": "assets/images/07-local-payment-methods/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "One Object, Many Outcomes: The Payment State Machine", "excerpt": "How do you model a payment that can be pending, need a customer action, succeed later, be partly captured and partly refunded? As one long-lived record with explicit states, which Stripe lets you read again as an object and Adyen reports as results, modifications and webhooks, and which your own system mirrors in a small vocabulary it controls.", "url": "payment-state-machines.html", "icon": "assets/icons/08-payment-state-machines.png", "logo": "assets/images/08-payment-state-machines/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Raising the Approval Rate: Retries, Tokens and Optimization", "excerpt": "Why are payments from genuine cardholders with money in the account declined, and what do providers do about it? Each issuer decides alone and mostly gives no reason, and Stripe and Adyen now reformat, retry and block inside the authorization call, so the approval rate is partly their product and its published uplift has to be measured on your own traffic.", "url": "authorization-optimization.html", "icon": "assets/icons/09-authorization-optimization.png", "logo": "assets/images/09-authorization-optimization/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "More Than One Provider: Routing and Orchestration", "excerpt": "When should payments be routed across providers, and what does it cost? Only when each segment has enough payments to measure a difference between routes; otherwise a second provider is a rehearsed failover, and in both cases disputes, settlement, balances and stored cards stay one set per provider.", "url": "payment-routing-and-orchestration.html", "icon": "assets/icons/10-routing-and-orchestration.png", "logo": "assets/images/10-routing-and-orchestration/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "The Card in the Room: Terminals and Unified Commerce", "excerpt": "What changes when the card is physically present, and what does it take to treat a store payment and an online payment as one? A device joins the payment path, with keys, software and liability rules of its own, and “one payment across channels” turns out to be three separate properties that each have to be built and tested.", "url": "in-person-payments.html", "icon": "assets/icons/11-in-person-payments.png", "logo": "assets/images/11-in-person-payments/logo.jpeg", "tags": []}]}, {"title": "Part III — LEDGER: Recording and Moving Money", "description": "Where the money is and whose it is: ledgers built so that money cannot be lost or invented, balances and funds flows, payouts, reconciliation inside the provider and out, and the licenses that decide who may hold funds.", "posts": [{"id": "", "status": "", "title": "Part III — LEDGER: Recording and Moving Money", "excerpt": "Between the customer paying and the merchant being paid, how does a payment provider know where the money is and whose it is? Part III argues that it knows only from a double-entry ledger it keeps itself and keeps proving against the networks' and banks' records, and that a balance, a payout, a report and a license are each that ledger seen from one side.", "url": "part-3.html", "icon": "assets/icons/part-3-intro.png", "logo": "assets/images/part-3-intro/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "The Book of Record: How Payment Companies Build Ledgers", "excerpt": "How does a payment company know, at every moment, whose money it holds and where it is? Not from its payment database and not at every moment: it knows from a separate, append-only double-entry ledger in which a missing movement shows up as a balance that will not clear, and it knows only as recently as that proof has run.", "url": "payment-ledgers.html", "icon": "assets/icons/12-payment-ledgers.png", "logo": "assets/images/12-payment-ledgers/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Pending, Available, Reserved: Balances and Funds Flows", "excerpt": "Between the customer paying and the merchant being paid, where is the money and whose is it? The cash is in transit or pooled at the provider, and the merchant holds a claim whose states (pending, available, reserved) are the provider's decisions; Adyen documents paying before it is paid, and Stripe's documentation does not say.", "url": "balances-and-funds-flows.html", "icon": "assets/icons/13-balances-and-funds-flows.png", "logo": "assets/images/13-balances-and-funds-flows/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Getting Money Out: Payouts and Money Movement", "excerpt": "How does money leave a payment provider and reach a bank account, and what happens when it does not arrive? In two steps that finish at different times: the provider debits the balance, a bank network delivers or returns the transfer later, and “paid” means sent, not received.", "url": "payouts-and-money-movement.html", "icon": "assets/icons/14-payouts-and-money-movement.png", "logo": "assets/images/14-payouts-and-money-movement/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Proving the Money: Reconciliation Inside the Provider and Out", "excerpt": "How does a payment provider prove its own books against the networks and banks, and what does it give customers to prove theirs? It matches every movement its ledger expects against a record it did not write and ages what stays unmatched, then hands customers the same proof one level down as scheduled reports: by payout at Stripe, by payable batch at Adyen.", "url": "payment-reconciliation-and-reporting.html", "icon": "assets/icons/15-payment-reconciliation-and-reporting.png", "logo": "assets/images/15-payment-reconciliation-and-reporting/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Whose Money Is It? Licences, Safeguarding and Where Funds Sit", "excerpt": "Who is legally allowed to hold customer money, and why should an engineer care? Only a licensed institution may, and its license decides which accounts its ledger must contain and what must be compared with a bank; a platform stays outside those rules only while it never has possession or control of the money.", "url": "licences-and-safeguarding.html", "icon": "assets/icons/16-licences-and-safeguarding.png", "logo": "assets/images/16-licences-and-safeguarding/logo.jpeg", "tags": []}]}, {"title": "Part IV — INTERFACE: The API as the Product", "description": "How a slow, multi-party process is made to look like one call: object models, idempotency and retries, versioning, webhooks, and the keys, sandboxes and limits around the API.", "posts": [{"id": "", "status": "", "title": "Part IV — INTERFACE: The API as the Product", "excerpt": "How can an API make a payment that takes days and several parties look like one call without misleading the developer who calls it? Part IV argues that it must give a contract for each case the call hides (state, a repeatable request, a pinned version, later events) and state the limit of each, and that those limits are part of the interface.", "url": "part-4.html", "icon": "assets/icons/part-4-intro.png", "logo": "assets/images/part-4-intro/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Objects, Commands and Events: How Payment APIs Are Designed", "excerpt": "What makes a payment API usable for ten years, and how do Stripe's and Adyen's object models differ? An integration lasts when it depends only on a stable identifier, a normalized vocabulary of states and refusal reasons, and an explicit line between the response and what arrives later; Stripe keeps the current state in an object you can fetch again, Adyen's Checkout API in a reference, a result code and the events that follow.", "url": "payment-api-design.html", "icon": "assets/icons/17-api-design-and-object-models.png", "logo": "assets/images/17-api-design-and-object-models/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Exactly Once, Over a Network That Does Not Allow It: Idempotency and Retries", "excerpt": "How do you make “charge this card” safe to send twice? Send the same key both times, a key derived from the business event and stored before the first attempt, while the provider still remembers it: at least 24 hours on Stripe's API v1, 7 to 14 days on Adyen.", "url": "idempotency-and-retries.html", "icon": "assets/icons/18-idempotency-and-retries.png", "logo": "assets/images/18-idempotency-and-retries/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Changing the API Without Breaking a Million Integrations: Versioning", "excerpt": "How do you evolve an API that customers integrated years ago and never want to touch? The provider lets each integration keep the version it was built against, which moves the cost of change without removing it: the provider maintains old versions, and the integrator who never upgrades builds up a gap it will one day cross in a single step.", "url": "payment-api-versioning.html", "icon": "assets/icons/19-api-versioning.png", "logo": "assets/images/19-api-versioning/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "The Provider Calls You: Webhooks and Events", "excerpt": "How does a payment provider tell millions of endpoints what happened, and what may a receiver assume? It sends each event again until the endpoint acknowledges it or a retry window closes, so a webhook is a notice to store and then confirm against the provider's own record: three days of retries at Stripe, up to 30 days in a queue at Adyen.", "url": "payment-webhooks-and-events.html", "icon": "assets/icons/20-webhooks-and-events.png", "logo": "assets/images/20-webhooks-and-events/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Keys, Sandboxes and Limits: The Developer Platform Around the API", "excerpt": "What else has to exist around a payment API before developers can safely build on it? Credentials that limit what each caller can do, a test environment whose gaps are stated and request limits you can plan for; each is a term of the API's contract, and Stripe and Adyen publish very different amounts about them.", "url": "payment-developer-platform.html", "icon": "assets/icons/21-developer-platform.png", "logo": "assets/images/21-developer-platform/logo.jpeg", "tags": []}]}, {"title": "Part V — TRUST: Card Data, Fraud, Authentication and Compliance", "description": "What must never leak, who is really paying and who is being paid: tokenization and PCI scope, network tokens, fraud and risk systems, 3-D Secure and strong customer authentication, and compliance as a running system.", "posts": [{"id": "", "status": "", "title": "Part V — TRUST: Card Data, Fraud, Authentication and Compliance", "excerpt": "What do the controls over card data, fraud, authentication and compliance actually do for a business that takes payments? Part V argues that each one moves card data, a decision or a loss to another party and leaves something behind, so no control makes the risk disappear.", "url": "part-5.html", "icon": "assets/icons/part-5-intro.png", "logo": "assets/images/part-5-intro/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Never Touch the Card: Tokenization, Vaults and PCI Scope", "excerpt": "How do payment providers keep card numbers out of everyone's systems, including most of their own? They collect the number in a frame they serve, hand back a token and lock the number in an isolated vault, which leaves the merchant its payment page and stored cards it holds only as tokens.", "url": "tokenization-vaulting-and-pci.html", "icon": "assets/icons/22-tokenization-vaulting-and-pci.png", "logo": "assets/images/22-tokenization-vaulting-and-pci/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "The Card Number's Replacement: Network Tokens and Credential Lifecycle", "excerpt": "What is a network token, who issues it, and why are card networks pushing every stored card toward one? It is a substitute card number that the network issues and keeps pointing at the customer's current card, and the push moves the keeping, restricting and pricing of stored cards from each vault to the network.", "url": "network-tokens.html", "icon": "assets/icons/23-network-tokens.png", "logo": "assets/images/23-network-tokens/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Deciding in Milliseconds: Fraud and Risk Systems", "excerpt": "How does a provider decide, during an authorization, whether a payment is fraud? It cannot know: it estimates the chance of a later fraud dispute, blocks above a threshold before the bank is asked, and learns weeks afterwards whether it was right, so the threshold is a price the merchant sets and pays.", "url": "payment-fraud-and-risk.html", "icon": "assets/icons/24-fraud-and-risk-systems.png", "logo": "assets/images/24-fraud-and-risk-systems/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Proving It Is You: 3-D Secure and Strong Customer Authentication", "excerpt": "How does the card's bank check who is paying online, and how do providers decide when to ask? The bank answers through 3-D Secure, silently or with a challenge, and a fraud loss moves to the bank only when that check happens, so deciding when to ask is deciding who carries the loss.", "url": "three-d-secure-and-sca.html", "icon": "assets/icons/25-3ds-and-sca.png", "logo": "assets/images/25-3ds-and-sca/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Know Your Customer, Watch the Money: Compliance as a System", "excerpt": "What must a payment company know about the businesses it pays, and how does that become software? It must keep knowing who they are, who owns them and whether their money looks clean, so verification becomes state on an account, with deadlines that can stop payouts months after onboarding.", "url": "payment-compliance-and-regulation.html", "icon": "assets/icons/26-kyc-aml-and-regulation.png", "logo": "assets/images/26-kyc-aml-and-regulation/logo.jpeg", "tags": []}]}, {"title": "Part VI — REVENUE: Billing, Tax and Recognition", "description": "From taking a payment to running revenue: subscriptions and the billing engine, usage metering, invoicing and dunning, tax, revenue recognition, and the provider as merchant of record.", "posts": [{"id": "", "status": "", "title": "Part VI — REVENUE: Billing, Tax and Recognition", "excerpt": "What has to be built on top of a payment API before single payments become recurring, usage-priced, taxed and reportable revenue? Part VI argues that it is a second state machine driven by the clock, whose output is the invoice and whose failures are a charge that is late, taken twice or counted in the wrong period.", "url": "part-6.html", "icon": "assets/icons/part-6-intro.png", "logo": "assets/images/part-6-intro/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Charging Again and Again: Subscriptions and the Billing Engine", "excerpt": "What does a billing engine do that a payment API does not? It decides what is owed, for which period and when to ask, and writes the answer down as an invoice; Stripe keeps that engine in its platform, while Adyen’s documentation offers a stored token with a recurring flag and leaves the rest to you.", "url": "subscriptions-and-billing-engines.html", "icon": "assets/icons/27-subscriptions-and-billing-engines.png", "logo": "assets/images/27-subscriptions-and-billing-engines/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Counting Before Charging: Usage Metering and Rating", "excerpt": "How do you bill for usage when events arrive late, twice and by the billion? You fix three time rules before the first invoice (how long an event is accepted, when the invoice closes, how a wrong event is corrected), remove duplicates by an identifier the producer assigns, and only then choose between aggregating events on arrival and computing the invoice from raw events.", "url": "usage-metering-and-rating.html", "icon": "assets/icons/28-usage-metering-and-rating.png", "logo": "assets/images/28-usage-metering-and-rating/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "From Invoice to Cash: Invoicing, Collections and Dunning", "excerpt": "What happens between “an amount is owed” and “it has been paid”, especially when the first attempt fails? Between the two stands the invoice, a frozen record of a debt that is collected through as many attempts and payment methods as it takes; Stripe retries an invoice it holds, while Adyen retries a payment that the merchant ties to its own invoice by a reference.", "url": "invoicing-collections-and-dunning.html", "icon": "assets/icons/29-invoicing-collections-and-dunning.png", "logo": "assets/images/29-invoicing-collections-and-dunning/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Whose Tax, at What Rate: Tax Calculation in the Payment Path", "excerpt": "How does indirect tax get calculated, collected and reported when the payment provider is also the tax engine? The provider can do the arithmetic because its invoice holds the facts, but registering, counting thresholds, filing and the liability itself stay with the seller.", "url": "billing-and-payment-tax.html", "icon": "assets/icons/30-tax.png", "logo": "assets/images/30-tax/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Cash Is Not Revenue: Revenue Recognition and the Hand-off to Finance", "excerpt": "How does a billing system turn invoices and payments into recognized revenue, and where should it stop? It gives each invoice line a service period, defers the amount and releases it as the service is delivered; it should stop where contracts stop matching invoices, and hand finance a line-level export either way.", "url": "billing-revenue-recognition.html", "icon": "assets/icons/31-revenue-recognition.png", "logo": "assets/images/31-revenue-recognition/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Who Is the Seller? Merchant of Record as an Operating Model", "excerpt": "What changes when the provider, not you, is the merchant of record? Its name goes on the card statement and the invoice, and it takes over the indirect tax and the handling of fraud and disputes, for a fee and for control; on Stripe the cost of disputes stays with you. That fits a small seller of digital products and excludes a platform whose sellers are third parties.", "url": "merchant-of-record.html", "icon": "assets/icons/32-merchant-of-record.png", "logo": "assets/images/32-merchant-of-record/logo.jpeg", "tags": []}]}, {"title": "Part VII — PLATFORMS: Paying Many Parties", "description": "When a platform sits between payer and seller: who is the merchant and who carries the loss, onboarding and verification, splits and seller payouts, and accounts, cards and capital as platform features.", "posts": [{"id": "", "status": "", "title": "Part VII — PLATFORMS: Paying Many Parties", "excerpt": "What does a platform take on when it puts itself between a payer and a seller? Part VII argues that it takes on its sellers' unpaid refunds, chargebacks and negative balances to the extent its account model assigns them to it, and that it makes that assignment at configuration, long before the first loss.", "url": "part-7.html", "icon": "assets/icons/part-7-intro.png", "logo": "assets/images/part-7-intro/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "One Payment, Three Parties: Platform and Marketplace Models", "excerpt": "When a platform sits between payer and seller, who is the merchant, who holds the money and who carries the loss? The merchant is whoever the customer thinks they are buying from, the money sits in balances at the provider, and the loss falls on the booked balance and then on whoever was assigned to stand behind it: on Stripe a permanent choice per account, on Adyen the platform by default.", "url": "platform-payment-models.html", "icon": "assets/icons/33-platform-payment-models.png", "logo": "assets/images/33-platform-payment-models/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Letting Sellers In: Onboarding and Verification on Platforms", "excerpt": "How does a platform get thousands of small businesses verified without losing them or its license partner's trust? By treating verification as a state the provider reopens for the life of every account: request few capabilities, let the provider's own flow collect the documents, and give every open deadline a named owner.", "url": "platform-onboarding-and-verification.html", "icon": "assets/icons/34-platform-onboarding-and-verification.png", "logo": "assets/images/34-platform-onboarding-and-verification/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Dividing the Money: Splits, Platform Balances and Seller Payouts", "excerpt": "How is one payment divided among platform, seller and provider, and how does each get paid? By bookings to balances inside the provider that are paid out within days, which is why a split is not final when the seller is paid: a refund or chargeback that arrives later debits whichever balance the payment was booked through.", "url": "splits-balances-and-platform-payouts.html", "icon": "assets/icons/35-splits-balances-and-platform-payouts.png", "logo": "assets/images/35-splits-balances-and-platform-payouts/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Beyond Payments: Accounts, Cards and Capital as Platform Features", "excerpt": "What does it take to offer a platform's sellers accounts, cards and loans, and how far have Stripe and Adyen gone? A licensed institution stands behind each product, the operating duties stay with the platform, and as of November 2026 availability differs by product, country and release stage.", "url": "embedded-finance.html", "icon": "assets/icons/36-embedded-finance.png", "logo": "assets/images/36-embedded-finance/logo.jpeg", "tags": []}]}, {"title": "Part VIII — SCALE: Reliability, Data and Operations", "description": "Keeping a money path up and correct: reliability and availability, data stores and consistency, multi-region operation and data residency, peak load, and changing the system while it runs.", "posts": [{"id": "", "status": "", "title": "Part VIII — SCALE: Reliability, Data and Operations", "excerpt": "How is a system that moves money kept running through failures, growth, laws on where data may live, peaks and constant change? Part VIII argues that it is run by deciding in advance what gives way, that the record of money is not on that list, and that much of how Stripe and Adyen do it is not public.", "url": "part-8.html", "icon": "assets/icons/part-8-intro.png", "logo": "assets/images/part-8-intro/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Down Is Not an Option: Reliability and Availability", "excerpt": "How do payment providers stay up, and what happens when they do not? They decide beforehand what may lag or be dropped so that no payment is recorded twice or lost, and when the path fails anyway, what you have to repair is the set of payments whose outcome nobody knows, not the minutes of downtime.", "url": "payment-reliability-and-availability.html", "icon": "assets/icons/37-payment-reliability.png", "logo": "assets/images/37-payment-reliability/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Never Lose a Cent: Data Stores and Consistency", "excerpt": "Which databases sit under a payment platform, and how do they keep money consistent while scaling? Stripe scaled a document database and Adyen a relational one, and in what either has published no transaction spans the shards: money stays right through small local transactions, retries that are safe to repeat, messages between stores and a check afterwards.", "url": "payment-data-stores-and-consistency.html", "icon": "assets/icons/38-payment-data-stores-and-consistency.png", "logo": "assets/images/38-payment-data-stores-and-consistency/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Where the Data Lives: Multi-Region Operation and Data Residency", "excerpt": "What decides where a payment platform runs and where its data stays? A localization law where one applies, and the provider's hosting model elsewhere; Stripe and Adyen have documented their hosting and a few sentences about regions, so the rest is a question to put to them in writing.", "url": "payment-multi-region-and-data-residency.html", "icon": "assets/icons/39-multi-region-and-data-residency.png", "logo": "assets/images/39-multi-region-and-data-residency/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "The Biggest Day: Peak Load and Capacity", "excerpt": "How do payment systems, and the merchants that call them, prepare for the day everything arrives at once? Your own predictable peak meets the limit a provider sets per customer long before it meets the provider's capacity, so the load has to be spread and paced by the party that creates it.", "url": "payment-peak-load.html", "icon": "assets/icons/40-payment-peak-load.png", "logo": "assets/images/40-payment-peak-load/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Changing the Engine in Flight: Deploys, Migrations and Incidents", "excerpt": "How do you ship changes many times a day to a system that moves money? You let each change reach a small, bounded share of live traffic, withdraw it automatically when its metrics deviate, and test the way back; and because one percent of traffic is still real payments, you call the change finished only when the records agree after it.", "url": "payment-safe-change.html", "icon": "assets/icons/41-safe-change.png", "logo": "assets/images/41-safe-change/logo.jpeg", "tags": []}]}, {"title": "Part IX — JOURNEYS: One Payment, End to End", "description": "The whole book in four stories: a card payment from tap to settled, a failed renewal that comes back, one payment split three ways and refunded after payout, and a dispute from chargeback to ledger.", "posts": [{"id": "", "status": "", "title": "Part IX — JOURNEYS: One Payment, End to End", "excerpt": "What do four payments followed from start to finish show that the chapters on single mechanisms could not? Part IX argues that every mechanism can work and the payment can still go wrong, because the failures sit at the hand-offs, where one step's promise is taken by the next as a finished fact.", "url": "part-9.html", "icon": "assets/icons/part-9-intro.png", "logo": "assets/images/part-9-intro/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Journey 1: Mila's Class Pass, From Tap to Settled", "excerpt": "What happens to one €120 card payment, step by step and party by party, between the tap and the studio's reconciled payout? Twelve steps: eleven end in a promise by the party that ran them, the “Payment successful” on the screen reports the fifth, and only the twelfth checks that the money arrived.", "url": "journey-card-payment.html", "icon": "assets/icons/42-journey-card-payment.png", "logo": "assets/images/42-journey-card-payment/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Journey 2: A Membership Renewal That Fails, and Comes Back", "excerpt": "When a €49 renewal is declined with nobody present, who decides whether and when to try again, and what is the member in the meantime? The decline code and the card network decide whether, the system that holds the period's debt decides when, and that system is Stripe's invoice on Stripe Billing and your own record on Adyen.", "url": "journey-failed-renewal.html", "icon": "assets/icons/43-journey-failed-renewal.png", "logo": "assets/images/43-journey-failed-renewal/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Journey 3: One Payment, Three Parties, and a Refund After Payout", "excerpt": "How is one €120 payment divided among a studio, a platform and a provider, and whose money pays an €84 refund a week after the studio was paid? An instruction attached to the payment divides it, and the refund is debited from a balance the payout already emptied, so the account model chosen at integration decides who goes short.", "url": "journey-platform-payment.html", "icon": "assets/icons/44-journey-platform-payment.png", "logo": "assets/images/44-journey-platform-payment/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Journey 4: A Dispute, From Chargeback to Ledger", "excerpt": "What happens, in money, deadlines and records, when a cardholder’s bank takes back a €120 payment three weeks after it was made, and who carries the loss? The money and a fee leave before anyone judges the claim, the merchant side answers once, and who pays was settled on the day of the sale by two settings nobody thought of as dispute settings.", "url": "journey-dispute.html", "icon": "assets/icons/45-journey-dispute.png", "logo": "assets/images/45-journey-dispute/logo.jpeg", "tags": []}]}, {"title": "Part X — BETS: Where Stripe and Adyen Diverge", "description": "The two anchors as cases: what each built and why, the architectural bets compared, three other answers, and what is moving in 2026. What the public record shows and where it stops.", "posts": [{"id": "", "status": "", "title": "Part X — BETS: Where Stripe and Adyen Diverge", "excerpt": "How far does the reading 'Adyen owns the regulated money path, Stripe owns the developer's abstraction over it' hold? Part X tests it against each company's own dated documents and finds an order of construction, not a division of territory: supported for banking and hosting, contradicted for card acquiring in Europe, and undecidable where Stripe has published nothing.", "url": "part-10.html", "icon": "assets/icons/part-10-intro.png", "logo": "assets/images/part-10-intro/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Case: Stripe, the Developer Platform That Became Financial Infrastructure", "excerpt": "What does Stripe's dated public record show about how a developer platform became financial infrastructure, and which of its practices can a builder use? The record shows an interface built first, a suite built and bought around it, and a regulated layer assembled per market by a company that is not a bank; the interface discipline transfers to a team of any size, the scale machinery does not.", "url": "case-stripe.html", "icon": "assets/icons/46-case-stripe.png", "logo": "assets/images/46-case-stripe/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Case: Adyen, the Single Platform With a Banking Licence", "excerpt": "What does Adyen's public record show about building payments as one platform under its own banking license? A company that built the regulated layers itself, in order, reports the result in audited figures and marks the platform's edges itself; since July 2026 the phrase “single platform” describes its payments and banking core, not the whole company.", "url": "case-adyen.html", "icon": "assets/icons/47-case-adyen.png", "logo": "assets/images/47-case-adyen/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Two Ways to Build It: The Architectural Bets Compared", "excerpt": "On which architectural bets do Stripe and Adyen demonstrably differ in November 2026, and what should a customer do with each difference? Two differences are of kind (who holds the money, who runs the machines); the rest are defaults, sequences and degrees that narrowed in 2025 and 2026, so the choice is made bet by bet and country by country.", "url": "stripe-and-adyen-bets-compared.html", "icon": "assets/icons/48-the-bets-compared.png", "logo": "assets/images/48-the-bets-compared/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Other Answers: PayPal and Braintree, Checkout.com, Block", "excerpt": "What do three other payment companies show about the Stripe and Adyen bets? Each started with a different customer and holds something neither anchor holds: a consumer wallet, a set of acquiring licenses assembled later, a seller’s till and a lending bank. The evidence is filings and press releases about business models, not architecture.", "url": "payment-contrast-cases.html", "icon": "assets/icons/49-contrast-cases.png", "logo": "assets/images/49-contrast-cases/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "What Is Moving: Agents, Stablecoins and Instant Payments in 2026", "excerpt": "Which of the changes under way in November 2026 alter how payment infrastructure should be built? Each moves one promise in the payment chain and none removes the work of tracking it, so build only what every variant assumes, put a date on everything else, and judge any new rail with three questions.", "url": "payments-what-is-moving.html", "icon": "assets/icons/50-what-is-moving.png", "logo": "assets/images/50-what-is-moving/logo.jpeg", "tags": []}]}, {"title": "Reference", "description": "The model-to-chapter coverage map, templates and cards, plain-language definitions with a Stripe–Adyen vocabulary crosswalk, and every source the book cites.", "posts": [{"id": "", "status": "", "title": "Domain Coverage: From the Planning Model to the Book's Chapters", "excerpt": "Which chapter covers which part of payments and revenue infrastructure? This reference page maps the 29 capabilities of the planning model behind the book to the chapters that treat them, says what the book covers only briefly or leaves out and why, and lists what it added that the model does not have.", "url": "domain-coverage.html", "icon": "assets/icons/domain-coverage.png", "logo": "assets/images/domain-coverage/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Toolkit: Cards and Templates for Payment Architecture Decisions", "excerpt": "Which written records show that a payment question has been decided, and not only discussed? Sixteen copyable cards, from the payment state card to the provider exit plan card, each built from the chapter that raises its question and filled in once with Larkfield's fictional facts.", "url": "toolkit.html", "icon": "assets/icons/toolkit.png", "logo": "assets/images/toolkit/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Glossary: Plain-Language Definitions and a Stripe–Adyen Crosswalk", "excerpt": "What does each payments, banking and billing term in the book mean, and what do Stripe and Adyen each call it? One plain definition per term with its owning chapter, grouped by part; a crosswalk of the two providers' vocabularies with a note wherever they do not match; Larkfield's fictional names; and an alphabetical index.", "url": "glossary.html", "icon": "assets/icons/glossary.png", "logo": "assets/images/glossary/logo.jpeg", "tags": []}, {"id": "", "status": "", "title": "Bibliography", "excerpt": "Which sources does the book cite, and how much does each kind of source support? Every public source the pages cite, listed once under a stable R-number with its date, its evidence type and the pages that rely on it, by publisher and by chapter.", "url": "bibliography.html", "icon": "assets/icons/bibliography.png", "logo": "assets/images/bibliography/logo.jpeg", "tags": []}]}], "book_image": null, "book_pdf": null, "book_epub": null}</script>
+<script>
+    (function () {
+        const data = JSON.parse(document.getElementById('data').textContent);
+        const root = document.getElementById('sections');
+        const visualRoot = document.getElementById('visual');
+        const tabList = document.getElementById('tab-list');
+        const tabVisual = document.getElementById('tab-visual');
+        const empty = document.getElementById('empty');
+        const hits = document.getElementById('hits');
+        const tagFilter = document.getElementById('tag-filter');
+        const statusFilter = document.getElementById('status-filter');
+        const qInput = document.getElementById('q');
+
+        function el(tag, attrs, children) {
+            const e = document.createElement(tag);
+            if (attrs) for (const k in attrs) {
+                if (k === 'class') e.className = attrs[k];
+                else if (k === 'text') e.textContent = attrs[k];
+                else e.setAttribute(k, attrs[k]);
+            }
+            if (children) children.forEach(c => c && e.appendChild(c));
+            return e;
+        }
+
+        const bookImage = (data.book_image || '').trim();
+        const bookPdf = (data.book_pdf || '').trim();
+        const bookEpub = (data.book_epub || '').trim();
+        if (bookImage || bookPdf || bookEpub) {
+            const book = document.getElementById('book-edition');
+            if (bookImage) {
+                book.appendChild(el('a', {
+                    class: 'book-cover',
+                    href: bookPdf || bookEpub || bookImage,
+                    'aria-label': bookPdf ? 'Read the book as PDF' :
+                        bookEpub ? 'Read the book as EPUB' : 'View the book cover'
+                }, [el('img', {src: bookImage, alt: 'Book cover'})]));
+            }
+            const details = el('div', {class: 'book-details'});
+            if (bookPdf || bookEpub) {
+                const links = el('div', {class: 'book-links'});
+                if (bookPdf) links.appendChild(el('a', {href: bookPdf, text: 'Download PDF'}));
+                if (bookEpub) links.appendChild(el('a', {href: bookEpub, text: 'Download EPUB'}));
+                details.appendChild(links);
+            }
+            book.appendChild(details);
+            book.hidden = false;
+        }
+
+        // Tag and status counts across all posts.
+        // status is stored as "name" or "name:color"; we count by name and
+        // remember the (first observed) color per name so the filter chip dot
+        // matches the inline post-status pill.
+        const tagCounts = new Map();
+        const statusCounts = new Map();
+        const statusColors = new Map();
+        let totalPosts = 0;
+        data.sections.forEach(section => {
+            section.posts.forEach(p => {
+                totalPosts++;
+                (p.tags || []).forEach(t => tagCounts.set(t, (tagCounts.get(t) || 0) + 1));
+                if (p.status) {
+                    const parts = String(p.status).split(':');
+                    const name = parts[0].trim();
+                    const color = (parts[1] || '').trim();
+                    if (name) {
+                        statusCounts.set(name, (statusCounts.get(name) || 0) + 1);
+                        if (color && !statusColors.has(name)) statusColors.set(name, color);
+                    }
+                }
+            });
+        });
+
+        // Build status filter buttons (sorted by count desc, then alpha).
+        // Only renders if any post defines a status, so the row stays empty
+        // and invisible otherwise.
+        const sortedStatuses = Array.from(statusCounts.entries())
+            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+        const activeStatuses = new Set();
+        sortedStatuses.forEach(([name, count]) => {
+            const btn = el('button', {type: 'button', 'data-status': name});
+            const dot = el('span', {class: 'status-dot'});
+            const color = statusColors.get(name);
+            if (color) dot.style.background = color;
+            btn.appendChild(dot);
+            btn.appendChild(document.createTextNode(name));
+            btn.appendChild(el('span', {class: 'count', text: '(' + count + ')'}));
+            btn.addEventListener('click', function () {
+                if (activeStatuses.has(name)) activeStatuses.delete(name);
+                else activeStatuses.add(name);
+                btn.classList.toggle('active', activeStatuses.has(name));
+                applyFilters();
+            });
+            statusFilter.appendChild(btn);
+        });
+
+        // Build tag filter buttons (sorted by count desc, then alpha).
+        // Show only the first TAG_VISIBLE_LIMIT tags initially; the rest are
+        // toggled via a "show more / fewer" button. Selected tags stay
+        // visible even when collapsed, so an active filter never disappears.
+        const TAG_VISIBLE_LIMIT = 12;
+        const sortedTags = Array.from(tagCounts.entries())
+            .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+        const activeTags = new Set();
+        const overflowButtons = [];
+        sortedTags.forEach(([tag, count], idx) => {
+            const btn = el('button', {type: 'button', 'data-tag': tag});
+            btn.appendChild(document.createTextNode(tag));
+            btn.appendChild(el('span', {class: 'count', text: '(' + count + ')'}));
+            btn.addEventListener('click', function () {
+                if (activeTags.has(tag)) activeTags.delete(tag);
+                else activeTags.add(tag);
+                btn.classList.toggle('active', activeTags.has(tag));
+                applyFilters();
+            });
+            if (idx >= TAG_VISIBLE_LIMIT) {
+                btn.classList.add('hidden');
+                overflowButtons.push(btn);
+            }
+            tagFilter.appendChild(btn);
+        });
+
+        let tagsExpanded = false;
+        if (overflowButtons.length) {
+            const toggle = el('button', {type: 'button', class: 'tag-toggle'});
+            const hiddenLabel = '+ ' + overflowButtons.length + ' more';
+            const shownLabel = 'show fewer';
+            toggle.textContent = hiddenLabel;
+            toggle.addEventListener('click', function () {
+                tagsExpanded = !tagsExpanded;
+                overflowButtons.forEach(b => {
+                    // keep selected overflow tags visible even when collapsed
+                    if (tagsExpanded || b.classList.contains('active')) {
+                        b.classList.remove('hidden');
+                    } else {
+                        b.classList.add('hidden');
+                    }
+                });
+                toggle.textContent = tagsExpanded ? shownLabel : hiddenLabel;
+            });
+            tagFilter.appendChild(toggle);
+        }
+
+        // Render sections
+        data.sections.forEach(section => {
+            const sec = el('section', {class: 'group'});
+            sec.appendChild(el('h2', {text: section.title}));
+            if (section.description) sec.appendChild(el('p', {class: 'group-desc', text: section.description}));
+            const ul = el('ul', {class: 'posts'});
+            section.posts.forEach(p => {
+                const li = el('li');
+                const tags = p.tags || [];
+                const statusName = p.status ? String(p.status).split(':')[0].trim() : '';
+                li.dataset.haystack = (p.title + ' ' + (p.excerpt || '') + ' ' + tags.join(' ') + ' ' + statusName).toLowerCase();
+                li.dataset.tags = tags.join('|').toLowerCase();
+                li.dataset.status = statusName.toLowerCase();
+                const iconWrap = el('div', {class: p.icon ? 'icon' : 'icon placeholder'});
+                if (p.icon) iconWrap.appendChild(el('img', {src: p.icon, alt: ''}));
+                li.appendChild(iconWrap);
+                const meta = el('div', {class: 'meta'});
+                if (p.id || p.status) {
+                    const idLine = el('p', {class: 'post-id'});
+                    if (p.status) {
+                        // status front-matter is "name" or "name:color".
+                        const parts = String(p.status).split(':');
+                        const statusName = parts[0].trim();
+                        const statusColor = (parts[1] || '').trim();
+                        const wrap = el('span', {class: 'post-status'});
+                        const dot = el('span', {class: 'status-dot'});
+                        if (statusColor) dot.style.background = statusColor;
+                        wrap.appendChild(dot);
+                        wrap.appendChild(document.createTextNode(statusName));
+                        idLine.appendChild(wrap);
+                    }
+                    if (p.status && p.id) {
+                        idLine.appendChild(el('span', {class: 'post-id-sep', text: '•'}));
+                    }
+                    if (p.id) idLine.appendChild(el('span', {class: 'post-id-text', text: '[' + p.id + ']'}));
+                    meta.appendChild(idLine);
+                }
+                meta.appendChild(el('a', {href: p.url, text: p.title}));
+                if (p.excerpt) meta.appendChild(el('p', {class: 'excerpt', text: p.excerpt}));
+                if (tags.length) {
+                    const tagWrap = el('div', {class: 'tags'});
+                    tags.forEach(t => tagWrap.appendChild(el('span', {class: 'tag', text: t})));
+                    meta.appendChild(tagWrap);
+                }
+                li.appendChild(meta);
+                ul.appendChild(li);
+            });
+            sec.appendChild(ul);
+            root.appendChild(sec);
+        });
+
+        // Render the Visual Overview pane: same sections, but each post is a
+        // card showing its hero logo image (instead of the abstract). Cards
+        // carry the same data-* attributes so search/tag/status filters apply
+        // to both views.
+        const visualToolbar = el('div', {class: 'visual-toolbar'});
+        const expandBtn = el('button', {type: 'button', text: 'Expand images'});
+        visualToolbar.appendChild(expandBtn);
+        visualRoot.appendChild(visualToolbar);
+
+        data.sections.forEach(section => {
+            const sec = el('section', {class: 'group'});
+            sec.appendChild(el('h2', {text: section.title}));
+            if (section.description) sec.appendChild(el('p', {class: 'group-desc', text: section.description}));
+            const grid = el('div', {class: 'visual-grid'});
+            section.posts.forEach(p => {
+                const tags = p.tags || [];
+                const statusName = p.status ? String(p.status).split(':')[0].trim() : '';
+                const card = el('a', {class: 'visual-card', href: p.url});
+                card.dataset.haystack = (p.title + ' ' + (p.excerpt || '') + ' ' + tags.join(' ') + ' ' + statusName).toLowerCase();
+                card.dataset.tags = tags.join('|').toLowerCase();
+                card.dataset.status = statusName.toLowerCase();
+                if (p.logo) {
+                    card.appendChild(el('img', {src: p.logo, alt: p.title, loading: 'lazy'}));
+                } else {
+                    card.appendChild(el('div', {class: 'no-logo', text: 'no image'}));
+                }
+                card.appendChild(el('p', {class: 'visual-title', text: p.title}));
+                grid.appendChild(card);
+            });
+            sec.appendChild(grid);
+            visualRoot.appendChild(sec);
+        });
+
+        // Expand toggle: full-width uncropped images, one per row. Clicking
+        // anywhere on a card opens the article in both modes.
+        let visualExpanded = false;
+        expandBtn.addEventListener('click', function () {
+            visualExpanded = !visualExpanded;
+            visualRoot.classList.toggle('expanded', visualExpanded);
+            expandBtn.classList.toggle('active', visualExpanded);
+            expandBtn.textContent = visualExpanded ? 'Compact grid' : 'Expand images';
+        });
+
+        // Tab switching between the article list and the visual overview.
+        // #visual in the URL hash deep-links the visual tab.
+        function selectView(visual) {
+            root.hidden = visual;
+            visualRoot.hidden = !visual;
+            tabList.classList.toggle('active', !visual);
+            tabVisual.classList.toggle('active', visual);
+            tabList.setAttribute('aria-selected', String(!visual));
+            tabVisual.setAttribute('aria-selected', String(visual));
+            const hash = visual ? '#visual' : '';
+            if (window.location.hash !== hash) {
+                history.replaceState(null, '', window.location.pathname + window.location.search + hash);
+            }
+        }
+
+        tabList.addEventListener('click', function () { selectView(false); });
+        tabVisual.addEventListener('click', function () { selectView(true); });
+        if (window.location.hash === '#visual') selectView(true);
+
+        function applyFilters() {
+            const q = qInput.value.trim().toLowerCase();
+            let visibleCount = 0;
+
+            function matchItem(item) {
+                const matchQ = !q || item.dataset.haystack.indexOf(q) !== -1;
+                let matchTag = true;
+                if (activeTags.size) {
+                    const itemTags = item.dataset.tags ? item.dataset.tags.split('|') : [];
+                    // any-match: post must carry at least one selected tag
+                    matchTag = false;
+                    for (const t of activeTags) {
+                        if (itemTags.indexOf(t.toLowerCase()) !== -1) {
+                            matchTag = true;
+                            break;
+                        }
+                    }
+                }
+                let matchStatus = true;
+                if (activeStatuses.size) {
+                    const itemStatus = item.dataset.status || '';
+                    // any-match: post status must equal one of the selected statuses
+                    matchStatus = false;
+                    for (const s of activeStatuses) {
+                        if (itemStatus === s.toLowerCase()) {
+                            matchStatus = true;
+                            break;
+                        }
+                    }
+                }
+                return matchQ && matchTag && matchStatus;
+            }
+
+            // Both views hold the same posts; count visibility once (list view)
+            // but toggle hidden state in both so tab switches stay filtered.
+            [root, visualRoot].forEach((pane, paneIdx) => {
+                pane.querySelectorAll('section.group').forEach(sec => {
+                    let secVisible = false;
+                    sec.querySelectorAll('li, .visual-card').forEach(item => {
+                        const match = matchItem(item);
+                        item.classList.toggle('hidden', !match);
+                        if (match) {
+                            secVisible = true;
+                            if (paneIdx === 0) visibleCount++;
+                        }
+                    });
+                    sec.classList.toggle('empty', !secVisible);
+                });
+            });
+            empty.classList.toggle('show', visibleCount === 0);
+            hits.textContent = ' = ' + ((q || activeTags.size || activeStatuses.size)
+                ? visibleCount + ' of ' + totalPosts + ''
+                : totalPosts + '');
+        }
+
+        qInput.addEventListener('input', applyFilters);
+        applyFilters();
+    })();
+</script>
+</body>
+</html>
