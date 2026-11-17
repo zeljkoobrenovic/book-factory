@@ -52,6 +52,11 @@ Rules that give the page its character:
   simple (the village shop that sells on a promise and is paid on payday: a
   debt, a record of it, trust, and a customer who might not pay). The
   complication plants the book's central idea before any technology appears.
+  Let the same early scene introduce the field's standing concerns as well as
+  its first concept: the shopkeeper who gives credit also decides whom to
+  trust, how much, and when to stop, which is risk management in its
+  plainest form. A concern met first in a scene anyone can picture is easier
+  to recognize later inside a system.
 - **Six to nine steps.** Fewer reads as a list of two eras; more reads as a
   history. Merge steps that add no new concept.
 - **Order by dependency, not strictly by date.** Usually these coincide. Where

@@ -48,6 +48,8 @@ Both sides gain. The family eats in the middle of the month, when it could other
 
 The price is the shopkeeper's, and it has two parts. The customer may never pay. And the notebook may be wrong: a line forgotten, a line written twice, a sum the customer remembers differently. Then two accounts of one debt have to be compared, line by line, until they agree. The book calls that comparison **reconciliation** ([[payment-reconciliation-and-reporting]]).
 
+A shopkeeper who sells on promises therefore has to manage that risk, and the notebook is the tool. Who gets credit at all: the family down the road, not the traveler passing through. How much: a week of bread, not a year of it. When to stop: no more goods for a customer whose old debt is still open. And how to survive the debts that are never paid: by setting prices that leave room for them. The book calls this work **risk management**. Every later way of paying does it too, with a model in place of the shopkeeper's memory ([[payment-fraud-and-risk]]).
+
 **When is it really paid?** On payday, if the customer comes. **Who is on the hook until then?** The shopkeeper, whose only proof is the notebook.
 
 ## The Check: A Promise on Paper, Carried Between Banks
@@ -156,7 +158,7 @@ Here are the nine steps side by side, each with what it made possible and what i
 | Step | What it made possible | What it added | New party or delay | What can now go wrong |
 | --- | --- | --- | --- | --- |
 | Cash | Two strangers trade with no trust | A payment that is complete on the spot | None | Loss, theft, forgery |
-| Shop credit | The family eats before payday; the shop keeps its customer | A promise, a ledger, reconciliation | A wait until payday | The debt is never paid; two records disagree |
+| Shop credit | The family eats before payday; the shop keeps its customer | A promise, a ledger, reconciliation, risk management | A wait until payday | The debt is never paid; two records disagree |
 | Check | Trade with another town without carrying cash | Clearing and settlement | Two banks; days | The check comes back unpaid after the goods are gone |
 | Card | The shop sells to a stranger; the customer pays later | The issuer and its guarantee, for a fee | The card company | The shop breaks a rule and the guarantee does not hold |
 | Card network | One card for any shop; any bank's card for the shop | The acquirer, authorization, interchange | A second bank and a network; money a day or more after the answer | **The Phantom Payment**, **The Black-Box Balance** |
