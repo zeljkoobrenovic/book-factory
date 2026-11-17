@@ -1,0 +1,1584 @@
+{
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "authorization-optimization",
+  "journal": "payments-platform-architecture",
+  "part": "part-2",
+  "title": "Raising the Approval Rate: Retries, Tokens and Optimization",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "Who can stop a payment (the issuer, the provider before the network, an invalid request) and why most issuer declines carry no usable reason.",
+        "The difference between authorization rate, payment success rate and checkout conversion, and between counting per attempt and per purchase.",
+        "The levers that move approvals (local acquiring, network tokens, account updater, authentication choices, message formatting, retries within network limits, timing) and what Stripe's Authorization Boost and Adaptive Acceptance and Adyen's Uplift are documented to do, with their dates and published claims."
+      ],
+      "believe": [
+        "One API call can now stand for several network attempts, or for none, because the provider decides inside the call.",
+        "A published uplift figure is a vendor estimate on an unstated cohort and baseline until the merchant measures it on its own traffic with a randomized holdout."
+      ],
+      "can_do": [
+        "State an approval metric with its numerator, denominator, cohort and counting rule before comparing two periods or two providers.",
+        "Design a test of an optimization feature with a holdout and guardrails for fraud, fees and blocked payments."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a reported improvement, the reader identifies what is missing before the number can be trusted.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "Your provider's account manager reports: 'After we enabled our optimization suite in March, your approval rate rose from 91.2% to 93.0%.' Using only this chapter, name four things you need to know before accepting that the suite caused a 1.8-point gain.",
+        "expected": "Four of: which rate (authorization rate or payment success rate) and what is excluded from the denominator; whether attempts or purchases are counted (retries inflate or deflate the raw rate); which cohort (first payments or renewals, which countries, card-not-present only); what else changed between the periods (season, card mix, issuer behavior), since this is a before-and-after comparison and not a randomized holdout; whether blocked-before-network payments moved out of the denominator; what happened to fraud, disputes and fees."
+      },
+      {
+        "id": "AC-2",
+        "statement": "Given an outcome that never reached the issuer, the reader classifies it correctly and says how it affects the metrics.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A payment comes back as 'blocked: low probability of authorization, not sent to network'. Is this an issuer decline? What does it do to your authorization rate and to your count of lost sales, according to this chapter?",
+        "expected": "It is not an issuer decline: the provider stopped it before the network, usually to avoid a fee. It leaves the authorization-rate denominator, so that rate can rise while sales do not; it still counts as a failed purchase in the payment success rate, and some blocked payments would have been approved."
+      },
+      {
+        "id": "AC-3",
+        "statement": "Every uplift figure from Stripe or Adyen is quoted with its wording, source and date and is labeled a vendor claim; the chapter states that the two companies' figures use different metrics and cannot be compared.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "Why are payments from genuine cardholders with funds available declined, and what do providers do about it?",
+    "claim": "Payments from genuine cardholders with funds available are declined because each issuer decides alone, by its own reading of the authorization message, and usually returns no reason the merchant can act on; providers respond by acting inside the authorization call, where they reformat the message, swap the card number for a network token, retry, switch network or block the payment before it is sent. The approval rate is therefore partly the provider's product, and the uplift Stripe and Adyen each publish for it (Stripe: an acceptance rate 3.8% higher on average, stated in 2025; Adyen: payment conversion up to 6% higher in a pilot reported in January 2025) rests on different metrics, cohorts and baselines, so the two figures can be neither compared nor checked from public data.",
+    "disputed_by": "The view that a decline is the issuer's verdict on the cardholder, so the provider is a neutral pipe, the approval rate would be the same anywhere, and optimization products are packaging around a number nobody controls; or the opposite view, that a vendor's published uplift is what a merchant should expect to gain.",
+    "so_what": "The merchant's system has to tolerate one call that produced several network attempts, a 'blocked' result that never reached a bank, and a credential or network other than the one it asked for. And the merchant, not the vendor, has to measure: fix the metric and denominator, hold out randomized traffic, wait for retries to finish, and watch fraud, fees and blocked payments in the same test.",
+    "how_why": "Stripe's guide describes issuers combining the fields of the authorization message each in their own way and classing most refusals as generic. Against that, both providers document actions the merchant did not request: Stripe's Adaptive Acceptance reformats and retries within the original request and, for accounts on interchange-plus pricing, blocks payments unlikely to succeed; Adyen's Uplift (January 2025) routes, adjusts messaging, retries and can block excessive retries. Both describe machine-learned models (Stripe a deep network replacing gradient-boosted trees, February 2025; Adyen several models coordinated by reinforcement learning with a 20-millisecond median budget each, January 2025) beside settings the merchant controls. On measurement, Stripe documents a modeled per-payment estimate and previewed a 30-day randomized test in April 2026; Adyen describes a control group that still receives a 'market baseline'. Neither publishes features, labels, per-issuer results, the cost of wrongly blocked payments or an audited lift, Visa's reattempt limit is confirmed from its rules of 24 October 2026 (20 in 30 days) while Mastercard's is known only from secondary sources, so the chapter argues from the documented behavior and says where the numbers are vendor claims.",
+    "supporting_claims": [
+      {
+        "id": "C1",
+        "claim": "A payment can fail at the issuer, at the provider before the network or as an invalid request, and an issuer decline is one bank's private reading of the authorization message, returned mostly without a reason the merchant can act on."
+      },
+      {
+        "id": "C2",
+        "claim": "An approval rate has no meaning until its numerator, denominator, cohort and counting rule (per attempt or per purchase) are stated, because the same payments yield rates more than ten points apart."
+      },
+      {
+        "id": "C3",
+        "claim": "The levers that move approvals change what the issuer sees (credential, acquirer, message, authentication) or when it is asked, and retries are capped by network rules that all of a merchant's attempts share."
+      },
+      {
+        "id": "C4",
+        "claim": "Stripe and Adyen now pull those levers themselves inside the authorization call, so one API call can stand for several network attempts or none, decided by machine-learned models beside a few merchant settings."
+      },
+      {
+        "id": "C5",
+        "claim": "The uplift figures the two companies publish are vendor estimates on different metrics, cohorts and baselines; only a randomized holdout on the merchant's own traffic, with guardrails for fraud, fees and blocked payments, measures the effect."
+      },
+      {
+        "id": "C6",
+        "claim": "Because the provider acts inside the call, the merchant's retry schedule, payment record and stored-card data must be designed around it, or the two will double-count, misread outcomes and overspend the retry allowance."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Shows the provider as an actor inside the authorization, which makes the approval rate a property of the provider's stack and gives the routing chapter the metric it compares providers on.",
+    "supports": [
+      "P2-4"
+    ]
+  },
+  "flow": {
+    "pattern": "problem_solution",
+    "additional_patterns": [
+      {
+        "pattern": "prerequisite_order",
+        "applies_to": "who-says-no, counting, levers, inside-the-call: each supplies the terms the next one uses (attempt and blocked payment, then the rates, then the levers, then the provider pulling them)"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "designs and where-they-differ"
+      }
+    ],
+    "rationale": "The reader meets two rates that disagree by 13.5 points before any term is defined, so the vocabulary arrives as the answer to a problem already felt. Who can say no comes first because the rates are defined by which failures they count; counting comes before the levers because a lever is judged by the rate it moves; the levers come before the providers' products because those products are the levers pulled automatically. Only when the reader knows what the provider does inside the call can a published uplift be read critically, and only after that do the design choice and the two-company comparison have their criteria. Larkfield's recount and test apply everything, and the failures close the body because each is a way the earlier advice is not followed. Opening with the products would present features with no metric to judge them by; putting measurement before the in-call actions would ask the reader to test something not yet described."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "A member's card is valid, the account has money in it and the member wants to pay. The bank still answers no, with a two-digit code, 05, that means only 'do not honor'. Nothing in the merchant's systems is wrong, and the same card was approved last month."
+    },
+    "bridge": {
+      "from_reader_world": "An engineer reads a declined payment as an error response: the request was fine, the remote system said no, and the reason should be in the body.",
+      "to_topic": "Here the remote system is one of thousands of banks, each deciding alone and mostly without giving a reason, and between the merchant and that bank sits a provider that changes the request, repeats it or withholds it. That turns 'why was it declined?' into 'who decided, on what message, and who is counting?'"
+    },
+    "thesis_statement": {
+      "text": "A decline is one issuer's reading of one message, usually returned without a reason, and the provider now acts inside the authorization call to change that reading. The approval rate is therefore partly the provider's product, and the uplift figures Stripe and Adyen publish for it cannot be compared with each other or checked from public data.",
+      "placement": "KEY POINTS bullets 1 and 3, and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p04",
+      "promises": [
+        {
+          "promise": "Start from two approval rates at Larkfield that cannot both describe the same month, and come back to them with one basis and one test.",
+          "kept_in": [
+            "scene",
+            "in-practice"
+          ]
+        },
+        {
+          "promise": "Say who can stop a payment and what the merchant is told.",
+          "kept_in": [
+            "who-says-no"
+          ]
+        },
+        {
+          "promise": "Define the rates and the two ways of counting them.",
+          "kept_in": [
+            "counting"
+          ]
+        },
+        {
+          "promise": "Go through the levers that move approvals, with the network limits on retries.",
+          "kept_in": [
+            "levers"
+          ]
+        },
+        {
+          "promise": "Describe what Stripe and Adyen document that they do inside the call, and compare the two.",
+          "kept_in": [
+            "inside-the-call",
+            "where-they-differ"
+          ]
+        },
+        {
+          "promise": "Read the published uplift figures and show how to measure your own.",
+          "kept_in": [
+            "uplift-claims"
+          ]
+        },
+        {
+          "promise": "Compare three ways to divide retry decisions between merchant and provider.",
+          "kept_in": [
+            "designs"
+          ]
+        },
+        {
+          "promise": "Show how optimization fails and how each failure is detected.",
+          "kept_in": [
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "A genuine cardholder with money in the account is declined with a code that says only 'do not honor', and for a subscription business each such decline can end a membership nobody chose to end.",
+        "function": "context",
+        "organization": "narration",
+        "evidence": [
+          {
+            "kind": "quotation",
+            "what": "\"some banks classify nearly all declines as 'Do not honor.'\"",
+            "shows": "The generic code is a normal answer, not an edge case, so the merchant cannot diagnose most declines from the response.",
+            "source": "Stripe guide, 'Optimizing authorization rates', https://stripe.com/guides/optimizing-authorization-rates (n.d., accessed November 2026)"
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "The decline is one issuer's private reading of one authorization message, and because providers now reformat, re-credential, retry, reroute or block inside the call, the approval rate is partly the provider's product and its published uplift cannot be compared or checked from outside.",
+        "function": "claim",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The decline that carries no reason.",
+          "introduces": "Why it happens and who has started acting on it: the chapter's thesis.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "On the journey of Mila's class pass this chapter sits between the authorization request and the issuer's answer at 19:42, and it follows her April membership renewal, which is declined once and approved three days later.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's class pass (9 March 2027, 19:42, approved) and her €49.00 renewal declined on 1 April 2027 and approved on 4 April (ledger).",
+            "shows": "Places the chapter on the recurring payment and names the renewal it will count.",
+            "source": "_research/scenario-ledger.md"
+          }
+        ],
+        "transition_in": {
+          "relationship": "place",
+          "carries_over": "The authorization call in which the provider acts.",
+          "introduces": "Where that call sits in the book's recurring payment.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "controlling_idea": "The chapter moves from Larkfield's two approval rates to who can say no, how approvals are counted, which levers move them, what Stripe and Adyen do inside the call, how to read and measure an uplift figure, three ways to own retries, the comparison of the two companies, Larkfield's recount and test, and the failures.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The chapter's place on the payment's journey.",
+          "introduces": "The order of its sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: Two Approval Rates for One Month",
+      "controlling_idea": "Larkfield holds two approval rates for the same month that differ by 13.5 points, and the difference comes from what each one counts before it says anything about either provider.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "C2"
+        ],
+        "how": "Poses the measurement problem with numbers before the vocabulary to resolve it exists."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The meeting, then what Femke finds behind the two numbers, then the questions she writes down; the questions are the chapter's sections, so they must come last."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The introduction's claim that an approval rate is partly the provider's product.",
+        "introduces": "One company that is about to compare two providers on that rate.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p05",
+          "controlling_idea": "In January 2027 Daniel Osei shows Femke de Graaf two figures for December's card renewals, 82.0% on Stripe and 95.5% on Adyen, and asks whether card renewals should move to Adyen.",
+          "function": "context",
+          "organization": "narration",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Illustrative Larkfield figures: 82.0% (Stripe) and 95.5% (Adyen) for card renewals in December 2026; decision K8 lets the payment service move a studio's online card payments to the other provider.",
+              "shows": "A decision worth millions of euros a year is about to rest on two numbers nobody has defined.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ]
+        },
+        {
+          "id": "p06",
+          "controlling_idea": "The two figures come from two queries written years apart, one dividing by every attempt and the other by renewals, over two providers that serve different countries.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe carries the United Kingdom, the United States, Belgium and studios onboarded before 2024; Adyen carries Dutch and German studios onboarded or migrated since 2024 (ledger).",
+              "shows": "The two populations of cards and issuers differ, so even an identical formula would not make the rates comparable.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Two rates that look like a verdict on two providers.",
+            "introduces": "What each rate was computed from.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p07",
+          "controlling_idea": "Before any payment moves, four questions have to be answered: who said no, what is being counted, what could change the answer, and who is already changing it.",
+          "function": "claim",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Two numbers that cannot be compared as they stand.",
+            "introduces": "The questions that make them comparable, which are the chapter's sections.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "who-says-no",
+      "heading": "Who Says No: The Issuer, the Provider or the Request",
+      "controlling_idea": "A payment can fail in three places, only one of which is the issuer, and an issuer's refusal is a private judgement returned in codes that are mostly generic.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "C1"
+        ],
+        "how": "Separates the issuer's decision from the provider's and establishes that the decline carries little the merchant can act on."
+      },
+      "flow": {
+        "pattern": "large_to_small",
+        "rationale": "From the three places a payment can stop, to the issuer's decision, to the code it returns, to the retry meaning of that code, to the fields each provider exposes; each step narrows onto what the merchant's code will read."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Femke's first question: who said no?",
+        "introduces": "The three places a payment can fail and what comes back from each.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p08",
+          "controlling_idea": "A payment fails in one of three places: the issuer declines it, the provider blocks it before it reaches the network, or the request itself is invalid.",
+          "function": "definition",
+          "organization": "classification",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"There are three reasons why a payment might fail\": issuer declines, blocked payments, invalid API calls; \"When Stripe blocks a payment, it doesn't obtain authorization from the card issuer.\"",
+              "shows": "Only one of the three outcomes is the bank's decision; the other two never reach it.",
+              "source": "Stripe documentation, 'Declines', https://docs.stripe.com/declines (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "figure",
+              "what": "Figure: a payment's path from merchant through provider and network to issuer, with three exits labeled invalid, blocked and declined.",
+              "shows": "Makes the three stopping points visible before the rates that count them are defined."
+            }
+          ]
+        },
+        {
+          "id": "p09",
+          "controlling_idea": "The issuer decides alone, by its own automated reading of the fields of the authorization message, and banks read the same fields differently.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"there are 128 fields in the ISO 8583 message, and each issuing bank can choose how to interpret and combine them\"",
+              "shows": "The same request can be approved by one bank and refused by another, which is what gives a provider something to adapt to.",
+              "source": "Stripe guide, 'Optimizing authorization rates', https://stripe.com/guides/optimizing-authorization-rates (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "quotation",
+              "what": "\"their automated systems and models decide whether to authorize it. These tools analyze signals such as spending habits, account balance, and card data (expiration date, address information, and CVC)\"",
+              "shows": "The decision is a model's judgement on signals, not a lookup of the balance.",
+              "source": "Stripe documentation, 'Declines', https://docs.stripe.com/declines (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The issuer decline, the first of the three failures.",
+            "introduces": "How the issuer reaches it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "controlling_idea": "Most issuer declines arrive as a generic code, so the merchant usually cannot learn the reason from the response.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"Card issuers categorize most declines as generic (generic_decline), making the exact decline reason unclear.\" \"For privacy and security reasons, card issuers discuss the specifics of a decline only with their cardholders.\"",
+              "shows": "The lack of a reason is by design.",
+              "source": "Stripe documentation, 'Card declines', https://docs.stripe.com/declines/card (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen's refusal reason 27, 'Declined Non Generic', 'maps all those response codes that cannot be reliably mapped', and Adyen warns: \"do not expose the details of the refusal reason to shoppers\".",
+              "shows": "Adyen's vocabulary has the same hole in the same place.",
+              "source": "Adyen documentation, 'Refusal reasons', https://docs.adyen.com/development-resources/refusal-reasons (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "A decision made privately by each bank's models.",
+            "introduces": "What little of it is returned.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "controlling_idea": "'Soft decline' and 'hard decline' are industry shorthand for whether a refusal may be retried; the network vocabulary behind them is Visa's four categories of decline code and Mastercard's advice codes.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Table of Visa's four categories (1 issuer will never approve; 2 issuer cannot approve at this time; 3 data quality; 4 generic), example codes (04, 14, 41, 43, 46 / 51, 59, 61, 91 / 54, N7, 1A / all others, including 05), and the reattempt rule for each.",
+              "shows": "Gives the reader the official terms that 'soft' and 'hard' stand for, and shows that the most common code, 05, sits in the generic category.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, 24 October 2026, section 7.3.6.3 and Table 7-2"
+            },
+            {
+              "kind": "fact",
+              "what": "Mastercard's Merchant Advice Code, as rendered in Adyen's documentation: '03 : Do not try again', '24 : Retry after 1 hour' through '30 : Retry after 10 days'; 'Not all Mastercard issuers return the MAC.'",
+              "shows": "Mastercard's equivalent is a separate code that says whether and when to retry; it is reported here through Adyen because Mastercard's own rule documents could not be read.",
+              "source": "Adyen documentation, 'Raw acquirer responses', https://docs.adyen.com/development-resources/raw-acquirer-responses (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Codes that are mostly generic.",
+            "introduces": "The one thing a code does reliably tell the merchant: whether it may try again.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p12",
+          "controlling_idea": "Stripe and Adyen each return three layers for a refused card payment: their own normalized reason, the network's raw code, and advice on retrying.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Table: layer by provider. Stripe: decline code such as insufficient_funds or generic_decline; network_decline_code and network_advice_code; advice_code with do_not_try_again, try_again_later, confirm_card_data. Adyen: resultCode Refused with refusalReason and refusalReasonCode; refusalReasonRaw and refusalCodeRaw once enabled, the code only for Visa and Mastercard on Adyen's own acquiring; merchantAdviceCode for Mastercard and a published mapping of raw codes to Visa's categories.",
+              "shows": "A retry policy needs all three layers stored per attempt, and the two providers' normalized vocabularies do not match.",
+              "source": "Stripe documentation, 'Card declines', https://docs.stripe.com/declines/card (n.d., accessed November 2026); Adyen documentation, 'Refusal reasons', https://docs.adyen.com/development-resources/refusal-reasons (n.d., accessed November 2026); Adyen documentation, 'Mapping to Visa system integrity fee categories', https://docs.adyen.com/development-resources/raw-acquirer-responses/visa-integrity-fees (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The network categories and advice codes.",
+            "introduces": "Where each provider puts them in its response.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "counting",
+      "heading": "Counting Approvals: Three Rates and Two Counting Rules",
+      "controlling_idea": "An approval rate means nothing until its numerator, denominator, cohort and counting rule are stated, because the same month of payments yields rates more than ten points apart.",
+      "function": "definition",
+      "advances_thesis": {
+        "supports": [
+          "C2"
+        ],
+        "how": "Defines authorization rate against payment success rate and conversion, and per-attempt against per-purchase counting, with the arithmetic that separates them."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The three rates must be defined before the counting rule that applies to each; the effect of blocked payments needs both; the instruction to state all four parts comes last because it is what the three paragraphs before it justify."
+      },
+      "transition_in": {
+        "relationship": "sequence",
+        "carries_over": "Three places a payment can stop and the attempts a retry adds.",
+        "introduces": "The rates that result from choosing which of those to count.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p13",
+          "controlling_idea": "The authorization rate counts only attempts that reached the network, the payment success rate counts everything submitted to the provider, and checkout conversion counts from the moment the customer starts to pay.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Authorization rate: \"we divide the number of payments authorized by the card issuer by the number of unique payment attempts submitted to the card network for authorization. We exclude invalid API calls, payments that fail 3D Secure authentication, and blocked payments in the denominator\"; payment success rate divides by \"unique payment attempts submitted through Stripe\".",
+              "shows": "The two rates share a numerator and differ in the denominator.",
+              "source": "Stripe documentation, 'Acceptance analytics', https://docs.stripe.com/payments/analytics/acceptance (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "statistic",
+              "what": "Stripe's worked example: 103,000 requests, 3,000 invalid, 1,000 failed authentication, 1,000 blocked, 93,000 authorized: payment success rate 93% (93,000 / 100,000), authorization rate 94.9% (93,000 / 98,000).",
+              "shows": "The same payments give two rates 1.9 points apart.",
+              "source": "Stripe documentation, 'Acceptance analytics', https://docs.stripe.com/payments/analytics/acceptance (n.d., accessed November 2026)"
+            }
+          ]
+        },
+        {
+          "id": "p14",
+          "controlling_idea": "Each rate can be counted per attempt or per purchase, and once a declined payment is retried the two counts move far apart.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"The raw rate includes all payment attempts (including retries) to make the same purchase.\" \"The deduplicated rate groups the retried payment attempts together and calculates the acceptance rate based on the final outcome.\" One purchase with two failures and a success: raw 33.3%, deduplicated 100%.",
+              "shows": "Stripe names the two rules and shows the extreme case.",
+              "source": "Stripe documentation, 'Acceptance analytics', https://docs.stripe.com/payments/analytics/acceptance (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "table",
+              "what": "Illustrative Larkfield table, one month of card renewals on Adyen: 210,000 renewals; 191,100 approved at the first attempt; 33,600 retry attempts; 200,550 renewals finally paid. Per attempt 82.3% (200,550 / 243,600); first attempt 91.0%; per renewal 95.5%.",
+              "shows": "One month, one provider, three defensible rates between 82.3% and 95.5%.",
+              "source": "Illustrative assumption built on the ledger's renewal volumes"
+            },
+            {
+              "kind": "figure",
+              "what": "Figure: one pile of payments measured by three rulers that read 82.3%, 91.0% and 95.5%.",
+              "shows": "Fixes the idea that the rate is a property of the counting rule as much as of the payments."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Two rates that differ by their denominator.",
+            "introduces": "A second choice, per attempt or per purchase, that multiplies the readings.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p15",
+          "controlling_idea": "A blocked payment, one the provider stops before the network because it expects a refusal or a penalty fee, leaves the authorization-rate denominator, so that rate can rise while not one more sale is made.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "From Stripe's example: block 1,000 more payments that would have been declined and the authorization rate becomes 93,000 / 97,000 = 95.9% while the payment success rate stays 93%; if 50 of the 1,000 would have been approved, 50 sales are lost and the authorization rate still rises.",
+              "shows": "Shows arithmetically why a blocked payment is not an issuer decline and why it flatters one rate.",
+              "source": "Stripe documentation, 'Acceptance analytics', https://docs.stripe.com/payments/analytics/acceptance (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "fact",
+              "what": "A payment blocked by Adaptive Acceptance returns type 'blocked', network_status 'not_sent_to_network', reason 'low_probability_of_authorization'.",
+              "shows": "The provider's own record says the bank never saw it.",
+              "source": "Stripe documentation, 'Declines', https://docs.stripe.com/declines (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Denominators that exclude blocked payments.",
+            "introduces": "What happens to each rate when the provider blocks more.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p16",
+          "controlling_idea": "State every approval rate with its numerator, denominator, cohort and counting rule, and compute it from your own record of attempts and purchases, because Adyen's one published formula (payment conversion rate: authorized over initiated transactions) does not say what counts as initiated and it gives none for authorization rate.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen's documentation and press use 'authorization rate' and 'payment conversion'; its glossary defines the payment conversion rate as authorized transactions divided by initiated transactions, and a July 2026 knowledge-hub article says Adyen reports acceptance rate on a gross basis; no formula for authorization rate and no definition of 'initiated' was found.",
+              "shows": "A two-provider comparison cannot lean on either provider's dashboard definition.",
+              "source": "Adyen documentation, 'Adyen Uplift', https://docs.adyen.com/uplift (n.d., accessed November 2026); Adyen press release, 'Introducing Adyen Uplift', https://www.adyen.com/press-and-media/adyen-uplift-launch (9 January 2025)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "Three rates, two counting rules and the effect of blocking.",
+            "introduces": "The rule for stating a rate and where to compute it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "levers",
+      "heading": "What Moves the Rate: Credentials, Message, Route, Retries and Timing",
+      "controlling_idea": "Every lever that raises approvals changes what the issuer sees or when it is asked, and the retry levers are bounded by network rules that all of a merchant's attempts share.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "C3"
+        ],
+        "how": "Lays out the levers and their limits before the next section shows the providers pulling them."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "additional_patterns": [
+          {
+            "pattern": "grouping",
+            "applies_to": "p17: the levers grouped by when they act"
+          }
+        ],
+        "rationale": "The levers are taken in the order they act on one payment: the stored credential before the request exists, the request as it is sent, the retry after a refusal, the scheduled attempt days later. The reader can then place each provider feature of the next section on that timeline."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "A rate that is now defined.",
+        "introduces": "What can change it.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p17",
+          "controlling_idea": "The levers fall into four moments: before the request exists, as it is sent, straight after a refusal, and days later.",
+          "function": "claim",
+          "organization": "classification",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Table of levers by moment: account updater and network tokens (stored credential); local acquiring, message formatting and data, authentication choice (as sent); in-call retry with changed fields, credential or network (after a refusal); scheduled retry and timing (days later); with what each changes for the issuer and who decides.",
+              "shows": "One map for the section; each row is developed below."
+            }
+          ]
+        },
+        {
+          "id": "p18",
+          "controlling_idea": "An account updater is a card-network service that gives the provider a replaced card's new number or expiry date, so a stored card keeps working after the bank reissues it.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: \"automatically attempts to update saved card details whenever a customer receives a new card\", \"widely supported in the United States\", \"International support varies from country to country\", announced through the payment_method.automatically_updated event; real-time updates announced 23 February 2023.",
+              "shows": "Stripe runs it as one automatic service whose coverage it does not list by country.",
+              "source": "Stripe documentation, 'Cards', https://docs.stripe.com/payments/cards/overview (n.d., accessed November 2026); Stripe newsroom, 23 February 2023"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen Real Time Account Updater: \"When you submit a payment that is refused, our Real Time Account Updater instantly checks for updated card details. If there is an update, we immediately retry the payment with the updated card details. This all happens while the payment is being processed, and appears as a single transaction.\"",
+              "shows": "On Adyen the update is itself an in-call retry, the first sign of the next section's subject.",
+              "source": "Adyen documentation, 'Real Time Account Updater', https://docs.adyen.com/online-payments/account-updater/real-time-account-updater (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The first moment: the stored credential.",
+            "introduces": "The service that keeps a stored card number current.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p19",
+          "controlling_idea": "A network token, a card-network stand-in for the card number that stays valid when the card is reissued, is used by both providers as a per-payment choice next to the real number, and neither publishes what it adds on its own.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: \"We maintain PAN redundancy to retry failed network token transactions on the underlying PAN\"; Adyen: \"the AI in Uplift can choose to tokenize, use a token, or swap a token for a PAN based on global optimization targets\".",
+              "shows": "Both keep the card number and choose per payment, which makes the token an optimization lever and not only a security measure.",
+              "source": "Stripe guide, 'Understanding the benefits of network tokens' (n.d., accessed November 2026); Andreu Mora, Adyen, 'The AI behind Uplift', https://www.adyen.com/knowledge-hub/the-ai-behind-uplift (17 January 2025)"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen: \"Network tokenization is only applicable for payments acquired by Adyen.\" Neither company publishes an approval gain from tokens isolated from its other features.",
+              "shows": "The lever has a documented boundary and an undocumented size.",
+              "source": "Adyen documentation, 'Network tokenization', https://docs.adyen.com/online-payments/network-tokenization (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "A service that keeps the card number current.",
+            "introduces": "A second credential that does not need updating, and how the providers use it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "controlling_idea": "Three levers change the request as it is sent: which entity acquires it, how its data fields are filled, and whether the cardholder is authenticated.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: \"banks are often more likely to approve domestic payments\"; its guide's example of testing postcode formats per issuer; Adyen Smart Payment Messaging: \"Adyen optimizes issuer messaging (for example, CVC and AVS fields) to increase authorization rates on low-risk transactions\".",
+              "shows": "Both describe adapting the message to the bank, and local acquiring as a matter of how the payment arrives.",
+              "source": "Stripe guide, 'Optimizing authorization rates', https://stripe.com/guides/optimizing-authorization-rates (n.d., accessed November 2026); Adyen documentation, 'Enable Adyen Uplift' (partner guide), https://docs.adyen.com/partners/uplift-enablement (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen's Authentication Engine \"helps decide when to offer strong customer authentication, which exemptions to ask for, and when to request the frictionless or the challenge flow based on issuer preference\"; Stripe excludes payments that fail 3-D Secure from the authorization-rate denominator.",
+              "shows": "Authentication is a lever with its own rate effect, owned by another chapter.",
+              "source": "Adyen documentation, 'Adyen Uplift', https://docs.adyen.com/uplift (n.d., accessed November 2026); Stripe documentation, 'Acceptance analytics', https://docs.stripe.com/payments/analytics/acceptance (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "Levers on the stored credential.",
+            "introduces": "Levers on the request itself.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p21",
+          "controlling_idea": "After a refusal the lever is the retry, and the networks cap it: Visa's rules allow up to 20 reattempts in 30 days for categories 2 to 4 and none for category 1.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa Table 7-2: Category 1, \"a Merchant must never resubmit an Authorization Request or Account Verification for the same Payment Credential\"; Categories 2, 3 and 4, \"Reattempt permitted (up to 20 attempts in 30 days)\".",
+              "shows": "The limit is a network rule in a public document, read directly.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, 24 October 2026, section 7.3.6.3 and Table 7-2"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen's mapping page still says \"up to 15 times in a 30-day period\" (accessed November 2026); Stripe \"recommends a maximum of eight retries\" and warns that issuers \"might see creating additional retries as potential fraud\"; Mastercard's thresholds (10 in 24 hours, 35 in 30 days) are known here only from an acquirer's guidance of May 2026.",
+              "shows": "Provider documentation lags or simplifies the rule, and Mastercard's is not confirmed from Mastercard.",
+              "source": "Adyen documentation, 'Mapping to Visa system integrity fee categories', https://docs.adyen.com/development-resources/raw-acquirer-responses/visa-integrity-fees (n.d., accessed November 2026); Stripe documentation, 'Card declines', https://docs.stripe.com/declines/card (n.d., accessed November 2026); PayPal, 'How to avoid excessive retries penalties', 15 May 2026 (secondary source)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "Levers applied before the issuer answers.",
+            "introduces": "The lever applied after it refuses, and its limit.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p22",
+          "controlling_idea": "A retry policy says which refusals are retried, how many times and when, and for recurring payments the when is spread over days inside a count and a window the merchant sets.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe Smart Retries (part of Billing): default for new accounts up to 8 retries within 2 weeks; signals include 'The best time to pay (payments made for debit cards in certain countries might be slightly more successful at 12:01 am in local time zones)'; hard decline codes are not retried.",
+              "shows": "Stripe's scheduled retries belong to its billing product and run inside a count and a window.",
+              "source": "Stripe documentation, 'Automate payment retries', https://docs.stripe.com/billing/revenue-recovery/smart-retries (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen Auto Rescue: retries refused shopper-not-present payments 'at optimal times' within a rescue window of 1 to 48 days, enabled per transaction or per merchant account; the response carries retry.rescueScheduled. Each company has one post on its retry model (owner: invoicing-collections-and-dunning): Stripe blog, 23 January 2024, 'more than 500 attributes'; Adyen knowledge hub, 3 December 2020, a contextual bandit that in one experiment converted 'about 6% more orders than the baseline'.",
+              "shows": "Adyen's belongs to payments and works for a merchant that runs its own billing.",
+              "source": "Adyen documentation, 'Auto Rescue' and 'Auto Rescue for card payments', https://docs.adyen.com/online-payments/auto-rescue (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "Retries within the limit.",
+            "introduces": "Retries placed days later, on a schedule.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "inside-the-call",
+      "heading": "Inside the Call: What Stripe and Adyen Do Without Being Asked",
+      "controlling_idea": "Both providers now pull the levers themselves inside the authorization call, so one API call can stand for several network attempts or none, decided by machine-learned models beside a few settings the merchant controls.",
+      "function": "evidence",
+      "advances_thesis": {
+        "supports": [
+          "C4"
+        ],
+        "how": "Documents, with dates, the actions each provider takes unasked and what each has published about the models that take them."
+      },
+      "flow": {
+        "pattern": "assertion_evidence_reasoning",
+        "rationale": "Each company's documented actions come first as evidence; the consequence for the merchant's record follows from both; only then does the chapter turn to what decides those actions (models) and what is left to the merchant (settings). Putting the models first would explain a behavior the reader has not yet seen."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "Levers described as things a merchant could pull.",
+        "introduces": "The provider pulling them inside the call, unasked.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p23",
+          "controlling_idea": "Stripe documents that Adaptive Acceptance reformats a request before sending it or after a decline, retries declined payments in real time, can retry a US debit card on another network, and, for accounts that pay network costs directly, blocks payments unlikely to succeed.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"Adaptive Acceptance uses AI to reformat payment requests based on card issuers' preferences. Stripe can make these changes before sending a payment or after a payment is declined.\" \"Decline prevention: Stripe blocks a payment from reaching the card network that was unlikely to succeed, avoiding additional scheme fees for the payment.\"",
+              "shows": "Reformatting, retrying and blocking are documented product behavior.",
+              "source": "Stripe documentation, 'Payments optimization', https://docs.stripe.com/payments/analytics/optimization (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "quotation",
+              "what": "Retries happen \"in real time—without the end customer ever seeing the initial decline\" (12 February 2025); Authorization Boost bundles Adaptive Acceptance, card account updater and network tokens (product page, accessed November 2026).",
+              "shows": "The first decline is invisible to the customer and, unless looked for, to the merchant.",
+              "source": "Stripe blog, 'AI enhancements to Adaptive Acceptance', https://stripe.com/blog/ai-enhancements-to-adaptive-acceptance (12 February 2025)"
+            }
+          ]
+        },
+        {
+          "id": "p24",
+          "controlling_idea": "Adyen documents the same kinds of action under Uplift, launched in January 2025: routing among its own routes, adjusted issuer messaging on by default, in-call retries and an opt-in block on excessive retries.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Uplift's Optimize module: Intelligent Payment Routing ('off by default', needs 'at least two available routes'), Smart Payment Messaging ('enabled by default', level adjustable), Auto Rescue; the Excessive Retry Prevention Service 'is opt-in, not priced, and in maintenance mode' and 'may have a negative impact on authorization rates'.",
+              "shows": "Each action has a documented default, which is what an integrator needs to know.",
+              "source": "Adyen documentation, 'Enable Adyen Uplift' (partner guide), https://docs.adyen.com/partners/uplift-enablement (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen product page: \"Auto Retries intelligently retries declined transactions by adapting the route, messaging, authentication, and tokenization to maximize the chance of success – in milliseconds.\"",
+              "shows": "The in-call retry is described on a product page, not in the documentation read; the article says so.",
+              "source": "Adyen product page, 'Optimize', https://www.adyen.com/uplift/optimize (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "Stripe's actions inside the call.",
+            "introduces": "Adyen's, with their defaults.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p25",
+          "controlling_idea": "Because of these actions one API call can produce several network attempts, a different credential or network than requested, or no attempt at all, while the merchant receives one result.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen: the updater's retry 'appears as a single transaction'; Stripe: a blocked payment's outcome reads network_status 'not_sent_to_network'; Stripe may 'reattempt a declined payment on an alternative card network'.",
+              "shows": "Each of the three cases (several attempts, a changed route, no attempt) is documented by at least one of the two.",
+              "source": "Adyen documentation, 'Real Time Account Updater', https://docs.adyen.com/online-payments/account-updater/real-time-account-updater (n.d., accessed November 2026); Stripe documentation, 'Declines', https://docs.stripe.com/declines (n.d., accessed November 2026); Stripe documentation, 'Payments optimization', https://docs.stripe.com/payments/analytics/optimization (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "figure",
+              "what": "Figure: one request entering a provider, three attempts leaving it toward the issuer (declined, reformatted, approved), one response returning to the merchant.",
+              "shows": "Shows why the merchant's attempt count and the network's can differ."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The two providers' documented actions.",
+            "introduces": "What they do to the meaning of one API call.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p26",
+          "controlling_idea": "Both companies say machine-learned models take these decisions; Stripe has published the model family and its results, Adyen the system around the models and its latency budget.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe, 12 February 2025: \"Our previous approach, based on a gradient-boosted tree model (XGBoost)... We transitioned to a TabTransformer-based deep neural network, which we call TabTransformer+\"; \"We can now train and deploy new versions of our Adaptive Acceptance model multiple times per week.\"",
+              "shows": "Stripe names the model and its retraining pace; the behavior of the call can change weekly.",
+              "source": "Stripe blog, 'AI enhancements to Adaptive Acceptance', https://stripe.com/blog/ai-enhancements-to-adaptive-acceptance (12 February 2025)"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen, 17 January 2025: models \"optimized globally through Reinforcement Learning\"; \"SLA for transaction processing: 1 second including acquirer communications which consumes around 600 ms\"; each transaction \"touched between 2 and 5 different AI endpoints\" with \"an allocated latency of 20 ms (median)\".",
+              "shows": "Adyen gives the engineering constraint the models work under.",
+              "source": "Andreu Mora, Adyen, 'The AI behind Uplift', https://www.adyen.com/knowledge-hub/the-ai-behind-uplift (17 January 2025)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "Decisions taken inside the call.",
+            "introduces": "What each company has published about what takes them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p27",
+          "controlling_idea": "What remains rule-based is the envelope the merchant sets (retry counts and windows, a routing objective, a messaging level, its own risk rules), while the per-payment decision inside it belongs to a model the merchant cannot inspect.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: Smart Retries policy of a retry count within 1 week to 2 months; Adyen: routing objective for US and Australia (balance, cost or conversion), messaging optimization level, rescue window, custom risk rules as a premium feature.",
+              "shows": "The settings are few and coarse compared with the decisions taken.",
+              "source": "Stripe documentation, 'Automate payment retries', https://docs.stripe.com/billing/revenue-recovery/smart-retries (n.d., accessed November 2026); Adyen documentation, 'Enable Adyen Uplift' (partner guide), https://docs.adyen.com/partners/uplift-enablement (n.d., accessed November 2026); Adyen documentation, 'Adyen Uplift', https://docs.adyen.com/uplift (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "reasoning",
+              "what": "Labeled inference: with about 600 ms of a one-second target spent on the acquirer leg and 20 ms per model call, the decision has to be made by small models in the payment path, which is a reason neither company exposes per-payment control.",
+              "shows": "Explains the design from Adyen's published budget without claiming it as documented intent.",
+              "source": "Andreu Mora, Adyen, 'The AI behind Uplift', https://www.adyen.com/knowledge-hub/the-ai-behind-uplift (17 January 2025)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Models that decide per payment.",
+            "introduces": "The small set of things the merchant still sets by rule.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "uplift-claims",
+      "heading": "Reading an Uplift Figure, and Measuring Your Own",
+      "controlling_idea": "The uplift each company publishes is a vendor estimate on its own metric, cohort and baseline, and the only figure a merchant can trust is one measured on its own traffic with a randomized holdout and guardrails.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "C5"
+        ],
+        "how": "Quotes each published figure with wording and date, shows why they cannot be compared or checked, and gives the measurement that can."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "The claims and what is missing from them come first, then the vendors' own measurement methods from weakest (a modeled estimate) to strongest (a randomized test), then the author's rules, which borrow from the strongest. The limits of the public record close the section because they qualify everything before them."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "A provider that changes the outcome of the call.",
+        "introduces": "The size of that change, as claimed and as measurable.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p28",
+          "controlling_idea": "Stripe and Adyen each publish a headline uplift, in words that name different metrics: an 'acceptance rate' 3.8% higher on average, and a 'payment conversion rate' up to 6% higher in a pilot.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Table of claims with exact wording, source and date. Stripe: \"can increase their acceptance rate by 3.8% on average, with some seeing up to 7%\" (15 May 2025); \"helping increase acceptance rates by an average of 3.8% and lower processing costs by up to 3.3%\" (29 April 2026); \"recovering a record-high $6 billion in falsely declined transactions\" in 2024 (12 February 2025). Adyen: \"increase payment conversion rates by up to 6% compared to legacy implementations\", \"Piloted by 60 enterprise businesses\" (9 January 2025), footnoted \"Based on the average conversion improvement of merchants that participated in the pilot and used all modules\" (January 2025); \"reduced payment cost by up to 5% for pilot customers in the U.S.\"",
+              "shows": "Every figure is a vendor's own statement; the table keeps the wording so the reader can see what each does and does not define.",
+              "source": "Stripe blog, 'Using AI to optimize payments performance with the Payments Intelligence Suite', https://stripe.com/blog/using-ai-optimize-payments-performance-payments-intelligence-suite (15 May 2025); Stripe blog, 'Everything we announced at Sessions 2026', https://stripe.com/blog/everything-we-announced-at-sessions-2026 (29 April 2026); Stripe blog, 'AI enhancements to Adaptive Acceptance', https://stripe.com/blog/ai-enhancements-to-adaptive-acceptance (12 February 2025); Adyen press release, 'Introducing Adyen Uplift', https://www.adyen.com/press-and-media/adyen-uplift-launch (9 January 2025)"
+            }
+          ]
+        },
+        {
+          "id": "p29",
+          "controlling_idea": "The two figures cannot be compared, and neither can be checked, because neither states its formula, cohort or baseline.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stripe's 'acceptance rate' is not defined where the 3.8% is stated (relative or percentage points, raw or deduplicated, which merchants); Adyen's 6% is 'up to' in the headline and an 'average' in the footnote, against 'legacy implementations', for pilot merchants using all five modules, including checkout and risk features.",
+              "shows": "Each gap is something the reader can point to in the quoted wording.",
+              "source": "Stripe blog, 'Using AI to optimize payments performance with the Payments Intelligence Suite', https://stripe.com/blog/using-ai-optimize-payments-performance-payments-intelligence-suite (15 May 2025); Adyen press release, 'Introducing Adyen Uplift', https://www.adyen.com/press-and-media/adyen-uplift-launch (9 January 2025)"
+            },
+            {
+              "kind": "quotation",
+              "what": "\"Stripe doesn't guarantee any outcomes for your use of Authorization Boost features. The optimization calculations we provide are estimates.\"",
+              "shows": "Stripe's own documentation tells the reader how to treat the number.",
+              "source": "Stripe documentation, 'Payments optimization', https://docs.stripe.com/payments/analytics/optimization (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Two figures that look alike.",
+            "introduces": "Why they measure different things and cannot be verified.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p30",
+          "controlling_idea": "The figure in Stripe's dashboard is a modeled estimate per payment of what would have happened without the feature, not a measured difference.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"For each payment, Stripe assesses the likelihood that optimizations contributed to its success, given that some payments might have otherwise still been approved.\" Example: 100 payments of 50 USD at a 20% likelihood give 1,000 USD recovered; the comparison chart \"shows the raw rate, rather than the deduplicated rate\".",
+              "shows": "The estimate depends on a counterfactual model the merchant cannot see, on a counting rule that differs from the test's.",
+              "source": "Stripe documentation, 'Payments optimization', https://docs.stripe.com/payments/analytics/optimization (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "Figures with no stated baseline.",
+            "introduces": "How one vendor estimates the baseline for a single merchant.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p31",
+          "controlling_idea": "Both companies describe randomized measurement, and each says what its control group still receives.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe's A/B test (previewed 29 April 2026; still behind a preview sign-up in November 2026): eligible volume randomized into two equal groups for 30 days, results after 37 days to let retries finish, deduplicated payment success rate, significance at 5%; the control keeps the merchant's existing optimizations, and the card account updater runs in both groups because Stripe 'can't apply card credential updates selectively'.",
+              "shows": "A documented design a merchant can copy, with the limit that one feature cannot be tested this way.",
+              "source": "Stripe documentation, 'Set up an A/B test for Authorization Boost', https://docs.stripe.com/payments/analytics/optimization/a-b-testing (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen: \"Note that we still act on the control group as we define baseline as a 'market baseline'\": \"blocking cards that we know are stolen, SCA (Strong Customer Authentication) exemption, forcing a network token, and retrying with a challenge if the authentication fails. This results in a lower, but more honest uplift calculation\".",
+              "shows": "Adyen states its control is not 'nothing'; the lift against it is smaller than against a bare integration.",
+              "source": "Andreu Mora, Adyen, 'The AI behind Uplift', https://www.adyen.com/knowledge-hub/the-ai-behind-uplift (17 January 2025)"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen's experiments run on live transactions, and 'You can only start optimization experiments following a recommendation.'",
+              "shows": "The merchant cannot freely design a test of Adyen's optimization features.",
+              "source": "Adyen documentation, 'Adyen Uplift experiments', https://docs.adyen.com/uplift/uplift-experiments (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "An estimate modeled per payment.",
+            "introduces": "Measurement by randomized groups, as each company documents it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p32",
+          "form": "list",
+          "controlling_idea": "Six rules, the author's, turn a claimed uplift into a measured one: fix the metric, fix the cohort, randomize a holdout, wait for retries, watch guardrails in the same test, and know what the control group receives.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Before-and-after comparisons confound the feature with season, card mix and issuer behavior; the guardrails are fraud and dispute rate, network fees, blocked-payment count and latency; a rule of thumb for size is about 16 × p(1−p)/d² payments per group to detect a difference d at a rate p.",
+              "shows": "Each rule answers one of the gaps found in the published figures."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The vendors' own randomized designs.",
+            "introduces": "The rules a merchant applies to any optimization feature.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p33",
+          "controlling_idea": "The public record stops short of what would let anyone verify either company's figure: features, labels, per-issuer results, the share of blocked payments that would have been approved, recovery rates across merchants for scheduled retries and any audited lift.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Not found in any source read for this chapter: a definition of 'false decline' behind Stripe's $6 billion; an authorization result from Stripe's Payments Foundation Model; the denominator of Adyen's 'payment conversion'; any figure after Adyen's pilot of 60; Uplift pricing; Mastercard's retry thresholds in a Mastercard document.",
+              "shows": "States where the chapter's evidence ends so the reader does not take silence for confirmation."
+            }
+          ],
+          "transition_in": {
+            "relationship": "emphasis",
+            "carries_over": "Rules for measuring on one's own traffic.",
+            "introduces": "Why they are needed: what neither company publishes.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "designs",
+      "heading": "Three Ways to Own the Retry, and What Each Costs",
+      "controlling_idea": "A merchant can leave every decision to the provider, add its own measurement on top, or build its own retry logic from raw codes; the provider should act inside the call and exactly one scheduler should act across days.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "C6"
+        ],
+        "how": "Turns the provider's role inside the call into a design decision about who schedules attempts across days."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "One unit: the three designs are set side by side in a table and the recommendation follows from the table's columns. It stands after the measurement section because the middle design is defined by that measurement, and before the two-company comparison because it is a choice the merchant makes on either provider."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "A provider that acts inside the call and figures that must be measured locally.",
+        "introduces": "The designs open to the merchant.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p34",
+          "controlling_idea": "Of the three ways to divide retry decisions, the rule I use is to let the provider act inside the call, own the schedule across days only if you run your own billing, and never let two schedulers retry the same payment.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Trade-off table: provider decides everything (defaults on); provider decides, merchant measures (holdout, own attempt record); merchant schedules its own retries from raw codes and advice codes. Columns: who decides the next attempt, what you build, what you can see, when it is right, main risk.",
+              "shows": "Sets the designs side by side on the same criteria before the recommendation chooses among them."
+            },
+            {
+              "kind": "reasoning",
+              "what": "Only the provider has the issuer-level data and the milliseconds; Adyen documents its code mapping for merchants who 'have built your own retry logic', which shows it expects some to; a merchant on a provider's billing product already has a scheduler.",
+              "shows": "Gives the conditions under which each design fits and the one combination that never does.",
+              "source": "Adyen documentation, 'Mapping to Visa system integrity fee categories', https://docs.adyen.com/development-resources/raw-acquirer-responses/visa-integrity-fees (n.d., accessed November 2026)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "The two companies document the same kinds of action and differ in defaults, in what the merchant can configure, in what they publish about their models and in how a merchant can measure the result.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "C4",
+          "C5"
+        ],
+        "how": "Sets the documented facts of the two previous evidence sections side by side and reads them as inference."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The table comes first and carries the facts in cells, without retelling the two evidence sections; the reading follows because it is advice drawn from the rows. The section comes after the designs so the reader can see which design each company's defaults lean toward, and before Larkfield's worked case, which uses both providers."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "Actions, models, claims and designs described company by company.",
+        "introduces": "The same facts in one table, with the author's reading.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p36",
+          "controlling_idea": "Seven aspects separate the two in the public record, from metric definitions to how a merchant can test.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Where They Differ table, seven rows: metric definitions; in-call reformatting and retries; blocking before the network; scheduled retries; published model detail; headline claim; how a merchant can measure. Every Stripe and Adyen cell is a fact cited earlier in the chapter or 'Not public'; the last column is the author's inference.",
+              "shows": "The required comparison; no cell introduces a fact the chapter has not already sourced."
+            }
+          ]
+        },
+        {
+          "id": "p37",
+          "controlling_idea": "On Stripe an integrator should read the outcome of every attempt and use the documented rate definitions; on Adyen it should enable raw responses, check each Uplift default and build its own rate from attempts.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Follows from the table: Stripe defines its rates and exposes blocked outcomes on the charge; Adyen exposes raw codes only once enabled, turns messaging optimization on by default and publishes one rate formula whose denominator ('initiated transactions') is undefined.",
+              "shows": "Turns the differences into what to do on each provider."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The documented differences.",
+            "introduces": "What an integrator does differently on each.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: One Basis, Then One Test",
+      "controlling_idea": "Recounted on one basis, Larkfield's 13.5-point gap between providers shrinks to under one point that the data cannot attribute, and the next step is a randomized test of something Larkfield controls.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "C2",
+          "C5"
+        ],
+        "how": "Applies the counting rules and the measurement rules to the scene's two numbers."
+      },
+      "flow": {
+        "pattern": "small_to_large",
+        "rationale": "The recount of the two aggregate rates comes first because it answers the scene; one renewal then shows how a single payment lands in each count; the test plan comes last because it is designed from what the first two reveal."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The comparison of the two providers and the rules for measuring.",
+        "introduces": "Both applied to Larkfield's two rates.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p38",
+          "controlling_idea": "Counted the same way, December's card renewals were approved at the first attempt 90.2% of the time on Stripe and 91.0% on Adyen, and paid in the end 95.1% and 95.5% of the time.",
+          "function": "evidence",
+          "organization": "illustration",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Illustrative table, December 2026 card renewals. Stripe: 330,000 renewals, 297,660 approved at first attempt (90.2%), 52,800 retry attempts, 313,830 paid (95.1% per renewal; 82.0% per attempt). Adyen: 210,000 renewals, 191,100 at first attempt (91.0%), 33,600 retry attempts, 200,550 paid (95.5% per renewal; 82.3% per attempt).",
+              "shows": "The scene's 82.0% and 95.5% were a per-attempt rate and a per-renewal rate; on one basis the gap is 0.8 or 0.4 points.",
+              "source": "Illustrative assumptions consistent with the ledger's 940,000 monthly renewals"
+            },
+            {
+              "kind": "reasoning",
+              "what": "The remaining gap compares British, American and Belgian cards with Dutch and German ones; the 1,140 Dutch and German studios still on Stripe give a closer comparison, though not a randomized one.",
+              "shows": "Shows why even the aligned rates do not rank the providers.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ]
+        },
+        {
+          "id": "p39",
+          "controlling_idea": "Mila's April renewal shows how one payment lands in each count: declined on 1 April for insufficient funds, approved on 4 April, it is two attempts and one paid renewal.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Mila's €49.00 renewal: declined 1 April 2027 (insufficient funds, Visa code 51, category 2), retried 4 April and approved; under K1 each scheduled attempt has its own idempotency key; under K5 the retry date follows from the decline code.",
+              "shows": "Per attempt it is 50%, per renewal 100%, and the decline code is what made the retry permissible and sensible.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "Aggregate rates on one basis.",
+            "introduces": "One renewal inside them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p40",
+          "controlling_idea": "Femke's first test randomizes what Larkfield controls, its own retry schedule for card renewals, by membership, with the metric, sample size, waiting period and guardrails fixed in advance.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Test plan: unit of randomization (membership id); cohort (card renewals at Dutch and German studios on Adyen); metric (renewals paid within 14 days, per renewal); size (about 27,500 per group to detect 0.5 points at 95.5%); duration (one month plus 14 days); guardrails (attempts per renewal, disputes, provider fees per paid renewal, blocked payments); control (the current schedule).",
+              "shows": "A concrete instance of the six rules, sized with the rule of thumb.",
+              "source": "Illustrative; sample size from 16 × p(1−p)/d²"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "What the recount cannot say.",
+            "introduces": "The test that can.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong",
+      "controlling_idea": "Optimization fails in three ways a merchant can detect: two schedulers spending one retry budget, a provider outcome misread by the merchant's own systems, and a rate that improves while sales, fraud or fees get worse.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "C6"
+        ],
+        "how": "Shows what happens when the merchant's systems are not designed for a provider that acts inside the call."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "Three failures, ordered from the one a merchant causes alone (two schedulers), to one caused at the boundary (misread outcomes), to one that originates with the provider (a regression behind a better-looking rate); detection gets harder in the same order."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "A test that goes to plan.",
+        "introduces": "The ways optimization goes wrong in production, and how each is noticed.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p41",
+          "controlling_idea": "When the merchant's retry job and the provider's automatic retries both act on one payment, they spend the same network retry allowance and can turn a recoverable decline into penalty fees.",
+          "function": "cause_effect",
+          "organization": "process",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Visa counts reattempts per payment credential; Adyen's Auto Rescue and Stripe's Smart Retries each schedule attempts of their own; Adyen's refusal reason 46 is 'Transaction blocked by Adyen to prevent excessive retry fees'.",
+              "shows": "Three systems can each believe they hold the whole budget; reason 46 is the visible symptom on Adyen.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, 24 October 2026, section 7.3.6.3 and Table 7-2; Adyen documentation, 'Auto Rescue' and 'Auto Rescue for card payments', https://docs.adyen.com/online-payments/auto-rescue (n.d., accessed November 2026); Stripe documentation, 'Automate payment retries', https://docs.stripe.com/billing/revenue-recovery/smart-retries (n.d., accessed November 2026); Adyen documentation, 'Refusal reasons', https://docs.adyen.com/development-resources/refusal-reasons (n.d., accessed November 2026)"
+            }
+          ]
+        },
+        {
+          "id": "p42",
+          "controlling_idea": "When the merchant's code treats every failure as an issuer decline and every stored card as unchanged, it tells customers to call a bank that never saw the payment and shows them a card number that has been replaced.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: outcome type 'blocked' with network_status 'not_sent_to_network'; the payment_method.automatically_updated event carries 'the card's new expiration date and last four digits'.",
+              "shows": "Both changes are announced in documented fields and events that have to be read and stored.",
+              "source": "Stripe documentation, 'Declines', https://docs.stripe.com/declines (n.d., accessed November 2026); Stripe documentation, 'Cards' (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "A failure from two systems acting.",
+            "introduces": "A failure from one system not reading what the other did.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p43",
+          "controlling_idea": "A provider-side change can raise the authorization rate while paid purchases, fraud or fees get worse, and only a standing holdout and guardrail metrics reveal it.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen says its retry-prevention service 'may have a negative impact on authorization rates'; Stripe's product page describes declining charges 'most likely to be rejected, while balancing impact to your auth rates'; Stripe retrains its model 'multiple times per week'.",
+              "shows": "Both companies concede the cost optimization can remove payments that would have been approved, and the model behind it changes without notice.",
+              "source": "Adyen documentation, 'Enable Adyen Uplift' (partner guide), https://docs.adyen.com/partners/uplift-enablement (n.d., accessed November 2026); Stripe product page, 'Authorization Boost' (n.d., accessed November 2026); Stripe blog, 'AI enhancements to Adaptive Acceptance', https://stripe.com/blog/ai-enhancements-to-adaptive-acceptance (12 February 2025)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Failures in the merchant's own systems.",
+            "introduces": "A failure that starts with the provider and hides behind an improved rate.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "Who says no, how approvals are counted, which levers exist and who pulls them are one fact seen four ways: the answer to an authorization request is produced jointly by an issuer the merchant cannot see and a provider that edits the question. A rate is then a statement about that joint system under one counting rule, and a claimed uplift is a statement about a change to it that only a randomized comparison on the merchant's own payments can size.",
+    "so_what": "A team that reads its approval rate as a fact about its customers will move payments, buy features and email members on numbers that measure something else. A team that fixes the metric, stores every attempt with the provider's own outcome and keeps a holdout can tell a lost sale from a blocked one and a real gain from a reclassification.",
+    "callback": {
+      "to": "The opening decline: a genuine cardholder with funds, refused with code 05, 'do not honor'.",
+      "how": "The reader can now say that the code is one bank's generic answer to one version of the message; that the provider may already have reformatted, retried or withheld it; and that whether such declines are becoming rarer is a question about a defined rate, not about the cardholder."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Write down your approval metric with numerator, denominator, cohort and counting rule; store each attempt with the provider's raw outcome; let the provider act inside the call and keep one scheduler across days; test every optimization against a randomized holdout with guardrails. Eight questions for a provider or a design review follow."
+    },
+    "hand_off": {
+      "to": "payment-routing-and-orchestration",
+      "relationship": "problem_solution",
+      "carries_over": "Every lever of this chapter sits inside one provider, whose decisions the merchant cannot inspect and whose outage stops every payment.",
+      "introduces": "The proposed remedy, a second provider and a layer that routes between them, with what it unifies, what it leaves per provider and when a simple switch is enough."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The failures and how each is detected.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p44",
+        "form": "list",
+        "controlling_idea": "Established: a payment can fail at the issuer, at the provider or as an invalid request; most issuer declines are generic; networks limit retries by decline category; and both providers document acting inside the call.",
+        "function": "synthesis"
+      },
+      {
+        "id": "p45",
+        "form": "list",
+        "controlling_idea": "Depends on context: which rate to manage, whether to accept pre-network blocking, who schedules retries across days, and whether a test is feasible at your volume.",
+        "function": "synthesis",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What the field agrees on.",
+          "introduces": "What changes with the merchant's pricing, billing setup and volume.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p46",
+        "form": "list",
+        "controlling_idea": "The author's synthesis: the approval rate is a joint product of issuer and provider, so treat the provider's actions as a dependency to record and test, and treat every published uplift as a hypothesis about your own traffic.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is established and what depends on context.",
+          "introduces": "The author's own position, labeled as such.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p47",
+        "form": "list",
+        "controlling_idea": "Eight questions let the reader test an approval figure or an optimization product in a design review or a provider evaluation.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The take-aways.",
+          "introduces": "Questions that apply them.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p48",
+        "controlling_idea": "Every lever in this chapter sits inside one provider, whose decisions the merchant cannot inspect and whose outage stops every payment, which is the case for a second provider that the next chapter weighs.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "A single provider acting inside the call.",
+          "introduces": "The proposal to add a second provider and route between them.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "The authorization message path, holds and validity windows, stand-in processing.",
+      "covered_in": [
+        "payment-authorization"
+      ]
+    },
+    {
+      "topic": "Which entity acquires in which country and how local acquiring is arranged.",
+      "covered_in": [
+        "acquiring-and-network-connectivity"
+      ]
+    },
+    {
+      "topic": "How network tokens are provisioned, cryptograms, token portability.",
+      "covered_in": [
+        "network-tokens",
+        "tokenization-vaulting-and-pci"
+      ]
+    },
+    {
+      "topic": "Fraud models, risk rules and card testing.",
+      "covered_in": [
+        "payment-fraud-and-risk"
+      ]
+    },
+    {
+      "topic": "3-D Secure flows, exemptions and liability shift.",
+      "covered_in": [
+        "three-d-secure-and-sca"
+      ]
+    },
+    {
+      "topic": "Dunning as a billing process: customer communication, grace periods, invoice states.",
+      "covered_in": [
+        "invoicing-collections-and-dunning",
+        "journey-failed-renewal"
+      ]
+    },
+    {
+      "topic": "Routing among acquirers, networks or providers, least-cost debit routing, failover.",
+      "covered_in": [
+        "payment-routing-and-orchestration"
+      ]
+    },
+    {
+      "topic": "Idempotency keys and what to do when an outcome is unknown.",
+      "covered_in": [
+        "idempotency-and-retries"
+      ]
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "Ruling 19 of the consistency file records the Visa limit. The journal spec's how_why says the current network retry limits could not be confirmed from primary network documents. Visa's limit was confirmed for this chapter in the Visa Core Rules of 24 October 2026 (Table 7-2: 20 attempts in 30 days); Mastercard's was not. The article says so, and the journal-spec sentence now says the same.",
+    "Larkfield's December 2026 renewal counts per provider (330,000 card renewals on Stripe, 210,000 on Adyen) are labeled assumptions in the article and appended to the ledger; journey-failed-renewal and invoicing-collections-and-dunning may reuse them.",
+    "Whether a retry through a second acquirer counts against the same network allowance is not stated in any source read; payment-routing-and-orchestration inherits the question."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "Ten body sections instead of the typical six to nine: the style guide's required elements (scene, designs with a trade-off table, Where They Differ, In Practice, When It Goes Wrong) plus the four the contract owns (who declines, the metric, the levers, the products and their measurement) do not merge without putting two controlling ideas in one section. Sections are kept short instead.",
+      "rejected": [
+        "Folding the three designs into the levers section",
+        "Folding measurement into the products section"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Larkfield's test randomizes its own retry schedule, not a provider feature, because Adyen documents that optimization experiments can only be started following a recommendation and it is not documented whether Stripe's Authorization Boost test applies to a platform's connected accounts.",
+      "rejected": [
+        "A Larkfield test of Adyen Uplift's Optimize module",
+        "A Larkfield run of Stripe's Authorization Boost A/B test"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Visa's retry limit is stated as 20 in 30 days from the Visa rules of 24 October 2026, with Adyen's '15' reported as what its documentation says; the research brief's advice to write '15 or 20' was superseded by reading the rule text.",
+      "rejected": [
+        "Stating the limit as '15 or 20 depending on the source'"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "After the flow rubric (sound with notes): the two design paragraphs were merged into one unit; the blocked payment is defined again where the rates first depend on it; the retry-policy paragraph stays at the level of the lever; sections 7 and 8 received a declared order. The note to cut the roadmap paragraph was not applied: the style guide requires it.",
+      "rejected": []
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Three figures (where a payment can stop; one call, several attempts; three readings of one month) to stay within the length limit.",
+      "rejected": [
+        "A fourth figure of the holdout test"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "PLAN.md",
+      "contributed": "The chapter contract: question, scope, owned terms (authorization rate, soft decline, retry policy, account updater), Larkfield thread."
+    },
+    {
+      "kind": "internal",
+      "ref": "journal-spec.json",
+      "contributed": "Intent, acceptance criteria, thesis and role, copied unchanged; the previous and next chapters' transitions."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-optimization-routing-orchestration.md",
+      "contributed": "Parts 1 to 6: decline types, metric definitions, retry rules, levers, Stripe's and Adyen's products, published machine learning, claims and measurement; open questions."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-card-lifecycle-and-networks.md",
+      "contributed": "Section 2.2: Visa Table 7-2 from the rules of 24 October 2026, Mastercard advice codes as rendered by Adyen, the two providers' decline fields."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "Mila's renewal, the provider split, renewal volumes, decisions K1, K5 and K8."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/consistency-issues.md",
+      "contributed": "Rulings 8 (gloss network token and risk block), 13 (idempotency key and scheduled retries), 15 (soft and hard decline are not network terms), 17 (Mastercard rules cited through providers)."
+    },
+    {
+      "kind": "external",
+      "ref": "Stripe documentation: Declines; Card declines; Acceptance analytics; Payments optimization; A/B testing Authorization Boost; Smart Retries; Cards (n.d., accessed November 2026)",
+      "contributed": "Failure types, codes, rate definitions, Adaptive Acceptance actions, attribution method, test design; re-fetched 17 November 2026."
+    },
+    {
+      "kind": "external",
+      "ref": "Stripe blog, 12 February 2025, 15 May 2025 and 29 April 2026; Stripe guide 'Optimizing authorization rates' and product page 'Authorization Boost' (n.d., accessed November 2026)",
+      "contributed": "Model change, headline claims, ISO 8583 description; re-fetched 17 November 2026."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen documentation: Adyen Uplift; Enable Adyen Uplift; Uplift experiments; Visa system integrity fee mapping; Raw acquirer responses; Refusal reasons; Real Time Account Updater; Auto Rescue; Network tokenization (n.d., accessed November 2026)",
+      "contributed": "Modules, defaults, retry mapping, refusal fields, updater and rescue behavior; re-fetched 17 November 2026."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen press release 'Introducing Adyen Uplift', 9 January 2025; Andreu Mora, 'The AI behind Uplift', 17 January 2025",
+      "contributed": "Launch claims and pilot; models, latency budget and control group; re-fetched 17 November 2026."
+    },
+    {
+      "kind": "external",
+      "ref": "Visa Core Rules and Visa Product and Service Rules, 24 October 2026",
+      "contributed": "Section 7.3.6.3 and Table 7-2: decline categories and reattempt limits; downloaded and read 17 November 2026."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 96 claims checked (82 confirmed, 3 corrected, 5 hedged, 0 unsupported and removed or relabeled, 1 unreachable; 5 not documented or not checked exhaustively); the sentence that Adyen had published no figure since its pilot was corrected (a press release of 22 September 2026 gives single-customer figures), and the Stripe guide quotation now reads 'Do not honor.' as the page does."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "First version, written from PLAN.md, the journal spec and the optimization and card-lifecycle research briefs."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('and the current network retry limits could not be confirmed ' -> 'Visa's reattempt limit is confirmed from its rules of 24 Oct')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation after verification: journal-spec entry and spec body brought into line with the verified page and consistency rulings (ruling 37b; stale open question closed). No unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: 6 statements of absence re-tested with a wide search (2 overturned, 0 narrowed, 4 hold; table in _research/absence-audit/09-authorization-optimization.md). Overturned: Adyen's glossary gives a formula for the payment conversion rate (authorized over initiated transactions) and a 2026 article says it reports on a gross basis; Adyen's press release of 11 February 2026 gives a figure across 6,500+ businesses (1.19% above 'industry baselines'). p-unit controlling idea and evidence on Adyen's formula updated."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Sweep of rulings 46-48: the retry-policy paragraph now names the one post each company has published on its retry model (Stripe 23 January 2024; Adyen 3 December 2020), following chapter 29 (ruling 46a); two Sources entries copied. No unit added or dropped."
+    }
+  ],
+  "length": {
+    "target_words": 5500,
+    "max_words": 6500
+  }
+}

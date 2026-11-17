@@ -1,0 +1,1509 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "payment-authorization",
+  "journal": "payments-platform-architecture",
+  "part": "part-1",
+  "title": "The First Promise: Authorization",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "What the authorization message carries and the path it takes, at an introductory level, and what a hold, a response code and a validity window are.",
+        "The variants: pre-authorization, incremental, partial and zero-value authorization, reversal, and stand-in processing.",
+        "The difference between customer-initiated and merchant-initiated transactions and what the stored-credential rules require.",
+        "How Stripe and Adyen each report a decline: a normalized reason, the raw network code and retry advice."
+      ],
+      "believe": [
+        "An approval is a perishable promise, not a payment, and a timeout is an unknown outcome, not a decline."
+      ],
+      "can_do": [
+        "Given an authorization and a planned capture date, say whether the promise will still be valid and where to read its expiry.",
+        "Given a decline, decide whether a retry is allowed, from the network's retry advice and not from the provider's message alone.",
+        "Given a request that timed out, state the steps to take before sending it again."
+      ]
+    },
+    "audience": {
+      "who": "A software engineer or architect who is new to payments and has read the previous chapter's six-step timeline; most of all the engineer who owns a retry loop, a renewal job or a payment-status column.",
+      "already_knows": [
+        "APIs, HTTP timeouts, retries, idempotency keys as a general technique, webhooks, state machines.",
+        "The parties of a card payment and the six-step timeline (journey-of-a-payment).",
+        "Larkfield, the Double Charge in outline and Mila's class pass (meet-larkfield)."
+      ],
+      "does_not_know": [
+        "Hold, response code, validity window, reversal, stand-in processing.",
+        "Estimated, incremental, partial and zero-value authorization.",
+        "Customer-initiated and merchant-initiated transaction, stored credential.",
+        "What ISO 8583 is and which fields of it surface in a provider's API."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a timeout on an authorization request the chapter does not contain, the reader says the outcome is unknown and names what to do before retrying.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A ticket shop sends a €45 card payment to its provider and the connection drops after ten seconds with no response. The code path marks the order 'payment failed' and shows the customer a 'try again' button. What is wrong with that, and what should the shop do instead?",
+        "expected": "No answer does not mean no approval: the customer's bank may have approved and reserved the €45. The shop should treat the outcome as unknown, look the payment up at the provider (or cancel it by its own reference) and only then retry, with the same request identifier so a second attempt cannot create a second charge."
+      },
+      {
+        "id": "AC-2",
+        "statement": "Given a decline with its codes, the reader says whether to retry and why.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A monthly membership charge comes back declined with the card network's code for 'not sufficient funds'. A second one comes back with a code from the group the network labels 'issuer will never approve'. Which may the merchant try again, how do you know, and what does it cost to get it wrong?",
+        "expected": "Insufficient funds is a 'cannot approve at this time' decline that may be retried within the network's limit of attempts; the second must never be sent again for that card. The category comes from the network's code and retry advice, which providers pass along next to their own reason, and retrying against it brings network fees."
+      },
+      {
+        "id": "AC-3",
+        "statement": "Validity windows and retry limits are given with their source and date (the Visa rules edition, or the provider's documentation with its access date), Mastercard rules are attributed to the provider that reports them, and the 7-day versus 10-day difference is stated without an invented reason.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      },
+      {
+        "id": "AC-4",
+        "statement": "Every payments term the chapter introduces (hold, response code, validity window, estimated, incremental, partial and zero-value authorization, reversal, stand-in processing, customer-initiated, merchant-initiated, stored credential) is defined in one plain clause before it is relied on.",
+        "check": "known_before_new",
+        "method": "rubric",
+        "severity": "major"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "What exactly does an authorization promise, who decides, and what can change before the money moves?",
+    "claim": "An authorization promises one thing: that the issuer will honor a claim for up to the approved amount if the claim arrives inside a validity window, which Visa's rules set, in their general table, at 5 to 30 days depending on the kind of transaction. The issuer alone decides, and by Stripe's account issuers return most refusals as a generic code. Until the claim arrives the promise can expire, be reversed or be changed in amount, and after a timeout it can exist without the merchant knowing.",
+    "disputed_by": "The view that an approved authorization means the customer has paid, and that an error or a timeout means they have not, so the safe response to a missing answer is to send the request again.",
+    "so_what": "The merchant must store when each approval expires, read it from the provider instead of computing it, keep the provider's reason, the raw network code and the network's retry advice as three separate facts, and resolve every timeout by looking the payment up before any retry; the Double Charge at Larkfield is what the other reading costs.",
+    "how_why": "The authorization is a message, not a transfer: the issuer reserves the amount on the cardholder's account and nothing moves. If the response is lost on the way back, the reservation still stands and the merchant does not know it. Visa's rules (edition of 24 October 2026) fix how long the acquirer has to present the transaction and sort declines into categories with retry limits, and Stripe's documentation says issuers return most declines as generic. The two providers document the same promise differently (both n.d., accessed November 2026): Stripe gives a 7-day window for a customer-initiated online Visa payment where Visa's rule and Adyen's page say 10, and gives no reason; Stripe says it and the network classify a payment as customer- or merchant-initiated from signals, while Adyen's pages take the merchant's declared fields; Adyen documents canceling by the merchant's own reference within 24 hours, which fits the case where no provider reference came back. Neither says whether an approval came from the issuer or from the network standing in for it, and the public record stops there.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "An authorization is a message exchange that ends in the issuer reserving an amount; it promises that a claim up to that amount will be honored if it arrives in time, and it moves no money."
+      },
+      {
+        "id": "S2",
+        "claim": "The issuer alone decides, most refusals arrive as a generic code, and a refusal is three separate facts (the provider's reason, the raw network code, the network's retry advice) of which the third governs a retry."
+      },
+      {
+        "id": "S3",
+        "claim": "The promise expires after 5 to 30 days under Visa's rules, the two providers document different windows for the same payment, and the expiry must therefore be read and stored, not computed."
+      },
+      {
+        "id": "S4",
+        "claim": "Before the claim arrives the promise can be resized or withdrawn (estimate, increment, partial approval, reversal), and the rules that apply depend on whether the customer or the merchant initiated the request."
+      },
+      {
+        "id": "S5",
+        "claim": "A request that gets no answer has an unknown outcome: the promise may exist, and it must be resolved against the provider's record or by the merchant's own reference before any new request is sent."
+      },
+      {
+        "id": "S6",
+        "claim": "Stripe and Adyen document the same promise differently in the window, the classification, the timeout procedure and the raw code, and neither says whether an approval came from the issuer or from the network standing in."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Shows that the first and most visible step moves no money and can lapse, which is the strongest single piece of evidence that the instant answer is a promise.",
+    "supports": [
+      "P1-2"
+    ]
+  },
+  "flow": {
+    "pattern": "problem_solution",
+    "additional_patterns": [
+      {
+        "pattern": "prerequisite_order",
+        "applies_to": "the five sections from what-an-authorization-is to who-is-asking, taken as whole sections: each supplies terms the next one uses (inside, validity-windows runs large to small and ways-to-ask is a grouping)"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "where-they-differ"
+      },
+      {
+        "pattern": "grouping",
+        "applies_to": "in-practice: one payment per outcome"
+      }
+    ],
+    "rationale": "The reader meets a duplicate charge caused by a missing answer before any term is defined, so the definitions arrive as answers to three questions the scene poses: what was promised, who decided, what can change. The body takes them in that order. What an authorization is must precede the issuer's decision, because a code is a field of the message; the decision must precede the expiry, because only an approval expires; the variants need the expiry (an increment does not extend it); customer- and merchant-initiated come after the variants because the zero-value check and the validity table both use the label and the reader needs those two uses to see why it matters. The unknown outcome comes after all of them because resolving it means knowing what may exist at the issuer: a hold, with an amount and an expiry. The provider comparison follows the last section that supplies one of its rows, and the Larkfield payments come last because they apply every section and close the opening scene. Moving the timeout section forward would give the reader a procedure before the thing it protects; moving the comparison forward would fill a table with terms not yet defined."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "On 1 November 2026 Larkfield's renewal job sends a membership charge to its payment provider and waits. No answer comes. It sends the charge again, and 1,840 members pay twice: €71,300 to refund and 212 disputes. Nothing was down, and no request had been refused."
+    },
+    "bridge": {
+      "from_reader_world": "Every engineer has written the loop that retries a call when it times out, and for most calls that loop is correct.",
+      "to_topic": "For a payment it is correct only if a missing answer means nothing happened, and it does not: the cardholder's bank may already have said yes. What that yes is, and what it is worth, is the subject of the chapter."
+    },
+    "thesis_statement": {
+      "text": "An authorization is the issuer's promise to honor a claim for up to an approved amount inside a limited window. It moves no money, the issuer alone decides, and before the claim arrives the promise can expire, be resized or be withdrawn; after a timeout it can exist without you knowing.",
+      "placement": "KEY POINTS callout, first bullet, and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p04",
+      "promises": [
+        {
+          "promise": "Start from the timeout behind Larkfield's Double Charge.",
+          "kept_in": [
+            "scene"
+          ]
+        },
+        {
+          "promise": "Explain what an authorization is: the message, its path, the hold and the promise.",
+          "kept_in": [
+            "what-an-authorization-is"
+          ]
+        },
+        {
+          "promise": "Show how the issuer decides and how a refusal and its retry rules reach the merchant.",
+          "kept_in": [
+            "issuer-decides"
+          ]
+        },
+        {
+          "promise": "Say how long an approval lasts and where to read its expiry.",
+          "kept_in": [
+            "validity-windows"
+          ]
+        },
+        {
+          "promise": "Set out the ways to ask for an approval and to give it back.",
+          "kept_in": [
+            "ways-to-ask"
+          ]
+        },
+        {
+          "promise": "Distinguish customer-initiated from merchant-initiated requests and the stored-credential rules.",
+          "kept_in": [
+            "who-is-asking"
+          ]
+        },
+        {
+          "promise": "Say what to do when no answer comes back.",
+          "kept_in": [
+            "no-answer"
+          ]
+        },
+        {
+          "promise": "Compare Stripe and Adyen and replay three Larkfield payments.",
+          "kept_in": [
+            "where-they-differ",
+            "in-practice"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "function": "context",
+        "organization": "narration",
+        "controlling_idea": "A renewal job that read a missing answer as a refusal charged 1,840 members twice, because each first request had been approved without Larkfield knowing.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Larkfield (fictional), 1 November 2026: a provider call timed out during the first-of-month renewals, the job retried with a new idempotency key, 1,840 members were charged twice, €71,300 was refunded and 212 disputes followed (scenario ledger, the Double Charge).",
+            "shows": "The cost of treating 'no answer' as 'no' is concrete before any mechanism is named."
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "function": "claim",
+        "controlling_idea": "An authorization is the issuer's promise to honor a claim for up to an approved amount inside a limited window; it moves no money, it can lapse, shrink or be withdrawn before the claim arrives, and after a timeout it can exist without the merchant knowing.",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The duplicate charges and the missing answer behind them.",
+          "introduces": "What the first request had actually obtained: a promise, with the three ways it can change.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "function": "context",
+        "controlling_idea": "On the journey of Mila's €120.00 class pass this chapter covers 19:42 on Tuesday 9 March 2027, the first of six steps and the only one she sees.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's class pass (scenario ledger): €120.00, Dutch Visa debit card in a phone wallet, Studio Noord on Adyen, approved at 19:42, captured automatically, paid out Thursday 11 March.",
+            "shows": "Places the chapter on the timeline the previous chapter drew."
+          }
+        ],
+        "transition_in": {
+          "relationship": "place",
+          "carries_over": "The promise the chapter is about.",
+          "introduces": "Its position on the recurring payment's journey.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "function": "transition",
+        "controlling_idea": "The chapter starts with the timeout at Larkfield, explains what an authorization is, how the issuer decides and reports a refusal, how long an approval lasts, the ways to ask for one, who is asking, and what to do when no answer comes back, then compares Stripe and Adyen and replays three Larkfield payments.",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The chapter's place on the journey.",
+          "introduces": "The order of its sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: A Timeout on the First of the Month",
+      "controlling_idea": "The Double Charge came from a model of the outcome with two values, approved and not approved, in which a timeout was filed under the second.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "Shows the cost of reading a missing answer as a refusal, which the unknown-outcome section later resolves."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The introduction's claim that an approval can exist without the merchant knowing.",
+        "introduces": "The incident in which that happened 1,840 times.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p05",
+          "function": "context",
+          "organization": "narration",
+          "controlling_idea": "On 1 November 2026 a provider call timed out during Larkfield's renewals and the job sent each waiting charge again under a new key.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger: 38% of monthly membership volume is attempted in a 6-hour window on the 1st; on 1 November 2026 the renewal job retried with a new idempotency key; 1,840 members charged twice; €71,300 refunded; 212 disputes anyway.",
+              "shows": "Gives the incident its size and its trigger in ledger figures."
+            }
+          ]
+        },
+        {
+          "id": "p06",
+          "function": "cause_effect",
+          "controlling_idea": "The job had two outcomes in its code, approved and not approved, and it filed the timeout under the second although the issuers had already approved and reserved the money.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "A timeout says the reply did not arrive; it says nothing about whether the request did. A new key made the retry a new request, so the provider could not recognize it as a repeat. Femke de Graaf's three questions in January 2027: what did the first request promise, who decided, what could still change.",
+              "shows": "Locates the fault in the model of the outcome, not in the network, and poses the chapter's question in the cast's words."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The retry under a new key.",
+            "introduces": "Why the code retried: its model had no third outcome.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "what-an-authorization-is",
+      "heading": "What an Authorization Is: A Message, a Decision and a Hold",
+      "controlling_idea": "An authorization is a question carried to the issuer and an answer carried back; an approval reserves an amount on the cardholder's account and promises to honor a later claim, and nothing else.",
+      "function": "definition",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "Defines the promise and separates it from the movement of money."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The definition comes first, then the path the message takes, then the message itself, then what the approval does at the issuer (the hold), and only then what the approval does and does not promise, which needs all four."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Femke's first question: what did the first request promise?",
+        "introduces": "The definition of an authorization and its parts.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p07",
+          "function": "definition",
+          "controlling_idea": "An authorization is the process in which the issuer, or a party acting for it, approves or declines a transaction before any money moves.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa glossary: Authorization is \"A process where an Issuer, a VisaNet Processor, Visa Scheme Processor, or Stand-In Processing approves a Transaction.\"",
+              "shows": "The network's own definition names who can approve, and already includes a party other than the issuer.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf"
+            }
+          ]
+        },
+        {
+          "id": "p08",
+          "function": "process",
+          "organization": "process",
+          "controlling_idea": "The request for Mila's pass travels from the app through Larkfield's payment service, the provider and the card network to her bank, and the answer returns the same way in a few seconds.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa's annual report for fiscal 2026 (filed 5 November 2026): \"Through VisaNet, the acquirer presents the transaction data to Visa, which in turn sends the transaction data to the issuer to check the account holder's account balance or credit line for authorization.\"",
+              "shows": "The network describes the same path in its own words.",
+              "source": "Visa Inc., Form 10-K, 2026-11-05"
+            },
+            {
+              "kind": "figure",
+              "what": "Figure: the request and the response between member app, platform, provider, card network and issuer, with the hold at the issuer.",
+              "shows": "Makes visible that the answer crosses four hops on the way back, any of which can lose it."
+            },
+            {
+              "kind": "table",
+              "what": "Requirements table for the exchange: speed (seconds; an assumption labeled as industry practice), availability (the network can answer for an unavailable or slow issuer: Visa's Stand-In Processing definition), consistency (the issuer's record is the truth, every other party holds a copy of the answer), failure (a lost reply leaves the outcome unknown).",
+              "shows": "States what the exchange is built to guarantee and what it leaves to the merchant."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The parties named in the definition.",
+            "introduces": "The route the question and the answer take between them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p09",
+          "function": "description",
+          "controlling_idea": "The question travels as an ISO 8583 message, a compact format of a type indicator, a bitmap and numbered data elements, which the provider builds and the merchant never sees.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe's explainer (updated 18 September 2026): ISO 8583 \"defines the structure of messages between acquirers and card issuers during a transaction\"; \"Each message is built from an MTI, a bitmap, and data elements\"; \"The ISO 8583 standard isn’t self-describing\"; \"ISO 8583 still dominates card authorisation, even as ISO 20022 gains adoption on other payment systems\"; \"Businesses that use a payments provider such as Stripe don’t have to build or manage these messages themselves.\"",
+              "shows": "Supplies the structure at an introductory level from a dated source, and the reason an integrator meets only its translation.",
+              "source": "Stripe, ISO 8583: The message standard behind card authorisations, 2026-09-18, https://stripe.com/en-nl/resources/more/iso-8583"
+            },
+            {
+              "kind": "fact",
+              "what": "The field an integrator meets most is the response code, for example Visa's \"51 (Not sufficient funds)\"; the standard itself is paid and was not read, so no field numbers are given.",
+              "shows": "Connects the message to the one field the next section is about.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The path of the request.",
+            "introduces": "The format of what travels on it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "function": "definition",
+          "controlling_idea": "An approval makes the issuer place a hold: it lowers the cardholder's available balance by the approved amount without debiting the account.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe documentation (n.d., accessed November 2026): \"Authorizing a payment guarantees the amount by holding it on the customer’s payment method.\" Adyen documentation (n.d., accessed November 2026): a pre-authorization \"verifies that the shopper's account is valid and has sufficient funds to cover a transaction, but does not debit the account.\" Stripe: \"Card statements from some issuers and interfaces from payment methods don’t always distinguish between authorizations and captured (settled) payments, which can sometimes confuse customers.\"",
+              "shows": "Both providers describe a reservation, not a transfer; the statement quote explains why customers think they have paid.",
+              "source": "https://docs.stripe.com/payments/place-a-hold-on-a-payment-method ; https://docs.adyen.com/online-payments/adjust-authorisation"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The approval carried back in the response.",
+            "introduces": "What the approval changes at the issuer.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "function": "analysis",
+          "controlling_idea": "The approval promises that a claim for up to the approved amount (the capture, in the next chapter's term) will be honored if it arrives in time, and it does not promise that money has moved, that the merchant will be paid or that the cardholder will not take it back.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "What it promises / What it does not promise: honors a claim up to the amount inside the validity window; not a transfer (clearing and settlement, next chapter), not a payout, not protection from a dispute (about 120 days), not indefinite.",
+              "shows": "Sets the one promise against the four things integrators assume it includes."
+            },
+            {
+              "kind": "reasoning",
+              "what": "Visa's rules call the answer an Approval Response and give the acquirer a maximum timeframe to process the completed transaction after it (section 5.7.3.5).",
+              "shows": "The rule text itself treats the approval as something that must be followed by a claim within a deadline.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf"
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The message, the decision and the hold.",
+            "introduces": "What they add up to: one promise, and four things it is not.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "issuer-decides",
+      "heading": "The Issuer Decides, and Mostly Does Not Say Why",
+      "controlling_idea": "The approval comes from the issuer's side of the network, never from the provider; its refusal arrives as a code that is usually generic, and the networks attach retry rules to the code that the provider's own message does not replace.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S2"
+        ],
+        "how": "Establishes who decides and why a decline must be stored as three separate facts."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "additional_patterns": [
+          {
+            "pattern": "comparison",
+            "applies_to": "p16"
+          }
+        ],
+        "rationale": "Who decides comes first, then the code the decision arrives as, then the retry rules the networks attach to that code, then the shorthand practitioners use for those rules, then how each provider passes all of it on, and last the cost of ignoring it; the provider comparison would be a list of field names without the network rules before it."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Femke's second question: who decided?",
+        "introduces": "The issuer's decision and the form in which a refusal reaches the merchant.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p12",
+          "function": "claim",
+          "controlling_idea": "The yes comes from the issuer's side of the network; a provider can refuse a payment before asking, but it cannot approve one.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe documentation (n.d., accessed November 2026): \"When Stripe blocks a payment, it doesn’t obtain authorization from the card issuer.\" (outcome `network_status: not_sent_to_network`). Adyen refusal reason 20, FRAUD: \"The pre-authorization risk checks resulted in a fraud score of 100 or more.\"",
+              "shows": "Both providers document a refusal that never reaches the issuer, and neither documents an approval of their own.",
+              "source": "https://docs.stripe.com/declines ; https://docs.adyen.com/development-resources/refusal-reasons"
+            }
+          ]
+        },
+        {
+          "id": "p13",
+          "function": "definition",
+          "controlling_idea": "A response code is the short code the issuer returns with its answer, and by both providers' accounts the most common refusal code is a generic one.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa rule 7.3.6.3: an issuer \"must send to VisaNet the Decline Response code that most accurately reflects the reason for the decline\". Stripe (n.d., accessed November 2026): \"Card issuers categorize most declines as generic (generic_decline), making the exact decline reason unclear.\" Adyen (n.d., accessed November 2026): \"The most frequent refusal reason, 05: Do not honor, falls into this category.\"",
+              "shows": "The rule asks for the most accurate code; the two providers report that in practice the answer is mostly uninformative.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf ; https://docs.stripe.com/declines/card ; https://docs.adyen.com/development-resources/raw-acquirer-responses/visa-integrity-fees"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The issuer's decision.",
+            "introduces": "The code it arrives as, and how little that code usually says.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p14",
+          "function": "explanation",
+          "controlling_idea": "The networks attach retry rules to the code: Visa sorts decline codes into four categories with reattempt limits, and Mastercard returns a separate advice code.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Visa Table 7-2 (24 October 2026): Category 1 'Issuer will never approve' (04, 07, 12, 14, 15, 41, 43, 46, 57, R0, R1, R3): \"a Merchant must never resubmit\"; Category 2 'Issuer cannot approve at this time' (includes 51 Not sufficient funds, 91 Issuer or switch inoperative): \"Reattempt permitted (up to 20 attempts in 30 days)\"; Category 3 'Data quality' (54, N7, 1A in Europe): same limit; Category 4 generic codes: same limit.",
+              "shows": "Gives the retry decision a source that is neither the provider's wording nor the merchant's guess.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen's page on Visa's categories says 15 retries in 30 days where the rule text says 20; Mastercard's Merchant Advice Code as Adyen documents it (n.d., accessed November 2026): 03 Do not try again, 24 Retry after 1 hour to 30 Retry after 10 days; \"Not all Mastercard issuers return the MAC.\"",
+              "shows": "A provider's page can lag the rule, so the rule edition is cited; Mastercard's rules were not readable directly and are attributed to the provider.",
+              "source": "https://docs.adyen.com/development-resources/raw-acquirer-responses"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The code returned with a refusal.",
+            "introduces": "The retry rule each network ties to it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p15",
+          "function": "definition",
+          "controlling_idea": "'Soft decline' and 'hard decline' are industry shorthand for 'may be retried' and 'must not be retried', not terms in the networks' rules.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "The nearest official vocabulary: Visa's Category 1 against Categories 2 to 4, Mastercard's advice code, and the authentication-required refusal (Visa code 1A in Europe; Stripe `authentication_required`; Adyen reason 38, \"Authentication required\").",
+              "shows": "Lets the reader translate a word they will hear daily into the rule that actually governs.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf ; https://docs.stripe.com/declines/codes ; https://docs.adyen.com/development-resources/refusal-reasons"
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "The networks' categories and advice codes.",
+            "introduces": "The informal words practitioners use for them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p16",
+          "function": "comparison",
+          "controlling_idea": "Each provider hands the merchant a refusal as three separate facts: its own normalized reason, the network's raw code and the network's retry advice.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Stripe: `decline_code` (for example `insufficient_funds`), `network_decline_code`, `network_advice_code` and Stripe's own `advice_code` (`do_not_try_again`, `try_again_later`, `confirm_card_data`). Adyen: `refusalReason` with `refusalReasonCode` (12 Not enough balance, 27 Declined Non Generic), `refusalReasonRaw` (must be enabled in the Customer Area), `additionalData.merchantAdviceCode` for Mastercard.",
+              "shows": "Shows the same three facts under different names, and that one of Adyen's is off until switched on.",
+              "source": "https://docs.stripe.com/declines/card ; https://docs.adyen.com/development-resources/raw-acquirer-responses ; https://docs.adyen.com/development-resources/refusal-reasons"
+            },
+            {
+              "kind": "example",
+              "what": "Stripe's next step for `insufficient_funds` reads \"The customer needs to use an alternative payment method\", advice for a checkout with the customer present; Visa puts code 51 in Category 2, where a reattempt is permitted.",
+              "shows": "The provider's message and the network's rule answer different questions, so a renewal scheduler needs the second."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "What the networks return.",
+            "introduces": "How each provider passes it to the merchant.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p17",
+          "function": "cause_effect",
+          "controlling_idea": "A retry against the network's advice costs money and approvals: the network charges fees, the provider may block the attempt, and issuers read repeated attempts as a sign of fraud.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen (n.d., accessed November 2026): \"Visa charges system integrity fees. These fees are related to excessive retries of failed transactions, and excessive numbers of transactions that failed due to incorrect payment details.\" Adyen refusal reason 46: \"Transaction blocked by Adyen to prevent excessive retry fees\". Stripe: \"Excessive retry prevention: Stripe blocks a payment that would have incurred network retry penalties and likely failed\"; \"Stripe recommends a maximum of eight retries for charges that permit retries. Card issuers might see creating additional retries as potential fraud\".",
+              "shows": "Three documented consequences; the fee amounts are not in the public pages read.",
+              "source": "https://docs.adyen.com/development-resources/raw-acquirer-responses/visa-integrity-fees ; https://docs.stripe.com/payments/analytics/optimization ; https://docs.stripe.com/declines/card"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The retry advice each provider passes on.",
+            "introduces": "What happens to a merchant that ignores it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "validity-windows",
+      "heading": "A Promise with an Expiry Date: Validity Windows",
+      "controlling_idea": "An approval is valid for 5 to 30 days under Visa's rules depending on the kind of transaction, the two providers document different windows for the same payment, and the expiry is therefore a fact to read and store.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S3"
+        ],
+        "how": "Shows that the promise is perishable and that its lifetime is not the same number on both providers."
+      },
+      "flow": {
+        "pattern": "large_to_small",
+        "rationale": "The network's rule first, then what each provider documents against it, then where to read the expiry for one payment, then what happens when it passes; the recommendation to read the expiry needs the disagreement between the documents before it."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The refusal and its retry rules.",
+        "introduces": "The other branch: an approval, and the first thing that can change it, which is time.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p18",
+          "function": "claim",
+          "controlling_idea": "Visa's rules give an approval a maximum life of 5, 10 or 30 calendar days, set by whether the cardholder took part in the payment or the merchant charged a stored card alone, and by where the card was used.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Visa Table 5-11 (24 October 2026): cardholder-initiated, card-absent: 10 calendar days (30 with an extended Authorization indicator); estimated authorization at cruise, lodging and vehicle rental merchants: 30; card-present: 5; all merchant-initiated transactions: 5. \"Timeframe starts on the date of a valid Authorization.\"",
+              "shows": "The primary source for the windows, with its edition date.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf"
+            }
+          ]
+        },
+        {
+          "id": "p19",
+          "function": "comparison",
+          "controlling_idea": "The two providers document different windows for the same Visa payment: Stripe gives 7 days for a customer-initiated online payment where Visa's rule and Adyen's page give 10, and Stripe's page gives no reason.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Stripe (n.d., accessed November 2026): Visa card-not-present 7 days customer-initiated, 5 days merchant-initiated with the note \"The exact authorization window is 4 days and 18 hours, to allow time for clearing processes\"; Mastercard 7 days. Adyen (n.d., accessed November 2026): Visa cardholder-initiated card-not-present 10 days, merchant-initiated 5 days, Mastercard final authorization 7 days and pre-authorization 30 days; \"Adyen expires (pre-)authorization requests automatically after 28 days\".",
+              "shows": "Sets the documents side by side so the difference is stated exactly and without an invented cause; Mastercard figures are the providers' rendering.",
+              "source": "https://docs.stripe.com/payments/place-a-hold-on-a-payment-method ; https://docs.adyen.com/online-payments/adjust-authorisation"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The network's maximum.",
+            "introduces": "What each provider tells its merchants.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "function": "recommendation",
+          "controlling_idea": "Read the expiry of each approval from the provider and store it with the order; do not compute it from a table.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (n.d., accessed November 2026): `payment_method_details.card.capture_before` \"is the most reliable and accurate way to determine your charge’s authorization window\"; \"Stripe and the card network classify transactions as MIT or CIT based on signals of cardholder participation, not solely on API parameters like off_session.\"",
+              "shows": "On Stripe the window depends on a classification the merchant does not fully control, so only the returned field is reliable.",
+              "source": "https://docs.stripe.com/payments/cits-and-mits ; https://docs.stripe.com/payments/place-a-hold-on-a-payment-method"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen's pages read for this chapter document no equivalent field: the window follows from its per-scheme table and the fields the merchant declared, the 28-day ceiling applies on top, and an EXPIRE webhook reports the expiry on Adyen's platform.",
+              "shows": "Says honestly where the recommendation can be followed literally and where it becomes 'derive, store and listen'.",
+              "source": "https://docs.adyen.com/online-payments/adjust-authorisation ; https://docs.adyen.com/development-resources/webhooks/webhook-types"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Two documents that disagree about one payment.",
+            "introduces": "The consequence for the integrator: read the expiry, store it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p21",
+          "function": "cause_effect",
+          "controlling_idea": "When the window passes, the promise is gone: on Stripe the payment is canceled, and on Adyen a late capture is possible at the merchant's risk.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: \"If the authorization expires before you capture the funds, the funds are released and the payment status changes to `canceled`.\" Adyen: capturing after expiry on the scheme's side \"increases the risk of\" a failed capture, \"Increased interchange fees\", \"Card scheme transaction fees\" and \"A cardholder-initiated chargeback for 'No Authorization' or 'Late Presentment' reasons\". Visa Dispute Condition 11.3: No Authorization/Late Presentment.",
+              "shows": "The two providers handle the same lapse differently, and the network gives the issuer a dispute right for it.",
+              "source": "https://docs.stripe.com/payments/place-a-hold-on-a-payment-method ; https://docs.adyen.com/online-payments/adjust-authorisation ; Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf"
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "The stored expiry.",
+            "introduces": "What happens on the day after it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ways-to-ask",
+      "heading": "Asking for the Promise: Five Variants and When Each Fits",
+      "controlling_idea": "There are five ways to ask for the promise (the exact amount, which is the default, an estimate, an increment, a partial approval and a zero-value check) and one way to give it back (a reversal), and the choice among them is a design decision with a table of trade-offs.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S4"
+        ],
+        "how": "Shows that the amount and the existence of the promise can change before the claim arrives."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "additional_patterns": [
+          {
+            "pattern": "comparison",
+            "applies_to": "p27"
+          }
+        ],
+        "rationale": "The default and the variants that change the amount come first (estimate, increment, partial), then the one that asks for no amount, then the reversal, which withdraws the promise; the trade-off table and the recommendation come last because they compare the five ways of asking and say when each leaves a reversal owed."
+      },
+      "transition_in": {
+        "relationship": "additional_support",
+        "carries_over": "Time as the first thing that changes an approval.",
+        "introduces": "The second: the merchant's own choices about the amount, and the option to give the promise back.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p22",
+          "function": "definition",
+          "controlling_idea": "An estimated authorization, which Adyen calls a pre-authorization, reserves an amount the merchant expects before the final amount is known; the default on both providers is a final authorization for the exact amount.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa glossary: an Estimated Authorization Request is \"for the amount that a Merchant expects a Cardholder to spend in an individual Transaction and that is submitted before the final Transaction amount is known\". Adyen: \"By default, Adyen handles all card payment requests as final authorizations\"; `additionalData.authorisationType`: PreAuth or FinalAuth.",
+              "shows": "Separates the two kinds of request and says which one a merchant gets without asking.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf ; https://docs.adyen.com/online-payments/adjust-authorisation"
+            }
+          ]
+        },
+        {
+          "id": "p23",
+          "function": "definition",
+          "controlling_idea": "An incremental authorization raises an approved estimate, and it does not extend the approval's life.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa: \"An Incremental Authorization Request does not extend the processing timeframes\". Stripe: \"a maximum of 10 incremental authorization attempts per PaymentIntent\", offered \"to users on IC+ pricing\". Adyen: authorization adjustment, with eligibility by merchant category code and an asynchronous or synchronous mode.",
+              "shows": "The rule and both providers agree that the clock keeps running from the first approval.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf ; https://docs.stripe.com/payments/incremental-authorization ; https://docs.adyen.com/online-payments/adjust-authorisation"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The estimate.",
+            "introduces": "Raising it.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p24",
+          "function": "definition",
+          "controlling_idea": "A partial authorization approves less than was asked, so the approved amount must be read from the response and never assumed to equal the request.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa glossary: \"An approval response for an amount less than the amount requested by a Merchant for a Transaction.\" Stripe: `request_partial_authorization: if_available`, with `amount_requested` and `amount_authorized` on the charge. Adyen: `additionalData.allowPartialAuth`, result code PartiallyAuthorised, Visa and Mastercard only, not available in the Sessions flow.",
+              "shows": "A third outcome between yes and no, opt-in on both providers.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf ; https://docs.stripe.com/payments/partial-authorization ; https://docs.adyen.com/online-payments/partial-authorizations"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Raising the amount on the merchant's initiative.",
+            "introduces": "The issuer lowering it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p25",
+          "function": "definition",
+          "controlling_idea": "A zero-value authorization, which Visa calls an account verification, asks whether the card can be used without reserving anything, and Visa requires it or a real authorization before a card is stored.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa glossary: Account Verification is \"A message sent by an Acquirer to the Issuer, using a currency unit of zero, for confirmation that a Transaction can be completed using the Card.\" Visa Table 5-21: before storing, a merchant must submit an Authorization Request for the amount or, \"If payment is not required, submit an Account Verification\". Adyen: \"We recommend that you store payment details by making a zero-auth transaction\". Stripe saves a card with a SetupIntent; its documentation page does not say what is sent, and a Stripe support article says Stripe may send a $0, $1 or similar authorization when card details are stored.",
+              "shows": "Defines the check, ties it to storing a card, and marks the one place where Stripe's behavior is not documented.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf ; https://docs.adyen.com/online-payments/tokenization/create-tokens ; https://docs.stripe.com/payments/setup-intents"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Requests that reserve an amount.",
+            "introduces": "A request that reserves none.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p26",
+          "function": "definition",
+          "controlling_idea": "A reversal is the message that cancels an approval and releases the hold, and Visa requires one within 24 hours when a sale is not completed.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa glossary: an Authorization Reversal is \"A V.I.P. System message that cancels an Approval Response.\" Visa Table 5-13: within 24 hours for an approval whose transaction is not completed, and for the difference when the final amount is lower. Stripe: canceling a PaymentIntent \"releases any held funds\"; Stripe uses 'reversal' for a refund issued shortly after the charge. Adyen: cancel before capture; its reversal endpoint cancels an uncaptured payment and refunds a captured one.",
+              "shows": "Defines the term in the network's sense and warns that each provider attaches the word to a different operation.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf ; https://docs.stripe.com/payments/paymentintents/lifecycle ; https://docs.stripe.com/refunds ; https://docs.adyen.com/online-payments/reversal"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The ways to obtain or resize the promise.",
+            "introduces": "The way to give it back.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p27",
+          "function": "recommendation",
+          "controlling_idea": "Ask for the exact amount and capture at once unless the sale forces otherwise; each other variant buys flexibility with an expiry to track, a field to read or a reversal to send.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Trade-off table: exact amount with immediate capture (nothing to track; Larkfield's passes and renewals); exact amount, capture on fulfillment (expiry to store, reversal owed if the order is canceled); estimate plus increments (unknown final amount; clock runs from the first approval; reversal for the difference); partial approval (prepaid and debit balances; second payment for the remainder); zero-value check (store a card now, charge later as merchant-initiated). The author's judgement, with the condition under which each row is right.",
+              "shows": "Turns five definitions into a choice a reader can make for their own sale."
+            },
+            {
+              "kind": "figure",
+              "what": "Figure: the life of an approval as states: requested, approved, then captured, adjusted, reversed or expired; declined; and unknown.",
+              "shows": "Shows every exit from 'approved' in one picture, including the two the merchant does not choose."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "Five variants.",
+            "introduces": "When each fits, and the author's default.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "who-is-asking",
+      "heading": "Who Is Asking: Customer-Initiated, Merchant-Initiated and Stored Credentials",
+      "controlling_idea": "Whether the customer is taking part in the payment or the merchant is charging a stored card under an agreement changes the validity window and the rules, and Stripe and Adyen settle that classification in different places.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S4"
+        ],
+        "how": "Shows that the same card and amount yield a different promise depending on who initiated the request."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The two labels are defined first, then the network's rules for storing and using a card, then both labels on Mila's two payments, and last who assigns the label on each provider, which only matters once the reader knows what hangs on it."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "'Merchant-initiated', used in the validity table and in the zero-value check without a definition.",
+        "introduces": "The definition, and the stored-credential rules behind it.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p28",
+          "function": "definition",
+          "controlling_idea": "A customer-initiated transaction is one the cardholder takes part in; a merchant-initiated transaction is one the merchant starts alone, under a prior agreement, with a card it has stored.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (n.d., accessed November 2026): \"An MIT is a transaction that you initiate without direct participation of your customer, based on a prior agreement with that customer authorizing you to store and use their credentials.\"",
+              "shows": "A provider's plain definition of the label the network rules turn on.",
+              "source": "https://docs.stripe.com/payments/cits-and-mits"
+            }
+          ]
+        },
+        {
+          "id": "p29",
+          "function": "explanation",
+          "controlling_idea": "Visa's stored-credential rules say what must happen before a card is stored, how a later charge must be marked and what the merchant owes the cardholder when a merchant-initiated charge is declined.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa glossary and Table 5-21 (24 October 2026): a Stored Credential is information \"stored by ... A Merchant or its agent, a Payment Facilitator, or a Digital Wallet Operator to process future Transactions\"; \"If the initial Authorization Request or Account Verification is not approved, the Merchant must not store the credential\"; a transaction with a stored credential must \"Use POS Entry Mode code 10\"; on a declined merchant-initiated request \"the Merchant must notify the Cardholder in writing and allow the Cardholder at least 7 calendar days to pay by other means.\" Mastercard's equivalent rules were not readable directly.",
+              "shows": "The rule text behind 'card on file', with the obligation that a renewal job inherits.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The prior agreement in the definition.",
+            "introduces": "What the network requires around it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p30",
+          "function": "example",
+          "organization": "illustration",
+          "controlling_idea": "Mila's two payments at Studio Noord carry the two labels: the pass on 9 March is customer-initiated, and each membership renewal is merchant-initiated under the agreement she made on 12 January.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger: membership of €49.00 set up on 12 January 2027 by typing in the card and passing a 3-D Secure challenge (the customer-initiated first payment), renewed on the 1st of each month as a merchant-initiated card payment; the €120.00 pass on 9 March paid from a phone wallet with device authentication.",
+              "shows": "Attaches each label to a payment the reader already knows, with the validity window each one gets (10 days and 5 days under Visa's table)."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The rules for storing and reusing a card.",
+            "introduces": "The same card used both ways by one member.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p31",
+          "function": "comparison",
+          "controlling_idea": "The label is assigned in different places: Stripe says it and the network classify from signals, while Adyen's pages take the fields the merchant declares.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: \"a payment with `off_session: true` might still be classified as a CIT if a CVC is present, resulting in the CIT authorization window instead.\" Adyen: `shopperInteraction` (Ecommerce, ContAuth) with `recurringProcessingModel` (CardOnFile, Subscription, UnscheduledCardOnFile); its validity table applies the merchant-initiated row to \"ContAuth + Subscription / UnscheduledCardOnFile\". Nothing on the Adyen pages read says Adyen reclassifies.",
+              "shows": "A documented difference in who holds the classification, which a two-provider integration has to map to one internal vocabulary.",
+              "source": "https://docs.stripe.com/payments/place-a-hold-on-a-payment-method ; https://docs.adyen.com/online-payments/tokenization/make-token-payments ; https://docs.adyen.com/online-payments/adjust-authorisation"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The labels on Mila's payments.",
+            "introduces": "Who puts them there on each provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "no-answer",
+      "heading": "When No Answer Comes Back: Unknown Outcomes and Stand-In Processing",
+      "controlling_idea": "A request has three outcomes, approved, declined and unknown; the unknown one is resolved by asking again with the same key or by looking the payment up or canceling it by the merchant's own reference, and even an approval may have come from the network standing in for the issuer.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "Establishes that a timeout is an unknown outcome and gives the documented way out on each provider."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "The third outcome is stated first, then its resolution on Stripe and on Adyen, then the related case in which an answer arrives but not from the issuer, and last the questions the public record leaves open; the resolutions would read as API trivia without the problem stated before them."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "Everything so far assumed that an answer arrived.",
+        "introduces": "The case in which none does, which is Femke's third question and the Double Charge.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p32",
+          "function": "claim",
+          "controlling_idea": "A request has three outcomes, not two: the reply can be lost after the issuer has approved, and then the hold exists while the merchant holds no answer.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (n.d., accessed November 2026): \"When a connection fails, you might not know whether Stripe received or executed the request.\"; \"Treat the outcome of a request that returns `500` as indeterminate: the operation might have produced side effects even though you received an error.\"",
+              "shows": "The provider itself names the third outcome.",
+              "source": "https://docs.stripe.com/error-low-level"
+            },
+            {
+              "kind": "figure",
+              "what": "Figure: three envelopes returning from the bank: 'yes', 'no', and one lost on the way back while the hold stays in place.",
+              "shows": "Makes the unknown outcome a picture: the decision was made, only the news of it is missing."
+            }
+          ]
+        },
+        {
+          "id": "p33",
+          "function": "process",
+          "controlling_idea": "On Stripe the way out is to repeat the request with the same idempotency key within 24 hours, and otherwise to retrieve the payment object before doing anything else.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: \"Retry with the same idempotency key and parameters within the first 24 hours after the original request.\"; \"Don’t retry with a new idempotency key until you’ve resolved the original outcome. Retrieve the relevant object, inspect the request in the Dashboard, and use webhook events to reconcile what happened.\"; keys are retained \"for at least 24 hours\".",
+              "shows": "The documented procedure, with its time limit.",
+              "source": "https://docs.stripe.com/error-low-level ; https://docs.stripe.com/api/idempotent_requests"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The unknown outcome.",
+            "introduces": "Its resolution on Stripe.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p34",
+          "function": "process",
+          "controlling_idea": "On Adyen there is no payment to fetch, so the way out is the same key, the webhook, or a cancel by the merchant's own reference within 24 hours.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen (n.d., accessed November 2026): \"If you do not receive a response (for example, in case of a timeout), you can safely retry the request with the same HTTP header\"; \"Idempotency keys are valid for a period of 7 to 14 days after first submission.\"; \"Canceling a payment using your reference is possible up to 24 hours after authorization\", recommended only \"if you generate a unique references for each payment request and do not have the `pspReference` available\"; a reversal for \"If you are not sure if a payment has been captured\". Checkout API v72 specification: three GET operations, none returning a payment by its reference.",
+              "shows": "The documented procedure where the object cannot be read; the fit between cancel-by-reference and the timeout case is the author's reading and is labeled as inference.",
+              "source": "https://docs.adyen.com/development-resources/api-idempotency ; https://docs.adyen.com/online-payments/cancel ; https://docs.adyen.com/online-payments/reversal ; https://github.com/Adyen/adyen-openapi"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A provider whose payment can be retrieved.",
+            "introduces": "A provider whose payment cannot.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p35",
+          "function": "explanation",
+          "controlling_idea": "Stand-in processing means an answer can come from the network on the issuer's behalf, so even an approval is not always the issuer's own decision.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa glossary: Stand-In Processing is \"The component ... that provides Authorization services on behalf of an Issuer when the Issuer, its VisaNet Processor, or a Visa Scheme Processor is unavailable, when Issuer responses exceed the maximum response time, or when the Issuer has instructed Visa to process a Transaction on behalf of the Issuer.\" Stripe's table of Visa codes: 91 is \"Issuer or switch inoperative and STIP not applicable or not available for this transaction; time-out when no stand-in\". Without stand-in the merchant sees Stripe `issuer_not_available` or Adyen reason 9, Issuer Unavailable.",
+              "shows": "The network's own timeout handling: an answer where it can stand in, a retryable decline where it cannot.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf ; https://docs.stripe.com/declines/network-codes"
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "A missing answer between the merchant and the provider.",
+            "introduces": "A missing answer between the network and the issuer, and what the network does about it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p36",
+          "function": "analysis",
+          "controlling_idea": "The public record stops at four points: neither provider says whether an approval came from stand-in, what it does when its own call to the network times out online (Adyen documents a 120- or 150-second cancellation for terminals), or how it turns an API call into a network message, and Mastercard's stand-in rules were not readable.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Searched and not found on the Stripe and Adyen pages read for this chapter (all n.d., accessed November 2026); Mastercard's rule documents returned HTTP 403.",
+              "shows": "Marks the limit of the evidence so that nothing in the chapter is read as a description of either company's internals."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "What the networks and providers document about missing answers.",
+            "introduces": "What they do not.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "The two providers document the same promise differently in five places: the Visa window, where the expiry is read, who classifies the transaction, how a timeout is resolved and how the raw decline reaches the merchant.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S6"
+        ],
+        "how": "Sets the documented differences side by side and separates them from the author's reading."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "The provider facts given section by section.",
+        "introduces": "The same facts in one table, with the author's reading of each difference.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p37",
+          "function": "comparison",
+          "controlling_idea": "On five aspects of the authorization the two companies' documentation differs, and on a sixth, stand-in, both are silent.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows: Visa customer-initiated online window (Stripe 7 days; Adyen 10 days); where the expiry is read (Stripe `capture_before` on the charge; Adyen per-scheme table, 28-day platform expiry, EXPIRE webhook); who classifies customer- or merchant-initiated (Stripe and the network from signals; Adyen from the merchant's declared fields); resolving a timeout (Stripe: same key for at least 24 hours, retrieve the object; Adyen: same key for 7 to 14 days, no payment GET, cancel by own reference within 24 hours); raw network code (Stripe `network_decline_code` on the charge outcome; Adyen `refusalReasonRaw` once enabled); stand-in approval flagged (Not public; Not public). Last column: the author's reading, introduced as inference.",
+              "shows": "Every cell is a fact cited earlier in the chapter or the words 'Not public'."
+            }
+          ]
+        },
+        {
+          "id": "p38",
+          "function": "recommendation",
+          "controlling_idea": "On Stripe, read what the provider decided (the expiry, the classification) from the object; on Adyen, declare the classification yourself, keep your own unique reference for every request and switch on the raw response.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Follows from the rows: Stripe returns the derived facts on a retrievable object; Adyen takes declarations and reports by webhook, with the merchant reference as the only handle when no PSP reference came back.",
+              "shows": "Turns the table into two short lists of what to do differently."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The differences in the table.",
+            "introduces": "What an integrator does differently on each provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: One Approval, One Decline and One Silence",
+      "controlling_idea": "Three Larkfield payments show the three outcomes handled correctly: Mila's pass approved at 19:42, her renewal declined on 1 April and retried on 4 April, and the timeout of the Double Charge replayed under Keel.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S1",
+          "S2",
+          "S3",
+          "S5"
+        ],
+        "how": "Applies the promise, the decline's three facts, the expiry and the unknown outcome to ledger payments on both providers."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "One payment per outcome, in the order the chapter introduced them: the approval and its expiry, the refusal and its retry, and the silence last because it resolves the opening scene."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The differences between the two providers.",
+        "introduces": "Three ledger payments worked through with them.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p39",
+          "function": "example",
+          "organization": "narration",
+          "controlling_idea": "At 19:42 on 9 March 2027 Mila's bank approves €120.00 and reserves it; Larkfield holds a promise and a reference, and no money has moved.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger: Studio Noord on Adyen; Dutch Visa debit card in a phone wallet, device authentication, no 3-D Secure challenge; captured automatically; payout Thursday 11 March.",
+              "shows": "The recurring payment at the chapter's step."
+            },
+            {
+              "kind": "table",
+              "what": "What exists at 19:42 and who holds it: the decision (issuer), the hold of €120.00 (issuer, on Mila's account), the result code Authorised and the PSP reference (Adyen's response), the AUTHORISATION webhook (Larkfield's receiver), money moved: none. Adyen: \"we recommend that you rely on the webhook to trigger any business logic\".",
+              "shows": "Lists the records one approval creates and shows that none of them is money.",
+              "source": "https://docs.adyen.com/development-resources/webhooks/webhook-types"
+            }
+          ]
+        },
+        {
+          "id": "p40",
+          "function": "example",
+          "controlling_idea": "Had the pass been authorized for later capture, the promise would lapse on a different day on each provider: about 16 March on Stripe's documented 7 days, 19 March on the 10 days of Visa's rule and Adyen's table.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "\"Had Studio Noord been on Stripe\" (the ledger's convention): 9 March plus 7 days and plus 10 days; an illustration, since Larkfield captures automatically.",
+              "shows": "Puts the 7-versus-10 difference on a calendar the reader can check."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The pass as it happened, captured at once.",
+            "introduces": "The same pass under delayed capture, where the expiry would matter.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p41",
+          "function": "example",
+          "controlling_idea": "Mila's renewal of €49.00 is declined on 1 April 2027 for insufficient funds, stored as three facts, and retried on 4 April because the network's category permits it.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger: renewal declined on 1 April 2027 (insufficient funds), retried on 4 April and approved; K5: retries on a schedule tied to decline codes; K1: the key includes the number of the scheduled attempt. Chapter facts: Adyen reason 12 Not enough balance; Visa code 51, Category 2, up to 20 attempts in 30 days; the 7-calendar-day notice rule for a declined merchant-initiated request.",
+              "shows": "Shows the retry decision taken from the network's category and the second attempt carrying a new key because it is a new business event."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "An approval.",
+            "introduces": "A refusal, and the decision whether to ask again.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p42",
+          "function": "example",
+          "controlling_idea": "Under Keel the timeout of 1 November 2026 becomes a payment in the state `pending`: the same key is sent again, the provider's record is consulted, and a new request is made only when the first is known to have failed.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger: K1 (one writer, one key derived from the business event), K2 (the provider's record is the truth; a job sweeps everything still pending), the payment record store's five states with `pending`. Chapter facts: Stripe replays the stored response and lets the object be retrieved; Adyen returns the first response for the same key and has no payment GET, so the webhook, the cancel by own reference and the settlement report stand in.",
+              "shows": "Replays the opening incident with the chapter's procedure and shows the 1,840 duplicates would not have been created."
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The opening scene's timeout.",
+            "introduces": "The same timeout handled as an unknown outcome on each provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "The decline's three facts, the expiry and the unknown outcome are one discipline seen three times: an authorization lives in the issuer's records, and the merchant holds only a copy of the answer, which can be vague (a generic code), stale (an expired window) or missing (a timeout). In each case the remedy is the same move: go back to a record closer to the issuer before acting.",
+    "so_what": "A payment record with one status field cannot hold a promise: it needs the approved amount, the expiry, the three facts of a refusal and a state for 'asked, not yet answered', and the code that retries must read them. That is cheaper than 1,840 refunds.",
+    "callback": {
+      "to": "The 1,840 members charged twice on 1 November 2026.",
+      "how": "The reader can now say that each first request had probably obtained a promise, that the job needed a third outcome and the same key, and what it should have asked the provider before sending anything new."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Give every authorization request a key and a reference of your own before it is sent, store what comes back as separate facts with the expiry, and treat silence as a state to resolve. Eight questions to ask follow."
+    },
+    "hand_off": {
+      "to": "clearing-and-settlement",
+      "relationship": "contrast",
+      "carries_over": "The authorization as a promise that reserves an amount and moves nothing.",
+      "introduces": "The steps that do move money, which run later, in batches and in net amounts, between parties the merchant never sees."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The three Larkfield payments.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p43",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Established: an authorization moves no money and expires, the issuer decides and usually answers with a generic code, the networks set retry limits by code, and a timeout leaves the outcome unknown."
+      },
+      {
+        "id": "p44",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Depends on context: whether to separate authorization from capture, how many retries to schedule, and how to resolve a timeout, which differs by provider.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What the field agrees on.",
+          "introduces": "What changes with the sale and the provider.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p45",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "The author's synthesis: the merchant holds a copy of an answer whose original is at the issuer, so the payment record should store the promise as separate facts and model silence as a state.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is established and what depends on context.",
+          "introduces": "The author's own position, labeled as such.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p46",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "Eight questions let the reader test how their own system, or a provider under evaluation, handles approvals, refusals and missing answers.",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The take-aways.",
+          "introduces": "Questions that apply them.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p47",
+        "function": "transition",
+        "controlling_idea": "The authorization reserved an amount and moved nothing; the next chapter follows the steps that do move money, later, in batches and as net amounts between parties the merchant never sees.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "A promise that moves no money.",
+          "introduces": "The steps that move it.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "The parties, the four-party model and the six-step timeline.",
+      "covered_in": [
+        "journey-of-a-payment"
+      ]
+    },
+    {
+      "topic": "Capture models, clearing, interchange qualification and settlement.",
+      "covered_in": [
+        "clearing-and-settlement"
+      ]
+    },
+    {
+      "topic": "Refunds, the dispute lifecycle and the provider-side meaning of a refund issued as a reversal.",
+      "covered_in": [
+        "refunds-reversals-and-disputes"
+      ]
+    },
+    {
+      "topic": "Raising the approval rate: retry scheduling, account updater, network tokens, routing.",
+      "covered_in": [
+        "authorization-optimization",
+        "network-tokens",
+        "payment-routing-and-orchestration"
+      ]
+    },
+    {
+      "topic": "How an idempotency key is designed and how a server implements it.",
+      "covered_in": [
+        "idempotency-and-retries"
+      ]
+    },
+    {
+      "topic": "The provider's payment state machine and where its state lives.",
+      "covered_in": [
+        "payment-state-machines"
+      ]
+    },
+    {
+      "topic": "3-D Secure, strong customer authentication and exemptions.",
+      "covered_in": [
+        "three-d-secure-and-sca"
+      ]
+    },
+    {
+      "topic": "Fraud scoring before authorization and card testing.",
+      "covered_in": [
+        "payment-fraud-and-risk"
+      ]
+    },
+    {
+      "topic": "Authorization on terminals, offline and store-and-forward.",
+      "covered_in": [
+        "in-person-payments"
+      ]
+    },
+    {
+      "topic": "Dunning: what the merchant tells the customer after a declined renewal.",
+      "covered_in": [
+        "invoicing-collections-and-dunning"
+      ]
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "Flow rubric notes not acted on, for the author: move the two definitions of customer- and merchant-initiated to the start of validity-windows (the chapter glosses the labels there in one clause instead); move stand-in processing next to 'who decides'; fold the where-the-evidence-stops paragraph into the comparison section; merge the storage requirement of the zero-value check into the stored-credential paragraph.",
+    "Why Stripe documents 7 days where Visa's rule allows 10 for a customer-initiated online payment: not explained by Stripe; the chapter states the difference without a cause.",
+    "Mastercard's own rule text (validity, advice codes, stored credentials, stand-in) was not readable (HTTP 403); Mastercard facts are attributed to Stripe's and Adyen's documentation.",
+    "Adyen's page gives 15 retries in 30 days for Visa where the rule edition of 24 October 2026 gives 20; the date of the change is not established.",
+    "Resolved 2026-11-17 (absence audit): a Stripe support article says Stripe may send a $0, $1 or similar authorization when card details are stored; the SetupIntent documentation page itself does not say.",
+    "Neither provider says whether an approval came from stand-in processing, or what it does when its own call to the network times out."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "The timeout section ('When No Answer Comes Back') stands before 'Stripe and Adyen: Where They Differ' and the Larkfield practice section after it, reversing the style guide's suggested order of the last three body sections: the comparison table has a row on timeouts that the earlier section must supply, and the practice section resolves the opening scene, so it reads best last.",
+      "rejected": [
+        "Style-guide order (comparison, practice, when it goes wrong): the table would cite a procedure not yet explained."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "'The designs' and 'Trade-offs' are carried by one section, 'Asking for the Promise', whose five variants are the realistic designs and whose last paragraph holds the trade-off table.",
+      "rejected": [
+        "A separate designs section: it would restate the five variants."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Three figures, not four: the message path, the life of an approval, and the three answers. The expiry is shown inside the second.",
+      "rejected": [
+        "A separate expiry figure: it would repeat the validity table."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "No ISO 8583 field numbers are given: the standard is paid and was not read, so the chapter takes the message structure from Stripe's dated explainer and names only the response code, which Visa's public rules confirm.",
+      "rejected": [
+        "A table of field numbers labeled as industry convention: unverifiable, and cut for length."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/PLAN.md",
+      "contributed": "The chapter contract: question, coverage, the Larkfield thread and owned terms."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/_research/scenario-ledger.md",
+      "contributed": "The Double Charge, Mila's class pass and membership renewal, Keel decisions K1, K2 and K5, the payment record store's states."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/_research/brief-card-lifecycle-and-networks.md",
+      "contributed": "Part 2 (authorization): message path, response codes and retry rules, validity windows, authorization variants, reversals, stand-in, stored credentials, with the Stripe and Adyen comparisons."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/_research/brief-stripe-payments-and-api.md",
+      "contributed": "PaymentIntent lifecycle, error model and decline fields, idempotency behavior and the indeterminate outcome."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/_research/brief-adyen-payments-and-api.md",
+      "contributed": "Result codes, no payment GET, cancel by merchant reference, authorization types and expiry, idempotency key lifetime."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/_research/consistency-issues.md",
+      "contributed": "Rulings 12 (no payment GET on Adyen), 13 (key lifetimes and the attempt number), 14 (wallet payment, no challenge), 15 (soft and hard decline are not network terms), 17 (Mastercard rules through the providers)."
+    },
+    {
+      "kind": "external",
+      "ref": "Visa, Visa Core Rules and Visa Product and Service Rules, 24 October 2026",
+      "contributed": "Definitions (Authorization, Authorization Reversal, Account Verification, Stand-In Processing, Stored Credential), Tables 5-11, 5-13, 5-21 and 7-2, Dispute Condition 11.3. Re-read for this spec."
+    },
+    {
+      "kind": "external",
+      "ref": "Stripe documentation, n.d., accessed 17 November 2026: place a hold on a payment method; declines (card, codes, network codes); CITs and MITs; low-level error handling; idempotent requests; incremental, partial and extended authorization; refunds; PaymentIntent lifecycle",
+      "contributed": "Stripe's documented windows, decline fields, classification statement and unknown-outcome procedure. Re-fetched for this spec."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen documentation, n.d., accessed 17 November 2026: adjust authorisation; refusal reasons; raw acquirer responses; Visa integrity fees; cancel; reversal; API idempotency; make token payments; create tokens; partial authorizations; result codes; webhook types; Checkout API v72 OpenAPI specification",
+      "contributed": "Adyen's documented windows, refusal fields, declared classification, cancel by reference and key lifetime. Re-fetched for this spec."
+    },
+    {
+      "kind": "external",
+      "ref": "Stripe, ISO 8583: The message standard behind card authorisations, updated 18 September 2026",
+      "contributed": "The message structure at an introductory level and its relation to ISO 20022."
+    },
+    {
+      "kind": "external",
+      "ref": "Visa Inc., Form 10-K for the fiscal year ended 30 September 2026, filed 5 November 2026",
+      "contributed": "The network's description of the authorization path."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Initial outcome spec, written from the PLAN contract, the journal-spec entry and the research briefs. Status draft."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 122 claims listed (114 confirmed, 3 corrected, 4 hedged, 0 unsupported and removed or relabeled, 0 unreachable, 1 not checked: Mastercard's own rules); Adyen refusal reason 38 is named \"Authentication required\" (\"Retry with 3D Secure\" is its description), and timetoread corrected from 28 to 23 minutes."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation after verification: journal-spec entry and spec body brought into line with the verified page and consistency rulings (journal entry thesis.claim (ch2 verification row 52) re-synced; ch2 verification row 32). No unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: 5 statements of absence re-tested with a wide search (1 overturned, 1 narrowed, 3 hold; table in _research/absence-audit/02-authorization.md). Overturned: Stripe's support site says it may send a $0, $1 or similar authorization when card details are stored. Narrowed: Adyen documents its time-out cancellation for in-person payments."
+    }
+  ],
+  "length": {
+    "max_words": 6500,
+    "target_words": 5500
+  }
+}

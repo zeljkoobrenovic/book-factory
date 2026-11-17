@@ -1,0 +1,554 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "part-1",
+  "journal": "payments-platform-architecture",
+  "part": "part-1",
+  "title": "Part I — MONEY: How a Payment Actually Moves",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "Part I argues that a card payment is a chain of promises by different parties, none of which makes it final.",
+        "The five chapters follow the payment in order: the journey, authorization, clearing and settlement, the backward flows, the economics."
+      ],
+      "can_do": [
+        "Pick the Part I chapter that answers a question about a payment status, a delay, a reversal or a fee."
+      ]
+    },
+    "audience": {
+      "who": "A software engineer or architect who is new to payments, has read the preface and is about to start Part I, or who arrives with one question about a payment status, a delay, a reversal or a fee and wants the chapter that answers it.",
+      "already_knows": [
+        "APIs, webhooks, retries, queues and databases.",
+        "From the preface: that the instant answer is not the truth, the sixteen failure patterns, and Larkfield in outline with Mila's €120 class pass (introduction, where-payment-systems-go-wrong, meet-larkfield)."
+      ],
+      "does_not_know": [
+        "Issuer, acquirer, card network, authorization, capture, clearing, settlement, payout, dispute, chargeback, interchange, scheme fees: each is owned by a Part I chapter and is only glossed in a clause here.",
+        "Bram de Wit's €120 dispute as a worked case."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "A reader of this page alone can state the part's claim and name the five chapters' subjects in reading order.",
+        "check": "intro_predicts_content",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "After reading only this page: what does Part I argue, and what will each of the next five chapters tell you, in order?",
+        "expected": "A payment is several promises by different parties and none is final; then: the parties and the timeline, what an authorization promises, how capture, clearing and settlement move the money, how refunds and disputes move it back, and who earns what."
+      },
+      {
+        "id": "AC-2",
+        "statement": "The page opens with the €120 dispute of 24 February 2027 as an actual scene with its dates and amounts, labeled as fictional, not with a description of the part.",
+        "check": "no_weak_introduction_pattern",
+        "method": "rubric",
+        "severity": "major"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "What actually happens between the moment an app says 'Payment successful' and the moment the merchant has money it can keep?",
+    "claim": "A card payment is not one event but a chain of separate promises made by different parties on different clocks: the issuer's authorization in seconds, the merchant's claim at capture, the acquirer's clearing record and the network's net settlement over the following days, and the provider's payout on its own schedule. None of them makes the payment final: the cardholder's right to dispute it runs for about 120 days and outlasts them all, so the money is the merchant's to keep only when that window closes, and what the merchant keeps is net of a fee divided among the same parties.",
+    "disputed_by": "The integrator's working model: a payment is a request that either succeeds or fails, the provider's 'succeeded' status means the money has been taken, and what happens after the API responds is the provider's internal plumbing.",
+    "so_what": "A team that accepts the claim stops storing one status per payment and starts recording which promise it holds, from whom, and when it expires; it treats a missing answer as unknown instead of failed, books refunds and disputes as events that arrive long after the sale, and reads a provider's price as three separate costs.",
+    "how_why": "The party that answers the API call is not the party that decides (the issuer), that moves the money between banks (the network's settlement process) or that can take it back (the cardholder, through the issuer). Each of those parties keeps its own record and works to its own deadline: Visa's public rules give an authorization, in their general table, 5 to 30 days of validity, define settlement as daily net amounts between members, and give the issuer up to 120 days to dispute most transactions. The provider can only report other parties' promises as they arrive, which is why its records, and the merchant's, lag the truth.",
+    "supporting_claims": [
+      {
+        "id": "P1-1",
+        "claim": "The provider that answers the API call does not decide the approval, does not move the money between banks and cannot stop it being taken back; each of those belongs to a different party with its own record and its own clock."
+      },
+      {
+        "id": "P1-2",
+        "claim": "An authorization is the issuer's time-limited promise to honor a claim for an amount; it moves no money, and a request that gets no answer has an unknown outcome, not a failed one."
+      },
+      {
+        "id": "P1-3",
+        "claim": "Money moves only at clearing and settlement, a day or more after the approval, as net amounts between network members, so 'settled' names a different event at the network, at the provider and at the merchant's bank."
+      },
+      {
+        "id": "P1-4",
+        "claim": "Money goes back through new transactions and a network-run dispute process, each with its own failures and deadlines, so a payment stays reversible for months after it was paid out."
+      },
+      {
+        "id": "P1-5",
+        "claim": "Each party in the chain is paid separately (interchange to the issuer, scheme fees to the network, a markup to the provider), and whether a provider blends these costs or passes them through decides which of them the merchant can see."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Performs the part's opening: the hook, the part thesis and the reading order.",
+    "supports": []
+  },
+  "flow": {
+    "pattern": "large_to_small",
+    "additional_patterns": [
+      {
+        "pattern": "chronological",
+        "applies_to": "chapters: the five chapter paragraphs, in the order a payment happens"
+      }
+    ],
+    "rationale": "The page opens on one payment that came back, states the claim that explains it, gives the reason the claim holds and what it changes for the reader's own records, then names the order of the chapters, then takes the chapters one by one, and ends by returning to the opening payment. The scene comes first because the claim is an answer to it; the reason (each step has a different owner with its own clock) stands before the roadmap because it is why the part has one chapter per step; the roadmap stands directly before the list it orders. Put the chapter list first and 'promise', 'issuer' and Bram's €120 arrive unexplained; put the claim before the scene and the reader has no case to test it on; put the closing's return to Bram before the list and it refers to parties and fees the reader has not met."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "On 2 February 2027 a €120.00 class pass is bought with Bram de Wit's card at Studio Noord, a yoga studio on the fictional platform Larkfield, and the payment is approved. On 24 February a chargeback arrives: the €120 is taken back, with a €15.00 dispute fee on top, because he told his bank he did not recognize the charge. No step of the payment had failed."
+    },
+    "bridge": {
+      "from_reader_world": "The reader's view as an engineer: a payment is a request to a provider's API that returned success.",
+      "to_topic": "The view of the parties behind the API, where that success was one bank's promise and three more steps and one long waiting period were still to come; hence the question of what happens between 'Payment successful' and money the merchant can keep."
+    },
+    "thesis_statement": {
+      "text": "Part I argues that a card payment is not one event but a chain of separate promises made by different parties on different clocks (the bank's approval, the merchant's claim, the settlement between banks, the provider's payout), that none of them makes the payment final because the cardholder can dispute it for about 120 days, and that what the merchant keeps is net of a fee divided among the same parties.",
+      "placement": "KEY POINTS callout and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "paragraph p04",
+      "promises": [
+        {
+          "promise": "Five chapters follow the payment in the order it happens: the whole journey and its parties, the authorization, capture with clearing and settlement, the refunds, reversals and disputes that move money back, and who earns what at each step; one paragraph introduces each.",
+          "kept_in": [
+            "chapters"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "A €120 class pass bought with Bram de Wit's card on 2 February 2027 at Studio Noord, on the fictional platform Larkfield, was approved and paid out, and on 24 February a chargeback took the €120 back with a €15.00 fee on top, although no step of the payment had failed.",
+        "function": "example",
+        "organization": "narration",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "The €120 dispute: pass bought 2 February 2027 at Studio Noord (Larkfield, fictional); approved; the studio paid within days; chargeback 24 February 2027 because the cardholder told his bank he did not recognize the charge; €15.00 dispute fee (illustrative).",
+            "source": "_research/scenario-ledger.md, 'The €120 dispute'; refunds-reversals-and-disputes",
+            "shows": "A payment can succeed at every step and still be taken back three weeks later, which the integrator's model of a request that succeeds or fails cannot explain."
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "What the API reported as success was one bank's promise: a card payment is a chain of separate promises by different parties (the cardholder's bank, called the issuer, approves; the merchant claims; the banks settle through the card network; the provider pays out), and none of them makes it final, because the cardholder's right to dispute runs for about 120 days and outlasts them all.",
+        "function": "claim",
+        "evidence": [
+          {
+            "kind": "fact",
+            "what": "Visa's public rules (edition of 24 October 2026) give the issuer 120 calendar days from the transaction processing date for most kinds of dispute.",
+            "source": "journey-of-a-payment; refunds-reversals-and-disputes",
+            "shows": "The last open promise outlasts authorization, settlement and payout, so no earlier step is final."
+          },
+          {
+            "kind": "figure",
+            "what": "Figure: one payment as a chain of four links (approved, claimed, settled, paid out), each held by a different party with its own clock, and a 120-day stretch after the last link from which an arrow runs back.",
+            "shows": "The part's claim in one picture: four promises, four owners, and a waiting period in which the payment can still be undone."
+          }
+        ],
+        "transition_in": {
+          "relationship": "elaboration",
+          "carries_over": "The €120 that came back although nothing had failed.",
+          "introduces": "The reading that explains it: the success was a bank's promise, the first of several, and the right to dispute outlasts them all.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "Because each of those promises belongs to a party other than the provider that answers the API call, and each party keeps its own record on its own clock, the provider can only report them as they arrive, so one stored status word is wrong for days at a time.",
+        "function": "explanation",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "The issuer decides the approval; the network's settlement process moves the money between banks as daily net amounts; the cardholder, through the issuer, can take it back; the provider reports each as it arrives.",
+            "source": "journey-of-a-payment (the provider controls none of the three steps that decide the outcome)",
+            "shows": "Why the provider's status lags the truth and why 'approved', 'captured', 'settled' and 'paid out' are four facts held by four parties."
+          }
+        ],
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The chain of promises by different parties.",
+          "introduces": "Why they cannot be collapsed into one status: each belongs to a party other than the provider, with its own record and clock; and what a team that accepts this stores instead.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "controlling_idea": "Part I follows the payment in the order it happens, in five chapters (the whole journey, the first promise, the money moving forward, the money moving back, the fee), and on the way three beliefs an integrator arrives with are overturned: that approved means paid, that paid out means final, that the fee is one charge.",
+        "function": "transition",
+        "evidence": [
+          {
+            "kind": "figure",
+            "what": "Figure: the five chapters of Part I laid along one payment's timeline: chapter 1 spans the whole line, chapter 2 the approval, chapter 3 capture to payout, chapter 4 the backward arrows in the dispute window, chapter 5 the fee paid to each party.",
+            "shows": "The reading order is the payment's own order, and each chapter enlarges one stretch of the line the first chapter draws."
+          }
+        ],
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "Separate promises, each with its own owner and clock.",
+          "introduces": "The part's shape: one chapter for the whole timeline, then one per stretch of it in order, and the fee last.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "chapters",
+      "heading": "Chapters in this part",
+      "controlling_idea": "Each of the five chapters answers one question about the payment, in the order the payment happens, and works the answer through one Larkfield case.",
+      "function": "description",
+      "advances_thesis": {
+        "supports": [
+          "P1-1",
+          "P1-2",
+          "P1-3",
+          "P1-4",
+          "P1-5"
+        ],
+        "how": "Each paragraph introduces the chapter that argues one of the part's five supporting claims, so the list is the part's argument in outline."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "additional_patterns": [
+          {
+            "pattern": "large_to_small",
+            "applies_to": "p05 to p06: the whole timeline, then its first step in detail"
+          }
+        ],
+        "rationale": "The part's own reading order, which is the order a payment happens: the whole timeline and its parties, then the promise, the money moving forward, the money moving back. Economics is last because a fee can be assigned to a party and a step only once the reader knows both. Put authorization before the journey and issuer and acquirer have no place to sit; put disputes before settlement and there is no settled money to take back; put the fee first and interchange is a number with no owner."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The five chapters named in order.",
+        "introduces": "One paragraph per chapter: its question in bold, what it argues and its Larkfield case.",
+        "form": "sentence",
+        "placement": "end_of_previous"
+      },
+      "paragraphs": [
+        {
+          "id": "p05",
+          "controlling_idea": "Chapter 1 follows one card payment through six steps carried out by at least five parties and shows that the provider answering the API call controls none of the three steps that decide the outcome.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P1-1"
+            ],
+            "how": "Introduces the chapter that names the parties and shows the provider relays other parties' decisions."
+          },
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Mila Janssen's €120.00 class pass, bought at 19:42 on Tuesday 9 March 2027 at Studio Noord and paid out to the studio on Thursday 11 March; studio owner Ines Bakker's question on the Wednesday: 'It says paid. Paid to whom?'",
+              "source": "journey-of-a-payment; scenario ledger",
+              "shows": "The chapter works on one concrete payment, and one status word cannot answer the owner's question."
+            },
+            {
+              "kind": "fact",
+              "what": "Six steps (authorization, capture, clearing, settlement, payout, dispute window); a message moves first, then a record, then money; the acquirer as the institution that accepts card payments on the merchant's behalf, and the first question to put to a provider: which legal entity is the acquirer in this country.",
+              "source": "journey-of-a-payment",
+              "shows": "The vocabulary and the first question to put to a provider, which every later chapter relies on."
+            }
+          ]
+        },
+        {
+          "id": "p06",
+          "controlling_idea": "Chapter 2 opens the first step: an authorization is the issuer's promise to honor a claim for up to an approved amount inside a window of 5 to 30 days under Visa's rules, it moves no money, and a request that gets no answer has an unknown outcome, not a failed one.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P1-2"
+            ],
+            "how": "Introduces the chapter that shows the first promise moves no money and can lapse or exist unknown."
+          },
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "The Double Charge of 1 November 2026: a renewal job read a timeout as a refusal and retried; 1,840 members paid twice and €71,300 was refunded.",
+              "source": "payment-authorization; scenario ledger",
+              "shows": "What reading a missing answer as a 'no' costs."
+            },
+            {
+              "kind": "fact",
+              "what": "Visa's rules (edition of 24 October 2026) set validity at 5, 10 or 30 calendar days by transaction type.",
+              "source": "payment-authorization",
+              "shows": "The promise has an expiry."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The six-step timeline, whose first step is the only one the customer sees.",
+            "introduces": "What that first step promises, who decides it, how long it lasts and what is known when no answer comes back.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p07",
+          "controlling_idea": "Chapter 3 covers the steps that do move money (the merchant's capture, the acquirer's clearing record, the network's daily net settlement, the provider's payout) and shows that 'settled' names a different event at the network, at the provider and at the merchant's bank.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P1-3"
+            ],
+            "how": "Introduces the chapter that locates the moment money moves and explains why the records disagree meanwhile."
+          },
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Wednesday 10 March 2027: Larkfield's record shows Mila's €120 as paid, the provider's balance shows it as not yet paid out, the studio's bank shows nothing; €117.47 arrives on Thursday 11 March.",
+              "source": "clearing-and-settlement; scenario ledger",
+              "shows": "Three systems give three answers and each is correct about the step it reports."
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe counts its settlement timing from the capture; Adyen pays a whole sales day on a fixed delay, and its terms (17 June 2024) say it pays whether or not it has received the funds (documentation n.d., accessed November 2026).",
+              "source": "clearing-and-settlement",
+              "shows": "A payout date is the provider's clock, not the network's, and the two providers' figures count different intervals."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The authorization, a promise that reserves an amount and moves nothing.",
+            "introduces": "The steps that do move money, later, in batches and as net amounts between banks.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p08",
+          "controlling_idea": "Chapter 4 follows the money backward by three routes with three owners (a cancel or reversal, a refund, a dispute) and shows why a paid-out payment stays open for months: the dispute runs on the issuer's clock and the merchant answers once.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P1-4"
+            ],
+            "how": "Introduces the chapter that shows the chain has no final link."
+          },
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Bram de Wit's €120 dispute followed day by day from the chargeback of 24 February 2027; the payment's financial effect stays open until at least 2 June 2027, 120 days after the sale.",
+              "source": "refunds-reversals-and-disputes; scenario ledger",
+              "shows": "The opening's case, worked through with its deadlines."
+            },
+            {
+              "kind": "fact",
+              "what": "Visa's rules (edition of 24 October 2026) give 120 days for most disputes and up to 540 where a service is delivered later.",
+              "source": "refunds-reversals-and-disputes",
+              "shows": "The dispute clock is independent of settlement and payout."
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "Money that has been cleared, settled and paid out, the last forward step.",
+            "introduces": "What can still happen afterwards for weeks or months: the merchant sends money back or the cardholder's bank takes it back.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p09",
+          "controlling_idea": "Chapter 5 puts a price on each promise: the fee on a card payment is three payments (interchange to the issuer, scheme fees to the network, a markup to the provider), and whether a provider blends them or passes two through decides which costs the merchant can see.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P1-5"
+            ],
+            "how": "Introduces the chapter that assigns a payment to each party and carries the part's closing."
+          },
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "The fee on Mila's €120 (illustrative): Larkfield's fee €2.53, of which €0.61 is provider cost: €0.24 interchange, €0.06 scheme fees, €0.31 for the provider.",
+              "source": "payment-economics; scenario ledger",
+              "shows": "One payment split to the cent among the parties the earlier chapters named."
+            },
+            {
+              "kind": "fact",
+              "what": "EU Regulation 2015/751 caps consumer interchange at 0.2% (debit) and 0.3% (credit); Stripe's published standard price is one blended rate, Adyen's published price passes interchange and scheme fees through at cost (price lists n.d., accessed November 2026).",
+              "source": "payment-economics",
+              "shows": "Which part is bounded by law and how the two published defaults differ."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The full chain in both directions and the parties that carry it.",
+            "introduces": "What each party charges for the promise it carries, and how the provider prices its share.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "Where to Begin",
+    "synthesis": "Read in order, the five chapters turn Bram's €120 from a surprise into a sequence: each party that said yes on 2 February made its own promise on its own clock and was paid for it, and the one right that outlasted them all belonged to the cardholder.",
+    "so_what": "A reader who finishes the part can look at any status, payout line, dispute event or fee and say whose promise it reports and what is still open, and can open the one chapter that answers a question about a status, a delay, a reversal or a fee.",
+    "callback": {
+      "to": "Bram de Wit's €120 of the opening (p01).",
+      "how": "By the end of the part the reader can name each party that said yes on 2 February, what each earned, and why none of those yeses stopped the chargeback of 24 February."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Read the chapters in order, beginning with the payment's journey; with one question in hand (a status, a delay, a reversal, a fee), open the chapter that answers it."
+    },
+    "hand_off": {
+      "to": "journey-of-a-payment",
+      "relationship": "example",
+      "carries_over": "The part's claim that a payment is a chain of promises by different parties, and the €120 that came back three weeks after it succeeded.",
+      "introduces": "One payment, Mila's class pass, followed party by party from 19:42 on Tuesday to the studio's payout on Thursday and into the dispute window."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The five chapters and what each answers, ending with who is paid for each promise.",
+      "introduces": "What they add up to for the opening's €120, and where to start reading.",
+      "form": "sentence",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p10",
+        "controlling_idea": "By the end of the part the reader can say who promised what on 2 February, what each was paid and why none of it stopped the €120 coming back; read in order from the journey of Mila's class pass, or, with one question about a status, a delay, a reversal or a fee, open the chapter that answers it.",
+        "function": "synthesis"
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "Teaching any chapter's content or defining its terms beyond a one-clause gloss; the page summarizes and does not re-argue.",
+      "covered_in": [
+        "journey-of-a-payment",
+        "payment-authorization",
+        "clearing-and-settlement",
+        "refunds-reversals-and-disputes",
+        "payment-economics"
+      ]
+    },
+    {
+      "topic": "A 'Stripe and Adyen: Where They Differ' section, take-away tiers, failure-pattern callout and Questions to Ask (style guide: not on part intros).",
+      "covered_in": [
+        "journey-of-a-payment",
+        "payment-authorization",
+        "clearing-and-settlement",
+        "refunds-reversals-and-disputes",
+        "payment-economics"
+      ]
+    },
+    {
+      "topic": "The outcome of Bram's dispute.",
+      "covered_in": [
+        "journey-dispute"
+      ]
+    },
+    {
+      "topic": "Larkfield's landscape, incidents and the Keel program in full.",
+      "covered_in": [
+        "meet-larkfield"
+      ]
+    },
+    {
+      "topic": "The part's closing synthesis (the promises and the fees on one line) and the hand-off to Part II, which the last chapter carries.",
+      "covered_in": [
+        "payment-economics"
+      ]
+    }
+  ],
+  "modalities": [],
+  "open_questions": [],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "The post entry in the journal spec has a question and no thesis. A part intro performs the part's opening, so this spec uses the part's thesis and its five supporting claims P1-1 to P1-5 unchanged (the precedent of ORDERED's part-1 intro); each chapter paragraph introduces the chapter that argues one of them. Intent outcome, AC-1, AC-2 and role are copied from the post entry; the hook from the part's opening.",
+      "rejected": [
+        "Writing a separate thesis for the page from its question: it would restate the part's claim."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The schema requires a conclusion and the structure check finds it by its heading, so the page ends with one short paragraph under 'Where to Begin' (the form ORDERED's part intros use) that carries the callback to Bram's €120 and the sentence 'Begin with [[journey-of-a-payment]].' The style guide puts that sentence at the end of the chapter list; here it is the last sentence before Sources and Evidence, one heading later.",
+      "rejected": [
+        "Ending the chapter list with the sentence and no closing section: the conclusion would have no unit and the structure check would fail.",
+        "A closing that performs the part's synthesis of promises and fees: the journal spec gives that to payment-economics."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Two figures: the chain of promises with p02 (the claim) and the five chapters on the payment's timeline with p04 (the roadmap). Chapter 1 already draws the six-step timeline and chapter 5 the promises-and-fees line; these two show the claim as links with owners and the part's shape, and repeat neither.",
+      "rejected": [
+        "A figure of the parties: journey-of-a-payment owns the four-party diagram."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Company facts on the page are limited to one clause per chapter, each already stated and sourced in that chapter, with the chapter linked at the start of the paragraph; no source is cited here.",
+      "rejected": [
+        "A comparison of the two providers in the intro: the chapters' own sections do that."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Flow rubric (fresh reader, order of ideas only): sound with notes. Taken: p02 names the issuer where it first says 'the cardholder's bank' and p05 glosses acquirer, so later chapter paragraphs can use both; p03 is narrowed to the one new consequence (separate records on separate clocks make one stored status wrong for days) and no longer repeats p02's list of who does what; p04 names the three beliefs the chapters overturn. Mila's class pass is introduced in p05 before the closing uses it. No unit was moved.",
+      "rejected": [
+        "Merging p03 into p02: the claim and its consequence for the reader's own records are two ideas."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "journal-spec.json (part-1 and its post entry part-1)",
+      "contributed": "Intent, AC-1, AC-2 and role (post entry); thesis, supporting claims, opening hook, bridge and roadmap, flow (part); chapter 1's transition_in for the hand-off; the transitions between the five chapters."
+    },
+    {
+      "kind": "internal",
+      "ref": "journey-of-a-payment, payment-authorization, clearing-and-settlement, refunds-reversals-and-disputes, payment-economics (posts/01 to 05, index.md, read in full)",
+      "contributed": "What each chapter argues, in its words and numbers; every statement about Stripe, Adyen, Visa's rules and the EU regulation."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "The €120 dispute, Mila's class pass, the Double Charge, the additions by chapters 01 to 05."
+    },
+    {
+      "kind": "internal",
+      "ref": "PLAN.md (Part I contracts), _research/style-guide.md and _research/INTRO-BRIEF.md",
+      "contributed": "Shape and length of a part introduction."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "While drafting, to keep the page within 1,200 words: the provider comparisons were dropped from the evidence of p05, p06 and p08 (acquirer disclosure, 7 versus 10 days, the shape of a dispute record); they stay in the chapters. Units and order unchanged, so the flow rubric verdict stands."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Initial spec for the part introduction, written after reading the five chapters. (AI-mediated session)"
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass (part introduction, checked against the corrected chapters 1-5): 24 claims checked (23 agree, 1 corrected to match, 0 removed); the authorization window is now attributed to Visa's general table, as chapter 2 was hedged."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation after verification: journal-spec entry and spec body brought into line with the verified page and consistency rulings (part thesis.how_why (ch2 verification row 52: Table 5-12 has country windows from 1 day) copy re-synced). No unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Part thesis claim reworded as approved by the author after verification (clause made too strong by the verified sources)."
+    }
+  ],
+  "length": {
+    "target_words": 1000,
+    "max_words": 1200
+  }
+}

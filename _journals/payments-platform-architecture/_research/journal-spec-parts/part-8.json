@@ -1,0 +1,586 @@
+{
+  "id": "part-8",
+  "title": "Part VIII — SCALE: Reliability, Data and Operations",
+  "detail": "full",
+  "intent": {
+    "outcome": {
+      "know": [
+        "What Stripe and Adyen have each published, with dates, about availability targets and contracts, incidents, databases and sharding, hosting, peak figures, rate limits and rollout practice.",
+        "Where the public record stops for both companies: the topology and timing of a failover between data centers or regions, cells, which data is replicated synchronously and the design of the webhook sender; and what is published short of that (Adyen lists its data centers by continent or country and states that its load balancers fail over between them; Stripe names no AWS region).",
+        "The vocabulary of operating a money path: availability target, failure isolation, graceful degradation, shard, consistency boundary, outbox, data residency and localization, backpressure, progressive rollout, dark launch."
+      ],
+      "believe": [
+        "A payment that is late can be repaired with an apology; a payment that is wrong costs refunds, disputes and trust, so a money path is designed to be late before it is wrong.",
+        "A provider's reliability cannot be read from its uptime figure, and a statement about its regions or failover that carries no source is a guess."
+      ],
+      "can_do": [
+        "For a money-moving path in their own system, say what gives way under a dependency failure, a peak and a change (what lags, what is refused, what is paced, what is rolled back) and show that the record of money is not on that list.",
+        "Sort a statement about how Stripe or Adyen runs its infrastructure into documented with a year, partially documented, or not public."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Every supporting claim of the part thesis is argued by at least one chapter, and every chapter supports at least one.",
+        "check": "children_cover_parent_thesis",
+        "method": "deterministic",
+        "severity": "blocker"
+      },
+      {
+        "id": "AC-2",
+        "statement": "Each chapter's closing hand-off expresses the relationship its successor declares in transition_in.",
+        "check": "transition_expresses_declared_relationship",
+        "method": "rubric",
+        "severity": "major"
+      },
+      {
+        "id": "AC-3",
+        "statement": "Given a design choice between making a payment late and risking making it wrong, in a case the part does not contain, a reader of Part VIII chooses late and names the mechanism that keeps the late payment from being lost.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A ticket seller's payment provider slows down during a sale. The seller can either (a) hold checkout requests in a queue for up to a minute, or (b) give up after five seconds, show 'payment failed' and let the customer press pay again, which sends a new request. Using Part VIII: which is safer for the money, and what must be true for the other option to be acceptable?",
+        "expected": "(a): a late answer can be repaired, a double charge cannot be undone without a refund. (b) is acceptable only if the retry carries the same idempotency key (a key that makes the provider treat the second request as the first) and the seller fetches the provider's record before telling the customer the payment failed, because a timeout is an unknown outcome, not a failure."
+      },
+      {
+        "id": "AC-4",
+        "statement": "Given statements about the two providers' infrastructure, a reader of Part VIII separates the documented ones from the ones the public record does not support.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "Mark each as documented, partially documented or not public, as of November 2026: (1) Stripe runs on Amazon Web Services. (2) Adyen runs in its own data centers. (3) Stripe serves its API from several regions at once. (4) Adyen's contract promises 99.9% uptime per quarter. (5) Adyen can move a merchant's traffic from one region to another within seconds. (6) Stripe deploys to a core API service about 400 times a day.",
+        "expected": "(1) documented (2023, 2024, current documentation); (2) documented (2021, 2025, 2026), with a list of sites by continent or country and no cities or count beyond 'tens of data centres'; (3) not public; (4) documented in the public terms (last updated 1 November 2023) as a 'commercially reasonable efforts' clause, with exclusions; (5) partially documented: Adyen's documentation says its load balancers 'manage the failover to the other data centers' and mentions 'alternative routing' to 'backup infrastructure', with no timing or topology, so 'within seconds' is not public; (6) documented in the 2023 annual letter, published 2024."
+      }
+    ]
+  },
+  "thesis": {
+    "question": "How is a system that moves money kept running through failures, growth, legal limits on where data may live, peaks and constant change, and how much of Stripe's and Adyen's answer is public?",
+    "claim": "A payment platform is run at scale by deciding in advance what gives way (the freshness of the books under failure, a system-wide transaction under growth, a global identifier under a localization law, a caller's burst under peak, the reach of a rollout under change), and in every design Stripe or Adyen has published the record of money is not among the things relaxed; the two have documented their choices on outages, data stores, limits and rollouts, and neither has published a cell design or the topology or timing of a failover of its payment path between its data centers or regions.",
+    "disputed_by": "The view that scale in payments is ordinary web scale with a stricter number: add redundancy and capacity until the uptime figure is reached, keep everything strongly consistent everywhere, and treat availability as the first measure of a provider.",
+    "so_what": "A team that accepts the claim writes down, for each of its own money-moving paths, what is allowed to lag, be refused, be paced or be rolled back, and stops comparing providers by a count of nines or by an assumed failover design that neither provider has documented.",
+    "how_why": "Something has to give when a dependency fails, data outgrows one database, a law fixes where data sits, a month's renewals arrive in six hours or a change goes wrong. The published designs show what was chosen: Adyen's 2021 account lets accounting run behind so the edge keeps answering; Stripe's 2017 account sheds non-critical requests first and its 2024 account moves data between shards with a write pause of under two seconds that retries absorb; Stripe's India page (updated 2023) records features cut to keep data in the country; Stripe's documented limits (accessed November 2026) cap each account long before capacity; Stripe's 2023 annual letter stages every change by traffic share. In none of them is the record of money the thing that is relaxed. On the topology and timing of failover, on cells and on which data is replicated synchronously the public record of both companies stops (Adyen lists its data centers by continent or country and states that its load balancers fail over between them; Stripe names no AWS region and describes takeover only for billing usage events, not for payments), and the part says so instead of inferring.",
+    "supporting_claims": [
+      {
+        "id": "P8-1",
+        "claim": "A payment path stays available because its operator decides beforehand what may lag or be shed, and the lasting cost of an outage is the payments left with an unknown outcome, which published uptime figures do not report."
+      },
+      {
+        "id": "P8-2",
+        "claim": "Once money data is split across shards or clusters, it is kept consistent by small local transactions, idempotent retries, messages between clusters and verification afterwards, not by a transaction that spans the system."
+      },
+      {
+        "id": "P8-3",
+        "claim": "Where payment data lives is settled by localization law where one applies and by the provider's hosting model elsewhere, before any engineering goal, and the public record gives each provider's hosting, the regions Adyen names and what each has said about India, but not the topology or timing of a failover."
+      },
+      {
+        "id": "P8-4",
+        "claim": "A merchant's predictable peak fails at the provider's per-customer limits, not at the provider's capacity, so the load has to be paced by the party that creates it."
+      },
+      {
+        "id": "P8-5",
+        "claim": "Change on a money path is made safe by bounding how much live traffic a mistake can reach and testing the way back, and a change is finished only when the records agree after it."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Shows that the mechanisms of Parts II to VII keep their guarantees under failure, growth, peaks and change only because correctness is put ahead of availability, and fixes the limit of what can be said about either company's infrastructure before the journeys and the company cases rely on it.",
+    "supports": [
+      "J8"
+    ]
+  },
+  "flow": {
+    "pattern": "prerequisite_order",
+    "additional_patterns": [
+      {
+        "pattern": "problem_solution",
+        "applies_to": "payment-peak-load to payment-safe-change: the system that cannot be stopped for a peak, then how it is changed while running"
+      }
+    ],
+    "rationale": "Reliability comes first because it introduces the split the other chapters use: a path that must answer and a record that must be right. Data stores then show how the record stays right once it is spread over shards; regions take the same shards and ask where they are allowed to be, and introduce the hosting difference (rented cloud, owned data centers) that the peak chapter needs to explain how each company gets capacity. Change comes last because the incidents the first four chapters cite (Stripe in July 2019 and February 2024, Adyen's partition near miss before a December peak) were all set off by a change, so the reader meets the cause after seeing its effects. Putting safe change first would discuss rollouts before the reader knows which path must answer and which record must be right; putting regions before data stores would ask where shards may live before saying what a shard is. Three of the five transitions are not sequence or support: the order is an argument from what must hold (the record) to what threatens it (growth, law, load, change)."
+  },
+  "opening": {
+    "carried_by": "part-8",
+    "hook": {
+      "type": "intriguing_example",
+      "content": "On 1 October 2026 Larkfield's renewal job hit its provider's rate limit and 7,900 membership renewals were delayed to the next day; dunning emails went to members who had done nothing wrong. On 1 November 2026 a provider call timed out, the job retried with a new idempotency key, and 1,840 members were charged twice: €71,300 refunded, and 212 disputes anyway. The first month was late. The second was wrong."
+    },
+    "bridge": "From the engineer's habit of counting downtime as the cost of failure to the two Larkfield months, where the late run cost emails and the wrong run cost refunds and disputes: in a money path the order of priorities is the reverse of a content site's.",
+    "roadmap": "Five chapters, each naming what gives way so that the record does not: how a payment path stays up and what an outage leaves behind; which databases hold the money and how they stay consistent when split; where the systems and the data are allowed to live, a short chapter because little is public; how a predictable peak is met; and how a system that cannot stop is changed."
+  },
+  "closing": {
+    "carried_by": "payment-safe-change",
+    "synthesis": "Read together, the five chapters show one asymmetry. What the two providers have documented is what they let give way: lagging books, a write pause of seconds, features cut in one country, a per-account limit, a rollout withdrawn at one percent. What neither has documented (the topology and timing of a failover, cells, which data is replicated synchronously) is the part a merchant cannot verify. A merchant's own reliability therefore rests on three things it can check: the contract, the documented limits, and its own measurement and reconciliation.",
+    "so_what": "The reader plans against the provider's contractual commitment and documented limits, measures payment success on their own side, and treats every outage, peak and deployment as finished only when the records agree, which is the same test the book applies to a single payment.",
+    "callback": "The two first-of-month runs from the part opening: 7,900 renewals a day late in October 2026, 1,840 members charged twice in November 2026. Keel's K5 accepts lateness on purpose by pacing renewals over 18 hours, and K1 removes the wrong outcome by deriving the key from the membership, the billing period and the number of the scheduled attempt.",
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "For each path in your system that moves money, write one line: when the provider is slow, at peak, and during a deploy, what gives way, and which check proves afterwards that the record did not."
+    }
+  },
+  "transition_in": {
+    "relationship": "contrast",
+    "carries_over": "From Part VII: the last of the mechanisms, a platform's account model, which decides who is liable for each seller's balance; and with it the full set of mechanisms from Parts II to VII, each described for one payment at a time.",
+    "introduces": "The same mechanisms under conditions no single payment shows: a dependency failing, data outgrowing one database, a law on where data sits, a month of renewals arriving in six hours, and several hundred deployments a day.",
+    "form": "paragraph",
+    "placement": "both"
+  },
+  "posts": [
+    {
+      "id": "part-8",
+      "folder": "part-8-intro",
+      "title": "Part VIII — SCALE: Reliability, Data and Operations",
+      "kind": "part_intro",
+      "detail": "full",
+      "question": "What does Part VIII argue, and in what order should its chapters be read?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "Part VIII answers five questions in order: how a payment path stays up, how its data stays consistent when split, where systems and data may live, how a peak is met, and how the system is changed while running.",
+            "This is the part of the book with the least public evidence, and chapter 39 is short for that reason."
+          ],
+          "believe": [
+            "In a money path, late is cheaper than wrong."
+          ],
+          "can_do": [
+            "Pick the Part VIII chapter that answers the operational question in front of them."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "A reader of this page alone can name the five chapters' subjects in reading order and state the part's claim in one sentence.",
+            "check": "intro_predicts_content",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "After reading only this page: what does Part VIII argue, and what will each of the next five chapters tell you, in order?",
+            "expected": "At scale something must give way, and in a payment system it is never the record of money; then reliability and outages, data stores and consistency, regions and data residency (short, little is public), peak load, safe change."
+          },
+          {
+            "id": "AC-2",
+            "statement": "The page opens on the two Larkfield first-of-month runs with the ledger's figures and says which was late and which was wrong.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "major"
+          },
+          {
+            "id": "AC-3",
+            "statement": "The page tells the reader, before any chapter, that a cell design, the topology and timing of a failover between regions, which data is replicated synchronously and the webhook sender are not public for either company.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "major"
+          }
+        ]
+      },
+      "role": {
+        "contribution": "Performs the part's opening: the two Larkfield months, the part thesis, the reading order and the warning about where the evidence is thin.",
+        "supports": []
+      },
+      "post_spec": "posts/part-8-intro/spec.json"
+    },
+    {
+      "id": "payment-reliability-and-availability",
+      "folder": "37-payment-reliability",
+      "title": "Down Is Not an Option: Reliability and Availability",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "How do payment providers stay up, and what happens when they do not?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "The different things published under the word 'uptime' by the two providers (a target, an achieved yearly figure, a peak-weekend figure, rolling 30-day and 90-day figures, a contractual commitment) and why they cannot be compared.",
+            "What failure isolation and graceful degradation mean in a payment path, and the two documented examples: accounting that runs behind the edge (Adyen, 2021) and shedding of non-critical requests (Stripe, 2017).",
+            "What the public incident accounts contain: Stripe's root-cause analysis of 10 July 2019 and its paragraph on 8 February 2024, Adyen's update on the attack of 21 April 2025 and its follow-up."
+          ],
+          "believe": [
+            "An outage is not over when the status page recovers; it is over when every payment attempted during it has a known outcome.",
+            "The contractual commitment and its exclusions, not the reported figure, is the number to plan against."
+          ],
+          "can_do": [
+            "Read a provider's availability figure and say what it measures, over what period, and what it leaves out.",
+            "For their own payment path, list which steps may be skipped, queued or refused when a dependency fails, and which may not.",
+            "After a provider outage, find the payments with unknown outcomes and resolve them without charging anyone twice."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a provider's reported and contracted availability and a described outage, the reader says which number to plan against and what to do about payments that timed out.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A provider's status page shows 99.999% for the last 30 days; its contract promises 99.9% per quarter, excluding failures at banks and card networks. Last month your checkout saw 40 minutes of failed and timed-out payments. Which number do you plan against, what do you measure yourself, and what do you do about the payments that timed out?",
+            "expected": "Plan against the contractual figure with its exclusions; measure payment success on your own side, because failures at banks and networks count against neither number; treat each timeout as an unknown outcome: fetch the provider's record or retry with the same idempotency key, and do not mark the payment failed or charge again until the record says so."
+          },
+          {
+            "id": "AC-2",
+            "statement": "Given a payment path with a failing dependency the chapter does not discuss, the reader says whether the step should fail open, fail closed or be queued, and what that choice risks.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "Your service that sends payment receipts by email is down, and so is the service that checks whether a studio is still allowed to take payments. For each: should the payment go ahead, be refused, or wait? Say what each choice risks.",
+            "expected": "Receipts: go ahead and queue the email; it can be late without money being wrong. The permission check: this decides whether money may move at all, so refusing or holding is defensible; letting it through (failing open) trades a compliance and loss risk for availability and must be a deliberate, written decision. The reader names the trade in both cases."
+          },
+          {
+            "id": "AC-3",
+            "statement": "Every availability figure in the chapter carries its publisher, its definition as published (or the statement that none is given) and its date, and the chapter says that no public service-level percentage for Stripe was found and that neither company publishes its failover design.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          },
+          {
+            "id": "AC-4",
+            "statement": "The terms availability target, failure isolation, graceful degradation and incident report are defined before they are used.",
+            "check": "known_before_new",
+            "method": "rubric",
+            "severity": "major"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "How do payment providers stay up, and what happens when they do not?",
+        "claim": "A payment path is kept answering by an operator that has decided beforehand what may lag or be dropped (the books, the non-critical requests) so that no payment is recorded twice or lost; when the path fails anyway, the provider restores service and publishes little about it, and what the merchant has to repair is the set of payments whose outcome nobody knows, not the minutes of downtime.",
+        "disputed_by": "The view that availability is a number to buy: pick the provider that reports the most nines, add redundancy on your own side, and consider an outage over when the status page says so.",
+        "so_what": "The reader plans against the contractual commitment and its exclusions, measures payment success on their own side, and builds the sweep that resolves unknown outcomes before building a second provider connection.",
+        "how_why": "Adyen described the split in 2021: for the edge 'the priority was uptime', while for accounting 'we don't mind if they are down for a little bit as long as we can guarantee their reliability and consistency', with a local database queue between them. Stripe described a different lever in 2017, reserving capacity for critical methods such as creating charges and shedding the rest, and committed to per-shard isolation after its outage of 10 July 2019; it has not published where state sits on its API path. The published figures do not settle a comparison: Stripe states a target of 99.9995% (2024, 2026) with no formula, and no public service-level percentage for Stripe was found; Adyen's public terms (last updated 1 November 2023) commit it to 'commercially reasonable efforts' toward 99.9% per quarter, with exclusions, while its status page reports successful requests over 30 days and Stripe's status page displays 99.999% over 90 days with no definition. None of these figures says what happened to requests that timed out. Stripe's root-cause analysis of 10 July 2019, the one full public account of an outage found, reports two windows of 27 and 93 minutes in which 'a substantial majority of API requests' failed, and says Stripe emailed every user with five or more failed POST requests: the cleanup was counted in requests, per customer, not in minutes. Neither company publishes its failover design or routine postmortems, and the chapter stops there."
+      },
+      "role": {
+        "contribution": "Introduces the split between the path that must answer and the record that must be right, which every later chapter of the part uses, and replaces the uptime figure with the unknown-outcome payment as the measure of an outage.",
+        "supports": [
+          "P8-1"
+        ]
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The part opening's two first-of-month runs and its claim that something must give way so the record does not.",
+        "introduces": "The first thing that gives way: under failure, the freshness of the books and the non-critical requests, and what a merchant is left to repair afterwards.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "post_spec": "posts/37-payment-reliability/spec.json"
+    },
+    {
+      "id": "payment-data-stores-and-consistency",
+      "folder": "38-payment-data-stores-and-consistency",
+      "title": "Never Lose a Cent: Data Stores and Consistency",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "Which databases sit under a payment platform, and how do they keep money consistent while scaling?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "What Stripe has published about its document database platform (2024, 2026) and its online migrations (2017), and what Adyen has published about PostgreSQL, its sharded accounting clusters (2021) and partitioning (2023 to 2025).",
+            "The terms shard, online migration, consistency boundary and outbox.",
+            "What is not public for either company: which data is replicated synchronously, read consistency, and how a transfer across shards or clusters is made atomic."
+          ],
+          "believe": [
+            "The choice of database product matters less for money than where the consistency boundary is drawn and whether everything that crosses it is idempotent and checked afterwards."
+          ],
+          "can_do": [
+            "Draw the consistency boundary for a payment record in their own system and say what is allowed to catch up later.",
+            "Replace a proposed cross-system transaction with a local transaction, an outbox and an idempotent consumer, and name the check that proves the two sides agree.",
+            "Plan the steps of an online migration of a payment table."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a proposal for a transaction across a database and a queue, the reader gives the outbox design and the duty it puts on the consumer.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A team must mark a payment as paid in its database and tell the booking system so that a class pass is activated. They propose one distributed transaction across the database and the message queue. What does this chapter suggest instead, what can still go wrong, and how is it caught?",
+            "expected": "Write the payment state and an outbox row in one local transaction; a separate process publishes the row, possibly more than once; the booking system deduplicates by event or payment id so that a repeat has no effect; a periodic comparison of paid payments against activated passes catches anything that was never delivered."
+          },
+          {
+            "id": "AC-2",
+            "statement": "Given a design in which one account's money can sit in two shards, the reader identifies that a transfer between them is no longer one transaction and says what keeps it correct.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A ledger is split into four databases and new entries go to whichever database is next in turn. A payout must debit a balance whose entries are spread across two of them. Why is this harder than before the split, and what did Adyen say it did about it in 2021?",
+            "expected": "The debit can no longer be one local transaction; money has to be moved from one cluster to the other. Adyen's 2021 account says the migration was 'quite painful' and that jobs exchange 'back and forth messages between the clusters to keep everything aligned'; the protocol itself is not public. The reader adds that such messages must be idempotent and verified."
+          },
+          {
+            "id": "AC-3",
+            "statement": "The statement that neither company uses a transaction spanning its money path is presented as an inference from the published mechanisms, labeled as such, and the chapter lists what is not public for each company.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          },
+          {
+            "id": "AC-4",
+            "statement": "Published scale figures for the two companies are given with their year and unit and are not ranked against each other.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "major"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "Which databases sit under a payment platform, and how do they keep money consistent while scaling?",
+        "claim": "Stripe scaled a document database and Adyen a relational one, and in what either has published no transaction spans the shards: the published mechanisms imply that money is kept consistent by local transactions, retries that are safe to repeat, messages between clusters and verification afterwards.",
+        "disputed_by": "The view that money needs one strongly consistent relational database, or distributed transactions across every service that touches it, and that a document store or any eventual consistency has no place near a payment.",
+        "so_what": "The reader stops asking which database is safe for money and instead draws a small consistency boundary (for Larkfield, the payment record and its outbox row), makes everything that crosses it idempotent, and adds a check that proves both sides agree.",
+        "how_why": "Stripe's 2024 account describes DocDB, built on MongoDB Community, with more than 2,000 shards and a platform that moves data between them; during the switch, which takes under two seconds, 'all failed reads and writes directed to the source shard succeed on retries'. Adyen's 2018 to 2025 posts describe PostgreSQL clusters; its 2021 account says accounting was sharded round-robin, that rebalancing was not implemented, and that clusters exchange 'back and forth messages' to stay aligned, while templates guarantee that the records sum to zero. That is the documented difference: Stripe invested in moving data between shards and verifies its ledger after the fact (2024), Adyen in not needing to move it and in checking at write time (2021). That both rely on idempotent operations and later verification instead of a global transaction is an inference from these mechanisms; neither company states it, and which data is replicated synchronously, read consistency and the cross-cluster protocol are not public."
+      },
+      "role": {
+        "contribution": "Shows how the record that chapter 37 says must be right stays right once it no longer fits in one database, and gives the reader the consistency boundary and the outbox as the small-scale version.",
+        "supports": [
+          "P8-2"
+        ]
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "Chapter 37's split: the answering path is kept independent of the record, and the record may lag but may not be wrong.",
+        "introduces": "The consequence of that split: the record has to be kept right on its own terms, in databases that have themselves been divided into shards, without a transaction that covers all of them.",
+        "form": "paragraph",
+        "placement": "both"
+      },
+      "post_spec": "posts/38-payment-data-stores-and-consistency/spec.json"
+    },
+    {
+      "id": "payment-multi-region-and-data-residency",
+      "folder": "39-multi-region-and-data-residency",
+      "title": "Where the Data Lives: Multi-Region Operation and Data Residency",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "What decides where a payment platform runs and where its data stays, and how much of Stripe's and Adyen's answer is public?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "The difference between data residency (where data is stored) and data localization (a law that requires it), and what active-active and active-passive mean.",
+            "The Reserve Bank of India's 2018 storage rule and its 2019 clarification, and what Stripe's India page (updated 2023) says the move cost in features.",
+            "What is documented about hosting: Stripe on Amazon Web Services (2023, 2024, current documentation); Adyen on its own infrastructure in data centers (2021, 2025, 2026) with five integration regions named and its data centers listed by continent or country.",
+            "What is not public for either company: which AWS regions Stripe uses and how many, the cities of Adyen's data centers, and how one region or data center takes over from another (Adyen states only that its load balancers fail over between data centers)."
+          ],
+          "believe": [
+            "A localization law is a product constraint as much as a storage one: identifiers, saved cards and fraud signals stop crossing the border.",
+            "A statement about a provider's regions or failover that the provider has not published should be asked for in writing, not inferred."
+          ],
+          "can_do": [
+            "Answer 'where is our customers' payment data' for each provider with what is documented, and list what must be asked of the provider.",
+            "Say what a new localization rule would change for stored cards, fraud checks and reporting in the affected country."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a confident sentence about a provider's regions, the reader separates the part the public record supports from the parts it does not.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "blocker",
+            "probe": "A colleague writes in a design document: 'Stripe runs active-active in three AWS regions, so our European members' data never leaves the EU.' Which parts of this sentence does the public record support, as of November 2026?",
+            "expected": "Only that Stripe runs on AWS. No AWS region is named and no count given; Stripe states active-active nowhere; Stripe's data-processing documents describe transfer mechanisms for European personal data, and no EU-residency product statement was found. The sentence should be replaced by a question to the provider."
+          },
+          {
+            "id": "AC-2",
+            "statement": "Given a new localization law in a country the chapter does not discuss, the reader names what changes for a merchant, going by the documented India case.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A country announces that payment data about transactions in the country must be stored only inside it. Going by what happened in India, name three things a merchant using a global provider there should expect to change.",
+            "expected": "Any three of: data for that country is stored on servers in the country and kept apart; saved payment details cannot be copied in or out; the same card gets a different fingerprint there than elsewhere, so duplicate and fraud checks stop matching across the border; some features (Stripe listed its card updater, revenue recognition in Billing and its Sigma reporting product) are disabled or changed; processing abroad may still be allowed with a deadline to bring the data back (24 hours in India's 2019 clarification)."
+          },
+          {
+            "id": "AC-3",
+            "statement": "The chapter contains no inferred topology: every Stripe and Adyen statement about hosting, regions or failover is a dated documented fact or the words 'not public', and a named section lists where the evidence stops.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          },
+          {
+            "id": "AC-4",
+            "statement": "The chapter is no longer than its evidence: it does not exceed about 3,800 words before Sources and Evidence.",
+            "check": "custom",
+            "method": "deterministic",
+            "severity": "minor"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "What decides where a payment platform runs and where its data stays, and how much of Stripe's and Adyen's answer is public?",
+        "claim": "Where a localization law applies, it settles where payment data is stored before any latency or availability goal, and elsewhere the provider's hosting model does. About the two providers the public record supports four kinds of statement and no more: Stripe runs on Amazon Web Services and names no AWS region; Adyen runs its own data centers, names five integration regions and lists its sites by continent or country, no finer; Stripe says it stores Indian payment system data only in India and lists the features that cost, while Adyen describes an isolated India environment; and Adyen says it accepts payments in several data centers at once and that its load balancers fail over between them. Neither says between which places takeover happens or how fast, and Stripe has described takeover only for one system, a two-region design for billing usage events (2025).",
+        "disputed_by": "The view that multi-region operation is an engineering choice made for latency and uptime, that any provider of this size must be active-active across regions, and that its layout can be worked out from its cloud provider or its customer list.",
+        "so_what": "The reader answers 'where is our members' data' with two differently shaped facts (a cloud provider whose regions are not named, and a list of regions and countries with no cities and no commitment that data stays there), puts residency and failover questions to each provider in writing, and expects a localization rule to change product behavior, not only storage.",
+        "how_why": "The Reserve Bank of India's 2018 circular requires that payment system data be stored 'only in India' and gives supervisory access, not privacy, as the reason; its 2019 clarification allows processing abroad if the data is brought back within 24 hours. Stripe's page on the move (last updated 2023) lists the cost: payment information 'can no longer be cloned into or out of India', and one card can have two fingerprints. The EU's operational-resilience regulation, applied from 17 January 2025, says in terms that it imposes no localization duty. On hosting the difference is documented: Stripe on AWS (2023 press release, 2024, current documentation), Adyen 'in several data centers around the world' (2021) for reasons it called 'part historical, part legal, and part technical', confirmed in 2025 and 2026; Adyen's documentation (n.d., accessed November 2026) names five regions an integrator can address: Europe, the United States, Australia, Northeast Asia and India. Its website (n.d., accessed November 2026) lists data centers in Europe, the United States, India, Singapore, Japan and Australia and says payments are 'stored in Europe and our isolated India environment', and its peak-season documentation calls the architecture 'active/active' and says load balancers 'manage the failover to the other data centers'. Stripe's Privacy Center (n.d., accessed November 2026) says payment system data is stored only on servers in India where the rule requires it. Nothing first-party names an AWS region Stripe runs in, a city for an Adyen data center, or the topology or timing of a failover at either company, or any mechanism beyond Adyen's load-balancer sentence, and Stripe has published no statement on takeover for payments, only a two-region design with failover for billing usage events (2025). The public record stops there, and so does the chapter."
+      },
+      "role": {
+        "contribution": "Adds the constraint that comes from outside engineering (law and hosting) and draws the boundary of the public record on regions and failover, so that no later page describes a topology neither company has published.",
+        "supports": [
+          "P8-3"
+        ]
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "Chapter 38's shards and clusters: data divided for engineering reasons, by size and load, in designs both companies have described at length.",
+        "introduces": "Data divided for reasons engineers do not choose, by country and by law, in a part of the record where both companies have published very little.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "post_spec": "posts/39-multi-region-and-data-residency/spec.json"
+    },
+    {
+      "id": "payment-peak-load",
+      "folder": "40-payment-peak-load",
+      "title": "The Biggest Day: Peak Load and Capacity",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "How do payment systems, and the merchants that call them, prepare for the day everything arrives at once?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "The peak profiles of payments (the four retail days from Black Friday to Cyber Monday, a ticket sale, the first of the month for subscriptions) and the peak figures each provider has published, with what they leave undefined.",
+            "The terms peak profile, load test, rate limit, load shedding, backpressure and fairness.",
+            "Stripe's 2017 account of its four limiters and its documented limits (accessed November 2026), and the fact that Adyen publishes no rate limit for payments.",
+            "How capacity is obtained on each side as published: split and merged shards on rented cloud capacity (Stripe, 2024); hardware bought ahead and a design rule of twenty times current load (Adyen, 2020 to 2026)."
+          ],
+          "believe": [
+            "The peak that hurts a merchant is its own predictable one, and the limit it meets is the one the provider sets per customer.",
+            "A rate-limited request is a late payment, not a failed one, and must not start the process for chasing a failed payment."
+          ],
+          "can_do": [
+            "Size and pace a batch of payments against a documented or agreed limit, with backoff and a stable idempotency key.",
+            "Tell from a peak figure what it counts and refuse to rank two providers by figures defined differently."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a planned burst of payments on a case the chapter does not contain, the reader predicts where it fails and redesigns the job.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A ticket seller using Stripe plans to charge 200,000 customers who registered in advance, all at 10:00 when the sale opens, as fast as its workers can send requests. Using this chapter: what will happen, and how should the job be built?",
+            "expected": "The job meets the account's rate and concurrency limits (documented as 100 requests per second in live mode, lower per endpoint, with a cap on requests in progress) and receives 'too many requests' responses long before the provider's capacity matters. Pace the job under the limit, back off with random delay on a rate-limit response, reuse the same idempotency key on every retry of the same charge, and do not tell a customer the payment failed because it was rate limited."
+          },
+          {
+            "id": "AC-2",
+            "statement": "Given two published peak figures, the reader says why they cannot be ranked.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "For the 2025 Black Friday weekend one provider reported 'more than 152,000 transactions per minute at peak' and another 'up to 199,000 transactions per minute'. Does the second have more capacity?",
+            "expected": "The figures do not show that: neither company defines 'transaction', one figure includes payments at in-store terminals, and both are reported load, not capacity. The reader declines to rank them."
+          },
+          {
+            "id": "AC-3",
+            "statement": "The Larkfield worked example uses the ledger's Renewal Wave figures (38% of monthly renewals in six hours, about 357,000 renewals, 7,900 delayed on 1 October 2026) and shows the job paced over 18 hours under K5.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "major"
+          },
+          {
+            "id": "AC-4",
+            "statement": "The chapter states what Adyen documents about peak (periodic load tests with merchants, a deployment freeze around named peak days, utilization generally under 30%) and that no Adyen payment rate limit or capacity figure was found, and makes no inference about Adyen from that absence.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "How do payment systems, and the merchants that call them, prepare for the day everything arrives at once?",
+        "claim": "A merchant's own predictable peak meets the provider's per-customer limit (published by Stripe at 100 requests per second, not published by Adyen for payments) before it meets the provider's capacity, so preparing for it means spreading and pacing the load on the merchant's side, not trusting the provider's Black Friday figures.",
+        "disputed_by": "The view that peak is the provider's problem: a provider that carried a Black Friday weekend at well over 100,000 transactions per minute will absorb one merchant's renewal run, so the merchant can send it at full speed and retry whatever fails.",
+        "so_what": "The reader designs a batch against the documented limit where there is one and an agreed limit where there is not, treats a rate-limit response as lateness and not as a declined payment, and accepts a longer run (Larkfield's 18 hours under K5) as the price of not sending reminders to members who did nothing wrong.",
+        "how_why": "Stripe's 2017 post describes four limiters: a per-user request rate, a per-user cap on requests in progress, and two load shedders, one of which keeps a share of the fleet for critical methods such as creating charges. Its documentation (n.d., accessed November 2026) gives the limits: 100 requests per second in live mode, 25 per endpoint unless stated otherwise, and 50 requests in progress. Adyen publishes no rate limit for its payment APIs, so there the figure has to be agreed in advance; that is the documented difference, and it is a difference in what is published, not evidence about Adyen's capacity. On capacity itself, Stripe wrote in 2024 that it splits shards in surges and tests load in production; Adyen wrote in 2020 and 2021 of designing for twenty times current load and in 2026 of buying compute and storage ahead. The published peak figures (Stripe 2023 to 2025, Adyen 2024 and 2025) leave 'transaction' undefined and cannot be ranked. Adyen's peak-season documentation describes periodic load tests with merchants and a deployment freeze around named peak days, but gives no capacity figure and no payment rate limit, and the chapter draws nothing from that absence."
+      },
+      "role": {
+        "contribution": "Moves the peak problem from the provider's side, where the reader can do nothing, to the caller's side, where the limit is documented or negotiable and the pacing is the reader's own design.",
+        "supports": [
+          "P8-4"
+        ]
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "Chapter 39's documented hosting difference: Stripe on rented cloud capacity, Adyen on infrastructure it owns.",
+        "introduces": "What follows from it when load arrives all at once: capacity that is scaled on demand on one side and bought ahead on the other, and, on both, a per-customer share that a merchant reaches first.",
+        "form": "paragraph",
+        "placement": "both"
+      },
+      "post_spec": "posts/40-payment-peak-load/spec.json"
+    },
+    {
+      "id": "payment-safe-change",
+      "folder": "41-safe-change",
+      "title": "Changing the Engine in Flight: Deploys, Migrations and Incidents",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "How do you ship changes many times a day to a system that moves money?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "The terms progressive rollout, feature flag, dark launch, zero-downtime migration and postmortem.",
+            "What Stripe's 2023 annual letter (published March 2024) says about its deployment pipeline, and what happened on 8 February 2024 when a change reached 1% of its critical traffic.",
+            "What Adyen has published about release practice (2018, 2021, and current documentation that says releases are applied continuously and frozen around named peak days) and database change without downtime (2018 to 2025), and that Adyen's Infrastructure page says it publishes new releases of its core system every week, while no figure comparable to Stripe's deploy count is public for it.",
+            "The engineering-culture facts each company has stated that bear on change: one dominant language and a monorepo at both, software built in-house or on open source at both, cloud rented at Stripe and hardware owned at Adyen."
+          ],
+          "believe": [
+            "On a money path, frequent small reversible changes are safer than rare large ones, and one percent of traffic is still real payments.",
+            "A deployment or migration is finished when the records agree afterwards, not when the rollout reaches 100%."
+          ],
+          "can_do": [
+            "Plan a change to a money path as stages with a bounded share of traffic, a signal that withdraws it and a way back at each stage.",
+            "Plan a table or version migration with dual writing, comparison and a reconciliation check before the old path is removed.",
+            "After a withdrawn rollout, find the payments it touched and prove their state."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a rollout that was withdrawn automatically, the reader says the work is not finished and names what remains.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A change to your payment service went to 1% of live traffic for ten minutes, error rates rose, and the rollout was withdrawn automatically. Your manager says the system worked and nothing more is needed. Using this chapter, what is still to do?",
+            "expected": "One percent of live traffic is real payments: some failed and some may be left with an unknown outcome or a half-written record. Find the payments handled by the new code in those ten minutes, compare each with the provider's record and with the ledger, repair differences, and only then close the change. The reader may cite Stripe's 8 February 2024 incident, where a change reached 1% of critical traffic and payments failed."
+          },
+          {
+            "id": "AC-2",
+            "statement": "Given a migration the chapter does not contain, the reader orders its steps so that each can be reversed and says when the old path may be removed.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "Your team must move from one version of a provider's API to another that renames a field your finance export reads, with no downtime and no wrong reports. Put the steps in order and say when the old code may be deleted.",
+            "expected": "Run the new version alongside the old without using its results (a dark launch against recorded or live traffic); compare outputs, including the finance export, field by field; switch a small share of traffic, then more, with a way back at each step; delete the old path only after a full reporting period reconciles on the new one. The reader ties this to a planned calendar of upgrades, not a forced one."
+          },
+          {
+            "id": "AC-3",
+            "statement": "The chapter does not compare the two companies' deployment frequency and says why the public record cannot support that comparison; it presents reconciliation after a change as the author's recommendation, and states that neither company has published such a gate.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          },
+          {
+            "id": "AC-4",
+            "statement": "As the page that carries the part's closing, the conclusion returns to the two Larkfield first-of-month runs and states what the five chapters show together that none shows alone.",
+            "check": "conclusion_calls_back_to_introduction",
+            "method": "rubric",
+            "severity": "major"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "How do you ship changes many times a day to a system that moves money?",
+        "claim": "A money path can take hundreds of changes a day when each one is first exposed to a bounded share of live traffic, is withdrawn automatically when its metrics deviate, and has a way back that has itself been tested; because even a change limited to 1% of traffic fails real payments, the author's rule is that a change is finished only when the records agree after it.",
+        "disputed_by": "The view that systems that move money should change rarely: release windows, freezes before busy periods and manual sign-off are safer than hundreds of deployments a day.",
+        "so_what": "The reader stops defending their payment system by pinning versions and avoiding change, which is how Larkfield reached the Version Cliff, and instead schedules small staged changes with a comparison step and a reconciliation after each, as K7 does.",
+        "how_why": "Stripe's 2023 annual letter (published March 2024) describes about 400 deployments a day to one core API service, each rolled out to test-mode traffic first and then to rising shares of live traffic, inspected against 55,000 metrics and withdrawn automatically. The same letter reports the limit: on 8 February 2024 an erroneous change reached 1% of critical traffic and payments failed. Its 2019 root-cause analysis shows a rollback causing the second outage of the day, which is why the way back has to be tested too; its 2017 and 2024 migration accounts keep both paths writable until a comparison passes. Adyen's 2018 account describes development on one main line, release branches, and features switched on one by one and then tried on a small share of traffic. So the documented difference is that Stripe describes gating the deployed code by traffic share (2024) and Adyen gating the feature (2018); each may do both; Adyen states a weekly release of its core system and no deploy count, so frequency cannot be compared number for number. Neither company has published a check of money correctness tied to a deployment; the last clause of the claim is the author's recommendation, drawn from the book's own test for a single payment."
+      },
+      "role": {
+        "contribution": "Names change as the cause behind the incidents the part has cited and gives the reader the staged, reversible, reconciled change as the practice; carries the part's closing.",
+        "supports": [
+          "P8-5"
+        ]
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "Chapter 40's open problem: a payment system cannot be stopped for its peaks, and the peak near miss on record (Adyen's partition change before a December season) was set off by a change, not by load.",
+        "introduces": "How a system that cannot stop is changed: bounded exposure, automatic withdrawal, reversible steps, and reconciliation as the test that a change is done.",
+        "form": "paragraph",
+        "placement": "both"
+      },
+      "post_spec": "posts/41-safe-change/spec.json"
+    }
+  ]
+}

@@ -1,0 +1,1488 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "payment-reliability-and-availability",
+  "journal": "payments-platform-architecture",
+  "part": "part-8",
+  "title": "Down Is Not an Option: Reliability and Availability",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "The different things published under the word 'uptime' by the two providers (a target, an achieved yearly figure, a peak-weekend figure, rolling 30-day and 90-day figures, a contractual commitment) and why they cannot be compared.",
+        "What failure isolation and graceful degradation mean in a payment path, and the two documented examples: accounting that runs behind the edge (Adyen, 2021) and shedding of non-critical requests (Stripe, 2017).",
+        "What the public incident accounts contain: Stripe's root-cause analysis of 10 July 2019 and its paragraph on 8 February 2024, Adyen's update on the attack of 21 April 2025 and its follow-up."
+      ],
+      "believe": [
+        "An outage is not over when the status page recovers; it is over when every payment attempted during it has a known outcome.",
+        "The contractual commitment and its exclusions, not the reported figure, is the number to plan against."
+      ],
+      "can_do": [
+        "Read a provider's availability figure and say what it measures, over what period, and what it leaves out.",
+        "For their own payment path, list which steps may be skipped, queued or refused when a dependency fails, and which may not.",
+        "After a provider outage, find the payments with unknown outcomes and resolve them without charging anyone twice."
+      ]
+    },
+    "audience": {
+      "who": "An engineer or architect new to payments who has to judge a provider's availability claims or design the failure behavior of a payment integration.",
+      "already_knows": [
+        "Availability, redundancy, timeouts, retries, queues, load shedding and circuit breakers as general engineering terms.",
+        "The unknown outcome and idempotency keys (idempotency-and-retries).",
+        "That a webhook is a notice confirmed against the provider's record, and the sweep over pending payments (payment-webhooks-and-events).",
+        "Rate limits and Stripe's 2017 limiters (payment-developer-platform).",
+        "Why a timeout is never retried on another provider (payment-routing-and-orchestration)."
+      ],
+      "does_not_know": [
+        "What Stripe and Adyen each publish as uptime and what each figure measures.",
+        "The documented designs by which each keeps its payment path answering, and where that record stops.",
+        "The contents of the public incident accounts of the two companies."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a provider's reported and contracted availability and a described outage, the reader says which number to plan against and what to do about payments that timed out.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A provider's status page shows 99.999% for the last 30 days; its contract promises 99.9% per quarter, excluding failures at banks and card networks. Last month your checkout saw 40 minutes of failed and timed-out payments. Which number do you plan against, what do you measure yourself, and what do you do about the payments that timed out?",
+        "expected": "Plan against the contractual figure with its exclusions; measure payment success on your own side, because failures at banks and networks count against neither number; treat each timeout as an unknown outcome: fetch the provider's record or retry with the same idempotency key, and do not mark the payment failed or charge again until the record says so."
+      },
+      {
+        "id": "AC-2",
+        "statement": "Given a payment path with a failing dependency the chapter does not discuss, the reader says whether the step should fail open, fail closed or be queued, and what that choice risks.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "Your service that sends payment receipts by email is down, and so is the service that checks whether a studio is still allowed to take payments. For each: should the payment go ahead, be refused, or wait? Say what each choice risks.",
+        "expected": "Receipts: go ahead and queue the email; it can be late without money being wrong. The permission check: this decides whether money may move at all, so refusing or holding is defensible; letting it through (failing open) trades a compliance and loss risk for availability and must be a deliberate, written decision. The reader names the trade in both cases."
+      },
+      {
+        "id": "AC-3",
+        "statement": "Every availability figure in the chapter carries its publisher, its definition as published (or the statement that none is given) and its date, and the chapter says that no public service-level percentage for Stripe was found and that neither company publishes its failover design.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      },
+      {
+        "id": "AC-4",
+        "statement": "The terms availability target, failure isolation, graceful degradation and incident report are defined before they are used.",
+        "check": "known_before_new",
+        "method": "rubric",
+        "severity": "major"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "How do payment providers stay up, and what happens when they do not?",
+    "claim": "A payment path is kept answering by an operator that has decided beforehand what may lag or be dropped (the books, the non-critical requests) so that no payment is recorded twice or lost; when the path fails anyway, the provider restores service and publishes little about it, and what the merchant has to repair is the set of payments whose outcome nobody knows, not the minutes of downtime.",
+    "disputed_by": "The view that availability is a number to buy: pick the provider that reports the most nines, add redundancy on your own side, and consider an outage over when the status page says so.",
+    "so_what": "The reader plans against the contractual commitment and its exclusions, measures payment success on their own side, and builds the sweep that resolves unknown outcomes before building a second provider connection.",
+    "how_why": "Adyen described the split in 2021: for the edge 'the priority was uptime', while for accounting 'we don't mind if they are down for a little bit as long as we can guarantee their reliability and consistency', with a local database queue between them. Stripe described a different lever in 2017, reserving capacity for critical methods such as creating charges and shedding the rest, and committed to per-shard isolation after its outage of 10 July 2019; it has not published where state sits on its API path. The published figures do not settle a comparison: Stripe states a target of 99.9995% (2024, 2026) with no formula, and no public service-level percentage for Stripe was found; Adyen's public terms (last updated 1 November 2023) commit it to 'commercially reasonable efforts' toward 99.9% per quarter, with exclusions, while its status page reports successful requests over 30 days and Stripe's status page displays 99.999% over 90 days with no definition. None of these figures says what happened to requests that timed out. Stripe's root-cause analysis of 10 July 2019, the one full public account of an outage found, reports two windows of 27 and 93 minutes in which 'a substantial majority of API requests' failed, and says Stripe emailed every user with five or more failed POST requests: the cleanup was counted in requests, per customer, not in minutes. Neither company publishes its failover design or routine postmortems, and the chapter stops there.",
+    "supporting_claims": [
+      {
+        "id": "C1",
+        "claim": "The two providers publish five different things under the word uptime (a target, an achieved yearly figure, a peak-weekend figure, rolling 30-day and 90-day figures, a contractual commitment); they cannot be compared, only Adyen's 99.9% per quarter is a public commitment and it has exclusions, no public percentage for Stripe was found, and none of the figures counts failures at banks and networks or says what happened to requests that timed out."
+      },
+      {
+        "id": "C2",
+        "claim": "A payment path is kept answering by failure isolation and graceful degradation decided in advance, and in the two documented designs (Adyen's accounting running behind its edge, 2021; Stripe's shedding of non-critical requests, 2017, and per-shard isolation after 2019) what gives way is not the record of a payment."
+      },
+      {
+        "id": "C3",
+        "claim": "For each step of a payment path the choice under a failed dependency is to skip, queue or refuse, and it follows from whether the step decides if money may move, records that it moved, or tells someone; a deadline on a slow dependency turns into unknown outcomes at the edge."
+      },
+      {
+        "id": "C4",
+        "claim": "When the path fails anyway the provider restores service and publishes little: four public documents exist for the two companies, they count the aftermath in failed requests or payments per customer where they count it at all, and neither company publishes its failover design or routine postmortems."
+      },
+      {
+        "id": "C5",
+        "claim": "What the merchant has to repair after an outage is the set of payments with unknown outcomes, so an outage is over when that set is empty, and the sweep that empties it comes before a second provider connection."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Introduces the split between the path that must answer and the record that must be right, which every later chapter of the part uses, and replaces the uptime figure with the unknown-outcome payment as the measure of an outage.",
+    "supports": [
+      "P8-1"
+    ]
+  },
+  "flow": {
+    "pattern": "problem_solution",
+    "additional_patterns": [
+      {
+        "pattern": "prerequisite_order",
+        "applies_to": "what-uptime-means before what-gives-way before skip-queue-refuse: the figure the reader arrives with, then the mechanism behind it, then the reader's own version of the mechanism"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "what-uptime-means, what-gives-way, incident-accounts and where-they-differ: each topic read at both providers, then gathered in one table"
+      },
+      {
+        "pattern": "chronological",
+        "applies_to": "incident-accounts (2019, 2024, 2025) and in-practice (before, during and after the scripted outage)"
+      }
+    ],
+    "rationale": "The reader arrives believing that availability is a number to buy, so the chapter starts with the Larkfield meeting in which that number is asked for and then takes the number apart: until the reader has seen that the five figures cannot be compared and that none counts timed-out requests, the designs would be read as ways to add nines. The mechanism comes next (what the operators let give way), and the reader's own choice per step follows it because skip, queue or refuse is the same decision at small scale and needs the two documented cases as its examples. The incident accounts come after the designs, not before, because they are read for what the designs failed to isolate and what was deliberately kept; placed first they would be anecdotes. The comparison table gathers three sections' facts and so cannot precede them. Larkfield's drill needs all of it: the contract arithmetic from the figures, the step table from the designs, the 44 minutes from the incident accounts. The failures of recovery come last because each is a departure from the drill."
+  },
+  "introduction": {
+    "hook": {
+      "type": "intriguing_example",
+      "content": "On 10 July 2019 the Stripe API was severely degraded for 27 minutes and then for 93. The company's account of that day closes with a sentence about email: 'We've sent you an email if you had five or more failed POST requests.' The provider measured the aftermath in requests per customer, not in minutes."
+    },
+    "bridge": {
+      "from_reader_world": "An engineer who has run other web systems measures a failure in minutes of downtime and compares providers by their count of nines.",
+      "to_topic": "In a payment path a request that got no answer may still have moved money, so an outage leaves behind payments whose outcome nobody knows, and those, not the minutes, are what has to be repaired."
+    },
+    "thesis_statement": {
+      "text": "A payment path is kept answering by an operator that has decided beforehand what may lag or be dropped (the books, the non-critical requests) so that no payment is recorded twice or lost; when the path fails anyway, the provider restores service and publishes little about it, and what the merchant has to repair is the set of payments whose outcome nobody knows, not the minutes of downtime.",
+      "placement": "KEY POINTS callout and paragraph p03"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p05",
+      "promises": [
+        {
+          "promise": "Start from the question asked at Larkfield: which provider is more reliable?",
+          "kept_in": [
+            "scene"
+          ]
+        },
+        {
+          "promise": "Say what each published uptime figure measures and which one to plan against.",
+          "kept_in": [
+            "what-uptime-means"
+          ]
+        },
+        {
+          "promise": "Explain how a payment path is kept answering, with the two documented designs.",
+          "kept_in": [
+            "what-gives-way"
+          ]
+        },
+        {
+          "promise": "Give the three choices for a step whose dependency fails, and the rule for choosing.",
+          "kept_in": [
+            "skip-queue-refuse"
+          ]
+        },
+        {
+          "promise": "Read the public incident accounts and say where they stop.",
+          "kept_in": [
+            "incident-accounts"
+          ]
+        },
+        {
+          "promise": "Compare the two providers.",
+          "kept_in": [
+            "where-they-differ"
+          ]
+        },
+        {
+          "promise": "Run an outage drill at Larkfield and go through the recoveries that make an outage worse.",
+          "kept_in": [
+            "in-practice",
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "function": "context",
+        "controlling_idea": "The one full public account of a payment API outage, Stripe's analysis of 10 July 2019, reports two windows of 27 and 93 minutes and ends by telling users it emailed everyone with five or more failed POST requests: the cleanup was counted in requests per customer.",
+        "evidence": [
+          {
+            "kind": "case",
+            "what": "Stripe, 'Root cause analysis: significantly elevated error rates on 2019-07-10' (https://stripe.com/rcas/2019-07-10, published July 2019; evidence age 7 years; re-fetched 2026-11-17): 'from 16:35 to 17:02 UTC, and again from 21:14 to 22:47 UTC, the Stripe API was severely degraded. A substantial majority of API requests during these windows failed.' and 'We've sent you an email if you had five or more failed POST requests.'",
+            "shows": "The provider's own account measures the aftermath in requests per customer, not in minutes."
+          },
+          {
+            "kind": "scenario",
+            "what": "Part VIII opening: 7,900 renewals a day late on 1 October 2026 and 1,840 members charged twice on 1 November 2026 (Scenario ledger).",
+            "shows": "Carries the part's late-versus-wrong contrast into this chapter."
+          }
+        ],
+        "transition_in": {
+          "relationship": "elaboration",
+          "carries_over": "The part opening's two first-of-month runs and its claim that something must give way so the record does not.",
+          "introduces": "The first thing that gives way, under failure, and what a merchant is left to repair afterwards.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p02",
+        "function": "context",
+        "controlling_idea": "An engineer who has run other web systems counts failure in minutes of downtime and buys availability as a count of nines, but a payment request that got no answer may still have moved money, so the lasting cost of a payment outage is the set of requests whose outcome nobody knows.",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "A failed page view is gone; a POST that creates a payment can time out after the issuer (the bank that issued the card) approved it. Chapter 18's unknown outcome, multiplied by every request in flight during an outage.",
+            "shows": "Moves the reader from downtime as the measure to unknown outcomes as the measure."
+          }
+        ],
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "Failed requests counted per customer.",
+          "introduces": "The habit the reader brings (minutes and nines) and why it misses the cost.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "function": "claim",
+        "controlling_idea": "A payment path is kept answering by an operator that has decided beforehand what may lag or be dropped, so that no payment is recorded twice or lost; when it fails anyway the provider restores service and publishes little, and what the merchant must repair is the set of payments with unknown outcomes, not the minutes of downtime.",
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "Unknown outcomes as the cost of an outage.",
+          "introduces": "The chapter's claim about how a path stays up and what is left when it does not.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "function": "context",
+        "controlling_idea": "In the journey of Mila's class pass this chapter covers no single step: it is every step of the evening of 9 March 2027 on a night when the request for her EUR 120.00 gets no answer.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Scenario ledger: Mila's class pass, EUR 120.00, Tuesday 9 March 2027 at 19:42, Studio Noord on Adyen, approved and captured automatically.",
+            "shows": "Places the chapter against the recurring payment: the same request with the answer missing."
+          }
+        ],
+        "transition_in": {
+          "relationship": "example",
+          "carries_over": "The claim about unknown outcomes.",
+          "introduces": "What it means for the book's recurring payment.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p05",
+        "function": "transition",
+        "controlling_idea": "The chapter goes from a question asked at Larkfield, through what the published uptime figures measure, how a payment path is kept answering, the three choices for a step whose dependency fails, and the public incident accounts, to the comparison of the two providers, an outage drill at Larkfield and the recoveries that make an outage worse.",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "Where the chapter sits in the payment's journey.",
+          "introduces": "The order of the sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: Which Provider Is More Reliable?",
+      "controlling_idea": "Asked which of its two providers is more reliable, Larkfield finds two published figures that cannot be compared and an incident of its own that neither figure would have shown, and replaces the question with three it can answer.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "C1",
+          "C5"
+        ],
+        "how": "Poses the chapter's question in the form a business asks it and shows from Larkfield's own incident that the figure is not the measure."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The question, the incident that undermines it, the questions that replace it."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The claim that the cost of an outage is unknown outcomes, not minutes.",
+        "introduces": "The Larkfield meeting in which the question is asked as a count of nines.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p06",
+          "function": "context",
+          "controlling_idea": "In May 2027, preparing the second quarterly rehearsal of the provider switch, Sofie Vermeer asks which of Larkfield's two providers is more reliable, and Daniel Osei answers with two published figures, 99.9995% for Stripe and 99.999% for Adyen, which turn out to be a target and a 30-day measurement.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Scenario ledger: K8 (two providers, one rehearsed switch, rehearsed quarterly for the 50 largest studios); cast. Local detail: the May 2027 meeting.",
+              "shows": "Sets the question in the form the disputed view asks it."
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe, 'Building a data plane from scratch' (https://stripe.dev/blog/building-a-data-plane-from-scratch-stripes-own-high-performance-distributed-proxy, 2026-08-26): 'we target 99.9995% reliability'. Adyen status page (https://status.adyen.com/, n.d., accessed 2026-11-17): 'Last 30 days: 99.999% uptime'.",
+              "shows": "The two numbers on the table are different kinds of statement."
+            }
+          ]
+        },
+        {
+          "id": "p07",
+          "function": "analysis",
+          "controlling_idea": "Larkfield's costliest payment incident, the Double Charge of 1 November 2026, began with provider calls that timed out and would have appeared in neither figure: its cost came from what Larkfield did with requests whose outcome it did not know.",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "Scenario ledger: the Double Charge, 1 November 2026: a provider call timed out, the renewal job retried with a new idempotency key, 1,840 members charged twice, EUR 71,300 refunded, 212 disputes. Chapter 2 addition: each first request had been approved and captured.",
+              "shows": "A handful of slow answers, invisible in any uptime figure, cost more than any outage Larkfield has had."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Two figures offered as the answer.",
+            "introduces": "The incident that neither figure measures.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p08",
+          "function": "claim",
+          "controlling_idea": "Femke de Graaf replaces the question with three: what each published figure measures, what gives way at the provider and at Larkfield when a dependency fails, and how long after an outage it takes until no payment has an unknown outcome; she adds an outage drill to the rehearsal to answer the third.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Local detail consistent with K1, K2 and K8: an outage drill added to the quarterly rehearsal, with the count of payments in an unknown state as its exit criterion (appended to the ledger).",
+              "shows": "Turns the chapter's thesis into three questions the sections answer in order."
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The figure is not the measure.",
+            "introduces": "Three questions that can be answered, and the drill.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "what-uptime-means",
+      "heading": "Five Figures Under One Word: What Uptime Measures",
+      "controlling_idea": "Five different things are published as uptime by the two providers (a target, an achieved yearly figure, a peak-weekend figure, rolling 30-day and 90-day figures and a contractual commitment); they cannot be compared, only the contractual one is a commitment, and none of them says what happened to failures at banks and networks or to requests that timed out.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "C1"
+        ],
+        "how": "Establishes that the published figures cannot settle a comparison and names the number to plan against."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "Definitions, then each company's reported figures, then the promised figure and its absence, then what none of them measures."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Femke's first question: what does each figure measure?",
+        "introduces": "The vocabulary (availability, target, commitment) and the five figures, each with publisher, definition and date.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p09",
+          "function": "definition",
+          "controlling_idea": "Availability is the share of time, or the share of requests, in which a service answers correctly, and a figure for it is one of three kinds of statement: an availability target (an internal goal), an achieved figure (a report) or a contractual commitment (a promise with consequences, usually called a service-level agreement).",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Author's arithmetic: 99.9% of a 91-day quarter allows about 131 minutes; 99.999% of 30 days allows about 26 seconds; 99.9995% of a 30-day month allows about 13 seconds (the last figure is also Stripe's own: Stripe Sessions talk 'Building a culture of system reliability' (https://stripe.com/us/sessions/2024/building-a-culture-of-system-reliability, 2024-04-25), 'Five and a half nine means in a month we can only tolerate 13 seconds of unavailability.').",
+              "shows": "Shows how far apart figures that look alike are once the period and the percentage are both read."
+            }
+          ]
+        },
+        {
+          "id": "p10",
+          "function": "evidence",
+          "controlling_idea": "Stripe publishes a target of 99.9995% (2024, 2026) without a formula, an achieved figure of 99.999% for 2023 and none in its letters for 2024 and 2025, peak-weekend figures above 99.9999% (2024, 2025) and, on its status page, a rolling 90-day figure for the Stripe API with no definition on the page; the only hint of a definition is a 2023 sentence about availability 'measured at the individual transaction level'.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe Sessions talk 'Building a culture of system reliability' (https://stripe.com/us/sessions/2024/building-a-culture-of-system-reliability, 2024-04-25) and Stripe, 'Building a data plane from scratch' (https://stripe.dev/blog/building-a-data-plane-from-scratch-stripes-own-high-performance-distributed-proxy, 2026-08-26) ('we target 99.9995% reliability'; 'maintaining 99.9995% public API uptime').",
+              "shows": "The target, stated twice, with no metric definition."
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe 2023 annual letter (https://stripe.com/annual-updates/2023, published 2024-03-13): 'Stripe was only 99.999% available last year'. Stripe 2022 annual letter (https://stripe.com/annual-updates/2022, published 2023-04-05; evidence age 3 years): 'Our API reliability is now consistently in excess of 99.999%' and 'a live tracker of our 90-day trailing API availability, measured at the individual transaction level'. BFCM press releases (https://stripe.com/us/newsroom/news/bfcm2024, 2024-12-03; /bfcm2025, 2025-12-02): API uptime of more than 99.9999%. The letters for 2024 (published 2025-02-27) and 2025 (published 2026-02-24) carry no reliability figure (PDFs searched 2026-11-17). Stripe status page (https://www.stripestatus.com/, n.d., accessed 2026-11-17): '99.999% uptime for the last 90 days' for the Stripe API, as rendered that day; no definition on the page.",
+              "shows": "Achieved figures exist for some years and for peak weekends, on different bases."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "Three kinds of statement.",
+            "introduces": "Stripe's figures, sorted by kind.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "function": "evidence",
+          "controlling_idea": "No published Adyen target was found; it reports a rolling 30-day figure on its status page, defined as the percentage of successful requests to its Payments API, and a peak-weekend figure for 2025, so set side by side the two companies' figures are five measurements on different periods and bases.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen status page (https://status.adyen.com/, n.d., accessed 2026-11-17): 'Last 30 days: 99.999% uptime', 'Based on the percentage of successful requests to our Payments API in the last [UPTIME_DAYS] days'. Adyen H2 2025 results (https://www.adyen.com/press-and-media/adyen-publishes-h2-2025-financial-results-3pgu2, 2026-02-12): 'processed 837 million transactions during Black Friday Cyber Monday with 99.9999% uptime'.",
+              "shows": "Adyen's reported figures and the one published definition."
+            },
+            {
+              "kind": "table",
+              "what": "Table: figure, publisher, kind, definition as published (or 'none given'), source date, for the Stripe and Adyen figures above and the Adyen contractual commitment.",
+              "shows": "Puts every figure next to its definition and date so the reader sees they are not one series."
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "Stripe's figures.",
+            "introduces": "Adyen's figures and the table of all of them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p12",
+          "function": "evidence",
+          "controlling_idea": "The one public contractual commitment is Adyen's: commercially reasonable efforts toward a quarterly-average minimum uptime of 99.9% for receiving transaction messages, with exclusions that cover issuing banks, acquirers, card networks, individual payment methods and general internet failures, and a right to terminate if it is missed for two consecutive quarters; its status page says the reported figure is not that commitment.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen Terms and Conditions (https://www.adyen.com/legal/adyen-terms-and-conditions, last updated 2023-11-01, for agreements entered into on or after that date, accessed 2026-11-17), clause 7.2: 'Adyen will use commercially reasonable efforts to achieve a quarterly-average minimum uptime of 99.9% of the Payment Interface, as measured by its ability to receive Transaction messages'; excluded is downtime caused by '(i) acts or omissions of Merchant, Issuing Banks, Acquirers or Scheme Owners; (ii) changes implemented by Adyen on Merchant's specific request; (iii) general internet failures; (iv) failures of individual Payment Methods; or (v) a Force Majeure Event'; clause 11.2: Merchant may terminate immediately if 'The SLA commitments in Clause 7.2 are not met during two consecutive quarters'. The older terms (https://www.adyen.com/legal/terms-and-conditions, effective 2023-03-07, for agreements before 1 November 2023) carry the same 99.9% in clause 6.1.",
+              "shows": "The commitment and what it leaves out."
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen status page (https://status.adyen.com/, n.d., accessed 2026-11-17): the page 'does not represent the service level commitments in your agreement with Adyen'.",
+              "shows": "Adyen itself separates the reported number from the promised one."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Reported figures.",
+            "introduces": "The promised figure and its exclusions.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p13",
+          "function": "evidence",
+          "controlling_idea": "No public service-level percentage for Stripe was found: its Services Agreement contains no uptime figure and says Stripe does not warrant uninterrupted use, and whether negotiated contracts carry a figure is not public.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe Services Agreement, General Terms (https://stripe.com/us/legal/ssa, n.d., accessed 2026-11-17), section 8.2: 'Stripe does not warrant that User's use of the Services and Stripe Technology will be uninterrupted or error-free'; a text search finds neither 'uptime' nor 'service level'.",
+              "shows": "The absence of a public commitment is itself a documented fact about the public terms."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Adyen's public commitment.",
+            "introduces": "The absence of one in Stripe's public terms.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p14",
+          "function": "analysis",
+          "controlling_idea": "None of the figures counts what a merchant experiences: failures at issuers, card networks and payment methods are excluded by Adyen's contract and fill both status pages, and no figure says what became of requests that timed out, so the number to plan against is the contractual one and the number to trust is the payment success rate measured on the merchant's own side.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe status feed (https://www.stripestatus.com/history.json, n.d., accessed 2026-11-17): 160 entries for October 2026 (count to be stated with its breakdown); entries such as 20 October 2025, 'Affirm, Klarna, and Amazon Pay had brief periods of unavailability due to a widespread outage external to Stripe'. Adyen status page (https://status.adyen.com/, n.d., accessed 2026-11-17): the page 'tracks performance across a variety of products, services, and payment methods'.",
+              "shows": "Most of what a status page reports is failure downstream of the provider, which neither the contract nor the headline figure counts against it."
+            },
+            {
+              "kind": "reasoning",
+              "what": "Brief judgement, presented as the author's: a merchant's experienced availability is lower than either figure and must be measured merchant-side.",
+              "shows": "Names the number to plan against and the number to measure."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Five figures, one commitment with exclusions, one absence.",
+            "introduces": "What all of them leave out and what follows for planning.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "what-gives-way",
+      "heading": "How a Payment Path Stays Up: Deciding What Gives Way",
+      "controlling_idea": "A payment path is kept answering by failure isolation and graceful degradation, and the two documented examples (Adyen's accounting that runs behind its edge, 2021; Stripe's shedding of non-critical requests, 2017, and its per-shard isolation after 2019) each let something other than the record of money give way.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "C2"
+        ],
+        "how": "Shows the mechanism behind the first half of the thesis with the two documented designs and says where the record stops."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "Definitions, Adyen's documented design, Stripe's documented design, then the limits of both records and the reading that joins them."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "Figures that report how often the path answered.",
+        "introduces": "How the path is kept answering: what its operator lets lag or drop.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p15",
+          "function": "definition",
+          "controlling_idea": "Redundancy alone does not keep a payment path up, because copies share dependencies; what does is failure isolation (one broken part cannot take the rest down) and graceful degradation (the important requests are still served, in a reduced way, while something is broken), and both require deciding in advance what is allowed to give way.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Definitions from the brief's glossary, plus the 2019 case as forward pointer: redundant nodes within a shard did not help when the shard itself was a dependency shared by everything.",
+              "shows": "Defines the two owned terms before any design uses them."
+            }
+          ]
+        },
+        {
+          "id": "p16",
+          "function": "evidence",
+          "controlling_idea": "Adyen's 2021 account describes an edge built to be expendable: every payment passes through a stateless acceptance layer in which any instance can be shut down without affecting processing.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen, 'Design to Duty: How we make architecture decisions at Adyen' (https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture, 2021-07-28; evidence age 5 years): 'any PAL instance can be shut down without impacting our ability to process payments, and a new PAL can immediately be as effective as the other PALs already running. This makes our horizontal scaling linear.'; 'All payments pass through it.'",
+              "shows": "The answering path is made of interchangeable parts, which is failure isolation at the edge."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "Failure isolation defined.",
+            "introduces": "Adyen's documented edge.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p17",
+          "function": "evidence",
+          "controlling_idea": "The same 2021 account states what gives way: the edge's priority is uptime and the accounting systems' is consistency, and a local database queue between them lets the books run behind without stopping the edge.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen, 'Design to Duty: The Accounting and Reporting Systems at Adyen' (https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2, 2021-08-23; evidence age 5 years): 'Whereas for the latter the priority was uptime, for the accounting systems we don't mind if they are down for a little bit as long as we can guarantee their reliability and consistency.'",
+              "shows": "States the split between the path that must answer and the record that must be right."
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen, 'Design to Duty: The Accounting and Reporting Systems at Adyen' (https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2, 2021-08-23; evidence age 5 years): the PAL 'saves the payment in a local database and a separate process picks it up when possible. This process will run behind if we have doubt about whether we can guarantee consistency in the accounting or if an accounting database is not available but that will not impact the availability of the PAL itself.'",
+              "shows": "The mechanism: a durable local queue, so what gives way is the freshness of the books."
+            },
+            {
+              "kind": "figure",
+              "what": "Figure 37-path-and-record: an answering path, a local queue, and books that run behind.",
+              "shows": "Makes the split visible."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "An edge that holds no state.",
+            "introduces": "Where the state goes and what is allowed to lag.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p18",
+          "function": "evidence",
+          "controlling_idea": "Stripe described a different lever in 2017: it divides traffic into critical methods such as creating charges and non-critical ones such as listing them, always reserves capacity for the first kind and sheds the second; a 2026 post suggests request priorities still exist in another form.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe, 'Scaling your API with rate limiters' (https://stripe.com/blog/rate-limiters, 2017-03-30; evidence age 9 years): 'We divide up our traffic into two types: critical API methods (e.g. creating charges) and non-critical methods (e.g. listing charges.)'; 'We always reserve a fraction of our infrastructure for critical requests.'",
+              "shows": "What gives way under overload is the non-critical request, not the payment."
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe, 'Building a data plane from scratch' (https://stripe.dev/blog/building-a-data-plane-from-scratch-stripes-own-high-performance-distributed-proxy, 2026-08-26): the in-house proxy 'supports retries, hedging, rate limiting, and dynamic priority-based request routing'.",
+              "shows": "A current source mentions priority-based routing without confirming the 2017 shedders; the limiters themselves belong to chapter 21."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Adyen's lever: the books lag.",
+            "introduces": "Stripe's lever: the non-critical request is refused.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p19",
+          "function": "evidence",
+          "controlling_idea": "Stripe's isolation work is documented from an outage: in 2019 its data was split into clusters and shards with redundant nodes, one shard still took the API down (the outage itself is told in the incident section), and Stripe committed to circuit breaking and to containing a single failed shard; its 2024 talk mentions cells in one phrase.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe, 'Root cause analysis: significantly elevated error rates on 2019-07-10' (https://stripe.com/rcas/2019-07-10, published July 2019; evidence age 7 years; re-fetched 2026-11-17): 'Stripe splits data by kind into different database clusters and by quantity into different shards. Each cluster has many shards, and each shard has multiple redundant nodes.'; remediation: 'additional circuit-breaking on failed operations to particular clusters' and 'additional fault isolation techniques to contain the impact of a single failed shard and limit resource consumption by clients attempting repeated retries of failed requests'.",
+              "shows": "Redundancy inside a shard did not isolate the API from that shard; isolation was the stated remedy."
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe Sessions talk 'Building a culture of system reliability' (https://stripe.com/us/sessions/2024/building-a-culture-of-system-reliability, 2024-04-25): 'cell architecture' appears once in a list of practices, with no detail.",
+              "shows": "One phrase is the whole public record on cells at Stripe."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Shedding by request class.",
+            "introduces": "Isolation by shard, documented after it failed.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "function": "analysis",
+          "controlling_idea": "The public record stops well short of a design for either company: Stripe has not published where state sits on its API path or which payment steps it would skip, Adyen has not published any shedding by request class, and on failover between data centers or regions Stripe has published nothing for the payment path (a two-region design for billing usage events only, 2025) and Adyen a few general sentences of documentation that state an intent without timings or topology.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen documentation, peak season readiness (https://docs.adyen.com/industries/peak-season, n.d., accessed 2026-11): 'active/active, stateless architecture'; 'With load balancers in front of every data center, transactions can be equally processed through any available data center. In the event that a data center is unavailable, these load balancers also manage the failover to the other data centers.' Stripe 2023 annual letter: its systems 'can automatically remediate many incidents by invoking redundant rails or enabling emergency fallback capabilities'. Adyen documentation, live endpoints (https://docs.adyen.com/development-resources/live-endpoints, n.d., accessed 2026-11): 'alternative routing can be enabled to backup infrastructure and new infrastructure can be provisioned on demand'. Adyen Annual Report 2025 (2026-03-05, the PDF offered at https://investors.adyen.com/financials/2025, which calls itself a printed version): 'Adyen designs its platform to avoid single points of failure'. Brief: not found for Stripe: any post on regional or cell architecture or API failover.",
+              "shows": "The most either company says about failover is a few general sentences from Adyen, which are not a design."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What the two companies have documented.",
+            "introduces": "What neither has.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p21",
+          "function": "analysis",
+          "controlling_idea": "Read together, the two published designs relax something other than the record of money (the freshness of the books at Adyen, the non-critical request at Stripe), which is the author's reading and is labeled as inference: late before wrong.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Brief architecture implication (ASSUMPTION/JUDGEMENT), rendered as an INFERENCE, NOT DOCUMENTED block: both split an answering path from a record-keeping path that may lag; neither company states this as a shared principle.",
+              "shows": "Connects the two documented cases to the part thesis without promoting the reading to fact."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "Two documented levers and the limits of the record.",
+            "introduces": "What they have in common, as inference.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "skip-queue-refuse",
+      "heading": "The Designs: Skip, Queue or Refuse, Step by Step",
+      "controlling_idea": "For each step of a payment path whose dependency fails there are three designs (let the payment proceed without the step, do the step later, or refuse the payment), and the choice follows from whether the step decides if money may move, records that it moved, or tells someone about it.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "C3"
+        ],
+        "how": "Turns the providers' documented choices into a rule the reader applies to their own path, which AC-2 tests."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The three designs must be named before the rule that chooses among them; the rule before its documented instances; and the timeout last, because it is what every one of the designs meets in practice."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Operators that decided beforehand what gives way.",
+        "introduces": "The reader's own version of that decision, one step at a time.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p22",
+          "function": "definition",
+          "controlling_idea": "When a step's dependency is unreachable there are three designs: fail open (skip the step and let the payment proceed), queue (accept the payment and do the step later) and fail closed (refuse or hold the payment), and each trades availability against a different risk.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Brief glossary: fail open / fail closed; the queue is Adyen's documented third option (the local database queue).",
+              "shows": "Names the three designs before the table uses them."
+            }
+          ]
+        },
+        {
+          "id": "p23",
+          "function": "explanation",
+          "controlling_idea": "The sorting rule is the step's job: a step that records or reports a payment can be queued because it may be late but not lost, a step that tells someone can be queued or skipped, and a step that decides whether money may move is refused by default and failed open only as a written decision with a bound on the loss.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Trade-off table: step (receipt or notification; ledger posting; fraud score; check that the seller may take payments; idempotency store; the issuer's authorization) by job, default design, what the choice risks. Author's recommendation, with the receipt and permission-check rows matching AC-2.",
+              "shows": "Gives the reader the rule in a form they can apply to a step the chapter does not list."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Three designs.",
+            "introduces": "The rule that picks one per step.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p24",
+          "function": "example",
+          "controlling_idea": "Each design has a documented instance: Adyen queues its accounting (2021); Adyen's API refuses a keyed request when its idempotency store is unavailable and hands the choice to the caller; Stripe in 2014 expected its fraud scoring to fail open under a network partition and found a latency spike instead.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen documentation, API idempotency (https://docs.adyen.com/development-resources/api-idempotency, n.d., accessed 2026-11): HTTP 503 with error 703 'required resource temporarily unavailable'; the caller may 'Pause processing and retry the requests later (if this is feasible)' or 'Fall back to non-idempotent processing by not submitting the idempotency-key HTTP header'.",
+              "shows": "A documented fail-closed step, with the fail-open decision left to the merchant."
+            },
+            {
+              "kind": "case",
+              "what": "Stripe, 'Game Day Exercises at Stripe: Learning from kill -9', Marc Hedlund, 2014-10-28 (read from the Internet Archive snapshot of 2021-06-22; evidence age 12 years): the team guessed a partition between charge processing and the scoring service 'would cause these calls to time out and fail open (that is, allow the charge to go through immediately)'; the test 'caused a spike in latency, where we'd expected calls to scoring-srv to time out and fail open quickly'.",
+              "shows": "A fail-open design is only real once it has been tested; the old case shows the intended design and the surprise."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The rule.",
+            "introduces": "One documented case of each design.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p25",
+          "function": "analysis",
+          "controlling_idea": "A failing dependency is more often slow than down, so every step needs a deadline, and at the outer edge a deadline turns slowness into unknown outcomes, by the thousand during an outage; clients that then retry at once add load to the system that is failing, which Stripe's 2019 remediation names.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe, 'Root cause analysis: significantly elevated error rates on 2019-07-10' (https://stripe.com/rcas/2019-07-10, published July 2019; evidence age 7 years; re-fetched 2026-11-17): 'limit resource consumption by clients attempting repeated retries of failed requests'.",
+              "shows": "Retries are part of the load a provider must contain."
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe, 'Advanced error handling' (https://docs.stripe.com/error-low-level, n.d., accessed 2026-11): 'When a connection fails, you might not know whether Stripe received or executed the request.'",
+              "shows": "The provider's own statement of the unknown outcome; chapter 18 owns the mechanism."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Designs tested against a dependency that is down.",
+            "introduces": "The commoner case, a slow dependency, and what a deadline produces.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "incident-accounts",
+      "heading": "When It Fails Anyway: What the Public Incident Accounts Show",
+      "controlling_idea": "Four public documents describe a failure of either company's payment path (Stripe's root-cause analysis of 10 July 2019 and its paragraph on 8 February 2024; Adyen's update on the attack of 21 April 2025 and its follow-up); they show failures set off by a change or an attack and deliberate choices about what to keep, and none says how the failover works or how many payments were left unknown.",
+      "function": "evidence",
+      "advances_thesis": {
+        "supports": [
+          "C4"
+        ],
+        "how": "Supplies the evidence for 'when the path fails anyway, the provider restores service and publishes little'."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The term first, then the accounts in date order (2019, 2024, 2025), then what they share."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "Designs that keep a path answering.",
+        "introduces": "The occasions on which it did not, as the companies have told them.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p26",
+          "function": "definition",
+          "controlling_idea": "An incident report (also called a root-cause analysis or postmortem) is a written account of what failed, why, and what will change; a merchant reads it for a fourth thing it rarely contains, what happened to the requests in flight, and for the two companies there are four such public documents in total.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Brief inventory: Stripe, one full RCA (2019) and one paragraph in the 2023 letter; Adyen, one incident update (2025-04-22) and one follow-up (2025-10-31); not found: any public detailed postmortem by Adyen, any public Stripe RCA after July 2019 other than that paragraph.",
+              "shows": "Sizes the public record before it is read."
+            }
+          ]
+        },
+        {
+          "id": "p27",
+          "function": "evidence",
+          "controlling_idea": "Stripe's analysis of 10 July 2019 describes a cascade: a database failover fault left one shard without a primary, that shard was used by so many applications that the API starved, and the second, longer window was caused by reverting the first fix.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe, 'Root cause analysis: significantly elevated error rates on 2019-07-10' (https://stripe.com/rcas/2019-07-10, published July 2019; evidence age 7 years; re-fetched 2026-11-17): 'two different database bugs and a configuration change interacted in an unforeseen way, causing a cascading failure across several critical services'; two nodes 'stopped emitting metrics reporting their replication lag but continued to respond as healthy to active checks'; 'Because of widespread use of this shard across applications, including the API, the unavailability of this shard starved compute resources for the API and cascaded into a severe API degradation'; 'our revert to a known stable version interacted poorly with a recently-introduced configuration change to the production shards'; 'Automated monitoring detected the failed election within a minute.'",
+              "shows": "Detection took a minute; isolation was what was missing, and the repair caused the second window."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "Four public documents.",
+            "introduces": "The fullest of them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p28",
+          "function": "analysis",
+          "controlling_idea": "For a merchant the telling part of that account is its unit: failed POST requests per user, and Stripe's current documentation says what such a request leaves behind, an indeterminate outcome that Stripe's own recovery may or may not reconcile.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe, 'Root cause analysis: significantly elevated error rates on 2019-07-10' (https://stripe.com/rcas/2019-07-10, published July 2019; evidence age 7 years; re-fetched 2026-11-17): 'We've sent you an email if you had five or more failed POST requests.'",
+              "shows": "The provider counted the aftermath per customer in money-moving requests."
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe, 'Advanced error handling' (https://docs.stripe.com/error-low-level, n.d., accessed 2026-11): 'Treat the outcome of a request that returns 500 as indeterminate'; 'During incident recovery, Stripe attempts to reconcile failed operations and send webhook events for any objects created during reconciliation. The cached response doesn't change, and reconciliation isn't guaranteed to resolve every operation.'",
+              "shows": "Documented: after an incident, objects may exist that no API response told the merchant about, and the provider does not promise to resolve them all."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The cascade and its two windows.",
+            "introduces": "What the account implies for the merchant's records.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p29",
+          "function": "evidence",
+          "controlling_idea": "Stripe's only later account is a paragraph in its 2023 annual letter about six minutes on 8 February 2024, caused by an erroneous change that reached 1% of the critical tier of traffic and counted in failed payments per user; the status feed's entries for 2026 state a window and a resolution and no analysis.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe 2023 annual letter (https://stripe.com/annual-updates/2023, published 2024-03-13): 'the most significant recent issue which happened on February 8, 2024 between 21:46 and 21:52 UTC'; 'the three most impacted users had 39, 15, and 12 payments fail, respectively'; 'an erroneous change rolled out all the way to 1% of the critical tier of traffic'.",
+              "shows": "Again the unit is payments per user; the cause is a change."
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe status feed (https://www.stripestatus.com/history.json, n.d., accessed 2026-11-17): 27 September 2026, impact 'major', 'From 00:32 UTC to 01:01 UTC, we saw elevated API errors. This issue is now resolved.'; 14 November 2026, 'From 02:34 to 03:01 UTC on November 14th, we saw increased API error rates for the Stripe API. This is now resolved.'",
+              "shows": "A status entry is evidence that something happened, not an account of it."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The 2019 analysis.",
+            "introduces": "The 2024 paragraph and the status feed.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p30",
+          "function": "evidence",
+          "controlling_idea": "Adyen's one public account concerns an attack: on 21 April 2025 a distributed denial-of-service attack on its European data centers disrupted payment processing mainly between 18:51 and 19:35 CEST, its mitigations deliberately left hosted checkout components impaired, and the detailed review went to customers only; a follow-up six months later names four changes.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen, 'Incident update: Mitigating a DDoS attack on April 21, 2025' (https://www.adyen.com/knowledge-hub/mitigating-a-ddos-april-2025, dated 2025-04-21 on the page): 'a DDoS attack targeting services across our European datacenters'; 'the main impact for Ecommerce and In-Person Payment Transaction processing occurring between 18:51 CEST and 19:35 CEST'; 'As a result of our deliberate mitigations, checkout services such as Session Integrations, Secured Fields, and Pay by Link, remained impacted throughout the entire incident.'; 'A detailed post-incident review, including root cause analysis and long term prevention measures, will be made available to our customers.'",
+              "shows": "A 44-minute main impact window, a deliberate degradation, and detail kept for customers."
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen, 'Strengthening our platform resilience' (https://www.adyen.com/knowledge-hub/strengthening-our-platform-resilience, 2025-10-31): 'introducing additional global DDoS mitigation partners, such as Cloudflare, alongside existing global providers'; 'We've scaled and re-architected our load-balancing layer'; 'We've accelerated planned geographic distribution of key services'; 'additional automated testing and monitoring'. Adyen Annual Report 2025 (printed version, 2026-03-05): 'In 2025, there was one instance of reduced availability, linked to the disruption incident referenced earlier.'",
+              "shows": "What changed afterwards, at the level of detail Adyen publishes."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Stripe's disclosed failures, set off by its own changes.",
+            "introduces": "Adyen's disclosed failure, set off from outside.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p31",
+          "function": "analysis",
+          "controlling_idea": "What the four documents have in common is their limit: each says what broke and what was kept, none describes a failover between regions or how many payments ended with an unknown outcome, and neither company publishes postmortems as a routine, so a merchant gets that detail only by asking for it under contract and by counting on its own side.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Brief open questions 7 and 9 and its 'where detail goes' row; Adyen's annual report: 'Each incident triggers a root-cause analysis and an assessment of its impact on the broader risk and control framework' (internal, not published).",
+              "shows": "States where the evidence stops and what the reader does about it."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "Four documents read one by one.",
+            "introduces": "Their shared limit.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "On reliability the documented differences are in what each company states and promises in public (a target at Stripe, a contractual commitment at Adyen), in which lever each has described, and in how each has reported incidents; on failover neither has published a design.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "C1",
+          "C2",
+          "C4"
+        ],
+        "how": "Gathers the dated facts of the three previous sections into the required comparison."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "Figures, designs and incident accounts, each read at both companies.",
+        "introduces": "The side-by-side table and what an integrator does differently on each.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p32",
+          "function": "comparison",
+          "controlling_idea": "Set side by side, Stripe states a target and no public commitment while Adyen states a public commitment and no target; Stripe has documented shedding and per-shard isolation, Adyen a lagging accounting queue; each has a handful of incident documents; and on failover between data centers Stripe's record is empty and Adyen's is a few general sentences.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Where They Differ table, six rows: stated target; reported figures; contractual commitment; documented lever (what gives way); public incident accounts; failover between data centers. Cells are the dated facts cited in the sections above or 'Not public'; the last column is the author's reading, introduced as inference.",
+              "shows": "The required comparison, every cell traceable."
+            }
+          ]
+        },
+        {
+          "id": "p33",
+          "function": "recommendation",
+          "controlling_idea": "An integrator therefore asks Stripe for a commitment in the contract and reads its feed by machine, reads Adyen's exclusions before relying on its 99.9%, asks both for incident reports under contract, and on both measures payment success itself.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Follows from the table rows; Stripe's status history is a public JSON feed, Adyen's page is a summary with a disclaimer.",
+              "shows": "Turns the differences into actions."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The table.",
+            "introduces": "What to do differently on each provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: A Scripted Forty-Four Minutes",
+      "controlling_idea": "Larkfield's outage drill scripts 44 minutes of failure at one provider and is finished when no payment has an unknown outcome, which shows that the sweep does the repair, that the contract would not have been breached, and that the switch helps only new payments.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "C3",
+          "C5"
+        ],
+        "how": "Works the thesis through with ledger facts: what gives way at Larkfield and what has to be repaired afterwards."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The dependency, the prepared decisions, the scripted outage, the repair, the end."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "What each provider documents and where each record stops.",
+        "introduces": "Larkfield, which depends on both, rehearsing an outage of one.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p34",
+          "function": "context",
+          "controlling_idea": "Larkfield depends on its two providers one studio at a time, so for most studios an outage of their provider means waiting: the K8 switch covers online card payments that bring their own credential at the 50 largest studios, stored-card renewals wait for the provider that holds the card, and the front desk has no second provider.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Scenario ledger: split by studio; K8; chapter 10 addition (verified accounts at both providers for the 50 largest studios; stored-card renewals stay with or wait for the provider that holds the card); chapter 11 addition (front desk has no second provider, offline payments not enabled).",
+              "shows": "States the dependency honestly: the second provider is a partial failover, by design."
+            }
+          ]
+        },
+        {
+          "id": "p35",
+          "function": "example",
+          "controlling_idea": "Larkfield's own step table says what gives way when a provider is slow: interactive checkout gets a deadline and a 'checking' state, renewals pause, receipts and ledger entries wait, and no step may record a payment as failed or create a second one.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Larkfield step table under Keel: checkout request (deadline, then pending with waiting_on = provider); renewal batch (paused and paced, K5); receipt email (queued); ledger entry (posted from the report, K3); studio verification status (read from the mirror, K6; refuse if the studio is not allowed to take payments). Local details consistent with K1 to K6 and the chapter 2 and 8 additions.",
+              "shows": "Applies the skip, queue or refuse rule to the running example with its own decisions."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "A dependency on two providers.",
+            "introduces": "What gives way at Larkfield when one is slow.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p36",
+          "function": "example",
+          "controlling_idea": "The June 2027 drill scripts a degradation of 44 minutes, the length of the main impact window Adyen published for April 2025, and assumes 2,000 payment attempts of which 760 get no usable answer; measured against a 99.9% quarterly commitment those 44 minutes are no breach.",
+          "evidence": [
+            {
+              "kind": "statistic",
+              "what": "Illustrative assumptions for the drill: 2,000 attempts, 1,240 answered, 760 timeouts or server errors. Author's arithmetic: a 91-day quarter has 131,040 minutes; 44 minutes is 0.034%, so the quarter would stand at about 99.966%, inside a 99.9% commitment that allows about 131 minutes.",
+              "shows": "The contract and the experience diverge: an evening that leaves 760 unknown outcomes is within the commitment."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "What gives way.",
+            "introduces": "The scripted outage and its count.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p37",
+          "function": "process",
+          "controlling_idea": "The 760 are resolved one by one without a new charge: each stays pending, is resent under its stored key inside Larkfield's limits, and what is still open goes to the sweep, the job that confirms each pending payment against the provider's record (the payment object on Stripe, the webhook and then the settlement report on Adyen); in the drill 310 turn out to have been approved and 450 never executed.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Scenario ledger: K1, K2; chapter 18 addition (resend under the stored key for 20 hours on Stripe and 6 days on Adyen; on Stripe the sweep finds the payment by the Larkfield identifier in metadata); chapter 2 addition (pending covers 'request sent, no answer yet'); ruling 12 (no payment GET in Adyen's Checkout API). Assumed split of the 760: 310 approved, 450 not executed.",
+              "shows": "Shows the sweep doing the repair, and why marking the 760 as failed would have left 310 members charged without a pass."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "760 payments with no answer.",
+            "introduces": "How each is resolved, per provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p38",
+          "function": "analysis",
+          "controlling_idea": "The drill ends when the count of unknown payments is zero, hours after the scripted recovery, and the switch plays a small part in it: thrown during the window it moves new wallet and typed-card payments at the 50 largest studios, while the 760 stay with the first provider and are never retried on the second.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Chapter 10: retry on another provider only when the first attempt is known to have failed. Local detail: the drill records time-to-known per provider as its result (appended to the ledger).",
+              "shows": "Supports the so-what: the sweep is built before the second connection is of use."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The 760 resolved.",
+            "introduces": "When the drill is over and what the switch contributed.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong: Recoveries That Make an Outage Worse",
+      "controlling_idea": "Four recoveries turn an outage into lasting damage: recording timeouts as failures, retrying everything at once when service returns, sending an unknown payment to the other provider, and declaring the outage over when the status page turns green.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "C5"
+        ],
+        "how": "Shows the failure modes of the merchant's side of the thesis, each with detection and recovery."
+      },
+      "flow": {
+        "pattern": "order_of_importance",
+        "rationale": "From the most common and most expensive (a timeout recorded as failed) to the one that makes the others invisible (ending the incident at green)."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "A drill in which every prepared decision held.",
+        "introduces": "The four ways the merchant's own recovery goes wrong.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p39",
+          "function": "analysis",
+          "controlling_idea": "Recording a timeout as a failure creates a Phantom Payment and invites a Double Charge, because the customer or a job then pays again; it is detected by payments at the provider with no successful local record, and prevented by a state for 'unknown'.",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "Scenario ledger: the Double Charge (1,840 members, EUR 71,300, 212 disputes); the drill's 310 approved among 760 unanswered (assumption).",
+              "shows": "The same error at two scales."
+            }
+          ]
+        },
+        {
+          "id": "p40",
+          "function": "analysis",
+          "controlling_idea": "Retrying everything the moment service returns hits the recovering provider with a burst and the merchant's own rate limit, which is the Renewal Wave produced by an outage; pacing, backoff with jitter and serving interactive payments before the backlog prevent it.",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "Scenario ledger: the Renewal Wave of 1 October 2026 (7,900 renewals delayed after the job hit the rate limit); chapter 21 addition (a 429 was treated as a failed attempt). Stripe, 'Root cause analysis: significantly elevated error rates on 2019-07-10' (https://stripe.com/rcas/2019-07-10, published July 2019; evidence age 7 years; re-fetched 2026-11-17): Stripe's commitment to 'limit resource consumption by clients attempting repeated retries of failed requests'.",
+              "shows": "A provider plans to contain retry bursts, so a merchant's burst is refused when it can least afford it."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "A wrong record.",
+            "introduces": "A wrong recovery rate.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p41",
+          "function": "analysis",
+          "controlling_idea": "Sending an unknown payment to the second provider charges the customer at two providers that share no idempotency key, and a second provider that has never carried traffic fails on the day; both are detected only by rehearsal.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Chapter 10 owns the cross-provider retry and the cold second rail; one paragraph and a link here.",
+              "shows": "Ties The Single Rail to the unknown outcome without re-teaching chapter 10."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Too many retries at one provider.",
+            "introduces": "A retry at the other provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p42",
+          "function": "analysis",
+          "controlling_idea": "Declaring the outage over when the status page recovers leaves the unknown payments unowned, and they keep changing afterwards (Stripe's recovery may create objects and send their events later); the outage is over when the count of payments older than a set age in an unknown state is zero, and that count needs an owner and an alert.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe, 'Advanced error handling' (https://docs.stripe.com/error-low-level, n.d., accessed 2026-11): 'Prepare your webhook handlers to process objects your integration hasn't received in an API response.'",
+              "shows": "The provider documents that the aftermath arrives after the incident ends."
+            },
+            {
+              "kind": "figure",
+              "what": "Figure 37-two-ends-of-an-outage: a timeline with 'Service restored' at minute 44 and 'Every outcome known' later, the count of unknown payments falling from 760 to zero between them.",
+              "shows": "Shows the two ends of an outage."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "Three wrong recoveries.",
+            "introduces": "The fourth: stopping too early, and the definition of 'over'.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "The provider and the merchant make the same decision at different scales. The provider keeps its path answering by letting the books lag or the list calls fail; the merchant keeps its records right by letting its own answer to the customer be late ('checking') instead of wrong. An availability figure measures only the first; the count of unknown outcomes measures the second, and it is the only one of the two the merchant controls.",
+    "so_what": "A team that plans this way reads the contract and its exclusions instead of the reported nines, measures payment success itself, and has a sweep that drives unknown outcomes to zero before it spends on a second provider connection; a team that buys nines and adds a failover has two providers and still charges people twice.",
+    "callback": {
+      "to": "The email Stripe sent in July 2019 to users with five or more failed POST requests, and Sofie Vermeer's question about which provider is more reliable.",
+      "how": "The email was the provider handing each customer its share of the outage; the answer to Sofie is that reliability, for Larkfield, is how fast that share reaches zero, on either provider."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "For each provider: write down the contractual commitment and its exclusions, alert on your own payment success rate, list for every step of your payment path whether it is skipped, queued or refused when its dependency fails, and rehearse an outage until the count of payments in an unknown state returns to zero without a duplicate."
+    },
+    "hand_off": {
+      "to": "payment-data-stores-and-consistency",
+      "relationship": "cause_effect",
+      "carries_over": "The split this chapter introduced: the answering path is kept independent of the record, and the record may lag but may not be wrong.",
+      "introduces": "The consequence: the record has to be kept right on its own terms, in databases that have themselves been divided into shards, without a transaction that covers all of them."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The recoveries that go wrong and the definition of when an outage is over.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p43",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Established: the published figures are different measurements; Adyen's public terms commit to 99.9% per quarter with exclusions and no public percentage for Stripe was found; Adyen (2021) and Stripe (2017, 2019) each documented a design that lets something other than the payment give way; a timeout or a 500 is an unknown outcome; neither company publishes its failover design or routine postmortems."
+      },
+      {
+        "id": "p44",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Depends on context: whether a deciding step may fail open, how long a customer-facing request may wait, whether a second provider is worth its cost, and how much to rely on a provider's own post-incident reconciliation all depend on the loss at stake, the kind of payment and what the merchant can rehearse.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What the record establishes.",
+          "introduces": "What changes with the merchant's situation.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p45",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "The author's synthesis: judge an outage by the time until every payment attempted during it has a known outcome, build the sweep before the second provider connection, and let your own answer be late before you let your record be wrong.",
+        "transition_in": {
+          "relationship": "additional_support",
+          "carries_over": "What is established and what depends.",
+          "introduces": "The author's own position.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p46",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "Nine questions let the reader test a provider's availability claims and their own payment path in a design review.",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The author's position.",
+          "introduces": "Questions that apply it.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p47",
+        "function": "transition",
+        "controlling_idea": "Keeping the answering path independent of the record has a consequence: the record must be kept right on its own terms, in databases that have themselves been split into shards with no transaction covering all of them, which is the subject of the next chapter.",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The split between the path that must answer and the record that must be right.",
+          "introduces": "The consequence for the record once it is spread over shards.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "The mechanics of idempotency keys, key windows and retry policy.",
+      "covered_in": [
+        "idempotency-and-retries"
+      ]
+    },
+    {
+      "topic": "The webhook receiver's contract and the sweep's implementation.",
+      "covered_in": [
+        "payment-webhooks-and-events"
+      ]
+    },
+    {
+      "topic": "Rate limits and the design of Stripe's 2017 limiters.",
+      "covered_in": [
+        "payment-developer-platform"
+      ]
+    },
+    {
+      "topic": "Routing across providers, orchestration and the mechanics of the switch.",
+      "covered_in": [
+        "payment-routing-and-orchestration"
+      ]
+    },
+    {
+      "topic": "Databases, shards, replication and how the record stays consistent.",
+      "covered_in": [
+        "payment-data-stores-and-consistency"
+      ]
+    },
+    {
+      "topic": "Hosting, regions, data centers and data residency.",
+      "covered_in": [
+        "payment-multi-region-and-data-residency"
+      ]
+    },
+    {
+      "topic": "Peak figures, capacity planning and load testing.",
+      "covered_in": [
+        "payment-peak-load"
+      ]
+    },
+    {
+      "topic": "Deployment practice, progressive rollout and how postmortems are run.",
+      "covered_in": [
+        "payment-safe-change"
+      ]
+    },
+    {
+      "topic": "Offline acceptance at the terminal.",
+      "covered_in": [
+        "in-person-payments"
+      ]
+    },
+    {
+      "topic": "EU operational-resilience regulation (DORA)."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "Stripe's availability formula (time-based or request-based, which endpoints, how downstream failures count) is not public; the only hint is the 2023 phrase 'measured at the individual transaction level'.",
+    "Whether Stripe's negotiated contracts carry a service-level percentage is not public.",
+    "Neither company has published a failover design for payments. Adyen's documentation says in general terms that load balancers fail over between its data centers (peak season readiness page) and that 'alternative routing ... to backup infrastructure' can be enabled; neither is described further. For Stripe nothing was found for payments; a blog post of 28 January 2025 describes two-region processing with automatic failover for billing usage events.",
+    "Adyen's detailed review of the April 2025 attack went to customers only; the saturated components and the number of affected payments are not public.",
+    "Whether Stripe's 2017 load shedders still exist in that form is unconfirmed; a 2026 post mentions priority-based request routing.",
+    "Adyen's status history endpoint returned a truncated view; nothing in the chapter may be read as 'Adyen had no incident of type X'.",
+    "Stripe's status page displayed '99.999% uptime for the last 90 days' for the Stripe API on 17 November 2026 and gives no definition; the page's own data endpoint (/uptime_showcase) returned 99.94 for the same component and window that day. The chapter states the displayed figure; the author decides whether to mention the discrepancy."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "The uptime figures come before the mechanism, because the thesis is disputed by 'availability is a number to buy' and the reader arrives with that number.",
+      "rejected": [
+        "Opening the body with failure isolation and treating the figures as an appendix."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Larkfield's worked example is a drill run by fault injection at Larkfield's own adapter, not a provider outage, so that nothing in the scene is evidence about a provider; its 44 minutes borrow the length of Adyen's published main impact window.",
+      "rejected": [
+        "Inventing a provider outage in 2027.",
+        "Replaying the Double Charge again (chapter 18 did)."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Status pages are treated as evidence inside the figures section and the incident section, not in a section of their own.",
+      "rejected": [
+        "A separate status-page section, which would repeat both."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Hosting (cloud versus own data centers), fault-injection practice in detail, deployment figures and peak figures are left to chapters 39, 40 and 41.",
+      "rejected": [
+        "A full inventory of each company's reliability engineering posts."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The trade press report of the April 2025 attack's resolution time is not used; only Adyen's own two documents and its annual report are.",
+      "rejected": [
+        "Citing a secondary source read only as a search summary."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "PLAN.md, chapter 37 contract",
+      "contributed": "Scope, owned terms, Larkfield example."
+    },
+    {
+      "kind": "internal",
+      "ref": "journal-spec.json, entry payment-reliability-and-availability and part-8",
+      "contributed": "Intent, acceptance criteria, thesis, role, transitions."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-reliability-and-scale.md, Part 1, Part 6, Part 7, Key numbers, Open questions",
+      "contributed": "The tagged claims used as evidence; the list of what is not public."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md and consistency-issues.md (rulings 4, 5, 12, 13)",
+      "contributed": "Larkfield facts, K1 to K8, ownership boundaries with chapters 18, 20 and 21."
+    },
+    {
+      "kind": "external",
+      "ref": "https://stripe.com/rcas/2019-07-10",
+      "contributed": "The 2019 root-cause analysis."
+    },
+    {
+      "kind": "external",
+      "ref": "https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture and -part2",
+      "contributed": "The stateless edge and the lagging accounting queue (2021)."
+    },
+    {
+      "kind": "external",
+      "ref": "https://stripe.com/blog/rate-limiters",
+      "contributed": "Critical and non-critical traffic (2017)."
+    },
+    {
+      "kind": "external",
+      "ref": "https://www.adyen.com/legal/terms-and-conditions; https://status.adyen.com/; https://stripe.com/us/legal/ssa",
+      "contributed": "The contractual commitment, the status-page definition and disclaimer, the absence of a Stripe percentage."
+    },
+    {
+      "kind": "external",
+      "ref": "Stripe annual letters 2022 and 2023; Sessions 2024 talk; stripe.dev proxy post 2026; BFCM press releases 2024, 2025",
+      "contributed": "Stripe's target and reported figures; the 8 February 2024 paragraph."
+    },
+    {
+      "kind": "external",
+      "ref": "https://www.adyen.com/knowledge-hub/mitigating-a-ddos-april-2025; /strengthening-our-platform-resilience; Adyen Annual Report 2025 (printed version); H2 2025 results",
+      "contributed": "The April 2025 incident, its follow-up, the BFCM 2025 figure."
+    },
+    {
+      "kind": "external",
+      "ref": "https://docs.stripe.com/error-low-level; https://docs.adyen.com/development-resources/api-idempotency; https://docs.adyen.com/development-resources/live-endpoints; https://www.stripestatus.com/history.json",
+      "contributed": "Indeterminate outcomes and incident reconciliation; the idempotency-store fallback; alternative routing; status entries."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation pass (parts 6-8): fields copied from the journal spec and unit-level controlling ideas and evidence brought into line with the verified page and the consistency rulings; no unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "First draft of the outcome spec from the PLAN contract, the journal-spec entry and the reliability brief."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "After the flow rubric: the sweep is named where the drill resolves its unknown payments; the failover paragraph states Adyen's one documented sentence so the comparison table only gathers; the 2019 outage is pointed forward from the isolation paragraph; the hook ends on the fact. Not acted on: merging the paragraph on the absence of a Stripe percentage into the paragraph on Adyen's commitment (kept apart, one idea each; AC-3 turns on it)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 67 claims checked (51 confirmed, 9 corrected, 6 hedged, 1 unsupported and relabeled, 0 unreachable); most significant fixes: Adyen does document failover between data centers in general terms (peak season readiness page), the uptime commitment is now quoted from Adyen's current terms of 1 November 2023 as a commercially-reasonable-efforts clause, and Stripe's status page shows a rolling 90-day figure. Paragraph-level controlling ideas and evidence updated to match; intent, thesis and acceptance criteria untouched; no unit added, dropped or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: statements of absence re-tested with a wide search (documentation and support sitemaps, company sites and license pages, web search). Narrowed: Stripe's yearly figures (the Sessions 2026 keynote gives 99.9996% for 'critical APIs' in 2025); Adyen's achieved figures (Adyen Australia publishes a quarterly regulatory availability disclosure: 100% for accepting card payments, Q3 2026); Stripe's contractual commitment (no availability percentage; paid support plans state a 15-minute response); Stripe on failover (none found for payments; a two-region design with failover is published for billing usage events, 2025). Holds: no Adyen availability target; no public service-level percentage for Stripe. Four sources added; connective sentences trimmed; units unchanged."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Sweep of rulings 46 to 48: the sentence on Stripe and failover is scoped to the payment path, as the table already was (46g); p20 aligned."
+    }
+  ],
+  "length": {
+    "target_words": 5000,
+    "max_words": 6500
+  }
+}

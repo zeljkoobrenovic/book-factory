@@ -1,0 +1,635 @@
+{
+  "id": "part-6",
+  "title": "Part VI — REVENUE: Billing, Tax and Recognition",
+  "detail": "full",
+  "intent": {
+    "outcome": {
+      "know": [
+        "What a billing engine adds to a payment API: a scheduler, a price calculator and a subscription state machine whose output is an invoice.",
+        "The terms the part owns: subscription, billing cycle, proration, usage event, meter, rating, invoice, credit note, dunning, involuntary churn, tax registration, deemed supplier, deferred revenue, performance obligation, merchant of record.",
+        "What Stripe documents for billing, metering, invoicing, recovery, tax, revenue recognition and merchant of record as of November 2026, what Adyen documents (token payments with recurring flags, Auto Rescue, account updating, the Orb acquisition closed on 1 July 2026), where no public source on Adyen was found, and where Adyen has stated its position (it does not act as a merchant of record)."
+      ],
+      "believe": [
+        "Recurring revenue is a second state machine driven by the clock, and its failures are failures of time: a charge that is late, taken twice, or counted in the wrong period.",
+        "The invoice, not the payment, is the unit of revenue: it is what gets scheduled, filled with usage, collected, taxed and recognized.",
+        "A provider's tax, recognition or merchant-of-record product covers the transactions and contracts that provider sees, and the obligation it does not explicitly take over stays with the seller."
+      ],
+      "can_do": [
+        "Given a billing incident, say whether it was late, twice or in the wrong period, and name the period, key or cut-off that should have prevented it.",
+        "For a recurring or usage-priced product, list the decisions a team must make before the first invoice: period boundaries and time zone, proration rule, event acceptance and correction rules, retry policy per decline type and payment method, tax registrations, and the data finance needs per invoice line.",
+        "For a stated business on Stripe, on Adyen or on both, say which of these jobs the provider's documented products do and which must live in the business's own system or a third-party one."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Every supporting claim of the part thesis is argued by at least one chapter, and every chapter supports at least one.",
+        "check": "children_cover_parent_thesis",
+        "method": "deterministic",
+        "severity": "blocker"
+      },
+      {
+        "id": "AC-2",
+        "statement": "Each chapter's closing hand-off expresses the relationship its successor declares in transition_in.",
+        "check": "transition_expresses_declared_relationship",
+        "method": "rubric",
+        "severity": "major"
+      },
+      {
+        "id": "AC-3",
+        "statement": "A reader who has read only Part VI classifies three billing faults in a case the part does not contain as late, twice and wrong period, and names the mechanism for each.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A meal-kit company bills a weekly box. After a deploy, some customers were charged twice for the same week; others were charged three days late and first received a 'your payment failed' email; and finance's March revenue includes, in full, one-year gift subscriptions paid in March. Using Part VI: what kind of failure is each, and what should have prevented it?",
+        "expected": "Twice: the charge was not tied to one invoice per subscription and period, so a second run created a second charge; a key or invoice per period prevents it. Late: the scheduler, not the customer, was late, and dunning was started by a missing payment instead of by a failed attempt on a finalized invoice. Wrong period: cash was reported as revenue; the annual amount is deferred revenue released over the service period."
+      },
+      {
+        "id": "AC-4",
+        "statement": "A reader can say, for each job in the part, whether Adyen's public documentation covers it as of November 2026, without presenting an absence of documentation as a statement by Adyen, or a statement by Adyen as an absence.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "blocker",
+        "probe": "A team that processes payments on Adyen needs: a subscription schedule with proration, retries of failed renewals, VAT calculation on its invoices, a revenue schedule for annual plans, and a provider that acts as the merchant of record. According to Part VI, which of these does Adyen's public documentation describe as of November 2026, and what does the part say about the rest?",
+        "expected": "Described: retrying failed merchant-initiated payments (Auto Rescue) and updating stored card details, both at the level of the payment. Stated by Adyen: it does not act as a merchant of record (its article of 15 September 2026). Not found in public sources: a first-party subscription or invoice object, tax engine or revenue-recognition product; Adyen's terms leave each party its own tax obligations. Orb was acquired on 1 July 2026 and has billing and recognition features of its own, and Orb's documentation describes Adyen as a payment gateway for Orb invoices, but no billing product is documented as part of Adyen's platform. The part states the absences as gaps in the public record, to be filled by the merchant's own or a third-party system, not as confirmed facts about Adyen."
+      }
+    ]
+  },
+  "thesis": {
+    "question": "What has to be built on top of a payment API before single payments become recurring, usage-priced, taxed and reportable revenue, and how does that system fail?",
+    "claim": "Revenue needs a second state machine on top of payments, driven by the clock and by billing periods instead of by a customer's click: it decides what is owed, for which period and when to ask, and hands the payment engine an invoice. Its failures are failures of time (a charge that is late, taken twice, or counted in the wrong period), and whoever holds the invoice is the only party that can collect it as a debt, tax it and recognize it. As of November 2026 the public record puts that machine inside Stripe's platform and outside Adyen's.",
+    "disputed_by": "The view that billing is a thin layer of configuration over payments (a monthly job that charges saved cards, plus reports for finance), so that a provider with good authorization rates and stored credentials has already solved the hard part.",
+    "so_what": "A team that accepts the claim designs renewals around the invoice and its period, not around the charge; asks of any provider 'where does the invoice live?' before comparing features; and, where the provider holds no invoice, budgets for a billing system of its own or a third party's.",
+    "how_why": "A customer-started payment has one moment and one amount. A recurring charge has neither until something computes them: a scheduler picks the instant, a price plan and a usage count give the amount, and a state machine says what the subscription is while the invoice is unpaid. Each of those depends on time boundaries (period start, event cut-off, retry window, tax point, service period), and each boundary is a place where a charge can land late, twice or in the wrong period. Stripe documents subscription, invoice, meter, tax and revenue-recognition objects on one platform. Adyen documents stored tokens charged with a recurring flag, payment-level retry and card updating, and closed its acquisition of the billing company Orb on 1 July 2026; no integrated Adyen billing product, tax engine or revenue-recognition product was found in public sources, and Adyen states that it does not act as a merchant of record, so several comparisons in this part are between Stripe's product and what a merchant must supply itself.",
+    "supporting_claims": [
+      {
+        "id": "P6-1",
+        "claim": "A billing engine is a scheduler, a price calculator and a subscription state machine whose output is an invoice; the payment API executes only its last step."
+      },
+      {
+        "id": "P6-2",
+        "claim": "Usage can be billed correctly only if three time rules are fixed before the first invoice (how long an event is accepted, when the period's invoice closes, how a wrong event is corrected), because usage events arrive late and twice."
+      },
+      {
+        "id": "P6-3",
+        "claim": "Between owed and paid, what is recovered is the debt on a finalized invoice, through as many attempts and payment methods as it takes; a provider that holds the invoice retries a debt, and one that sees only payments retries a payment."
+      },
+      {
+        "id": "P6-4",
+        "claim": "Tax and revenue recognition are second readings of the same invoice lines, by place and by period, and a provider can compute them only for the sales and contracts it sees; the liability and the accounting judgement stay with the seller."
+      },
+      {
+        "id": "P6-5",
+        "claim": "As of November 2026 the public record shows the billing state machine inside Stripe's platform and outside Adyen's: Adyen documents recurring token payments, payment-level retry and an Orb acquisition closed on 1 July 2026 with no documented integrated product, so for invoicing, tax, recognition and merchant of record the comparison is Stripe's product against the merchant's own or a third-party system."
+      },
+      {
+        "id": "P6-6",
+        "claim": "Making the provider the merchant of record puts its name on the customer's statement and invoice and hands it the indirect tax and the handling of fraud and disputes; under the one arrangement documented in detail as of November 2026, Stripe's, the cost of disputes, refunds and reversals, the seller-of-record role and the revenue stay with the business. The price is a fee, the checkout, the statement name and part of the customer relationship; it is an operating model, and it does not fit a platform that pays other sellers."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Shows that the gap between instant answer and slow truth repeats one level up: a renewal 'succeeds' or 'fails' on a schedule nobody watches, and the truth about what was owed, taxed and earned arrives later still. Without this part the book would explain single payments and leave out the system that starts most of them.",
+    "supports": [
+      "J6"
+    ]
+  },
+  "flow": {
+    "pattern": "prerequisite_order",
+    "additional_patterns": [
+      {
+        "pattern": "chronological",
+        "applies_to": "subscriptions-and-billing-engines to invoicing-collections-and-dunning: one billing period in the order it happens, from the scheduler through the usage count to the invoice and its collection"
+      },
+      {
+        "pattern": "grouping",
+        "applies_to": "billing-and-payment-tax and billing-revenue-recognition: the two calculations that read a finalized invoice"
+      }
+    ],
+    "rationale": "The invoice is built up chapter by chapter. Chapter 27 defines the subscription, the period and the invoice as the engine's output; chapter 28 needs the period to say when usage stops counting toward it; chapter 29 needs both to explain finalization and what is being collected; tax (30) and recognition (31) read the finalized invoice's lines, credit notes and refunds, which chapter 29 owns; and merchant of record (32) can be judged only after the reader has seen every obligation it takes over. Putting tax or recognition before invoicing would ask the reader to tax and schedule a document whose immutability and corrections have not been explained; putting merchant of record first would present it as a shortcut before the reader knows what it is a shortcut around. Three of the six transitions are not sequence because the chapters do different work: 28 breaks the fixed-amount assumption of 27, and 32 answers the burden that 27 to 31 accumulate."
+  },
+  "opening": {
+    "carried_by": "part-6",
+    "hook": {
+      "type": "vivid_anecdote",
+      "content": "On 1 October 2026 Larkfield's renewal job hit its provider's rate limit and 7,900 membership renewals slipped to the next day; dunning emails went to members who had done nothing wrong. On 1 November 2026 a provider call timed out, the same job retried with a new idempotency key, and 1,840 members were charged twice; €71,300 was refunded and 212 members disputed the charge anyway. Every card payment that ran in those two months did what it was asked. The fault was in the thing that decides when to ask, and for which month."
+    },
+    "bridge": "From Parts I to V, where a customer starts each payment and the question is whether it was approved, recorded and safe, to payments that nobody present starts: a clock does, for a period, from a stored credential. The reader's own experience of this is a subscription that renewed without them noticing, or failed without them knowing why.",
+    "roadmap": "Six chapters in the order of one billing period and what follows from it: the billing engine and its subscription state machine; counting usage before charging for it; the invoice, its collection and what happens when the first attempt fails; tax on the invoice; revenue recognition and the hand-off to finance; and the model in which the provider sells in its own name as the merchant of record. The part says up front that Adyen's side of the tax, recognition and merchant-of-record chapters is short: no first-party Adyen tax or recognition product was found in public sources, and Adyen states that it does not act as a merchant of record."
+  },
+  "closing": {
+    "carried_by": "merchant-of-record",
+    "synthesis": "Every chapter of the part turned out to be about one document. The scheduler exists to produce the invoice, metering fills it, dunning collects it, tax and recognition read it, and merchant of record changes whose name is on it. So the question that sorts billing architectures, and the two providers, is not which features each has but where the invoice lives: the party that holds it knows what is owed, for which period, by whom and to whom, and every other party sees only payments with a reference.",
+    "so_what": "A reader evaluating a provider, or a build-versus-buy decision for billing, can ask one question first (who holds the invoice and its period?) and predict from the answer who will do the retries, the tax, the revenue schedule and the corrections.",
+    "callback": "Larkfield's 1 October and 1 November 2026: late, then twice. Keel's answers to both are billing-engine decisions taken inside a payments program: K1 derives the idempotency key for a renewal from the membership id, the billing period and the number of the scheduled attempt, and K5 has the renewal job pace itself over 18 hours and retry on a schedule tied to decline codes.",
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "For every recurring charge in your own system, write down the period it is for, derive its key from that period, and name the one system that holds the invoice. Then check each of the part's jobs (retry, tax, recognition, correction) against that system, not against the payment provider's feature list."
+    }
+  },
+  "transition_in": {
+    "relationship": "contrast",
+    "carries_over": "From Part V and the parts before it: stored credentials and network tokens, merchant-initiated payments that run without the cardholder present, the payment state machine and idempotency keys, and Part V's point that a control moves liability between parties without removing it.",
+    "introduces": "Payments that no customer starts. A clock starts them, for a billing period, which adds a second state machine above the payment and a new kind of failure: not declined or fraudulent, but late, twice or in the wrong period. The question of who carries a liability returns at the end of the part as the merchant of record.",
+    "form": "paragraph",
+    "placement": "end_of_previous"
+  },
+  "posts": [
+    {
+      "id": "part-6",
+      "folder": "part-6-intro",
+      "title": "Part VI — REVENUE: Billing, Tax and Recognition",
+      "kind": "part_intro",
+      "detail": "full",
+      "question": "What does Part VI argue, and in what order should its chapters be read?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "Part VI argues that revenue needs a second, time-driven state machine above payments, whose output is the invoice and whose failures are late, twice and wrong period.",
+            "The six chapters follow one billing period: engine, usage, invoice and collection, tax, recognition, merchant of record.",
+            "The Adyen side of several chapters is short: no first-party Adyen tax, invoicing or revenue-recognition product was found in public sources as of November 2026, and Adyen states that it does not act as a merchant of record."
+          ],
+          "can_do": [
+            "Pick the chapter of Part VI that answers the billing question in front of them."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "A reader of this page alone can state the part's claim and name the six chapters' subjects in reading order.",
+            "check": "intro_predicts_content",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "After reading only this page: what does Part VI argue, and what will each of the next six chapters tell you, in order?",
+            "expected": "Billing is a second state machine driven by time, and it fails by being late, twice or in the wrong period. Then: the billing engine and subscriptions; usage metering and rating; invoicing, collections and dunning; tax; revenue recognition; merchant of record."
+          },
+          {
+            "id": "AC-2",
+            "statement": "The page opens with the two dated Larkfield renewal incidents themselves (1 October and 1 November 2026, with their figures), not with a description of billing.",
+            "check": "no_weak_introduction_pattern",
+            "method": "rubric",
+            "severity": "major"
+          }
+        ]
+      },
+      "role": {
+        "contribution": "Performs the part's opening: the two renewal incidents, the part thesis, the reading order, and the warning that the public record on Adyen is thin for half the part.",
+        "supports": []
+      },
+      "post_spec": "posts/part-6-intro/spec.json"
+    },
+    {
+      "id": "subscriptions-and-billing-engines",
+      "folder": "27-subscriptions-and-billing-engines",
+      "title": "Charging Again and Again: Subscriptions and the Billing Engine",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "What does a billing engine do that a payment API does not?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "The parts of a billing engine (scheduler, price calculator, subscription state machine) and the objects Stripe documents for them: product, price, subscription, schedule, invoice, and the payment created for an invoice.",
+            "What a billing cycle anchor, a proration and a subscription status are, and how Stripe documents month ends, UTC instants, eight statuses and two billing modes.",
+            "That Adyen's documented recurring model is a stored token charged with a declared processing model, and that Orb, acquired on 1 July 2026, is not documented as part of Adyen's platform as of November 2026."
+          ],
+          "believe": [
+            "A subscription is a state machine that produces invoices, not a job that charges a card.",
+            "Billing rules such as proration are part of the agreement with the customer and cannot be changed under invoices already issued."
+          ],
+          "can_do": [
+            "List the decisions their own code must make if they run renewals on a bare payment API.",
+            "Say, for a given provider, where the schedule, the amount and the invoice live."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a subscription case the chapter does not contain, the reader names the decisions a billing engine makes that a payment API does not.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A language-learning app charges €12 a month. A customer signs up on 31 January and, halfway through March, moves to the €20 plan. The team uses only a payment API with saved cards. Which decisions does their own code now have to make?",
+            "expected": "On which day the February charge falls (the last day of the month) and at which instant and in which time zone a period starts; what the unused half of the old price is worth and what the rest of the new one costs (proration), and whether that is charged now or on the next invoice; what identifies each period's charge so a retry does not charge it twice; and what state the subscription is in while a charge is unpaid."
+          },
+          {
+            "id": "AC-2",
+            "statement": "The reader can state what Adyen's documentation provides for recurring payments and what must be supplied elsewhere, with the Orb acquisition's status as of November 2026.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A colleague says 'we are on Adyen, so Adyen handles our subscriptions'. From this chapter: what does Adyen's documentation provide, and what has to live somewhere else?",
+            "expected": "Adyen provides a stored token and a merchant-initiated payment flagged as a subscription payment. The schedule, the amount, proration, the invoice and the subscription's state live in the merchant's system or a billing system connected to Adyen. Adyen bought the billing company Orb (closed 1 July 2026), which still runs as a stand-alone product; no integrated Adyen billing product is documented as of November 2026."
+          },
+          {
+            "id": "AC-3",
+            "statement": "Every statement about how Stripe's scheduler or Adyen's platform works internally is either a dated documented fact or a labeled inference, and the chapter says where the public record on renewal scheduling stops: one 2024 Stripe engineering post describes a scheduling service, and neither company has published how that work is partitioned, paced or kept from running twice.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "What does a billing engine do that a payment API does not?",
+        "claim": "A billing engine decides what is owed, for which period and when to ask: it is a scheduler, a price calculator and a subscription state machine whose output is an invoice, and the payment API executes only the last step. Stripe keeps that engine in its platform, with subscription, invoice and payment as separate objects; Adyen's documentation offers a stored token charged with a recurring flag and leaves the schedule, the amount and the invoice to the merchant or a connected billing system, and Orb, acquired on 1 July 2026, is not documented as part of Adyen's platform as of November 2026.",
+        "disputed_by": "The view that a subscription is a monthly job that charges a saved card, so a payment API with stored credentials is enough and a billing engine is packaging around it.",
+        "so_what": "A team choosing between running renewals itself and using a billing engine knows what it is taking on: period boundaries, a proration rule it cannot change later, a status for every unpaid state, and one charge per period. A team on Adyen knows it must name the system that holds those, because the payment provider does not.",
+        "how_why": "Charging on a clock raises questions a customer-started payment never asks: what 'the 31st' means in February, at which instant a period starts (Stripe stores anchors as UTC seconds), what a mid-period plan change is worth, and what a subscription is while its invoice is unpaid. Stripe's documentation answers each with a rule: eight subscription statuses, month-end anchoring, proration to the second, and since 2025 two billing modes with one-way migration, which the chapter reads, as a labeled inference, as a sign that billing rules cannot be changed in place once invoices exist. The public record stops at the scheduler itself: Stripe documents its visible timing (a renewal invoice stays in draft for about an hour, and finalization waits for webhook acknowledgment) and one 2024 Stripe engineering post describes a scheduling service that finds subscriptions whose billing periods have just ended and triggers a new invoice; no Stripe or Adyen publication describes how that work is partitioned, paced or kept from running twice."
+      },
+      "role": {
+        "contribution": "Defines the second state machine and its output, the invoice, which every later chapter of the part fills, collects or reads; and establishes where that machine sits on each provider.",
+        "supports": [
+          "P6-1",
+          "P6-5"
+        ]
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The part intro's claim that something above the payment decides when to ask and for which month, shown by Larkfield's late and doubled renewals.",
+        "introduces": "What that something is made of: a scheduler, a price calculator and a subscription state machine, with the invoice as the object it hands to the payment engine.",
+        "form": "paragraph",
+        "placement": "end_of_previous"
+      },
+      "post_spec": "posts/27-subscriptions-and-billing-engines/spec.json"
+    },
+    {
+      "id": "usage-metering-and-rating",
+      "folder": "28-usage-metering-and-rating",
+      "title": "Counting Before Charging: Usage Metering and Rating",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "How do you bill for usage when events arrive late, twice and by the billion?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "What a usage event, a meter, rating, a credit balance and a commitment are.",
+            "The limits Stripe documents for its meters (events accepted up to 35 days back, a finalization grace period of 1 hour by default and up to 72 hours, cancellation within 24 hours) and the design Stripe described in January 2025 (stream aggregation with a 30-second path and a five-minute durable path).",
+            "That Orb's documentation describes the other design (immutable raw events, invoices computed by query), and that Stripe completed its acquisition of Metronome on 14 January 2026 and Adyen its acquisition of Orb on 1 July 2026."
+          ],
+          "believe": [
+            "An event that is accepted is not thereby an event that is billed; the two are separate rules.",
+            "A duplicate can be removed only by an identifier the producer of the event assigned."
+          ],
+          "can_do": [
+            "Write a late-event policy for a usage-priced product: acceptance window, billing cut-off and correction path.",
+            "Say whether a requirement needs a real-time balance or invoice-time rating, and what each costs."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given duplicated and late usage in a case the chapter does not contain, the reader says what had to be decided beforehand for each.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "An API company bills per request. Its gateway resends a batch after a timeout, so some requests are reported twice. A regional outage then delivers another batch three days after the month ended. For each problem: what must have been decided before the first invoice, and by whom?",
+            "expected": "Duplicates: each event carries an identifier assigned by the gateway that produced it, so the second report is dropped; an identifier generated on receipt removes nothing. Late batch: whether it is still inside the acceptance window, whether the month's invoice has already closed, and, if it has, which correction path applies (a later invoice, a credit note or an adjustment). The reader distinguishes accepted from billed."
+          },
+          {
+            "id": "AC-2",
+            "statement": "The reader can tell a real-time balance check from invoice-time rating and say which one a prepaid-credit requirement needs.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A customer has bought €50 of prepaid usage credit. Can the customer use €80 worth before anything stops them? What decides the answer?",
+            "expected": "Yes, if credit is applied only when the invoice is computed; no, if a balance is drawn down as usage is rated. These are two consistency requirements with different cost, and the chapter gives the documented example of each."
+          },
+          {
+            "id": "AC-3",
+            "statement": "Statements about Orb's architecture are presented as Orb's documentation about Orb, not as facts about Adyen's platform, and no claim is made about Metronome's internal design.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "How do you bill for usage when events arrive late, twice and by the billion?",
+        "claim": "A usage invoice can stop changing and still be explained only if three time rules are fixed before the first invoice (how long an event is accepted, when the period's invoice closes, how a wrong event is corrected) and duplicates are removed by an identifier the producer assigns; volume then forces one design choice, to aggregate events as they arrive or to keep them raw and compute the invoice by query (raw where prices may change retroactively or an invoice must be explained from its events, aggregated where volume leaves no alternative), and the public record shows one documented example of each: Stripe's 2025 account of windowed stream aggregation and Orb's documentation of invoices computed from immutable events.",
+        "disputed_by": "The view that metering is a counter (add one per event, multiply by the price at month end) and that the engineering problem is throughput, to be solved with a faster stream processor.",
+        "so_what": "The reader sets the three rules on purpose instead of inheriting a vendor's defaults, knows that a provider can accept an event and still never bill it, and keeps raw events wherever a price may be changed retroactively or an invoice may have to be explained to an auditor.",
+        "how_why": "An invoice has to stop changing while events keep arriving, so every usage system draws a line in time and needs a path for what lands after it. Stripe's meters accept events up to 35 days old, bill them only until the invoice is finalized plus a grace period (1 hour by default, at most 72), and allow cancellation for 24 hours; Orb documents a 12-hour grace period and amendments that archive events instead of overwriting them. Aggregating on arrival is cheap to query and loses the original events' context; computing from raw events keeps it and costs more per invoice. Both providers bought their usage engines in 2026 (Stripe completed Metronome on 14 January, Adyen completed Orb on 1 July). Stripe documents Metronome as pushing finished invoices into Stripe one way; Orb's design is documented by Orb about Orb; and the sources used say nothing of Metronome's internals, so the chapter does not place it on either side of the design choice."
+      },
+      "role": {
+        "contribution": "Shows the time problem in its sharpest form: the amount owed for a period is unknown until a cut-off the system itself must choose, which is where 'late' and 'twice' enter billing before any payment is attempted.",
+        "supports": [
+          "P6-2",
+          "P6-5"
+        ]
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The billing period, the invoice as the engine's output, and a price that is known the moment the period starts.",
+        "introduces": "A price that is not known until the period ends, because it depends on events that arrive late and more than once; counting them is a problem of its own before any invoice can be written.",
+        "form": "paragraph",
+        "placement": "end_of_previous"
+      },
+      "post_spec": "posts/28-usage-metering-and-rating/spec.json"
+    },
+    {
+      "id": "invoicing-collections-and-dunning",
+      "folder": "29-invoicing-collections-and-dunning",
+      "title": "From Invoice to Cash: Invoicing, Collections and Dunning",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "What happens between 'an amount is owed' and 'it has been paid', especially when the first attempt fails?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "The invoice's states as Stripe documents them (draft, open, paid, void, uncollectible), what finalization fixes, and why corrections are credit notes.",
+            "What dunning and involuntary churn are; the difference between a hard and a soft decline for retry purposes; why direct debit needs its own retry rules.",
+            "What each provider documents for recovery: Stripe's Smart Retries on invoices (for new accounts, up to 8 retries within 2 weeks by default) and automatic card updates; Adyen's Auto Rescue on payments (a rescue window of one calendar month by default for cards) and its account updater, with Adyen's documentation pages cited as undated."
+          ],
+          "believe": [
+            "What is being recovered is a debt on an invoice, not a failed payment.",
+            "Published recovery and churn percentages are vendor claims, nearly all without a stated baseline (Adyen's 2020 retry experiment is the exception), and the chapter's argument does not depend on them."
+          ],
+          "can_do": [
+            "Design a dunning policy that branches on decline type and payment method and ends in a defined subscription state.",
+            "Correct a finalized invoice without editing it.",
+            "On a provider that holds no invoice, say how retry results are tied back to the invoice in their own system."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given two failed renewals with different causes in a case the chapter does not contain, the reader prescribes different handling and gives the reason.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A streaming service has two failed renewals of €9.99. The first card payment came back 'stolen card'. The second, a SEPA Direct Debit (a bank debit the customer authorized in advance), came back days later as 'insufficient funds'. What should the collection process do in each case, and why not the same thing?",
+            "expected": "Stolen card is a hard decline: retrying that card cannot succeed, so the process asks the customer for a new payment method and retries only once one exists. Insufficient funds on a direct debit can be retried, but the failure arrives days late and the number of retries is capped, so it needs its own, slower schedule. In both cases the debt is the same invoice."
+          },
+          {
+            "id": "AC-2",
+            "statement": "The reader corrects a finalized invoice by a credit note or by voiding and reissuing, and can say why editing is not allowed.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "An invoice for €500 was finalized yesterday with the wrong customer address and €50 too much. What do you do, and why can you not just fix the invoice?",
+            "expected": "Issue a credit note for the €50, or void the invoice and issue a corrected copy for the address; a finalized invoice is kept as it was issued because tax rules commonly require it to be retained unchanged."
+          },
+          {
+            "id": "AC-3",
+            "statement": "No involuntary-churn share or recovery rate appears without attribution to the vendor that published it, and the chapter states that no independent measurement was found.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "What happens between 'an amount is owed' and 'it has been paid', especially when the first attempt fails?",
+        "claim": "Between owed and paid stands the invoice: once finalized it is frozen, and it is then collected as one debt through as many attempts, payment methods and partial payments as it takes, so recovery acts on the debt and not on the failed payment. Which party holds the invoice decides what a provider can recover: Stripe retries an invoice it holds (Smart Retries, by default up to 8 retries within 2 weeks on new accounts), while Adyen's Auto Rescue retries a payment linked to the billing cycle only by a reference the merchant supplies, and the invoice stays in the merchant's system.",
+        "disputed_by": "The view that a failed renewal is a payment problem solved by charging the card again on a fixed schedule, and that the invoice is a PDF produced afterwards for the customer's records.",
+        "so_what": "The reader models retries against the invoice, so that a new card, a bank transfer or a partial payment can all settle the same debt; separates hard from soft declines before scheduling anything; gives direct debit its own schedule; and, on Adyen, plans to hold the invoice state and join Auto Rescue results to it by reference.",
+        "how_why": "Finalization assigns the number and freezes the fields that matter for tax, which Stripe's documentation explains by the requirement to retain invoices as issued; every later change is a credit note. Because the debt outlives any one attempt, the useful questions are whether another attempt can succeed at all (Stripe schedules but does not execute retries on hard declines until a new payment method appears; SEPA and Bacs debits get at most 2 retries in 30 days) and whether the credential can be repaired first (Stripe's network-dependent automatic card updates; Adyen's Real Time Account Updater, which checks for new card details and retries inside the same refused payment). The public record on the retry logic is one engineering post each: Stripe's of 23 January 2024 on Smart Retries ('more than 500 attributes') and Adyen's of 3 December 2020 on Auto Rescue (a contextual bandit; 'about 6% more orders than the baseline' in one experiment); neither publishes the model now running or the timing for a given decline. Stripe's recovery figures and the one customer result Adyen has published for Auto Rescue are vendor claims without definitions, and no independent measurement of involuntary churn was found, so the chapter quotes no churn share."
+      },
+      "role": {
+        "contribution": "Supplies the invoice's state machine and the collection process, the place where the part's 'late' failure is handled on purpose, and the clearest documented consequence of where the billing engine sits on each provider.",
+        "supports": [
+          "P6-3",
+          "P6-5"
+        ]
+      },
+      "transition_in": {
+        "relationship": "sequence",
+        "carries_over": "An amount owed for a period, whether fixed by the plan (chapter 27) or counted from usage (chapter 28), and the cut-off after which it stops changing.",
+        "introduces": "The step from owed to paid: the invoice as a frozen document, the attempts made against it, and the process that runs when the first attempt fails.",
+        "form": "paragraph",
+        "placement": "end_of_previous"
+      },
+      "post_spec": "posts/29-invoicing-collections-and-dunning/spec.json"
+    },
+    {
+      "id": "billing-and-payment-tax",
+      "folder": "30-tax",
+      "title": "Whose Tax, at What Rate: Tax Calculation in the Payment Path",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "How does indirect tax get calculated, collected and reported when the payment provider is also the tax engine?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "At an introductory level, what VAT, GST and sales tax are, what a tax registration and a threshold are, and what a deemed supplier is.",
+            "The four steps Stripe's documentation names (know where you must collect, register, calculate and collect, file and remit) and which of them Stripe Tax performs as of November 2026.",
+            "That no public source was found describing an Adyen product that calculates, collects or files tax on a merchant's sales, and that this is an absence of evidence."
+          ],
+          "believe": [
+            "A provider's tax product is a calculator with partial sight: the registrations, the sales it does not see and the liability remain the seller's.",
+            "For a platform, who owes the tax is a property of each transaction that the payment flow has to carry."
+          ],
+          "can_do": [
+            "Say which facts and which state a tax calculation needs and where in a checkout or billing flow they are available.",
+            "Spot when a provider's threshold monitoring undercounts, and name the two ways to fix it.",
+            "Ask whether a platform is a deemed supplier for its category before designing its funds flow."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a business that sells through more than one channel, the reader explains why one provider's threshold monitoring can be wrong and what to do.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A software company takes 60% of its sales through a provider that has a tax feature and 40% through another provider. The tax feature's monitor says no new tax registration is needed anywhere. Why might that be wrong, and what are the two ways to fix it?",
+            "expected": "The monitor counts only the sales that provider processed, while a registration threshold applies to all of the seller's sales into a territory. Fix: import the other sales into the tax product, or use a tax engine that is independent of both providers. Either way, confirming the obligation remains the seller's job."
+          },
+          {
+            "id": "AC-2",
+            "statement": "The reader can explain why a calculated tax of zero is not proof that no tax is due.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A provider's tax calculation returns €0 tax on a sale to a consumer in another country. Give one reason, from this chapter, why that may not mean 'no tax is due'.",
+            "expected": "The calculation returns zero wherever the seller has not recorded a registration, so zero can mean 'not registered here', which may itself be the problem if a threshold has been passed. An accepted alternative: a customer tax number that made the sale look business-to-business was not validated."
+          },
+          {
+            "id": "AC-3",
+            "statement": "The Adyen column of the comparison says 'nothing public found' where that is the case, names where the search was made, and does not infer an Adyen design from the absence.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "How does indirect tax get calculated, collected and reported when the payment provider is also the tax engine?",
+        "claim": "A provider can calculate indirect tax because the checkout or invoice it runs already holds the three facts the calculation needs (who sells, what is sold, where the customer is), but calculating and collecting is one of four steps (know where tax is due, register, calculate and collect, file and remit) and the liability stays with the seller: Stripe Tax returns zero where the seller has recorded no registration, monitors thresholds only on the sales it sees, and as of November 2026 files itself only in the United States and for selected registrations in Ireland and Canada. The comparison is one-sided: no public source shows an Adyen product that calculates, collects or files tax on a merchant's sales, so on Adyen tax is computed by the merchant's own system or a separate tax engine.",
+        "disputed_by": "The view that switching on a provider's tax feature makes tax the provider's responsibility; and the opposite view that tax belongs wholly to finance and the ERP and has no place in the payment path.",
+        "so_what": "The reader treats a provider's tax product as a calculator fed by the provider's own data: registrations are state the business must maintain, a business on two providers (as Larkfield is) must feed the other provider's sales in or use an independent engine, and a platform must record the liable party on each transaction.",
+        "how_why": "The tax amount has to be on the invoice before it is finalized and correct at the moment of the charge, which is why calculation sits beside billing and checkout and not in the ledger. Whether tax is due at all depends on registration, and registration depends on thresholds counted across every channel: an EU-wide €10,000 threshold for cross-border consumer sales since 1 July 2021, and sales-based 'economic nexus' in US states since the Wayfair decision of 21 June 2018. For platforms the law can move the liability itself: the EU has treated marketplaces as deemed suppliers of certain goods since 2021, and the 2025 VAT in the Digital Age package extends the idea to short-term accommodation and road passenger transport from 1 July 2028. The public record stops early on the Adyen side: searches of Adyen's documentation, help center and product pages found no product that calculates, collects or files tax on a merchant's sales, which is absence of evidence and not a statement by Adyen. They found how Adyen taxes its own fees, a tax amount the merchant may send with a payment, a `VAT` split type that books an amount the platform supplies, the filing of US form 1099-K for platform sellers, and a clause in Adyen's terms under which each party complies with its own tax obligations; Orb's documentation says it connects to third-party tax providers. The chapter is short for that reason."
+      },
+      "role": {
+        "contribution": "Adds the first of the two calculations that read the invoice, and the part's first chapter in which the comparison is Stripe's product against what a merchant must bring itself.",
+        "supports": [
+          "P6-4",
+          "P6-5"
+        ]
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Chapter 29's statement that a finalized invoice is frozen for tax reasons, and that it carries the customer's address and tax number.",
+        "introduces": "The tax line on that invoice: who owes it, what decides the rate, and how much of the work a payment provider's tax product does.",
+        "form": "paragraph",
+        "placement": "end_of_previous"
+      },
+      "post_spec": "posts/30-tax/spec.json"
+    },
+    {
+      "id": "billing-revenue-recognition",
+      "folder": "31-revenue-recognition",
+      "title": "Cash Is Not Revenue: Revenue Recognition and the Hand-off to Finance",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "How does a billing system turn invoices and payments into recognized revenue, and where should it stop?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "Why cash, billings and revenue are three different numbers, and what a performance obligation, a revenue schedule and deferred revenue are, at an architect's level.",
+            "The five steps of IFRS 15 and ASC 606 (issued together in May 2014) in one line each.",
+            "How Stripe Revenue Recognition is documented: built on a double-entry ledger, each invoice line treated as one performance obligation and amortized evenly over its period, with rules and imports for the rest. No Adyen revenue-recognition product was found; Orb documents one of its own."
+          ],
+          "believe": [
+            "A payments report is not a revenue report.",
+            "Recognition inside a billing provider fits a business whose contracts equal its invoices; past that point the schedule belongs in a finance system."
+          ],
+          "can_do": [
+            "Say how much of an up-front payment is revenue on a given date and what the rest is.",
+            "Specify the export a billing engine owes finance: per invoice line, the amount net of tax, the service period and every later adjustment with its own date.",
+            "Recognize a contract that the provider's default method will get wrong."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given an up-front payment in a case the chapter does not contain, the reader splits it into recognized and deferred revenue and names the data needed to do so.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A customer pays €1,200 on 1 January for one year of a software service. On 31 March: how much of it is revenue, what is the rest called, and what must the billing system have recorded for finance to work this out?",
+            "expected": "About €300 is revenue (three of twelve months); about €900 is deferred revenue, a liability until the service is delivered. Needed: the invoice line's amount net of tax, the start and end of its service period, and any refund, dispute or credit note with its own date."
+          },
+          {
+            "id": "AC-2",
+            "statement": "The reader identifies a contract for which invoice-line-equals-obligation recognition gives the wrong schedule.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A sales team sells, on one invoice line, a year of software access together with a one-day onboarding workshop held in the first week. Why might a billing provider's default revenue schedule be wrong for this sale, and what are the options?",
+            "expected": "The default treats the invoice line as a single obligation spread evenly over the year, but the workshop is a separate promise delivered at one point in time. Options: split the line, apply a rule or import that splits the treatment, or keep the schedule in a finance system fed by the billing data."
+          },
+          {
+            "id": "AC-3",
+            "statement": "The chapter links to RECONCILED for posting to the general ledger and does not re-teach it; it stops at the data the billing side must hand over.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "major"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "How does a billing system turn invoices and payments into recognized revenue, and where should it stop?",
+        "claim": "A billing system turns invoices into revenue by giving each invoice line a service period, deferring its amount and releasing it as the service is delivered, with every refund, dispute and credit note as a dated adjustment; it should stop where contracts stop matching invoices. Stripe Revenue Recognition is documented on exactly that assumption (each invoice line is one performance obligation, amortized evenly over its period), so it serves a business whose contracts equal its invoices, and beyond that the schedule belongs in a finance system that the billing engine feeds. Adyen documents no revenue-recognition product; its reports describe payments, settlement and fees.",
+        "disputed_by": "The view that revenue is what was charged in the month, so the payment provider's report is the revenue report; and the opposite view that recognition is the ERP's business alone and the billing engine owes finance nothing but totals.",
+        "so_what": "An architect can specify what the billing side must export whatever tool does the recognition: per invoice line, the amount net of tax, the service period, and each later adjustment with its own date; and, for usage, the date of the usage as well as the date of the invoice, because they fall in different accounting periods at every month end.",
+        "how_why": "IFRS 15 and ASC 606 recognize revenue when a promise to the customer is fulfilled, which for a service is over time; the cash for an annual plan arrives on one day and is a liability until earned. That is the part's third time failure, the wrong period, and it is produced by reading a payments report as revenue. Stripe documents its product as a double-entry ledger over the activity inside Stripe, with one rule per transaction and CSV imports for what Stripe did not process, and reports that update hours later; Stripe's own product page calls it 'a centralised revenue subledger', and its output still has to reach the general ledger. Orb documents recognition from invoices and raw usage for its own product, which describes Orb and not Adyen's platform; no Adyen revenue-recognition product was found in its documentation, help center or site, where revenue recognition is mentioned only on an Orb partner page and in an article of 22 October 2026."
+      },
+      "role": {
+        "contribution": "Supplies the part's third failure of time, the wrong period, and draws the line between what a billing engine must hand to finance and what finance must do itself.",
+        "supports": [
+          "P6-4"
+        ]
+      },
+      "transition_in": {
+        "relationship": "similarity",
+        "carries_over": "Tax as a calculation that reads the invoice's lines and asks where the sale took place and who owes the tax.",
+        "introduces": "A second calculation that reads the same lines and asks a different question: in which period the amount counts as revenue. As with tax, the provider can compute it only for what it sees.",
+        "form": "paragraph",
+        "placement": "end_of_previous"
+      },
+      "post_spec": "posts/31-revenue-recognition/spec.json"
+    },
+    {
+      "id": "merchant-of-record",
+      "folder": "32-merchant-of-record",
+      "title": "Who Is the Seller? Merchant of Record as an Operating Model",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "What changes when the provider, not you, is the merchant of record?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "The difference between a processor, a payment facilitator and a merchant of record: who is the seller to the buyer, whose name is on the card statement, who owes the indirect tax, who handles a dispute and who pays for it.",
+            "What Stripe documents for Managed Payments as of November 2026: first in the preview API version 2026-02-25.preview and in a release version since 22 April 2026, 3.5% per successful transaction on top of payment fees, digital products sold directly, the customer sees 'Sold through Link', no Connect platforms, countries where the tax liability does not transfer, and service terms under which the business remains the seller of record and pays for disputes, refunds and reversals.",
+            "That Paddle and the app stores are the contrast cases, and that Adyen states it does not act as a merchant of record."
+          ],
+          "believe": [
+            "Merchant of record is an operating model that changes the checkout, the statement name, the invoice issuer and who holds customer data; it is not a setting on a payment integration.",
+            "A liability can be handed to a provider only by letting the provider become the seller to the customer, and only as far as the provider's contract says."
+          ],
+          "can_do": [
+            "Decide for a stated business whether a merchant-of-record provider fits, and list what the business gives up.",
+            "Explain why a platform whose sellers are the merchants cannot solve its tax and dispute burden this way."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given two businesses the chapter does not contain, the reader says which can use a merchant-of-record provider, what it gives up, and why the other cannot.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "Business A is two people selling a €15-a-month note-taking app to consumers in 40 countries. Business B is a booking platform that takes payments for 500 independent hair salons. Which of them could put a merchant-of-record provider in front of its sales, what would it give up, and why can the other not?",
+            "expected": "A can: a fully automated digital product sold directly to customers. It gives up its own checkout and its name as seller on the statement and invoice, some control over refunds and disputes, part of the customer data, and pays a fee on top of payment fees. B cannot: the salons are the sellers of in-person services and the platform pays third parties, while a merchant of record must itself be the seller of what is sold."
+          },
+          {
+            "id": "AC-2",
+            "statement": "The reader can fill a three-column comparison of processor, payment facilitator and merchant of record for seller, statement name and tax liability.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "For a processor, a payment facilitator (a provider that lets many businesses accept cards under its own agreement with the card networks) and a merchant of record: in each case, who is the seller to the buyer and who owes the sales tax or VAT?",
+            "expected": "Processor: the business is the seller and owes the tax. Payment facilitator: the business is still the seller and owes the tax. Merchant of record: the provider is the seller to the buyer and owes the tax, except where local rules prevent the transfer."
+          },
+          {
+            "id": "AC-3",
+            "statement": "The chapter's closing synthesizes the part around where the invoice lives, returns to Larkfield's 1 October and 1 November 2026 renewals, and hands off to Part VII through the fact that Larkfield's studios, not Larkfield, are the sellers.",
+            "check": "conclusion_calls_back_to_introduction",
+            "method": "rubric",
+            "severity": "major"
+          },
+          {
+            "id": "AC-4",
+            "statement": "The explanation of why Adyen has no merchant-of-record product is labeled as inference while Adyen's position is given as its own published statement, the Managed Payments release history is cited to Stripe's own pages, and no sentence says that the cost of disputes, refunds or reversals moves to the provider under Stripe's terms.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "What changes when the provider, not you, is the merchant of record?",
+        "claim": "When the provider is the merchant of record it sells your product to the customer in its own name, and only part of the seller's position moves with that. Under Stripe's Managed Payments, the one arrangement whose contract terms this chapter reads (as of November 2026), the provider's entity is the name on the customer's bank statement and the invoice, is the supplier for indirect tax wherever local rules let that transfer, and handles fraud screening, disputes and transaction support; the business remains the seller of record, books the revenue and pays the full cost of disputes, refunds and reversals, on top of a fee and the loss of control over the checkout, the eligible products and the integration. Because the provider must itself be the party the customer buys from, this is an operating model, not a feature added to a payment integration, and it does not fit a platform whose sellers are third parties: Managed Payments, in a release version of the API since 22 April 2026, takes digital products sold directly and excludes Connect platforms. Adyen states that it does not act as a merchant of record.",
+        "disputed_by": "The view that a merchant of record takes the seller's liabilities whole, the cost of fraud and disputes included, so that a business can switch it on as a compliance add-on to an existing integration; and the view that it is a payment facilitator under another name.",
+        "so_what": "The reader can decide fit from the business model before reading a price list: a small seller of an automated digital product in many tax jurisdictions gains most, and a business that needs its own checkout, sells goods or human-delivered services, or pays other sellers is excluded or loses more than it gains. A business that adopts the model still budgets for lost disputes and refunds, and reads the provider's contract to see what moves. It also explains why Larkfield cannot hand its studios' tax and disputes to such a provider: the studios are the sellers.",
+        "how_why": "Tax authorities and card networks hold the party that sells to the customer responsible, so a provider can take over the indirect tax and the name on the statement only by selling in its own name, and a party that sells in its own name decides what it sells and how. How much else moves is set by the provider's contract, not by the term. Stripe's service terms (last modified 28 September 2026) make its affiliate Sold through Link, LLC the merchant of record and the supplier 'for Indirect Tax purposes only', say that it 'is not the seller of record' and 'will not book the revenue', and keep the business liable 'for the full amount of any Disputes, refunds, and Reversals': Stripe handles a dispute and the business pays for it. The terms thus split two roles: merchant of record and tax supplier move to Stripe's affiliate, while seller of record and the revenue stay with the business. Stripe's documentation shows the other consequences: a fee of 3.5% on top of payment fees, the customer sees 'Sold through Link', only Checkout and Payment Links are supported, access depends on an eligibility review, and in some countries (Japan for domestic sales, for example) the tax liability does not transfer. Paddle sells the role as one bundled price and says it acts as the seller, and app stores are its older form. The release history is in Stripe's own pages: announced on 7 May 2025, in the preview API version 2026-02-25.preview, in the release version 2026-04-22.dahlia, and open to all digital businesses according to Stripe's blog of 29 April 2026; no page read uses the words 'generally available', and Apple's public developer agreement (Schedule 2, 13 October 2026) appoints Apple as agent or commissionaire depending on the region. Adyen's article of 15 September 2026 says that it 'doesn't act as a direct, third-party merchant of record'; that it offers no such product because its enterprise merchants are their own sellers in each market is the author's inference, not a documented reason."
+      },
+      "role": {
+        "contribution": "Closes the part with the limiting case: instead of carrying the seller's obligations yourself, let the provider sell in its own name, and see which obligations move and which stay. It also carries the part's closing and sets up Part VII by showing a model that platforms cannot use.",
+        "supports": [
+          "P6-6",
+          "P6-5"
+        ]
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "The obligations chapters 27 to 31 left with the seller: running the billing engine, registering for and filing tax, answering disputes, and producing the data finance needs.",
+        "introduces": "A model that moves some of them (the indirect tax, the handling of fraud and disputes, the name on the statement) by changing who sells to the customer, and what that costs in money, control and customer data.",
+        "form": "paragraph",
+        "placement": "end_of_previous"
+      },
+      "post_spec": "posts/32-merchant-of-record/spec.json"
+    }
+  ]
+}

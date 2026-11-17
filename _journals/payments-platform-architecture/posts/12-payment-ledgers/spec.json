@@ -1,0 +1,1478 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "payment-ledgers",
+  "journal": "payments-platform-architecture",
+  "part": "part-3",
+  "title": "The Book of Record: How Payment Companies Build Ledgers",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "What double-entry, an immutable entry, a clearing account and a fund flow are, and why a ledger is a separate system from the payment database.",
+        "What Stripe published about its Ledger in 2024 and its money-movement platform in 2026, what Adyen published about its accounting system in 2021, and that Adyen's account is five years old.",
+        "What neither company has published: Stripe's ledger storage and how its customer-facing balance is derived; whether Adyen's 2021 design is current."
+      ],
+      "believe": [
+        "A ledger's value is that a missing or wrong movement becomes a balance that will not clear, which a simple query finds.",
+        "A platform should copy a provider's ledger invariants and not its scale machinery."
+      ],
+      "can_do": [
+        "Given a money movement, write it as balanced entries through a clearing account and say what a nonzero balance in that account would mean.",
+        "Say, for a given system, whether money correctness is enforced when an entry is written or detected afterwards, and what each choice requires."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a design that keeps money as mutable status fields and computed sums, the reader names what it cannot answer and the two changes that fix it.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "blocker",
+        "probe": "A marketplace keeps each order's payment status in an orders table and works out what it owes each seller with a nightly SUM over paid orders. A refund made after the seller was paid is recorded by changing the order's status to 'refunded'. Using only this chapter: what can this design not tell you, and what two changes would you make?",
+        "expected": "It cannot say what was owed on an earlier date, or show that the seller was paid money that is now owed back, because the status was overwritten and the sum silently changes. Change one: append-only balanced entries, with the refund as a new entry and never an edit. Change two: accounts for money in flight (clearing accounts) that must return to zero, so the amount to recover from the seller stays visible until it is recovered."
+      },
+      {
+        "id": "AC-2",
+        "statement": "The reader can explain why a clearing account with a nonzero balance signals an error and why that makes detection cheap at any volume.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "An account named 'card funds expected from the network' shows €18,400 that has been there for nine days. What does that tell you, and why did nobody need to compare individual payments to find it?",
+        "expected": "A flow that should have completed did not: an expected movement is missing, late or was recorded against the wrong identifier. Because every flow must leave the clearing account at zero, the error shows up as a remaining balance, found by querying for clearing accounts that are not empty."
+      },
+      {
+        "id": "AC-3",
+        "statement": "Every statement about Stripe's or Adyen's ledger carries its year; Adyen's 2021 account is flagged as five years old; and the chapter says in plain words what neither has published.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "How does a payment company know, at every moment, whose money it holds and where it is?",
+    "claim": "It does not know it from the payment database, and it does not know it at every moment: it knows it from a separate, append-only double-entry ledger in which every movement is two balanced entries and every amount in flight sits in a clearing account that must return to zero, so that a missing or mismatched movement appears as a balance that will not clear. The knowledge is as current as that proof, which at Stripe in 2024 meant 99.99% of dollar volume ingested and verified within four days.",
+    "disputed_by": "The view that the payment tables already are the record: sum the successful payments, subtract refunds and fees, and you have each merchant's money, so a ledger is a reporting layer that finance can add later.",
+    "so_what": "A team building on a provider needs the same invariants at small scale (entries never edited, every movement balanced, clearing accounts that must empty, corrections as new entries) and none of the provider's machinery; a team that skips them finds out, as Larkfield did with €412,000, that a list of paid payments cannot explain a balance.",
+    "how_why": "A payment row holds one payment's current state and is overwritten as it changes; it has no place for money that is between parties or for what was true yesterday. Double entry gives every amount a source and a destination, so a missing half is visible. The two anchors apply this at different points. Adyen's 2021 engineering post says records can be added only through templates proven to net to zero, so an unbalanced entry cannot be written, and that the payment layer queues work for the accounting databases instead of waiting for them. Stripe's 2024 post describes many independent systems publishing events into an immutable log, with errors found afterwards by three measures: clearing, timeliness and completeness. The public record stops there: Stripe names no storage engine and does not say how the balance in its API relates to Ledger, and no newer Adyen account confirms the 2021 design.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "A payment table holds each payment's current state and overwrites it, so it cannot say what was owed on an earlier date or where an amount in flight is; sums computed from it change silently."
+      },
+      {
+        "id": "S2",
+        "claim": "A double-entry ledger of immutable, balanced entries routes every amount in flight through a clearing account that must return to zero, so a missing or mismatched movement appears as a balance that will not clear, which one query finds at any volume."
+      },
+      {
+        "id": "S3",
+        "claim": "The invariant can be enforced when an entry is written or detected afterwards: Adyen's 2021 post describes the first, Stripe's 2024 post the second, and both keep the ledger off the path that answers the payment."
+      },
+      {
+        "id": "S4",
+        "claim": "The knowledge a ledger gives is as current as its proof (at Stripe in 2024, 99.99% of dollar volume ingested and verified within four days), and the public record stops short of Stripe's storage, the link between its Ledger and its API balance, and whether Adyen's 2021 design is current."
+      },
+      {
+        "id": "S5",
+        "claim": "A platform building on a provider needs the invariants at small scale (entries never edited, every movement balanced, clearing accounts that must empty, corrections as new entries) and none of the provider's scale machinery."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Supplies the record and its vocabulary (entry, account, clearing account, fund flow) that the balance, payout, reconciliation and license chapters all read from.",
+    "supports": [
+      "P3-1"
+    ]
+  },
+  "flow": {
+    "pattern": "problem_solution",
+    "additional_patterns": [
+      {
+        "pattern": "prerequisite_order",
+        "applies_to": "payment-table before mechanism (the failure defines what the parts must do); mechanism before prevention and detection (both enforce the invariant it defines)"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "prevention, detection, trade-offs, where-they-differ"
+      }
+    ],
+    "rationale": "The reader meets a €412,000 difference and a payment table that cannot explain it before any ledger term is defined in full (the thesis names them; the mechanism section defines them), so the terms arrive as the answer to a felt problem; defining them first would leave the reader with vocabulary and no reason to want a second system. The two enforcement designs come only after the invariant, because each is a way of enforcing it; putting the company material first would make the Stripe and Adyen accounts read as two unrelated systems. The general trade-off comes before the Stripe and Adyen table so that the table's rows are read as instances of a choice, not as trivia. Larkfield's small ledger comes after the comparison so that the reader can see which provider features it leaves out, and the failure section comes last because every failure is read off the accounts built in the practice section."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "At the end of 2025 Larkfield, the fictional studio-software platform this book follows, has every payment's status right in its payment record store. Yet its books say it owes studios €412,000 more than its two providers' balances show, and it takes three weeks to find out why."
+    },
+    "bridge": {
+      "from_reader_world": "An engineer's first model of money is a payments table: sum the paid rows, subtract refunds and fees, and you know what each merchant is owed.",
+      "to_topic": "Every row was correct and the sum was still wrong, so the record of who owes whom must be something other than the list of payments; that other record is the ledger."
+    },
+    "thesis_statement": {
+      "text": "A payment company does not know whose money it holds from its payment database. It knows it from a separate, append-only double-entry ledger in which every movement is balanced and every amount in flight sits in a clearing account that must return to zero, so a missing movement shows up as a balance that will not clear; and it knows it only as recently as that proof has run.",
+      "placement": "KEY POINTS callout, first bullet, and paragraphs p02 and p03"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p05",
+      "promises": [
+        {
+          "promise": "Start from Larkfield's €412,000 difference and why a list of paid payments could not explain it.",
+          "kept_in": [
+            "scene",
+            "payment-table"
+          ]
+        },
+        {
+          "promise": "Define the ledger's parts: entry, account, clearing account and fund flow, with one €120 payment worked through them.",
+          "kept_in": [
+            "mechanism"
+          ]
+        },
+        {
+          "promise": "Describe the two published ways to enforce the invariant: refusing an unbalanced entry at the write (Adyen, 2021) and letting many systems write and proving the result afterwards (Stripe, 2024 and 2026).",
+          "kept_in": [
+            "prevention",
+            "detection"
+          ]
+        },
+        {
+          "promise": "Compare what each costs, say where the public evidence stops, and set the two companies side by side.",
+          "kept_in": [
+            "trade-offs",
+            "where-they-differ"
+          ]
+        },
+        {
+          "promise": "Rebuild Larkfield's ledger at small scale and list how a ledger fails.",
+          "kept_in": [
+            "in-practice",
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "function": "context",
+        "organization": "narration",
+        "controlling_idea": "At year-end 2025 every payment in Larkfield's payment record store had the right status, and its books still said studios were owed €412,000 more than the two providers' balances showed.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "The Unexplained €0.4 Million: €412,000 difference at year-end 2025, three weeks to trace; Larkfield is named as fictional.",
+            "shows": "A difference that correct payment rows could not explain, which is the chapter's problem.",
+            "source": "Larkfield scenario ledger (fictional)"
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "function": "claim",
+        "controlling_idea": "A payment company knows whose money it holds from a separate, append-only double-entry ledger, in which a missing or mismatched movement appears as a clearing-account balance that will not return to zero, and not from its payment database.",
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "The difference that the payment rows could not explain.",
+          "introduces": "The ledger as the record that would have shown it, and the mechanism by which it shows errors.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "function": "explanation",
+        "controlling_idea": "The ledger's knowledge is as current as its proof, which is this chapter's form of the gap between the instant answer and the slow truth.",
+        "evidence": [
+          {
+            "kind": "statistic",
+            "what": "\"Each day, Ledger sees five billion events and 99.99% of our dollar volume is fully ingested and verified within four days.\"",
+            "shows": "Even at the company with the newest published ledger, proof trails the payment by days.",
+            "source": "Stripe, 'Ledger: Stripe's system for tracking and validating money movement', Ilya Ganelin, https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement, published 2024-02-16"
+          }
+        ],
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "The ledger as the record that knows where money is.",
+          "introduces": "The limit on that knowledge: it is proven after the fact, not at every moment.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "function": "context",
+        "controlling_idea": "For Mila's €120 class pass, this chapter covers the record that exists from the approval at 19:42 on 9 March 2027 until Studio Noord is paid on 11 March: who owes the €120 to whom at each step.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's class pass: €120.00, Larkfield fee €2.53, studio receives €117.47, payout Thursday 11 March 2027; Studio Noord is on Adyen.",
+            "shows": "Ties the abstract record to the payment the book follows.",
+            "source": "Larkfield scenario ledger (fictional)"
+          }
+        ],
+        "transition_in": {
+          "relationship": "place",
+          "carries_over": "The chapter's subject.",
+          "introduces": "Its position on the recurring payment's journey.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p05",
+        "function": "transition",
+        "controlling_idea": "The chapter moves from Larkfield's unexplained difference and the limits of a payment table, through the ledger's parts, to the two published enforcement designs, their trade-offs and the Stripe and Adyen comparison, then to Larkfield's small ledger and the ways a ledger fails.",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "Where the chapter sits on the payment's journey.",
+          "introduces": "The order of its sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: €412,000 and a List of Paid Payments",
+      "controlling_idea": "Larkfield's €412,000 difference came from three kinds of money movement that had no entry of their own, while every payment row was correct.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "Shows the failure before the vocabulary: correct payment rows, wrong total."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The introduction's claim that the payment database is not the record of who owes whom.",
+        "introduces": "The one company and one year-end where that was found out.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The finding, its three causes, then the question it leaves; the reader reaches the question the way Femke did."
+      },
+      "paragraphs": [
+        {
+          "id": "p06",
+          "function": "context",
+          "organization": "narration",
+          "controlling_idea": "In January 2027 Priya Raman walks Femke de Graaf through the audit finding: Larkfield's books put what it owed studios €412,000 higher than the providers' balances, and three causes account for all of it.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Cause / amount / why no entry existed: refunds after payout €317,200; chargeback fees €73,500 (4,900 disputes at the illustrative €15.00); currency-conversion rounding in Larkfield's posting job €21,300; total €412,000. 'Chargeback' is glossed in one clause.",
+              "shows": "The whole difference is explained by movements, not by wrong payments.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ]
+        },
+        {
+          "id": "p07",
+          "function": "analysis",
+          "controlling_idea": "All three causes were money that moved after the payment row was last correct, and the books of 2025, though called a ledger, were written only from payment rows: one entry when a payment became paid and one when a payout was created.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger fact: the 2025 ledger was posted by a nightly job on `paid` and on payout creation; refunds after payout, chargeback fees and conversion had no entries until Keel K3.",
+              "shows": "Explains why the ledger of 2025 inherited the payment table's blind spots.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The three causes.",
+            "introduces": "What they share: a movement with no entry.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p08",
+          "function": "claim",
+          "controlling_idea": "Femke's question is the chapter's: what must a book record so that such a difference shows up on the day it begins, without anyone comparing payments one by one?",
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "Three weeks of comparing payments by hand.",
+            "introduces": "The requirement the rest of the chapter answers.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "payment-table",
+      "heading": "Why the Payment Table Cannot Be the Book",
+      "controlling_idea": "A payment row records one payment's current state and is overwritten, so it has no place for history or for money between parties, and a sum over it changes without a trace.",
+      "function": "refutation",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "States the opposing view fairly and shows the two things it cannot answer."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Femke's question about what a book must record.",
+        "introduces": "Why the record Larkfield already had, the payment table, could not be that book.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "flow": {
+        "pattern": "assertion_evidence_reasoning",
+        "rationale": "The opposing view first, then its two failures on Mila's refund, then an outside company's account of the same failure, then the two changes that follow; the reader must see the table fail before accepting a second system."
+      },
+      "paragraphs": [
+        {
+          "id": "p09",
+          "function": "counterargument",
+          "controlling_idea": "The natural view is that the payment tables already are the record: sum the successful payments, subtract refunds and fees, and a ledger is a reporting layer finance can add later.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Until 2025 Larkfield computed what each studio was owed with a nightly query: the sum of its `paid` payments, less fees and payouts sent.",
+              "shows": "The view is not a straw man; it is what the scenario company ran for eight years.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ]
+        },
+        {
+          "id": "p10",
+          "function": "example",
+          "controlling_idea": "A refund made after the payout overwrites the row, so the sum for a past date changes and nothing records that it changed.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Mila's refund after payout: €84.00 of the €120.00 pass refunded on 18 March 2027, after Studio Noord was paid €117.47 on 11 March; the five-state vocabulary has one `refunded` status for a part refund.",
+              "shows": "One row, one status: the amount owed on 11 March is no longer derivable after 18 March.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The nightly sum that seemed sufficient.",
+            "introduces": "The first thing it cannot answer: what was owed on an earlier date.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "function": "explanation",
+          "controlling_idea": "A payment row also has no place for money that is between parties, such as the €84 Studio Noord now owes back.",
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "What the row loses about the past.",
+            "introduces": "The second thing it cannot hold: an amount in flight or owed back.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p12",
+          "function": "evidence",
+          "controlling_idea": "Payment companies report the same two limits from their own single-entry tables.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Square (2019) on its single-entry settlement table: computing a merchant's balance \"requires doing an expensive group-by aggregate for each merchant\", and \"It’s impossible to split a single payment into multiple payouts\".",
+              "shows": "A payment company met the same limit and built a ledger for it.",
+              "source": "Square, 'Books, an immutable double-entry accounting database service', Łukasz Strzałkowski, https://developer.squareup.com/blog/books-an-immutable-double-entry-accounting-database-service/, published 2019-10-16 (evidence age: 7 years)"
+            },
+            {
+              "kind": "quotation",
+              "what": "Modern Treasury: \"in most cases, companies need to retrofit [accounting concepts] after painful incidents involving missing funds, broken payout flows, or inconsistent balances\" (quoted from the phrase \"after painful incidents involving missing funds, broken payout flows, or inconsistent balances\").",
+              "shows": "The 'add it later' path is common and is paid for in incidents; a vendor's observation, attributed as such.",
+              "source": "Modern Treasury, 'Accounting for Developers, Part I', https://www.moderntreasury.com/journal/accounting-for-developers-part-i, published 2022-08-17, updated 2025-08-13"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The two limits seen at Larkfield.",
+            "introduces": "Published accounts that describe them at a real company and across integrators.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p13",
+          "function": "claim",
+          "controlling_idea": "Two changes fix both limits: money is recorded as append-only balanced entries, and amounts in flight get accounts of their own that must return to zero.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Question / payment table / ledger: current state of one payment; what was owed on a past date; where an amount in flight is; what a seller owes back; how an error shows.",
+              "shows": "Sets the two data models side by side on the questions that matter."
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The two things a payment table cannot answer.",
+            "introduces": "The two changes that answer them, which the next section defines.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "heading": "Entries, Accounts and Clearing Accounts: How a Ledger Works",
+      "controlling_idea": "A ledger is accounts plus immutable entries whose lines sum to zero, with clearing accounts on every multi-step path, and that construction turns an error into a balance left where none should be.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "S2"
+        ],
+        "how": "Defines the four owned terms and shows on one payment why a missing movement cannot hide."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The two changes named at the end of the previous section.",
+        "introduces": "The parts they are made of, one term at a time.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "Entry and account before immutability, immutability before derived balances, clearing account before fund flow, the worked flow before the error it reveals; each term is used by the next."
+      },
+      "paragraphs": [
+        {
+          "id": "p14",
+          "function": "definition",
+          "controlling_idea": "An account is a named bucket of value, an entry is a set of signed lines that sum to zero, and double entry means every movement is recorded in at least two accounts so that a missing half is visible.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"Ledger is based on double-entry bookkeeping, a standard method for guaranteeing that all money in a system is fully accounted for by balancing credits and debits.\"",
+              "shows": "A payment company states the same definition as its foundation.",
+              "source": "Stripe, 'Ledger: Stripe's system for tracking and validating money movement', Ilya Ganelin, https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement, published 2024-02-16"
+            }
+          ]
+        },
+        {
+          "id": "p15",
+          "function": "definition",
+          "controlling_idea": "Entries are immutable: nothing is edited or deleted, a correction is a new entry, and a balance is computed from the entries, so any past state can be rebuilt.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"Transactions previously published into Ledger cannot be deleted or modified, and we can always reconstruct past state by processing all events up to that point.\"",
+              "shows": "Immutability is what makes the past answerable.",
+              "source": "Stripe, 'Ledger: Stripe's system for tracking and validating money movement', Ilya Ganelin, https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement, published 2024-02-16"
+            },
+            {
+              "kind": "quotation",
+              "what": "\"once transfers are recorded, they cannot be erased. Reversals are implemented with separate transfers to provide a full and auditable log of business events.\"",
+              "shows": "The same rule stated by a database built only for this schema.",
+              "source": "TigerBeetle documentation, https://docs.tigerbeetle.com/concepts/debit-credit/ and https://docs.tigerbeetle.com/coding/two-phase-transfers/, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Balanced entries.",
+            "introduces": "The second property: they are never changed.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p16",
+          "function": "definition",
+          "controlling_idea": "A clearing account holds an amount only while a multi-step process is in flight and must return to zero when the process completes, unlike accounts that are meant to hold a lasting balance.",
+          "evidence": [
+            {
+              "kind": "analogy",
+              "what": "Stripe's image: \"At steady state, terminal (nonclearing) reservoirs are full, and intermediate (clearing) pipes are empty. If there is water stuck in the pipes, then you have a problem\".",
+              "shows": "Gives the reader a picture of the invariant: pipes must be empty.",
+              "source": "Stripe, 'Ledger: Stripe's system for tracking and validating money movement', Ilya Ganelin, https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement, published 2024-02-16"
+            },
+            {
+              "kind": "figure",
+              "what": "Illustration: reservoirs connected by pipes, one pipe with water stuck in it.",
+              "shows": "Makes 'a balance that will not clear' visible."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "Accounts and immutable entries.",
+            "introduces": "The special kind of account that carries money in flight.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p17",
+          "function": "process",
+          "controlling_idea": "A fund flow is the fixed path an amount takes through accounts for one kind of business event, a state machine in which accounts are the states and entries are the transitions.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"Ledger encodes a state machine representation of producer systems, and models its behavior as a logical fund flow—the movement of balances (events) between accounts (states).\"",
+              "shows": "The term and its state-machine reading are Stripe's own (2024).",
+              "source": "Stripe, 'Ledger: Stripe's system for tracking and validating money movement', Ilya Ganelin, https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement, published 2024-02-16"
+            },
+            {
+              "kind": "table",
+              "what": "Teaching model, not either provider's chart of accounts: four entries for a €120.00 card payment (captured; network settles; payout instructed; bank confirms), each with signed lines across 'card funds expected from the network' (clearing), 'owed to merchant', 'cash at bank' and 'payout in transit' (clearing); fees left out.",
+              "shows": "Shows both clearing accounts returning to zero when the flow completes."
+            },
+            {
+              "kind": "figure",
+              "what": "Illustration: the €120 moving through four accounts, the two clearing accounts ending empty.",
+              "shows": "The structural figure of the chapter."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "Clearing accounts as the in-flight states.",
+            "introduces": "The path that strings them together, worked on one payment.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p18",
+          "function": "analysis",
+          "controlling_idea": "Four rules together (every movement is a balanced entry, entries are never edited, a correction is a new entry, and every amount in flight sits in a clearing account that must return to zero) mean that a missing, late or misidentified movement is whatever balance remains in a clearing account, and finding it is one query whatever the volume.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"Even when we have billions of transactions, a single missing, late, or incorrect transaction immediately creates a detectable accuracy issue with a simple query—for example, 'Find the clearing Accounts with nonzero balance.'\"",
+              "shows": "Detection cost does not grow with the number of payments.",
+              "source": "Stripe, 'Ledger: Stripe's system for tracking and validating money movement', Ilya Ganelin, https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement, published 2024-02-16"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The worked flow with its clearing accounts emptied.",
+            "introduces": "What happens to those accounts when a step is missing or wrong.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p19",
+          "function": "example",
+          "controlling_idea": "An account named 'card funds expected from the network' that has shown €18,400 for nine days says that a flow which should have completed did not, and nobody compared payments to learn it.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Illustrative figures (assumption): €18,400 in 'card funds expected from the network', nine days old.",
+              "shows": "Lets the reader practice the reading the acceptance criterion asks for."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The claim that an error is a remaining balance.",
+            "introduces": "One such balance and how to read it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "function": "explanation",
+          "controlling_idea": "The invariant proves that the book agrees with itself, not that it agrees with the world: a movement recorded on both sides that never happened still balances.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (2024) lists the inputs that go wrong: \"malformed reports or propagated errors from banking or network partners\".",
+              "shows": "The outside records the book must be matched against are themselves imperfect; proving the book against them is a separate job, owned by the reconciliation chapter.",
+              "source": "Stripe, 'Ledger: Stripe's system for tracking and validating money movement', Ilya Ganelin, https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement, published 2024-02-16"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What a clearing balance reveals.",
+            "introduces": "What no internal invariant can reveal, and which records do.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "prevention",
+      "heading": "Design One: Refuse the Entry That Does Not Balance",
+      "controlling_idea": "One design enforces the invariant at the write, so that an unbalanced entry cannot exist; Adyen described it in 2021, and it works because the payment layer does not wait for the books.",
+      "function": "evidence",
+      "advances_thesis": {
+        "supports": [
+          "S3"
+        ],
+        "how": "Documents the first of the two enforcement points with its date and its cost."
+      },
+      "transition_in": {
+        "relationship": "sequence",
+        "carries_over": "The invariant every ledger shares.",
+        "introduces": "The first of two places a system can enforce it: before the entry exists.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "flow": {
+        "pattern": "assertion_evidence_reasoning",
+        "rationale": "The design, Adyen's account of it, the price Adyen names, then two non-anchor systems that take the same position; the dated primary source comes before the contrasts that generalize it."
+      },
+      "paragraphs": [
+        {
+          "id": "p21",
+          "function": "claim",
+          "controlling_idea": "The first design allows only writers that cannot produce an unbalanced entry, so correctness is a property of the write path."
+        },
+        {
+          "id": "p22",
+          "function": "evidence",
+          "controlling_idea": "Adyen's 2021 engineering post says records enter its accounting system only through templates that are automatically proven to net to zero.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"The only way to add new records to the accounting system is by means of templates.\" \"These templates are mathematically verified... prove that every combination of amounts will result in a net sum of 0. This verification is fully automated and runs on every change to the templates.\" \"if at any time, we sum up all the records in the accounting system, the result will always be 0.\"",
+              "shows": "Prevention by construction, in Adyen's words; flagged as five years old.",
+              "source": "Adyen, 'Design to Duty: The Accounting and Reporting Systems at Adyen', Willem Pino, https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2, published 2021-08-23 (evidence age: 5 years)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The design in the abstract.",
+            "introduces": "The anchor company that published it, with the age of the account.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p23",
+          "function": "evidence",
+          "controlling_idea": "The same post names the price: about fifty rows per payment, a PostgreSQL database sharded into clusters, and a payment layer that queues work for the books instead of waiting for them.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"Over the lifetime of a payment transaction, about 50 rows have to be inserted into the accounting database.\" \"we decided to shard our accounting database into several accounting clusters\" by \"a simple round-robin strategy\". A payout \"needs to come from one account\", so \"the money needs to be transferred from one cluster to the other\".",
+              "shows": "The storage design and the cross-shard cost, as of 2021.",
+              "source": "Adyen, 'Design to Duty: The Accounting and Reporting Systems at Adyen', Willem Pino, https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2, published 2021-08-23 (evidence age: 5 years)"
+            },
+            {
+              "kind": "quotation",
+              "what": "\"for the accounting systems we don't mind if they are down for a little bit as long as we can guarantee their reliability and consistency.\" The payment layer \"saves the payment in a local database and a separate process picks it up when possible.\"",
+              "shows": "The ledger is a separate system from the payment path, by stated priority.",
+              "source": "Adyen, 'Design to Duty: The Accounting and Reporting Systems at Adyen', Willem Pino, https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2, published 2021-08-23 (evidence age: 5 years)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Every movement written through verified templates.",
+            "introduces": "What that write volume and strictness cost, and how the payment path is kept free of it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p24",
+          "function": "comparison",
+          "controlling_idea": "Square's Books (2019) and the TigerBeetle database take the same position: the store itself refuses a write that is not a balanced movement.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"you should never be able to transact with the database in a way that results in an illogical financial transaction.\"",
+              "shows": "A second payment company chose prevention; its account is seven years old.",
+              "source": "Square, 'Books, an immutable double-entry accounting database service', Łukasz Strzałkowski, https://developer.squareup.com/blog/books-an-immutable-double-entry-accounting-database-service/, published 2019-10-16 (evidence age: 7 years)"
+            },
+            {
+              "kind": "quotation",
+              "what": "\"Where SQL allows destructive UPDATE and DELETE, TigerBeetle enforces append-only immutability\"; \"A two-phase transfer moves funds in stages\" (pending, then posted or voided).",
+              "shows": "The invariant can live in the database engine; design documentation, not a company's production account.",
+              "source": "TigerBeetle documentation, https://docs.tigerbeetle.com/concepts/debit-credit/ and https://docs.tigerbeetle.com/coding/two-phase-transfers/, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "Adyen's write-time enforcement.",
+            "introduces": "Two other systems that make the same choice, one a company's service and one a database.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "detection",
+      "heading": "Design Two: Let Many Systems Write, Then Prove the Result",
+      "controlling_idea": "Stripe's 2024 post describes the other design: many independent systems publish events into an immutable log, and errors are found afterwards by three measures, with a stated delay.",
+      "function": "evidence",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S4"
+        ],
+        "how": "Documents the second enforcement point, its measures and the four-day figure the thesis rests on."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "A single write path that refuses bad entries.",
+        "introduces": "A company whose many writers could not be put behind one gate.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "flow": {
+        "pattern": "assertion_evidence_reasoning",
+        "rationale": "Why a gate was not available, what the log records, how it is checked, how fast, how it is corrected, and what 2026 adds; each step needs the one before it."
+      },
+      "paragraphs": [
+        {
+          "id": "p25",
+          "function": "context",
+          "controlling_idea": "Stripe's 2024 post starts from a different constraint: many independently built systems, with different cadences and volumes, all record money.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"there is no intrinsic mechanism forcing these systems to represent or deliver data in the same way\"; \"some producers generate billions of events per day, while others may only generate a few hundred\"; \"prove that these individual systems are collectively modeling our financials correctly\".",
+              "shows": "The stated problem is agreement among many writers, not the absence of accounting primitives.",
+              "source": "Stripe, 'Ledger: Stripe's system for tracking and validating money movement', Ilya Ganelin, https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement, published 2024-02-16"
+            }
+          ]
+        },
+        {
+          "id": "p26",
+          "function": "evidence",
+          "controlling_idea": "Ledger records each producer's work as events in an immutable log, and joins events that arrive separately, and possibly out of order, by their identifiers.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"We built Ledger, an immutable and auditable log, as a trustworthy system of record for all of our financial data.\" \"the creation and release events are completely independent. Even if they arrive out of order, or are created by different sources, Ledger maintains accurate fund flows\".",
+              "shows": "Writers are not coordinated at write time; the log is.",
+              "source": "Stripe, 'Ledger: Stripe's system for tracking and validating money movement', Ilya Ganelin, https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement, published 2024-02-16"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "Many writers with no common form.",
+            "introduces": "The common structure they all publish into.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p27",
+          "function": "evidence",
+          "controlling_idea": "Correctness is then measured after the fact by three questions: did the flow clear, did the data arrive on time, and is it complete.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"Clearing: Did the fund flow complete correctly? Timeliness: Did the data arrive on time? Completeness: Do we have a complete representation of the underlying data system?\"; \"we ensure that every ID in a producer database has a matching Ledger event\"; \"the 50% score for Aging Balances means that some clearing issues have persisted over time\".",
+              "shows": "The three measures and the fact that open clearing balances are aged and scored per team.",
+              "source": "Stripe, 'Ledger: Stripe's system for tracking and validating money movement', Ilya Ganelin, https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement, published 2024-02-16"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "Events recorded without a gate.",
+            "introduces": "How their correctness is judged afterwards.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p28",
+          "function": "analysis",
+          "controlling_idea": "The post's own numbers put a delay on the proof: 99.99% of dollar volume ingested and verified within four days, with faster response named as future work.",
+          "evidence": [
+            {
+              "kind": "statistic",
+              "what": "\"Each day, Ledger sees five billion events and 99.99% of our dollar volume is fully ingested and verified within four days.\" \"over 99.9999% explainability of money movement\". \"In the future, we want to improve timeliness to minute-level analysis and response.\" (Stripe's own figures, February 2024.)",
+              "shows": "The ledger described proves money movement days after it happens.",
+              "source": "Stripe, 'Ledger: Stripe's system for tracking and validating money movement', Ilya Ganelin, https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement, published 2024-02-16"
+            },
+            {
+              "kind": "reasoning",
+              "what": "INFERENCE, NOT DOCUMENTED: a system verified within four days is an after-the-fact proof system and is unlikely to be what answers a balance request during an API call; the post does not say what does.",
+              "shows": "Separates what the figure shows from what it leaves open."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Checks that run after the events arrive.",
+            "introduces": "How long after, in Stripe's figures, and what that implies about what Ledger is.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p29",
+          "function": "evidence",
+          "controlling_idea": "Because the log is immutable, Stripe corrects it by reverting and reprocessing under review, never by editing.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"we can’t run simple queries to mutate the state; instead, we have to revert and reprocess prior operations\"; \"All operations must go through a two-phase review and commit of the data\".",
+              "shows": "Correction is itself an audited flow.",
+              "source": "Stripe, 'Ledger: Stripe's system for tracking and validating money movement', Ilya Ganelin, https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement, published 2024-02-16"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Errors found after the fact.",
+            "introduces": "How a found error is repaired without breaking immutability.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p30",
+          "function": "evidence",
+          "controlling_idea": "Stripe's 2026 post on fee credits shows the same vocabulary still in use and adds a rule enforced at the write, so the two designs are not exclusive.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"we extended Stripe’s existing Money Movement and Storage (MMS) platform\"; \"the financial account, which represents an entity capable of holding a balance and participating in money transfers\"; \"Every OMT follows a three-phase lifecycle through the ledger: submitted → prepared → disbursed\"; \"We reject attempts to create a transfer between a logical account and a real account at the platform level\".",
+              "shows": "Ledger-based money movement is current in 2026, and some invalid movements are refused before they exist. How MMS, its 'internal ledger' and the 2024 Ledger relate is not stated.",
+              "source": "Stripe, 'How we built Stripe Credits', Pratik Gupta and Sai Samant, https://stripe.dev/blog/how-we-built-stripe-credits-a-programmable-auditable-way-to-pay-your-stripe-fees, published 2026-04-16"
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "The 2024 account.",
+            "introduces": "A 2026 account that confirms it is current and qualifies the detection-only reading.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "trade-offs",
+      "heading": "Trade-offs: What Each Enforcement Point Costs",
+      "controlling_idea": "Prevention buys certainty at the write and needs a single write path; detection accepts any writer and pays in delay and investigation; and in both the ledger stays off the payment path.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S3"
+        ],
+        "how": "Sets the designs on the same criteria and gives the author's reading of why each company chose as it did."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The two designs as each company described its own.",
+        "introduces": "The same criteria applied to both, and to having no ledger at all.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The table first, then the author's reading of why each company sits where it does, then the property both designs share; the shared property comes last because it is what the reader carries into the Stripe and Adyen table."
+      },
+      "paragraphs": [
+        {
+          "id": "p31",
+          "function": "comparison",
+          "controlling_idea": "Set on the same criteria, computed sums, write-time prevention and after-the-fact detection differ in who may write, what an error looks like, and how long it takes to know.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Design (computed sums over the payment table / prevention at the write / detection after the write) by: who can write; what an error looks like; when you know; main cost; right when.",
+              "shows": "The trade-off table the style guide requires, including the no-ledger baseline."
+            }
+          ]
+        },
+        {
+          "id": "p32",
+          "function": "analysis",
+          "controlling_idea": "My reading is that the choice follows the number of writers: one write path can be put behind a template, and hundreds of producers on different cadences cannot.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "INFERENCE, NOT DOCUMENTED: neither company says this; it is consistent with Stripe's description of many producers (2024) and Adyen's of one in-house accounting framework (2021). The designs overlap: Stripe refuses some transfers at the platform level (2026), and Adyen matches partner reports to its records after the fact (2021: \"first parse a file and then split it into the relevant parts for each cluster\").",
+              "shows": "Keeps the author's reading apart from what is documented."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The table's row on who may write.",
+            "introduces": "The author's explanation of why each company sits where it does, labeled as inference.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p33",
+          "function": "explanation",
+          "controlling_idea": "Both designs keep the ledger off the path that answers the payment, because the payment must be fast and available while the book must be complete and consistent.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "What a ledger must promise: how fast (not on the authorization path; minutes to days), how consistent (an entry is written whole or not at all), how available (may pause), on failure (queue and catch up, never guess); each row marked documented (Adyen 2021, Stripe 2024) or typical.",
+              "shows": "The requirements table for the mechanism."
+            },
+            {
+              "kind": "quotation",
+              "what": "Uber (2020): its legacy design had separate collection and disbursement systems with \"no holistic view of end-to-end money movements\"; Gulfstream \"is a single, integrated, SOX-compliant system built on the principles of double-entry accounting and can reconcile itself.\"",
+              "shows": "A contrast company reached the same separation of a book of record from the systems that move money.",
+              "source": "Uber, 'Revolutionizing Money Movements at Scale with Strong Data Consistency', https://www.uber.com/blog/money-scale-strong-data/, published 2020-10-02 (evidence age: 6 years)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "Where the two designs differ.",
+            "introduces": "The property they share: the book is a separate system with different promises.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "On the public record the two share the invariant and differ in where they enforce it, how many systems write and how old the account is; much is unpublished, and none of it is visible in either API.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S4"
+        ],
+        "how": "The required side-by-side of documented facts, with the inference column marked."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "The designs, their costs and the limits of the evidence.",
+        "introduces": "The two anchors in one table.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p35",
+          "function": "comparison",
+          "controlling_idea": "Seven aspects of the two ledgers can be compared from dated public sources, and the last column of the table is my inference.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Aspect / Stripe / Adyen / what the difference suggests: public engineering account (two posts, Feb 2024 and Apr 2026 / one post, Aug 2021); where the invariant is enforced; who writes; published scale (five billion events a day, 99.99% within four days / about 50 rows per payment, thousands of inserts a second); storage (Not public / PostgreSQL clusters, round-robin, 2021); correction (revert and reprocess under two-phase review / Not public); one core for payments and stored balances (financial accounts, 2026 / 'We leverage this same system of accounting for our banking platform', 2021).",
+              "shows": "Every cell is a cited fact or 'Not public'.",
+              "source": "Stripe, 'Ledger: Stripe's system for tracking and validating money movement', Ilya Ganelin, https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement, published 2024-02-16; Stripe, 'How we built Stripe Credits', Pratik Gupta and Sai Samant, https://stripe.dev/blog/how-we-built-stripe-credits-a-programmable-auditable-way-to-pay-your-stripe-fees, published 2026-04-16; Adyen, 'Design to Duty: The Accounting and Reporting Systems at Adyen', Willem Pino, https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2, published 2021-08-23 (evidence age: 5 years)"
+            }
+          ]
+        },
+        {
+          "id": "p34",
+          "function": "context",
+          "controlling_idea": "The public record stops well short of an implementation: Stripe names no storage engine and does not say how the balance in its API relates to Ledger, and nothing newer than 2021 says whether Adyen's design is current.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Absences checked by reading the full posts: the 2024 Stripe post names no database, schema or consistency model; neither Stripe post relates the Balance and balance transaction objects to Ledger; no Adyen engineering account of the accounting system after August 2021 was found; Airbnb's 2017 ledger post could not be fetched and is not used.",
+              "shows": "States the limits required by the acceptance criterion on evidence."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What the table shows the two companies have published.",
+            "introduces": "What neither has published, in plain words, which bounds every reading in the table's last column.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p36",
+          "function": "recommendation",
+          "controlling_idea": "An integrator does nothing differently at the API because neither ledger is exposed; what differs is the one-sided record each provider hands you to build your own book from.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe's balance transaction object has `amount`, `fee` and `net` against one balance, and an example query in Stripe's Sigma documentation labels the table \"the canonical record of changes to your Stripe balance\" (https://docs.stripe.com/api/balance_transactions/object, https://docs.stripe.com/data/data-freshness, n.d., accessed 2026-11). Adyen's settlement details report lists entries by journal type, such as Settled, Refunded, Chargeback and MerchantPayout (https://docs.adyen.com/reporting/settlement-reconciliation/transaction-level/settlement-details-report, n.d., accessed 2026-11).",
+              "shows": "What the merchant receives is a derived, single-sided line, on both providers."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Two internal systems that are only partly published and not exposed.",
+            "introduces": "What that means for someone who sees only each provider's outputs.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ],
+      "flow": {
+        "pattern": "assertion_evidence_reasoning",
+        "rationale": "The table of documented facts, then the limits of the record the table rests on, then what an integrator does with both; the limits must come before the advice so the advice does not lean on the 2021 details."
+      }
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: A Ledger Small Enough to Copy",
+      "controlling_idea": "Larkfield's 2027 ledger applies the four rules of the mechanism section with a handful of accounts and one write path, and with them the €412,000 would have appeared as balances on the day each cause began.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S5"
+        ],
+        "how": "Works the invariants on ledger numbers and shows which parts of a provider's design were left out."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "Two providers' ledgers that the integrator cannot see.",
+        "introduces": "The book the integrator keeps itself, at Larkfield's size.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "flow": {
+        "pattern": "small_to_large",
+        "rationale": "The accounts, one payment, one refund after payout, then the whole year-end difference, then what was deliberately not built; each example reuses the accounts of the one before."
+      },
+      "paragraphs": [
+        {
+          "id": "p37",
+          "function": "description",
+          "controlling_idea": "Under Keel decision K3 Larkfield's ledger has three lasting accounts and three clearing accounts per provider and currency, and it records claims, not cash, because Larkfield never holds member funds.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Account / kind / what a balance means: funds at provider; owed to studio (one per studio); fees owed to Larkfield; clearing: sales awaiting settlement report, payouts in transit, to recover from studio.",
+              "shows": "The whole chart of accounts fits in six rows.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ]
+        },
+        {
+          "id": "p38",
+          "function": "example",
+          "controlling_idea": "Mila's €120.00 pass is four entries, and after the fourth both clearing accounts it touched are back at zero.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Entries with signed lines: 1 report line for the capture of 9 March (+120.00 sales awaiting settlement report; −117.47 owed to Studio Noord; −2.53 fees owed to Larkfield); 2 settlement report line (−120.00 sales awaiting settlement report; +120.00 funds at provider); 3 payout reported as sent, 11 March (+117.47 payouts in transit; −117.47 funds at provider); 4 payout marked arrived, 25 March (+117.47 owed to Studio Noord; −117.47 payouts in transit), the order chapter 14 owns. Each entry is written from a provider report line, never from a webhook (ruling 28); the capture line on Adyen is a SentForSettle record in the payment accounting report (https://docs.adyen.com/reporting/invoice-reconciliation/payment-accounting-report, n.d., accessed 2026-11).",
+              "shows": "Balanced entries through clearing accounts, on ledger numbers.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The accounts.",
+            "introduces": "One payment moving through them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p39",
+          "function": "example",
+          "controlling_idea": "The €84.00 refund on 18 March is one more entry, booked against 'owed to Studio Noord' because the studio's balance covers it, and into 'to recover from Studio Noord' only for a part the balance could not cover, where the old nightly sum would have silently lowered a figure already paid out.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "The refund entry (−84.00 funds at provider; +84.00 owed to Studio Noord; the studio's balance of €212.40 that day covers it, ruling 26). Counterfactual with an empty balance: +84.00 to recover from Studio Noord, and a further entry when recovered (−84.00 to recover from Studio Noord; +84.00 owed to Studio Noord). The treatment of Larkfield's fee on the refunded part is left to the platform chapters.",
+              "shows": "The amount owed back stays visible until it is recovered, which is the second change the acceptance probe asks for.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The pass sold and paid out.",
+            "introduces": "The refund after payout, the case the payment table could not hold.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p40",
+          "function": "analysis",
+          "controlling_idea": "Replayed through these accounts, each of the three causes of the €412,000 becomes an entry or a balance on the day it happens.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "€317,200 of refunds after payout as entries against 'owed to studio' where the studio's balance covered the refund and into 'to recover from studio' only for the part it could not cover; €73,500 of chargeback fees booked from the providers' report lines; €21,300 of rounding removed by booking the provider's reported amount instead of recomputing it.",
+              "shows": "Ties the opening incident to the mechanism.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "One refund handled as an entry.",
+            "introduces": "The whole year-end difference handled the same way.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p41",
+          "function": "recommendation",
+          "controlling_idea": "Larkfield copied the four rules and none of the machinery: one database and one posting function that refuses an unbalanced entry or a second entry for the same business event, and no shards, event log or template prover.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "With one writer (the reconciliation job, posting only from provider report lines) the write path can enforce balance in a single database transaction and reject a repeated business-event id; Adyen's 50 rows per payment and Stripe's five billion events a day are answers to volumes Larkfield's 31.4 million payments a year do not approach.",
+              "shows": "Author's judgement, with the condition under which it stops holding (many writers).",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What Larkfield built.",
+            "introduces": "What it deliberately did not build, and why prevention fits a system with one writer.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong",
+      "controlling_idea": "A ledger fails in a small number of recognizable ways, and each shows up as a duplicate, a lag or a clearing balance that ages, provided someone owns the balance.",
+      "function": "cause_effect",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S4"
+        ],
+        "how": "Shows detection and recovery for each failure, and that an unowned clearing balance defeats the mechanism."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The ledger working as designed.",
+        "introduces": "The ways it fails and how each is detected and repaired.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "flow": {
+        "pattern": "order_of_importance",
+        "rationale": "The catalogue first, then the two failures that need more than a table row: the book falling behind, and the balance nobody owns, which is the one that turns a detected error into a loss."
+      },
+      "paragraphs": [
+        {
+          "id": "p42",
+          "function": "cause_effect",
+          "controlling_idea": "Six failures cover most of what goes wrong, and each has a visible sign in the book and a repair that adds entries without editing any.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Failure / how it shows / recovery: duplicate posting; missing event; late event; wrong identifier; entry edited in place; payment recorded while the ledger is down.",
+              "shows": "The failure catalogue the style guide requires, in ledger terms."
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe (2024): if a release event \"is never published or has the wrong `id`, Ledger would not clear the balance\".",
+              "shows": "The wrong-identifier row is a documented failure mode, not an invented one.",
+              "source": "Stripe, 'Ledger: Stripe's system for tracking and validating money movement', Ilya Ganelin, https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement, published 2024-02-16"
+            }
+          ]
+        },
+        {
+          "id": "p43",
+          "function": "explanation",
+          "controlling_idea": "When the ledger falls behind the payments, the safe behavior is to queue and catch up, and to date every balance, never to write estimated entries.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen (2021): the pick-up process \"will run behind if we have doubt about whether we can guarantee consistency in the accounting or if an accounting database is not available but that will not impact the availability of the PAL itself\" (PAL is Adyen's payment processing layer).",
+              "shows": "A documented example of choosing a late book over a wrong one.",
+              "source": "Adyen, 'Design to Duty: The Accounting and Reporting Systems at Adyen', Willem Pino, https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2, published 2021-08-23 (evidence age: 5 years)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The table's last row, the ledger being down.",
+            "introduces": "What to do while it is behind.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p44",
+          "function": "explanation",
+          "controlling_idea": "A clearing balance detects an error only if someone owns it and its age is tracked, because the older an unexplained amount is, the more likely it is a loss.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (2024) scores \"Aging Balances\" per team and raises \"auto-generated tickets\".",
+              "shows": "The anchor with the detection design treats ownership and age as part of the system.",
+              "source": "Stripe, 'Ledger: Stripe's system for tracking and validating money movement', Ilya Ganelin, https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement, published 2024-02-16"
+            },
+            {
+              "kind": "scenario",
+              "what": "Larkfield's local rule under Keel: every clearing balance has a named owner, and one open for more than five business days goes to Priya Raman's weekly review.",
+              "shows": "A small-scale version of the same control.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "emphasis",
+            "carries_over": "Errors made visible as balances.",
+            "introduces": "The organizational condition without which visibility achieves nothing.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "The payment table, the two enforcement designs and Larkfield's six accounts are one idea at three sizes: money is known only as movements that balance, and an error is known only as a balance left where none should be. Where the invariant is enforced is a consequence of how many systems write; whether it is kept is not optional at any size.",
+    "so_what": "A team building on a provider that keeps mutable statuses and computed sums will meet its own €412,000; the four invariants cost a few tables and one posting function, and nothing a provider has published about scale is needed to adopt them.",
+    "callback": {
+      "to": "The opening €412,000 that correct payment rows could not explain.",
+      "how": "The reader can now say it was three kinds of movement with no entry, and name the account in which each would have appeared on the day it began."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "For every money movement in your system, write the balanced entry, name the clearing account that must return to zero and the outside record that proves it; then give every clearing balance an owner and an age limit. Eight questions to ask follow."
+    },
+    "hand_off": {
+      "to": "balances-and-funds-flows",
+      "relationship": "contrast",
+      "carries_over": "The ledger as the provider's complete, two-sided record of every movement, kept for the provider's own proof.",
+      "introduces": "The merchant sees none of that: it sees one-sided lines against a balance, and the open question there is when the amount becomes the merchant's to use."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The failure modes and their repairs.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p45",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Established: double entry with clearing accounts (and, at Stripe, Square and Uber, stated immutability) is the published basis of both anchors' books and of the contrast systems, and it makes errors visible as balances."
+      },
+      {
+        "id": "p46",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Depends on context: whether to enforce at the write or detect afterwards, how stale a balance may be, and whether to buy or build the store depend on the number of writers and the volume.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What the field agrees on.",
+          "introduces": "What changes with the situation.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p47",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "The author's synthesis: copy the invariants, not the machinery, and treat any provider balance as a claim that is as current as its last proof.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is established and what depends on context.",
+          "introduces": "The author's own position, marked as such.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p48",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "Eight questions let the reader test a ledger, their own or a provider's, in a design review.",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The take-aways.",
+          "introduces": "Questions that apply them.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p49",
+        "function": "transition",
+        "controlling_idea": "The ledger is the provider's two-sided record kept for its own proof, whereas the merchant sees only one-sided lines against a balance, where the question is when the money becomes theirs to use.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "The complete internal record this chapter described.",
+          "introduces": "The merchant's partial view of it, the subject of the next chapter.",
+          "form": "paragraph",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "What the merchant sees of the ledger: balances, pending and available funds, balance transactions, payable batches, reserves, pre-funding.",
+      "covered_in": [
+        "balances-and-funds-flows"
+      ]
+    },
+    {
+      "topic": "Payouts, rails and payout returns.",
+      "covered_in": [
+        "payouts-and-money-movement"
+      ]
+    },
+    {
+      "topic": "Proving the ledger against network clearing files, bank statements and provider reports; exception handling in depth.",
+      "covered_in": [
+        "payment-reconciliation-and-reporting"
+      ]
+    },
+    {
+      "topic": "Who may legally hold the money, and safeguarding.",
+      "covered_in": [
+        "licences-and-safeguarding"
+      ]
+    },
+    {
+      "topic": "Debits and credits, charts of accounts, the general ledger and posting to an ERP.",
+      "covered_in": [
+        "accounting-for-architects",
+        "designing-financial-ledgers",
+        "payments-to-ledger"
+      ]
+    },
+    {
+      "topic": "Database engines, sharding and consistency models for payment data.",
+      "covered_in": [
+        "payment-data-stores-and-consistency"
+      ]
+    },
+    {
+      "topic": "Interchange, scheme fees and the provider's cost inside a payment.",
+      "covered_in": [
+        "payment-economics"
+      ]
+    },
+    {
+      "topic": "Who funds a refund after payout on each provider, and split mechanics.",
+      "covered_in": [
+        "platform-payment-models",
+        "splits-balances-and-platform-payouts"
+      ]
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "How Stripe's customer-facing balance relates to Ledger and to MMS is not public; the chapter says so and does not guess beyond one labeled inference.",
+    "Whether Adyen's 2021 accounting design (templates, PostgreSQL clusters, round-robin) is current is not public.",
+    "Airbnb's 2017 double-entry post returned HTTP 403 during research and is not used; PLAN names Airbnb as an optional contrast.",
+    "Flow rubric note not acted on: moving p30 (the 2026 post showing the designs are not exclusive) into the trade-offs section. It stays with the Stripe material because it is dated evidence about Stripe; the trade-offs section restates the overlap in p32."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "Entries are shown as signed lines that sum to zero, with debit and credit named once and left to RECONCILED.",
+      "rejected": [
+        "Debit and credit columns throughout: an engineer new to payments would have to learn the sign convention before the invariant."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The two enforcement designs get one section each, with the anchor company's dated account inside its design, and the comparison is kept for the required section.",
+      "rejected": [
+        "One section per company: it would present the designs as company trivia instead of as choices."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Square, TigerBeetle, Modern Treasury and Uber appear in one or two sentences each, only where they support a design choice.",
+      "rejected": [
+        "A survey of ledger systems; an Airbnb contrast (source unreachable)."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Added a breakdown of the €412,000 and the pre-2025 nightly query to the scenario ledger so the worked example has numbers.",
+      "rejected": [
+        "Leaving the three causes without amounts."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "PLAN.md, chapter 12 contract",
+      "contributed": "Scope, owned terms, required Larkfield example."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-ledgers-and-money-movement.md, Part 1",
+      "contributed": "Verified quotations and dates for Stripe (2024, 2026), Adyen (2021), Square, Uber, TigerBeetle, Modern Treasury; the list of what is not public."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-reliability-and-scale.md, sections 2.1 to 2.4 and 6.4",
+      "contributed": "Storage facts and their absence for Stripe; Adyen's PostgreSQL sharding."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "The Unexplained €0.4 Million, K1 to K3, Mila's class pass and the refund after payout, plus this chapter's three additions."
+    },
+    {
+      "kind": "external",
+      "ref": "https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement (2024-02-16)",
+      "contributed": "Stripe's Ledger: fund flows, clearing, the three measures, scale figures, correction."
+    },
+    {
+      "kind": "external",
+      "ref": "https://stripe.dev/blog/how-we-built-stripe-credits-a-programmable-auditable-way-to-pay-your-stripe-fees (2026-04-16)",
+      "contributed": "MMS, financial accounts, the transfer lifecycle, write-time rejection."
+    },
+    {
+      "kind": "external",
+      "ref": "https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2 (2021-08-23)",
+      "contributed": "Adyen's templates, zero-sum guarantee, sharding, decoupling of the payment layer."
+    },
+    {
+      "kind": "external",
+      "ref": "https://developer.squareup.com/blog/books-an-immutable-double-entry-accounting-database-service/ (2019-10-16)",
+      "contributed": "Limits of a single-entry table; prevention by construction."
+    },
+    {
+      "kind": "external",
+      "ref": "https://www.uber.com/blog/money-scale-strong-data/ (2020-10-02)",
+      "contributed": "Contrast: an integrated double-entry platform replacing separate systems."
+    },
+    {
+      "kind": "external",
+      "ref": "https://docs.tigerbeetle.com/concepts/debit-credit/ and /coding/two-phase-transfers/ (n.d.)",
+      "contributed": "Immutability and pending transfers enforced by the database."
+    },
+    {
+      "kind": "external",
+      "ref": "https://www.moderntreasury.com/journal/accounting-for-developers-part-i (2022, updated 2025)",
+      "contributed": "Retrofitting ledgers after incidents."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "First version, written from the PLAN contract, the ledger and scale briefs and the journal spec entry."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "After the flow rubric: the scene says 'books' before 'ledger' is defined and states that the 2025 ledger was written from payment rows; the four rules are enumerated in p18; the paragraph on where the evidence stops (p34) moved from trade-offs into the Stripe and Adyen section, after the table."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 58 claims checked (52 confirmed, 2 corrected, 2 hedged, 0 unsupported and removed or relabeled, 0 unreachable; 2 not checked); the Larkfield ledger example now agrees with rulings 26 and 28 and with chapter 14: entries are written only from provider report lines, the covered €84.00 refund is booked against 'owed to studio', and the payout entries follow sent (11 March) then arrived (25 March)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: 8 statements of absence re-tested with a wide search of both companies' engineering posts, documentation and sites (0 overturned, 0 narrowed, 8 hold; table in _research/absence-audit/12-payment-ledgers.md); two sentences now say what was searched."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Ruling 46(i) checked: the page already quotes the three-phase transfer ('submitted → prepared → disbursed') from the stripe.dev post of 16 April 2026 and lists it in Sources; no text change."
+    }
+  ],
+  "length": {
+    "target_words": 5000,
+    "max_words": 6500
+  }
+}

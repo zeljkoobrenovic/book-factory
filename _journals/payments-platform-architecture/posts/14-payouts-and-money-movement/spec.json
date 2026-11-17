@@ -1,0 +1,1583 @@
+{
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "payouts-and-money-movement",
+  "journal": "payments-platform-architecture",
+  "part": "part-3",
+  "title": "Getting Money Out: Payouts and Money Movement",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "What a payout, a payout rail, a cut-off, a value date, a payout return and an instant payout are.",
+        "The documented payout states at each provider: at Stripe, 'paid' that may become 'failed' within five business days, and 'posted' then 'returned' for Global Payouts; at Adyen, 'booked' followed by tracking events and possibly 'returned'.",
+        "What the EU's verification of payee rule (in force for euro-area providers since 9 October 2025) and the UK's Confirmation of Payee check before a transfer, and what each provider exposes of it."
+      ],
+      "believe": [
+        "'Paid' on a payout means the provider sent it; arrival is a separate fact that often has to be inferred from the absence of a return.",
+        "A returned payout is a new credit that reopens a debt to the payee, not an undo of the original."
+      ],
+      "can_do": [
+        "Design a payout record with separate states for instructed, sent, arrived and returned, and say how long it must stay open.",
+        "Given a rail and a time of day, reason about when the transfer is processed and when a failure could still surface.",
+        "Decide what to do with a payee-name check that returns a close match or no match, and say who carries the loss if the sender continues."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a payout marked complete that the payee never received, the reader explains what happened and what the payout record should have looked like.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "blocker",
+        "probe": "A platform marks a seller's payout 'completed' when the provider's notification says the payout is paid. Eight days later the seller says nothing arrived, and the provider shows a balance for that seller that is higher than the platform's own records say. Using only this chapter: what most likely happened, and how should the platform have recorded the payout?",
+        "expected": "The receiving bank returned the transfer, and the return came back days later as a new credit to the seller's balance at the provider. The platform should keep 'sent' and 'arrived' as different states, leave a payout open for the return window, and book a return as a new entry linked to the original payout that reopens the amount owed to the seller."
+      },
+      {
+        "id": "AC-2",
+        "statement": "The reader can say how the two providers' payout interfaces differ in what the sender chooses, and what follows for an adapter over both.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "You must send the same third-party payout through either provider. What do you choose in the request at Stripe's Global Payouts and what at Adyen's Transfers API, and which of the two tells you the money arrived?",
+        "expected": "At Stripe the sender can name the network (for example SEPA, Faster Payments, Fedwire, SWIFT); at Adyen the sender names a priority (regular, fast, instant, wire, cross-border) that Adyen maps to a route. Adyen reports a 'credited' status for instant bank transfers; otherwise both report that the transfer was sent, and a return may follow."
+      },
+      {
+        "id": "AC-3",
+        "statement": "Product availability, limits, fees and cut-off times are stated with 'as of November 2026' and marked as likely to change.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "major"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "How does money leave the provider and reach a bank account, and what happens when it does not arrive?",
+    "claim": "Money leaves the provider through two processes that finish at different times: the provider's accounting debits the balance when it instructs the transfer, and a bank rail then delivers or returns it on the rail's own clock, so a payout marked 'paid' has been sent, not received. A transfer that does not arrive comes back days later as a new credit, and Stripe and Adyen both document payouts this way.",
+    "disputed_by": "The view that a payout is the last step of a payment and ends when the provider reports it paid, so that a payout failure is an error returned by the API at request time.",
+    "so_what": "A platform must keep every payout open until the return window has passed, link each return to the payout it undoes and to the payee it now owes again, and check the payee before sending, because Stripe's documentation says funds sent to a wrong account might not be recoverable.",
+    "how_why": "Batch rails accept a transfer first and reject it later: the receiving bank finds the account closed or the details wrong and sends the money back. Stripe's documentation (accessed November 2026) says a failed payout 'might initially show as paid' and change to failed within five business days, that a posted Global Payout 'doesn't guarantee that your recipient has received money', and that the funds of a returned one come back 'in a separate transaction'. Adyen's (accessed November 2026) splits the lifecycle into accounting events up to 'booked' and tracking events after it, says a non-instant payout 'cannot fail' but can be returned, and creates a new transaction for the return. The documented difference is in what the sender controls and learns: Stripe's Global Payouts lets the sender name the network, Adyen's Transfers API takes a priority and chooses the route, and Adyen confirms arrival for instant bank transfers. Checks of the payee's name before sending (required of euro-area providers since 9 October 2025, and offered in the UK as Confirmation of Payee) move the error to a warning before the money leaves; both providers pass the result to the sender and leave the decision there. Which rail either uses for a standard merchant payout in each country is not published.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "A payout is two processes on two clocks: the provider's accounting debits the balance when it instructs the transfer, and a bank rail then delivers it according to its own cut-offs, business days and limits."
+      },
+      {
+        "id": "S2",
+        "claim": "Batch rails accept a transfer first and reject it later, so a failed payout comes back days after it was marked sent, as a new credit and not an undo, and Stripe and Adyen both document it that way."
+      },
+      {
+        "id": "S3",
+        "claim": "The documented difference between the two providers is in what the sender controls and learns: a named network at Stripe's Global Payouts, a priority mapped to a route at Adyen, and a confirmed arrival only for instant transfers."
+      },
+      {
+        "id": "S4",
+        "claim": "A check of the payee's name before sending moves the error from money gone to a warning, and leaves the decision to continue, and its consequences, with the sender."
+      },
+      {
+        "id": "S5",
+        "claim": "A payout record therefore needs separate states for instructed, sent, arrived and returned, must stay open through the return window, and must link each return to its payout and payee."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Follows a balance out of the provider's ledger onto a rail it does not control, and leaves the part with its sharpest case of two records that disagree: 'paid' at the provider and nothing at the bank.",
+    "supports": [
+      "P3-3"
+    ]
+  },
+  "flow": {
+    "pattern": "problem_solution",
+    "additional_patterns": [
+      {
+        "pattern": "prerequisite_order",
+        "applies_to": "two-clocks, rails, lifecycle: each supplies the vocabulary the next uses"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "designs, where-they-differ"
+      },
+      {
+        "pattern": "chronological",
+        "applies_to": "in-practice, when-it-goes-wrong"
+      }
+    ],
+    "rationale": "The reader meets 412 payouts that were marked paid and came back before any term is defined, so the two processes arrive as the explanation of a failure they have already seen. The rails follow because the second process cannot be reasoned about without them, and the providers' documented states come only then, since they are read as instances of the two processes. The payee check sits after the returns because its case is the one failure a return does not report. Designs come after all the mechanisms they choose among; the provider comparison after the facts it tabulates; the worked payout and the remaining failures last, because they use the four-state record. Opening with the rails would be a catalogue without a question; putting the comparison table before the lifecycles would compare statuses the reader cannot yet read."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "A studio owner calls support: the dashboard has shown her payout as 'Paid' for eight days, and her bank account shows nothing. The support agent can see that the provider debited the balance on the day it said it would. Both statements are true."
+    },
+    "bridge": {
+      "from_reader_world": "An engineer reads a status field named 'paid' the way they read HTTP 200: the operation completed.",
+      "to_topic": "On a payout the field reports what the provider did, and the bank that had to finish the job answers later, on another system's clock, or not at all."
+    },
+    "thesis_statement": {
+      "text": "A payout is two processes that finish at different times: the provider debits the balance when it instructs the transfer, and a bank rail then delivers or returns it on its own clock. 'Paid' means sent; a transfer that does not arrive comes back days later as a new credit.",
+      "placement": "KEY POINTS bullet 1 and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p04",
+      "promises": [
+        {
+          "promise": "Start from Larkfield's 412 payouts that were marked paid and came back.",
+          "kept_in": [
+            "scene"
+          ]
+        },
+        {
+          "promise": "Separate the provider's accounting from the bank rail's delivery, with the vocabulary of rails, cut-offs, value dates and returns.",
+          "kept_in": [
+            "two-clocks",
+            "rails"
+          ]
+        },
+        {
+          "promise": "Read the payout states Stripe and Adyen each document, including how a failed payout comes back.",
+          "kept_in": [
+            "lifecycle"
+          ]
+        },
+        {
+          "promise": "Explain the check of the payee's name before sending, in the EU and the UK, and what each provider exposes of it.",
+          "kept_in": [
+            "payee-check"
+          ]
+        },
+        {
+          "promise": "Compare three ways to record a payout and what a faster rail costs, then compare the two providers.",
+          "kept_in": [
+            "designs",
+            "where-they-differ"
+          ]
+        },
+        {
+          "promise": "Work one payout through Larkfield's record on both providers and list the ways a payout fails after it was sent.",
+          "kept_in": [
+            "in-practice",
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "A payout shown as paid for eight days and a bank account that never received it can both be accurate records.",
+        "function": "context",
+        "organization": "narration",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "A studio owner's call to support: 'Paid' in the dashboard, nothing at the bank, the provider's balance debited on schedule.",
+            "shows": "A disagreement the reader can picture in which no system is malfunctioning."
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "A payout is two processes on two clocks, the provider's accounting and a bank rail's delivery, so 'paid' reports that the money was sent and a failed delivery returns later as a new credit.",
+        "function": "claim",
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "The two true statements that disagree.",
+          "introduces": "The two processes that explain them, and the chapter's claim.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "In the journey of Mila's class pass this chapter is the step where Studio Noord's €117.47 leaves Adyen's books for Ines Bakker's bank account, due there on Thursday 11 March 2027, which is a different fact from the record state 'arrived' set on 25 March.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's €120.00 pass bought Tuesday 9 March 2027 at 19:42; studio share €117.47; payout due in the account Thursday 11 March (best case); record state 'arrived' on Thursday 25 March.",
+            "shows": "Places the chapter on the recurring payment: the last movement, and the first one outside the provider's ledger.",
+            "source": "Larkfield scenario ledger"
+          }
+        ],
+        "transition_in": {
+          "relationship": "place",
+          "carries_over": "The chapter's claim about payouts in general.",
+          "introduces": "Its position on the recurring payment's journey.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "controlling_idea": "The chapter goes from Larkfield's returned payouts to the two processes and the rails, then the providers' documented lifecycles and returns, the payee check, the ways to record a payout, the comparison of Stripe and Adyen, a worked payout and the failures that remain.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The claim and where it sits on the journey.",
+          "introduces": "The order in which the chapter argues it.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: 412 Payouts Marked Paid",
+      "controlling_idea": "In June 2026 Larkfield recorded 412 payouts as finished that the receiving banks sent back, and it had no place to record a payout that returns.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S5"
+        ],
+        "how": "Shows the cost of a record with one final state before any mechanism is named."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "What happened, why it stayed invisible, then the questions it left: the reader arrives at the chapter's questions the way Femke did."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The claim that 'paid' means sent.",
+        "introduces": "One company whose payout record treated it as arrived.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p05",
+          "controlling_idea": "In June 2026 a form that let studio owners change bank details without checking the account holder led to 412 payouts worth €386,000 being returned by receiving banks over three weeks.",
+          "function": "context",
+          "organization": "narration",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "The Payout That Bounced: 412 payouts, €386,000, three weeks, June 2026.",
+              "shows": "The scale of a failure that began with one unchecked field.",
+              "source": "Larkfield scenario ledger"
+            }
+          ]
+        },
+        {
+          "id": "p06",
+          "controlling_idea": "The returns sat unreconciled because Larkfield's payout record ended at 'paid', so a credit that arrived days later had no payout to attach to and no owner.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "19 days to pay every studio; two studios left; Aylin Demir's support team heard first.",
+              "shows": "The damage came from the missing state, not from the returns themselves.",
+              "source": "Larkfield scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The 412 returned payouts.",
+            "introduces": "Why nobody saw them: the record had no state after 'paid'.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p07",
+          "controlling_idea": "The incident leaves three questions the chapter answers: what 'paid' asserts, how long a payout can still come back, and what should have stopped the transfer before it left.",
+          "function": "claim",
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The record that ended too early.",
+            "introduces": "The three questions Femke de Graaf takes into the Keel program in 2027.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "two-clocks",
+      "heading": "Two Processes, Two Clocks: Why “Paid” Means Sent",
+      "controlling_idea": "A payout is the provider's accounting followed by a bank rail's delivery, and the provider controls and observes only the first.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "Establishes the two processes and the vocabulary (payout, payout rail, cut-off, value date, payout return) that every later section uses."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "Payout is defined before its two processes; the processes before the consequence for the status field; the return last, because it is the second process reporting back. Reordering would use 'rail' and 'return' before they are defined."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The question of what 'paid' asserts.",
+        "introduces": "The two processes inside one payout.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p08",
+          "controlling_idea": "A payout is the provider sending money it owes from a balance in its books to a bank account outside the provider, which distinguishes it from a transfer between two balances inside the provider.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'Stripe sends funds from your available balance to your bank account as payouts.'",
+              "shows": "The provider's own definition ties the payout to the balance of the previous chapter.",
+              "source": "docs.stripe.com/payouts (n.d., accessed 2026-11)"
+            }
+          ]
+        },
+        {
+          "id": "p09",
+          "controlling_idea": "The first process is accounting inside the provider's ledger: check the balance, reserve the amount, debit it, and it finishes when the provider decides.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen's accounting events: received, authorised ('we reserve the payout amount on your balance account'), booked ('Adyen deducts the funds from your balance account and creates a transaction').",
+              "shows": "A documented example of the first process ending with a debit, before any bank is involved.",
+              "source": "docs.adyen.com/payouts/payout-service/payout-lifecycle (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The payout as money leaving the provider's books.",
+            "introduces": "The first of its two processes, which stays inside those books.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "controlling_idea": "The second process is delivery on a payout rail, the bank network that carries the instruction to the receiving bank, which runs to cut-off times and business days and credits the payee with a value date of its own.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Who holds the money and who can see it at each step: provider ledger, provider's bank or direct connection, the rail, the receiving bank, the payee's account.",
+              "shows": "After the instruction is submitted the money and the knowledge of its state are both outside the provider."
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen: 'There are specific times during a business day, called cut-off times, when Adyen stops processing bank transfers for settlement within the settlement delay.'",
+              "shows": "A provider's own definition of a cut-off.",
+              "source": "docs.adyen.com/payouts/payout-service/pay-out-to-bank-accounts (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The debit that ends the accounting process.",
+            "introduces": "The delivery process that starts there, with rail, cut-off and value date defined.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "controlling_idea": "Because a batch rail does not confirm the credit to the sender, the status a provider shows after sending describes its own action, and both providers say so.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe Global Payouts: 'A posted status doesn’t guarantee that your recipient has received money, because their bank might delay the release of funds.'",
+              "shows": "Stripe states the gap in its own status table.",
+              "source": "docs.stripe.com/global-payouts/manage-payouts (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen: for non-instant bank transfers the tracking webhook carries tracking.estimatedArrivalTime, an estimate, where instant transfers get a credited status.",
+              "shows": "Adyen's tracking gives a forecast, not a confirmation, on batch rails.",
+              "source": "docs.adyen.com/payouts/payout-service/payout-lifecycle (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "figure",
+              "what": "Two timelines side by side: the provider's ledger (instructed, debited) and the rail (submitted, cut-off, receiving bank, credited or returned).",
+              "shows": "Makes visible that the first timeline ends before the second has an outcome."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Delivery happening on a network the provider does not run.",
+            "introduces": "What that does to the meaning of the provider's status.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p12",
+          "controlling_idea": "A payout return is the receiving bank sending the money back after the rail accepted the transfer, typically because the account is closed or the details do not match, and it reaches the sender as a new transaction days later.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'Incorrect destination information causes most returned payouts (for example, the provided bank account is closed, or the account holder’s details don’t match the recipient’s information).'",
+              "shows": "The documented common causes of a return.",
+              "source": "docs.stripe.com/global-payouts/manage-payouts (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "A status that cannot confirm arrival.",
+            "introduces": "The one signal the second process does send back: the return.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rails",
+      "heading": "The Rails a Payout Travels On",
+      "controlling_idea": "Which rail carries a payout decides when it is processed, whether the sender gets a definite answer and what it costs.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "Shows that the second clock is not one clock: each rail has its own schedule, limits and failure behavior."
+      },
+      "flow": {
+        "pattern": "large_to_small",
+        "rationale": "The table of rails first, then the three properties that matter for an integration one at a time (cut-offs, business days and value dates, instant), then the cross-border case that adds parties. The table must come first because the later paragraphs refer to its rows."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The rail as the network outside the provider.",
+        "introduces": "The rails that exist and how they differ.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p13",
+          "controlling_idea": "Payout rails differ mainly in whether they process in batches or one transfer at a time, when they operate, and whether the sender learns the outcome.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rails: SEPA Credit Transfer, SEPA Instant Credit Transfer, ACH, Faster Payments, wires (Fedwire, SWIFT), push to card; columns: where, how it processes, what the sender learns, where the providers name it.",
+              "shows": "Gives the reader the set of rails and the properties to compare them on."
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe's Global Payouts pricing lists ACH next day, ACH same day, RTP, Fedwire, SEPA Credit Transfer, SEPA Instant Credit Transfer, Faster Payments and SWIFT as rails.",
+              "shows": "The rail names are the providers' own, not the author's taxonomy.",
+              "source": "docs.stripe.com/global-payouts/supplemental-pricing-information (n.d., accessed 2026-11)"
+            }
+          ]
+        },
+        {
+          "id": "p14",
+          "controlling_idea": "Cut-off times turn the time of day into a processing date, as Adyen's published table shows.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen cut-off examples as of November 2026: SEPA regular 15:45 CET same day; UK regular 19:30 GMT with settlement delay T+3; UK fast 21:00 GMT same day; US regular 01:45 ET; transfers after the cut-off are processed the next day.",
+              "shows": "Real cut-offs, with the consequence of missing one stated by the provider.",
+              "source": "docs.adyen.com/payouts/payout-service/pay-out-to-bank-accounts (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe: same-day manual payouts in EUR if initiated before 4 pm Europe/Copenhagen; payments and payouts processed according to UTC.",
+              "shows": "The same mechanism on the other provider, in another time zone.",
+              "source": "docs.stripe.com/payouts (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "Batch rails that operate on a schedule.",
+            "introduces": "Published cut-offs and what happens after them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p15",
+          "controlling_idea": "Rails and banks count business days, so a payout's arrival date is an expectation computed from calendars, and the value date is the receiving bank's to set.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe's Payout object: arrival_date is the 'Date that you can expect the payout to arrive in the bank. This factors in delays to account for weekends or bank holidays.'",
+              "shows": "The provider's arrival field is documented as an expectation.",
+              "source": "docs.stripe.com/api/payouts/object (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen: 'Adyen cannot process payouts on bank holidays'; after initiation 'your bank may need up to three more business days to post the funds.'",
+              "shows": "The receiving bank's posting time is outside the provider's promise.",
+              "source": "docs.adyen.com/account/getting-paid (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Time of day deciding the processing date.",
+            "introduces": "Weekends, holidays and the receiving bank's own posting adding to it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p16",
+          "controlling_idea": "An instant rail replaces the schedule with a synchronous answer within seconds, around the clock, at the price of an amount limit and banks that cannot be reached.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Regulation (EU) 2024/886: the payee's PSP makes the amount available 'within 10 seconds'; euro-area PSPs had to offer sending instant credit transfers by 9 October 2025; charges 'shall not be higher' than for other credit transfers.",
+              "shows": "The legal definition of instant in the euro area and its dates.",
+              "source": "Regulation (EU) 2024/886, Official Journal 19 March 2024"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen: instant priority 24/7, maximum 100,000.00 EUR in SEPA and 1,000,000.00 USD in the US; 'while most banks can process regular transfers, some do not support instant transfers.'",
+              "shows": "Limits and reach of the instant route on one provider, as of November 2026.",
+              "source": "docs.adyen.com/payouts/payout-service/pay-out-to-bank-accounts (n.d., accessed 2026-11); docs.adyen.com/platforms/custom-payouts/on-demand-payouts (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "table",
+              "what": "Requirements of a payout on a batch rail and on an instant rail: how fast, how definite the answer, when it operates, what failure looks like.",
+              "shows": "Sets the two contracts side by side so one API can be designed to cover both."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Batch rails with cut-offs and business days.",
+            "introduces": "Instant rails, which answer at once.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p17",
+          "controlling_idea": "A payout that crosses a border adds intermediary banks and a currency conversion, so the amount that arrives can differ from the amount sent.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: with the cross-border priority 'payout delays and additional fees may occur due to intermediary banks. As a result, the beneficiary may receive a lower amount than the instructed value.'",
+              "shows": "The provider states that the arriving amount is not guaranteed.",
+              "source": "docs.adyen.com/payouts/payout-service/pay-out-to-bank-accounts (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe Global Payouts, as of November 2026: SWIFT 20.00 EUR per payout; FX fee 0.50% on 20 listed currencies and 1.00% on all others, the higher of the two currencies' rates applying; Adyen pays out to third parties in local currencies with two exceptions.",
+              "shows": "What the published prices and limits are, dated.",
+              "source": "docs.stripe.com/global-payouts/supplemental-pricing-information (n.d., accessed 2026-11); docs.adyen.com/payouts/payout-service/pay-out-to-bank-accounts (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Domestic rails, batch and instant.",
+            "introduces": "The cross-border case, with more parties and a conversion.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "lifecycle",
+      "heading": "How a Payout Leaves, and How It Comes Back, at Each Provider",
+      "controlling_idea": "Stripe and Adyen both document a payout as a sequence of states in which the money can come back after the state that looks final.",
+      "function": "evidence",
+      "advances_thesis": {
+        "supports": [
+          "S1",
+          "S2"
+        ],
+        "how": "Gives the documentary evidence for both halves of the thesis: the states up to sent, and the return as a new movement."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "additional_patterns": [
+          {
+            "pattern": "comparison",
+            "applies_to": "p19 to p22: Stripe's two payout objects, then Adyen's transfer, then the mapping"
+          }
+        ],
+        "rationale": "The order a payout lives through: scheduled, sent, mapped to common states, returned, retried; then the limit of the public record about how it is carried; the case that never returns closes the section because the next section answers it. Returns before the states would describe a movement out of states the reader has not met."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "Rails and the two processes in general.",
+        "introduces": "The states each provider's documentation gives a payout as it passes through them.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p18",
+          "controlling_idea": "A standard payout is a scheduled batch that carries many payments, and its schedule controls when it is sent, not when funds become available.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'Choosing a payout schedule doesn’t change how long it takes for your pending balance to become available. It only controls when payouts are sent.'",
+              "shows": "Separates the payout schedule from availability, which the previous chapter owns.",
+              "source": "docs.stripe.com/payouts (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen: payouts follow the payable batch; 'After the payable batch closes, it can take one to two business days for the payout to be initiated'; on platforms a managed payout schedule is Standard ('two business days after capture') or Accelerated (one).",
+              "shows": "The batch unit and the published timing on the other provider.",
+              "source": "docs.adyen.com/account/getting-paid (n.d., accessed 2026-11); docs.adyen.com/platforms/managed-payouts (n.d., accessed 2026-11)"
+            }
+          ]
+        },
+        {
+          "id": "p19",
+          "controlling_idea": "Stripe's Payout object moves from pending to in_transit to paid, and the documentation says a paid payout may still become failed within five business days.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe API reference: 'A payout is pending until it’s submitted to the bank, when it becomes in_transit. The status changes to paid if the transaction succeeds, or to failed or canceled (within 5 business days). Some payouts that fail might initially show as paid, then change to failed.'",
+              "shows": "The state that looks final is documented as reversible.",
+              "source": "docs.stripe.com/api/payouts/object (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The scheduled batch.",
+            "introduces": "The states Stripe gives it once it is created.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "controlling_idea": "Stripe's Global Payouts, its product for paying third parties, uses a different object whose states are processing, posted and returned, and posted is defined as funds leaving, not arriving.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "OutboundPayment statuses: processing, failed, canceled, posted, returned; 'Creating an OutboundPayment doesn’t mean that Stripe has sent the funds'; reviews 'typically take up to 2 business days'.",
+              "shows": "A second Stripe vocabulary for the same lifecycle, with a review hold before sending.",
+              "source": "docs.stripe.com/global-payouts/manage-payouts (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "The Payout object for a merchant's own balance.",
+            "introduces": "The parallel states of the third-party payout product.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p21",
+          "controlling_idea": "Adyen splits the lifecycle into accounting events that end at booked and tracking events after it, and only an instant bank transfer gets a status that says the funds arrived.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Tracking after booked: instant bank transfers 'receive a credited status when the funds arrive, or failed'; payouts to cards get accepted; non-instant bank transfers get tracking.estimatedArrivalTime.",
+              "shows": "Adyen documents exactly which transfers get a confirmation of arrival.",
+              "source": "docs.adyen.com/payouts/payout-service/payout-lifecycle (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "'After a payout reaches the booked status, but before the funds leave Adyen, the payout is automatically analyzed'; if it fails manual review 'Adyen freezes the funds and does not pay them out externally'.",
+              "shows": "Booked is a debit, not yet a departure.",
+              "source": "docs.adyen.com/payouts/payout-service/payout-lifecycle (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Stripe's single status field per object.",
+            "introduces": "Adyen's two groups of events, accounting and tracking.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p22",
+          "controlling_idea": "The three vocabularies map onto four states an integrator needs: instructed, sent, arrived and returned.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows instructed, sent, arrived, returned; columns Stripe Payout, Stripe Global Payouts OutboundPayment, Adyen transfer.",
+              "shows": "Shows which documented status supplies each state, and that 'arrived' is empty for batch rails on both providers."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "Three documented lifecycles.",
+            "introduces": "One set of four states they can be translated into.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p23",
+          "controlling_idea": "Both providers document a failed delivery as a new movement that credits the balance, days after the payout was sent.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: 'It can take up to 5 additional business days for your bank to return the payout and inform us that it failed'; the Payout's failure_balance_transaction is 'the balance transaction that reverses the initial balance transaction and returns the funds from the failed payout back in your balance'.",
+              "shows": "On Stripe the return is its own balance transaction.",
+              "source": "docs.stripe.com/payouts (n.d., accessed 2026-11); docs.stripe.com/api/payouts/object (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe Global Payouts, returned: 'The payout failed to arrive at the destination. Stripe returns the funds to you in a separate transaction... Payouts are typically returned within 2–3 business days, but might take longer depending on the recipient country.'",
+              "shows": "The same on the third-party product, with a typical delay.",
+              "source": "docs.stripe.com/global-payouts/manage-payouts (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'Payouts that do not have an instant priority cannot fail, but they can be returned by the counterparty's bank... A new transaction is created for the return.'",
+              "shows": "Adyen states that on batch rails the failure mode is the return.",
+              "source": "docs.adyen.com/payouts/payout-service/payout-lifecycle (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen merchant payouts: five business days after the batch closed, filter the Aggregate settlement details report on journal type BankInstructionReturned.",
+              "shows": "For Adyen's standard merchant payouts the return is found in a report.",
+              "source": "docs.adyen.com/account/getting-paid (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "The states up to sent.",
+            "introduces": "What both providers record when the delivery fails afterwards.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p24",
+          "controlling_idea": "What follows a return differs by product: Stripe reattempts a standard payout once the bank details are corrected, while Global Payouts and Adyen's transfers leave the next step to the sender.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe standard payouts: 'Stripe then reattempts the payout at the next scheduled payout interval'; Global Payouts: 'Stripe doesn’t retry or reroute payouts automatically'; Adyen: a list of priorities is tried in order when a route is unavailable, which happens before sending.",
+              "shows": "Automatic recovery exists only for the merchant's own scheduled payout.",
+              "source": "docs.stripe.com/payouts (n.d., accessed 2026-11); docs.stripe.com/global-payouts/send-money (n.d., accessed 2026-11); docs.adyen.com/platforms/custom-payouts/on-demand-payouts (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The return as a credit.",
+            "introduces": "Who sends the money again.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p25",
+          "controlling_idea": "Neither provider publishes which rail or bank carries a standard merchant payout in each country, or how often payouts are returned, so anything beyond the documented states is inference.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stripe's payouts page names no rail for standard payouts (its Global Payouts pages do); Adyen's April 2026 press release says its banking licenses enable 'direct connections to payment rails' without listing them; no return rates are published by either.",
+              "shows": "Marks where the documented record ends and labels the reference-architecture reading that follows.",
+              "source": "docs.stripe.com/payouts; adyen.com press release, 9 April 2026"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What the documentation states about sending, returning and resending.",
+            "introduces": "What it leaves out: the rails, the banks and the return rates.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p26",
+          "controlling_idea": "A transfer to a valid account that belongs to someone else produces no return, and the documentation puts that loss on the party that supplied the details.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'Stripe might send payouts to the wrong bank account and might not be able to recover the funds. Any fees or losses that you incur because of incorrect information fall under your responsibility.'",
+              "shows": "States both the possibility and who bears it.",
+              "source": "docs.stripe.com/payouts (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "Global Payouts reversals: US domestic ACH and Fedwire 'within 24 hours of creating the payout'; UK Faster Payments and cross-border payouts not reversible; 'Stripe can’t guarantee a reversal'.",
+              "shows": "There is no general undo after sending.",
+              "source": "docs.stripe.com/global-payouts/manage-payouts (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Failures that come back as returns, documented or inferred.",
+            "introduces": "The failure that does not come back, which the next section answers.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "payee-check",
+      "heading": "Checking the Payee Before the Money Leaves",
+      "controlling_idea": "A check of the payee's name against the receiving bank's record turns a misdirected payout into a warning before sending, and leaves the decision and its consequences with the sender.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S4"
+        ],
+        "how": "Covers the one control that acts before the second clock starts."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "Why a wrong account succeeds, then the rule that answers it in the EU and the service in the UK, then what the two providers expose, then what to do with the result. The recommendation needs the result codes, which need the rule."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "The misdirected payout that never returns.",
+        "introduces": "A check that can catch it before the transfer is authorized.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p27",
+          "controlling_idea": "Bank transfers are routed by account identifier and not by name, so a valid number that belongs to the wrong person is a successful transfer.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Regulation (EU) 2024/886, Article 5c(8), refers to 'the execution of a credit transfer to an unintended payee on the basis of an incorrect unique identifier, as laid down in Article 88 of Directive (EU) 2015/2366'.",
+              "shows": "EU law itself treats the identifier as what the transfer is executed on.",
+              "source": "Regulation (EU) 2024/886, Official Journal 19 March 2024"
+            }
+          ]
+        },
+        {
+          "id": "p28",
+          "controlling_idea": "Since 9 October 2025 payment service providers in the euro area must check the payee's name against the account before the payer authorizes a credit transfer, tell the payer the result, and still let the payer proceed.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Article 5c: 'A payer’s PSP shall offer the payer a service ensuring verification of the payee... immediately after the payer provides relevant information about the payee and before the payer is offered the possibility of authorising that credit transfer.'",
+              "shows": "The rule and its timing in the flow.",
+              "source": "Regulation (EU) 2024/886, Official Journal 19 March 2024"
+            },
+            {
+              "kind": "fact",
+              "what": "On an almost-match the PSP shows the name on the account; the service is free of charge; it must not prevent the payer from authorizing; non-consumers may opt out for payment orders submitted as a package; non-euro member states comply by 9 July 2027.",
+              "shows": "The details that matter to a platform sending batches.",
+              "source": "Regulation (EU) 2024/886, Official Journal 19 March 2024"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "Routing by number alone.",
+            "introduces": "The EU's verification of payee rule.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p29",
+          "controlling_idea": "The United Kingdom has run the equivalent check, Confirmation of Payee, since 2020 as a service between banks.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Pay.UK: 'Since launching in 2020, over 300 organisations have already implemented CoP, with more than 2m checks being completed every day'; 'CoP is an API-based peer-to-peer service, with no central infrastructure in place, but with a directory identifying the organisations in the ecosystem.'",
+              "shows": "Scale and architecture of the UK service, from its operator.",
+              "source": "Pay.UK, Confirmation of Payee (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "The EU rule.",
+            "introduces": "The older UK service that does the same job.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p30",
+          "controlling_idea": "Both providers pass the result of the check to the sender: Stripe in the Dashboard and API flows of Global Payouts, Adyen through an endpoint for its enterprise payouts.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe Global Payouts: for a GBP payout from a UK financial account to a UK bank account the results are Match, Partial Match or No Match, and Unavailable, with 'Continue without match' in the Dashboard, and a recipient_verification result that must be acknowledged in the API; a Stripe support article says 'When initiating a payout to an EU recipient in the Dashboard, Stripe will perform the VoP check'.",
+              "shows": "What Stripe exposes and where.",
+              "source": "docs.stripe.com/global-payouts/send-money (n.d., accessed 2026-11); support.stripe.com/questions/verification-of-payee-support-for-treasury (n.d., accessed 2026-11; read from the article data embedded in the page)"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen: POST /verifyCounterpartyName for 'enterprise bank account holders', domestic EU and UK accounts; responses nameMatch, partialNameMatch, noNameMatch, nameMatchNotSupported; the account name is returned only on a partial match 'to safeguard against name-guessing'.",
+              "shows": "What Adyen exposes and where.",
+              "source": "docs.adyen.com/payouts/payout-service/pay-out-to-bank-accounts/verify-counterparty (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The two national schemes.",
+            "introduces": "What Stripe and Adyen each expose of them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p31",
+          "controlling_idea": "The sender should treat a no-match as a stop, route a close match to a person with the returned name in front of them, and record who decided to continue, because the consequences of continuing fall on the sender.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'Only continue without a match if you’re confident the bank account belongs to the intended recipient. Funds sent to the wrong bank account might not be recoverable.'",
+              "shows": "The provider's own advice and warning.",
+              "source": "docs.stripe.com/global-payouts/send-money (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "Article 5c(8): a PSP 'shall not be held liable for the execution of a credit transfer to an unintended payee on the basis of an incorrect unique identifier... provided that it has fulfilled the requirements of this Article'; PSPs must inform users of the implications of ignoring a notification.",
+              "shows": "After a completed check the provider is not the party that carries the misdirected transfer.",
+              "source": "Regulation (EU) 2024/886, Official Journal 19 March 2024"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "A result handed to the sender.",
+            "introduces": "What the sender should do with each result, as the author's judgement.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "designs",
+      "heading": "Three Ways to Record a Payout, and What Speed Costs",
+      "controlling_idea": "A payout can be recorded as finished when the provider says paid, held open through a return window, or confirmed by an instant rail, and the third costs money and has limits.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S5",
+          "S3"
+        ],
+        "how": "Turns the mechanism into the design choice the so_what names, and prices the alternative of confirmed arrival."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The three designs in order of increasing certainty, the table that compares them, then the separate question of paying people who are not merchants on the provider, which uses the same record. The table must follow the three designs it summarizes."
+      },
+      "transition_in": {
+        "relationship": "sequence",
+        "carries_over": "Controls before sending.",
+        "introduces": "How to record the payout after it is sent.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p32",
+          "controlling_idea": "The first design copies the provider's status into one field and treats paid as final, which is correct for most payouts and silent about every return.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield's record in June 2026.",
+              "shows": "The design the scene showed failing.",
+              "source": "Larkfield scenario ledger"
+            }
+          ]
+        },
+        {
+          "id": "p33",
+          "controlling_idea": "The second design keeps four states and leaves a sent payout open for a return window, inferring arrival from the absence of a return.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Documented windows: Stripe paid may become failed within 5 business days; Global Payouts returns typically within 2–3 business days, longer by country; Adyen advises checking for a returned bank instruction five business days after the batch closed.",
+              "shows": "The window has documented lower bounds and no documented upper bound.",
+              "source": "docs.stripe.com/payouts (n.d., accessed 2026-11); docs.stripe.com/global-payouts/manage-payouts (n.d., accessed 2026-11); docs.adyen.com/account/getting-paid (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A record that ends at paid.",
+            "introduces": "A record that stays open until the return window has passed.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p34",
+          "controlling_idea": "The third design pays for a rail that confirms arrival: instant payouts, which both providers sell with a fee and a ceiling.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe Instant Payouts, as of November 2026: funds 'typically settle... within 30 minutes'; at most 10 a day; 0.40 to 9,999 EUR per payout in the euro area; 'Stripe assesses a fee on each Instant Payout'; the Connect pricing page as shown in euros lists 1% of payout volume.",
+              "shows": "Stripe's instant product is priced by percentage and capped per payout.",
+              "source": "docs.stripe.com/payouts/instant-payouts (n.d., accessed 2026-11); stripe.com/connect/pricing (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen: instant is a transfer priority; 'A payout with a higher priority incurs higher fees'; no public price table; credited status on arrival.",
+              "shows": "Adyen's instant route gives the confirmation and publishes no price.",
+              "source": "docs.adyen.com/payouts/payout-service/pay-out-to-bank-accounts (n.d., accessed 2026-11); docs.adyen.com/payouts/payout-service/payout-lifecycle (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Arrival inferred from silence.",
+            "introduces": "Arrival confirmed by the rail, at a price.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p35",
+          "controlling_idea": "The three designs trade cost against how soon and how surely the payer knows the money arrived, and the second is the default for scheduled payouts.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Designs: status copy, open window, confirmed arrival; columns: what 'arrived' rests on, cost, what it misses, when it is right.",
+              "shows": "Puts the choice on one page with the condition for each."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The three designs.",
+            "introduces": "Their trade-offs side by side.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p36",
+          "controlling_idea": "Paying someone who is not a merchant on the provider uses a separate product at each company, with narrower availability at Stripe and a license question for the sender.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe Global Payouts, as of November 2026: senders located in GB and US; 22 countries in private preview; 'Global Payouts requires Treasury'; 'best for businesses that already hold the licenses required to move money themselves'; 'Payouts don’t flow through a Stripe balance belonging to the recipient, so you’re responsible for any desired tracking of recipient funds.'",
+              "shows": "Availability, funding and the ledgering duty on Stripe.",
+              "source": "docs.stripe.com/global-payouts (n.d., accessed 2026-11); docs.stripe.com/connect/cross-border-payouts-to-recipients/compare-global-payouts (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen payouts service: payouts 'from your balance account to third-party bank accounts by using the Transfers API', funded by 'funds acquired through payments with Adyen or externally transferred funds'; packaged with liquidity management as Intelligent Money Movement on 9 April 2026.",
+              "shows": "The equivalent on Adyen and its 2026 packaging.",
+              "source": "docs.adyen.com/payouts/payout-service (n.d., accessed 2026-11); adyen.com press release, 9 April 2026"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Recording payouts to merchants.",
+            "introduces": "The products for payouts to third parties, where the same record applies.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "The two providers document the same sent-then-returned lifecycle and differ in what the sender chooses and what the sender is told.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S3"
+        ],
+        "how": "States the documented difference the thesis names: network versus priority, and confirmation of arrival."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "Lifecycles, checks and products described provider by provider.",
+        "introduces": "The same facts aspect by aspect.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p37",
+          "controlling_idea": "Aspect by aspect, for payouts to third parties Stripe exposes the network and publishes per-rail prices, while Adyen takes a priority, chooses the route and confirms arrival on instant transfers.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Aspects: status after sending; how the sender picks speed; confirmation of arrival; after a return; payee check; third-party payouts; published prices. Columns Stripe, Adyen, what the difference suggests.",
+              "shows": "Every cell is a fact cited earlier in the chapter or 'Not public'; the last column is the author's reading."
+            }
+          ]
+        },
+        {
+          "id": "p38",
+          "controlling_idea": "An adapter over both should send an intent (amount, payee, latest acceptable arrival) and map it to a network list at Stripe and a priority list at Adyen, and should store the return as its own record on both.",
+          "function": "recommendation",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The differences in the table.",
+            "introduces": "What an integrator does differently on each provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ],
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The table first, then what an integrator does about it; the advice would have nothing to refer to if it came first."
+      }
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: One Payout Record for Two Providers",
+      "controlling_idea": "Larkfield's 2027 payout record has four states, a clearing account that must empty and a window, and it would have surfaced the 412 returns as open items on the day each arrived.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "Works the recommended record through the recurring payment and replays the incident against it."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "One payout from sent to arrived, its ledger entries, the incident replayed, then the same record on the second provider. The replay needs the entries; the second provider needs the first as the reference."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The four-state design and the provider differences.",
+        "introduces": "Both applied to Studio Noord's payout of 11 March 2027.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p39",
+          "controlling_idea": "The payout that carries Mila's €117.47 is marked sent when Adyen books the transfer and arrived only when the window closes without a return.",
+          "function": "example",
+          "organization": "narration",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Pass bought Tuesday 9 March 2027 19:42; payout reaches the account Thursday 11 March (best case; Adyen allows up to five business days from batch close to bank posting); Larkfield's window of 10 business days ends Thursday 25 March (illustrative policy).",
+              "shows": "The four states on the recurring payment with real dates.",
+              "source": "Larkfield scenario ledger; window is a Larkfield assumption"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen managed payouts, Standard: 'The funds arrive in your user's bank account two business days after capture.'",
+              "shows": "The provider behavior the scene relies on is documented.",
+              "source": "docs.adyen.com/platforms/managed-payouts (n.d., accessed 2026-11)"
+            }
+          ]
+        },
+        {
+          "id": "p40",
+          "controlling_idea": "In the ledger the payout passes through a clearing account, payouts in transit, which empties on arrival or on return and whose aged balance is the list of stranded payouts.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Entries: sent, arrived, returned within the window, returned after the window; debit and credit accounts for each.",
+              "shows": "Shows the return as a new entry and the clearing account as the detector."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The states of the payout record.",
+            "introduces": "The ledger entries behind each state, under Keel decision K3.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p41",
+          "controlling_idea": "Replayed against this record, each of the 412 returns of June 2026 would have matched a sent payout by the provider's reference and reopened that studio's balance the day it arrived.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "412 payouts, €386,000, about €937 on average; 19 days in 2026; under Keel a change of bank details triggers a payee-name check and holds the next payout.",
+              "shows": "The counterfactual shows what the record and the check each would have changed.",
+              "source": "Larkfield scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The entries for one payout.",
+            "introduces": "The same entries applied to the incident.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p42",
+          "controlling_idea": "For a studio on Stripe the same four states are fed by different signals: payout.paid sets sent, a later payout.failed sets returned, and the window is the documented five business days plus a margin.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: payout.created, payout.paid and payout.failed events; status may change from paid to failed within 5 business days.",
+              "shows": "The Stripe signals that feed the same record.",
+              "source": "docs.stripe.com/payouts (n.d., accessed 2026-11); docs.stripe.com/api/payouts/object (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "scenario",
+              "what": "Ironworks Climbing, Ravi Shah's three locations in Manchester, on Stripe Connect.",
+              "shows": "The second provider on a ledger studio.",
+              "source": "Larkfield scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Studio Noord on Adyen.",
+            "introduces": "Ironworks Climbing on Stripe, with the same record and different signals.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong",
+      "controlling_idea": "Four failures remain after the record is fixed, and each has a signal to watch and a recovery.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S5"
+        ],
+        "how": "Tests the record against the cases the happy path and the ordinary return do not cover."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "In the order they occur in a payout's life: before sending (duplicate, held), then after (late return, no return)."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The record working as designed.",
+        "introduces": "The cases it has to survive.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p43",
+          "controlling_idea": "A payout request that times out and is retried without the same idempotency key can pay a studio twice, and the defense is a key derived from the payout's business identity.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Keel decision K1: one writer, one key derived from the business event.",
+              "shows": "The ledger's rule applied to payouts.",
+              "source": "Larkfield scenario ledger"
+            }
+          ]
+        },
+        {
+          "id": "p44",
+          "controlling_idea": "A payout can be debited and not yet sent, because both providers review payouts after the accounting step and can hold or freeze them.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen: review after booked, funds frozen on failure; Stripe Global Payouts: status remains processing with reason under_review, reviews 'typically take up to 2 business days'.",
+              "shows": "Documented holds between the debit and the departure.",
+              "source": "docs.adyen.com/payouts/payout-service/payout-lifecycle (n.d., accessed 2026-11); docs.stripe.com/global-payouts/manage-payouts (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "A failure at the request.",
+            "introduces": "A hold after the debit and before the rail.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p45",
+          "controlling_idea": "A return that arrives after the window has closed must reopen the debt with a new entry and never by editing the closed payout.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: returns 'might take longer depending on the recipient country'.",
+              "shows": "The documented window is typical, not a bound.",
+              "source": "docs.stripe.com/global-payouts/manage-payouts (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "Holds before sending.",
+            "introduces": "A return that comes later than the window allowed for.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p46",
+          "controlling_idea": "A misdirected payout that the receiving bank keeps produces no event at all, so the payee's complaint is the detector and a bank trace reference is the only tool.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: Payout trace_id is 'A value that generates from the beneficiary’s bank that allows users to track payouts with their bank'; Adyen: 'download the bank instruction letter... and share it with your bank.'",
+              "shows": "What each provider gives the sender to chase a payout at the bank.",
+              "source": "docs.stripe.com/api/payouts/object (n.d., accessed 2026-11); docs.adyen.com/account/getting-paid (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A late return, which is at least a signal.",
+            "introduces": "The failure with no signal.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "The rails, the documented states, the payee check and the record design are one fact seen four times: the party that says 'paid' is not the party that knows whether the money arrived, so certainty about a payout is either bought from an instant rail, checked before sending, or waited for.",
+    "so_what": "A platform that closes a payout on the provider's word will discover returns from its customers; one that keeps the payout open, links the return and checks the payee first discovers them from its own clearing account.",
+    "callback": {
+      "to": "The studio owner whose payout was 'Paid' for eight days with nothing at the bank.",
+      "how": "The reader can now say that 'Paid' was the provider's debit, that the bank's answer was a return already sitting in the studio's balance as a new credit, and which state the record lacked."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Give the payout record four states and a window, book every return as a new linked entry through a clearing account, check the payee when bank details change, and take the eight questions into the next provider review."
+    },
+    "hand_off": {
+      "to": "payment-reconciliation-and-reporting",
+      "relationship": "problem_solution",
+      "carries_over": "A payout the provider recorded as paid and the bank returned: two records of the same money that disagree.",
+      "introduces": "Matching every expected movement against the other party's record, aging what does not match, and the reports that let customers do the same."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The failures and their recoveries.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p47",
+        "form": "list",
+        "controlling_idea": "Established: a payout status reports sending, a failed delivery returns as a new movement, and a payee-name check precedes euro-area credit transfers.",
+        "function": "synthesis"
+      },
+      {
+        "id": "p48",
+        "form": "list",
+        "controlling_idea": "Depends on context: the length of the window, whether instant payout is worth its fee, and how strictly to stop on a close match.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is settled.",
+          "introduces": "What depends on the platform's payees, amounts and rails.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p49",
+        "form": "list",
+        "controlling_idea": "The author's synthesis: 'arrived' is a state the platform has to earn, and the studio owner's call is answered by a return the record could not hold.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "emphasis",
+          "carries_over": "Conditional recommendations.",
+          "introduces": "The author's own position, with the callback to the opening call.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p50",
+        "form": "list",
+        "controlling_idea": "Eight questions let the reader test a payout design or a provider's payout product.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The take-aways.",
+          "introduces": "Questions to carry into a design review.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p51",
+        "controlling_idea": "A returned payout is two records of the same money that disagree, and the standing answer is to match every movement against the other party's record, which is the next chapter.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "The disagreement between 'paid' at the provider and nothing at the bank.",
+          "introduces": "Reconciliation as the practice that settles such disagreements.",
+          "form": "paragraph",
+          "placement": "both"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "When funds become available, reserves, negative balances and pre-funding.",
+      "covered_in": [
+        "balances-and-funds-flows"
+      ]
+    },
+    {
+      "topic": "How a provider or a customer reconciles payouts against bank statements, and the payout reports themselves.",
+      "covered_in": [
+        "payment-reconciliation-and-reporting"
+      ]
+    },
+    {
+      "topic": "Which license lets a party hold or move other people's money, including the license question Global Payouts raises.",
+      "covered_in": [
+        "licences-and-safeguarding"
+      ]
+    },
+    {
+      "topic": "Splits, sweeps, payout schedules per seller and refunds after payout on a platform.",
+      "covered_in": [
+        "splits-balances-and-platform-payouts",
+        "platform-payment-models"
+      ]
+    },
+    {
+      "topic": "Verifying a seller's bank account at onboarding and requirements that pause payouts.",
+      "covered_in": [
+        "platform-onboarding-and-verification",
+        "payment-compliance-and-regulation"
+      ]
+    },
+    {
+      "topic": "The design of ledgers and clearing accounts in general.",
+      "covered_in": [
+        "payment-ledgers"
+      ]
+    },
+    {
+      "topic": "Payouts to crypto wallets and stablecoin rails.",
+      "covered_in": [
+        "payments-what-is-moving"
+      ]
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "Which rail and which bank carry a standard merchant payout in each country at Stripe and at Adyen: not published; the chapter says so.",
+    "Return rates for payouts at either provider: not published.",
+    "Instant payout prices by country at Stripe (only the euro rendering of the Connect pricing page was read) and any price list for Adyen's transfer priorities.",
+    "Whether either provider runs a payee-name check on standard payouts to a merchant's own verified bank account: nothing found.",
+    "The European Payments Council's Verification Of Payee scheme rulebook (result codes, response time) could not be fetched (HTTP 403); the chapter cites the regulation only.",
+    "Stripe's support article on Verification of Payee does not say whether a sender can continue past a mismatch on an EU payout (it names acknowledging, editing or canceling); the UK flow documents 'Continue without match'."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "Returns are documented inside the lifecycle section instead of in a section of their own, so that a return is read as the last state of the same lifecycle; 'When It Goes Wrong' is kept for the failures that remain after the record handles ordinary returns.",
+      "rejected": [
+        "A separate returns section between the lifecycle and the payee check",
+        "Folding all failures into the lifecycle section"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Rails are described by three properties (batch or instant, operating hours, what the sender learns) with provider-documented figures only; no scheme-rulebook return windows are stated, because none was read from a primary source.",
+      "rejected": [
+        "A full table of return windows per rail from memory"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Larkfield's ledger entries route a payout through a 'payouts in transit' clearing account so that the debt to the studio closes on arrival, not on sending; a return inside the window clears the account and leaves the debt open.",
+      "rejected": [
+        "Closing the debt at 'sent' and reopening it on every return"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Platform payout scheduling (sweeps, managed payouts, delay_days) gets one paragraph and a link, since chapter 35 owns it.",
+      "rejected": [
+        "A section on platform payouts"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/PLAN.md, contract 14",
+      "contributed": "Scope, owned terms, the Larkfield incident."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/_research/scenario-ledger.md",
+      "contributed": "The Payout That Bounced, Mila's class pass dates and amounts, Keel K1–K3, cast."
+    },
+    {
+      "kind": "external",
+      "ref": "Stripe documentation: Receive payouts; The Payout object; Global Payouts (overview, send money, manage payouts, pricing, comparison with Connect); Instant Payouts (n.d., accessed 2026-11)",
+      "contributed": "Payout states, the paid-then-failed rule, returns as separate transactions, networks, fees, limits, Confirmation of Payee."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen documentation: Payout lifecycle (n.d., accessed 2026-11); Pay out to bank accounts; Verify counterparty name; Getting paid; Managed payouts; On-demand payouts (n.d., accessed 2026-11)",
+      "contributed": "Accounting and tracking events, returns, priorities, routes, cut-offs, counterparty name verification."
+    },
+    {
+      "kind": "external",
+      "ref": "Regulation (EU) 2024/886 of 13 March 2024 (Instant Payments Regulation), Official Journal 19 March 2024",
+      "contributed": "Verification of payee (Article 5c), instant credit transfer deadlines, 10 seconds, charges."
+    },
+    {
+      "kind": "external",
+      "ref": "Pay.UK, Confirmation of Payee (n.d., accessed 2026-11)",
+      "contributed": "UK service: launch year, scale, architecture."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen press release, 'Adyen launches Intelligent Money Movement', 9 April 2026",
+      "contributed": "The 2026 packaging of payouts and the statement on direct connections to rails."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 70 claims checked (59 confirmed, 6 corrected, 4 hedged, 0 unsupported and removed or relabeled, 0 unreachable; 1 labeled industry practice). Most significant fix: Stripe's Confirmation of Payee is documented for the API as well as the Dashboard, and the EU support article is now quoted directly; also the Adyen lifecycle page is cited n.d. (its 'last modified' was build metadata), and the page separates the money reaching the account on 11 March (best case) from the record state 'arrived' on 25 March."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "After the flow rubric: swapped the last two paragraphs of the lifecycle section so it ends on the misdirected payout that the payee check answers; scoped the comparison's controlling idea to third-party payouts. Notes not acted on: the paragraph on third-party payout products stays in the designs section; the cross-border paragraph stays in the rails section."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "First draft of the spec from the PLAN contract, the journal spec entry and the research on payouts; sources re-fetched the same day."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: 3 statements of absence re-tested with a wide search (1 overturned, 0 narrowed, 2 hold; table in _research/absence-audit/14-payouts-and-money-movement.md). Overturned: Adyen documents what follows a returned payout (return reason codes with retry advice; transfers blocked after a permanent reason), so 'a resend is not documented' is replaced by 'the sender retries by reason code'."
+    }
+  ],
+  "length": {
+    "target_words": 5200,
+    "max_words": 6500
+  }
+}

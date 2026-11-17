@@ -1,0 +1,1325 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "journey-dispute",
+  "journal": "payments-platform-architecture",
+  "part": "part-9",
+  "title": "Journey 4: A Dispute, From Chargeback to Ledger",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "The steps of a dispute: the cardholder's claim to the issuer, the chargeback through the network, the provider's notification, the debit of the amount and a fee, the evidence and its single submission, the deadline, the issuer's review, the outcome and its possible reopening, the booking of the loss on the platform, the ledger entries and the count toward the network's monitoring program; for each, the party, the record, the promise and the failure, with the chapter that owns it.",
+        "The canonical facts: Bram de Wit disputes a €120.00 pass bought at Studio Noord on 2 February 2027 as 'not recognized'; the chargeback arrives on 24 February 2027 with an illustrative €15.00 fee.",
+        "The two providers' dispute records as documented in 2026: on Stripe one Dispute object with a status, the amount and a fee debited when it is created, and the amount returned only on a win; on Adyen a series of events against the original payment (notification of chargeback, chargeback, information supplied, chargeback reversed, second chargeback), with the credit on a reversal provisional. On Adyen for Platforms the chargeback is booked by logic set on the payment, by default to the platform's liable balance account; on Stripe Connect the charge type decides which balance is debited.",
+        "Where the public record stops: Adyen's chargeback fee amount is contractual, with only CAD 24.00 published, in Adyen Canada's fee disclosure (Stripe's Netherlands list price is €20 per dispute received and €20 per dispute countered); Mastercard's deadlines are known here only as the two providers render them."
+      ],
+      "believe": [
+        "A paid-out payment is not final; it is a payment nobody has disputed yet.",
+        "Winning a dispute returns the money and leaves the count against the merchant unchanged.",
+        "Who carries a dispute's loss is settled when the payment is created, so it is a design decision, not something to settle when the dispute arrives."
+      ],
+      "can_do": [
+        "Book a chargeback on the day it arrives, against the balance the account model names, as a provisional entry that a later event can reverse.",
+        "List the evidence their own system would need at the moment of sale to answer a 'not recognized' claim in one submission.",
+        "Say which dispute event on each provider a ledger must not treat as final."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a team's plan for handling a chargeback on a platform the chapter does not contain, the reader says what is wrong with each step of the plan.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A ticket marketplace receives a €200 chargeback (the buyer's bank taking the payment back, here with the claim that the buyer did not make it) on a sale it paid out to the event organizer two months ago. The team plans to (a) book nothing until it knows whether it has won, (b) refund the buyer now so that the dispute goes away, and (c) collect evidence when someone has time. Using only this chapter: what is wrong with each?",
+        "expected": "(a) The €200 and a fee are debited before the issuer has ruled, from the balance fixed by the charge type or the chargeback logic set on the payment, so the ledger is wrong from that day unless the debit is booked at once, as a provisional entry and as an amount owed by the organizer or a loss to the platform. (b) A refund does not close a dispute: the bank has already taken the money, so the buyer would be paid twice; Stripe does not allow a refund outside the dispute process while a dispute is open; and the dispute still counts in the network's monitoring ratio. (c) The merchant gets one submission against a deadline counted in days (at Adyen 18 days for Visa outside the US and Canada and 40 for Mastercard; 'usually 7-21 days' at Stripe), so the evidence has to have been captured at the sale."
+      },
+      {
+        "id": "AC-2",
+        "statement": "The reader can name, for each provider, the dispute event or status that looks final and is not.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A ledger is fed by dispute events from both Stripe and Adyen. Using only this chapter: name one event or status on each provider that the ledger must not treat as the end of the dispute, and say what can follow it.",
+        "expected": "On Adyen, CHARGEBACK_REVERSED: the amount returns while the issuer is still reviewing the defense, and a SECOND_CHARGEBACK can debit it again (and American Express can reopen a dispute closed in the merchant's favor). On Stripe, the status 'lost': it can change to 'won' later when an issuer credits Stripe outside the regular lifecycle, and where appeals are enabled a rejected response can go on to pre-arbitration or arbitration. In both cases the entry for the outcome has to be reversible."
+      },
+      {
+        "id": "AC-3",
+        "statement": "The reader can say whether winning disputes improves a merchant's standing in a network monitoring program and what does.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A studio answers ten disputes in a month and wins nine. Using only this chapter: has its standing in the card networks' dispute monitoring programs (which count a merchant's disputes against its sales each month) improved, and what would have?",
+        "expected": "No. The programs count disputes when they are received and do not consider outcomes or refunds; on Visa a payment with both a fraud report and a dispute counts twice. What lowers the count is fewer disputes arriving: on Visa, disputes resolved through pre-dispute products are excluded from the ratio, so prevention and resolution before the chargeback matter, not the win rate. A platform should keep its own estimate of the ratio and act well below the threshold."
+      }
+    ]
+  },
+  "thesis": {
+    "question": "What happens, in money, deadlines and records, when Bram de Wit's bank takes back a €120 payment three weeks after it was made, and who ends up carrying the loss?",
+    "claim": "A chargeback debits first and judges later. The €120 and a fee (an illustrative €15) leave the platform side before the issuer has ruled on any evidence; the merchant may submit evidence once, within a deadline counted in days (at Adyen, 40 for a Mastercard such as the one in this dispute and 18 for a Visa payment processed outside the US and Canada); and the dispute counts toward the network's monitoring ratio whether it is won or lost. Adyen records it as separate events, with a provisional credit if the chargeback is reversed, and Stripe as one Dispute object whose status can still change after 'lost'. Who carries the €135 was decided before Bram de Wit made his claim: on Adyen by the chargeback logic set on the payment of 2 February, which by default books it to Larkfield's liable balance account, and on Stripe by the charge type.",
+    "disputed_by": "The view that a dispute is a customer-service case: it is rare, support answers it when it arrives, the merchant who is in the right gets the money back, and nothing in the payment system needs to be designed for it.",
+    "so_what": "A team that accepts this captures evidence at the sale, books the debit the day it arrives as an entry a later event can reverse, sets the chargeback logic or charge type knowing it is choosing who pays, and tracks its own dispute count per network. Chargeback fees were one of the three causes of Larkfield's unexplained €412,000, and under K3 every dispute movement is a ledger entry.",
+    "how_why": "The issuer returns the transaction to the acquirer through the network on the cardholder's word, and the rules give the merchant side a response, not a veto: for many Visa conditions the issuer has 120 calendar days from processing to dispute, the Visa rules give the acquirer 30 calendar days to respond, and the providers' merchant-facing deadlines are shorter (18 days at Adyen for Visa outside the US and Canada; 'usually 7-21 days' at Stripe). A 'not recognized' claim is a fraud dispute, which on Visa follows the flow Adyen calls Allocation, where a defended chargeback is not credited back at once. Both providers document that evidence is submitted once (Stripe: 'only one opportunity to submit your response'; Adyen: submitting defense documents 'is irreversible'). As documented in 2026, Stripe models the dispute as one object with a status and moves money when it is created and, if the dispute is won, again when it ends, though 'lost' can later become 'won'; Adyen exposes the network's cycle as separate events, so a reversal's credit is provisional and a second chargeback can take it again. The monitoring programs count disputes received and ignore outcomes and refunds. Adyen's terms (clause 8.2) call the chargeback fee non-refundable and leave its amount to the merchant agreement, so the €15 is illustrative; Mastercard's time limits are given as the two providers state them, because Mastercard's own rule documents were not readable for this book.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "Three things that decided Bram de Wit's dispute were fixed on 2 February 2027, before any claim existed: the payment carried no liability shift because Adyen requested an exemption and the issuer granted it, the chargeback logic sent with the payment named Studio Noord's balance account for the amount and the fee, and the evidence that would answer the claim was a by-product of the sale and of two check-ins held in the booking app."
+      },
+      {
+        "id": "S2",
+        "claim": "The claim reaches the merchant side as a debit and not as a question: on 24 February the €120.00 and an illustrative €15.00 fee leave Studio Noord's balance account before anyone has read any evidence, so the dispute record has to be opened from the notification and the ledger entries written from the provider's report that day, as entries a later event can reverse."
+      },
+      {
+        "id": "S3",
+        "claim": "The merchant side answers once, against a deadline the provider sets (40 days for Mastercard and 18 days for Visa outside the US and Canada at Adyen; 'usually 7-21 days' at Stripe), so what Larkfield sends on 3 March can only be what already existed, and a refund is not one of the answers."
+      },
+      {
+        "id": "S4",
+        "claim": "A favorable event is not the outcome: Adyen returns the €120.00 on a chargeback reversal while the issuer is still reviewing, a second chargeback can take it again, and Bram's dispute is won only when the issuer's time runs out on 12 May; on Stripe the money returns only on a win, and a dispute marked lost can still become won."
+      },
+      {
+        "id": "S5",
+        "claim": "Winning returned the €120.00 and changed nothing else: the fee stayed with the studio, the dispute stayed in Mastercard's count for February, and the payment stayed disputable until 2 June 2027."
+      },
+      {
+        "id": "S6",
+        "claim": "Seen whole, the dispute is twelve hand-offs, most of them between parties Larkfield does not control, and it reads differently per provider: on Adyen a series of events against the payment's reference with the studio's balance debited by an instruction on the payment, on Stripe one Dispute object with Larkfield's platform balance debited first."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Follows the one flow that starts outside every system the merchant controls, from the cardholder's claim to the ledger entries and the monitoring count, on Adyen and on Stripe; as the part's last journey it also performs the part's closing, setting the four journeys against the €412,000 of the opening.",
+    "supports": [
+      "P9-4",
+      "P9-5"
+    ]
+  },
+  "flow": {
+    "pattern": "chronological",
+    "additional_patterns": [
+      {
+        "pattern": "grouping",
+        "applies_to": "sale and after-win: three settings fixed at the sale; three things the win left unchanged"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "on-stripe: the rows that differ between the two providers"
+      },
+      {
+        "pattern": "small_to_large",
+        "applies_to": "conclusion p34 to p36: from this journey to the four journeys of the part"
+      }
+    ],
+    "rationale": "The dispute is told in the order of its dates (2 February, 24 February, 3 March, 5 March to 12 May) because its lesson is an order: the settings come before the claim, the debit before the answer, the credit before the verdict. Starting on 24 February, where the merchant first notices anything, would present the loss bearer and the missing liability shift as discoveries and hide that they were decisions. What the win left unchanged follows the win because each residue is defined against it. The step table comes after the narrative, as its summary, because a reader who met twelve rows of event names first would have no dates or amounts to attach them to; the Stripe reading comes after the table because it is told as the rows that differ. The part's closing is last because it needs all four journeys, of which this is the fourth."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "On Wednesday 24 February 2027 Studio Noord's balance at Adyen fell by €135.00. The pass it paid for had been sold three weeks earlier for €120.00, paid out to the studio two days after the sale, and used for two classes. No one at the studio, at Larkfield or at Adyen had decided anything, and no one had yet looked at any evidence."
+    },
+    "bridge": {
+      "from_reader_world": "An engineer's expectation of a complaint process: someone raises a claim, the two sides are heard, a decision is made, and only then does money move; a sale that was approved, paid out and consumed is a closed record.",
+      "to_topic": "A card dispute runs in the other order. The cardholder's bank takes the money back first, the merchant side may answer once, and the ruling comes weeks later, so the questions that matter (who pays, with what evidence, counted where) were answered when the payment was made."
+    },
+    "thesis_statement": {
+      "text": "A chargeback debits first and judges later: the €120 and a fee leave before the issuer has ruled, the merchant side answers once against a deadline, the dispute counts in the network's monitoring ratio whether it is won or lost, and who carries the loss was decided on the day of the sale, on Adyen by the chargeback logic set on the payment and on Stripe by the charge type.",
+      "placement": "KEY POINTS callout, first bullet, and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p05",
+      "promises": [
+        {
+          "promise": "Start on 2 February, with the three things about Bram de Wit's payment that were settled before anyone disputed it.",
+          "kept_in": [
+            "sale"
+          ]
+        },
+        {
+          "promise": "Follow the claim to 24 February, when it arrives as a debit of €135.00 and has to be recorded.",
+          "kept_in": [
+            "debit"
+          ]
+        },
+        {
+          "promise": "Show the single answer Larkfield sends on 3 March and why a refund is not one.",
+          "kept_in": [
+            "answer"
+          ]
+        },
+        {
+          "promise": "Follow the money back on 5 March and the wait until the dispute is won on 12 May.",
+          "kept_in": [
+            "provisional"
+          ]
+        },
+        {
+          "promise": "Say what the win left unchanged: the fee, the count and the open window.",
+          "kept_in": [
+            "after-win"
+          ]
+        },
+        {
+          "promise": "Lay the whole dispute out as a step table of twelve rows with one sequence figure.",
+          "kept_in": [
+            "step-table"
+          ]
+        },
+        {
+          "promise": "Read the same rows on Stripe, where one object replaces the events and the platform pays first.",
+          "kept_in": [
+            "on-stripe"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "On 24 February 2027 Studio Noord's balance at Adyen fell by €135.00 for a pass that had been sold, paid out and used, before anyone on the merchant side had decided anything or seen any evidence.",
+        "function": "context",
+        "organization": "narration",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "The €120 dispute: Bram de Wit, Dutch Mastercard credit card, €120.00 pass bought at Studio Noord on 2 February 2027; chargeback on 24 February 2027 with an illustrative €15.00 fee; check-ins on 4 and 11 February.",
+            "shows": "A sale that every system had closed is reopened by a party outside all of them.",
+            "source": "Larkfield scenario ledger (fictional)"
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "A chargeback debits first and judges later, and who carries the loss was decided when the payment was made.",
+        "function": "claim",
+        "evidence": [
+          {
+            "kind": "fact",
+            "what": "Adyen: 'Adyen processes the chargeback and debits the payment amount and the chargeback processing fee from your account.' Stripe: on creation of a dispute it 'Debits the disputed amount, plus a dispute fee, from your Stripe account.'",
+            "shows": "Both providers document that the money leaves at the start of the process.",
+            "source": "Adyen documentation, Dispute flow, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/understanding-disputes/dispute-process-and-flow; Stripe documentation, How disputes work, n.d., accessed 2026-11, https://docs.stripe.com/disputes/how-disputes-work"
+          }
+        ],
+        "transition_in": {
+          "relationship": "elaboration",
+          "carries_over": "The debit that nobody on the merchant side decided.",
+          "introduces": "The order of events in a card dispute, and the point in time at which its outcome for the merchant was fixed.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "This journey teaches no new mechanism: it follows one dispute through mechanisms that earlier chapters own, told on Adyen with the Stripe record beside it, and it marks which of its dates and amounts are illustration.",
+        "function": "explanation",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "Studio Noord is on Adyen in the ledger; the pairing of Adyen and Stripe terms is the book's own mapping; dates after 24 February and the €15.00 fee are illustrative; Mastercard's rules are given as Adyen and Stripe render them (ruling 17).",
+            "shows": "Tells the reader how to weigh each kind of statement that follows.",
+            "source": "Consistency rulings 10 and 17; Larkfield scenario ledger (fictional)"
+          }
+        ],
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The claim about the order of a dispute.",
+          "introduces": "How the journey is told and what in it is fact, rendering or illustration.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "controlling_idea": "On the payment's journey this is the last and slowest step, shown on a second sale at the same studio, and it differs from Journey 3's refund in that nobody on the merchant side agreed to it and it brings a fee, a deadline and a count.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Journey 3: Mila's €84.00 refund of 18 March 2027, requested by the member and funded from Studio Noord's balance account; Mila's own pass stays disputable until about 7 July 2027.",
+            "shows": "The refund and the chargeback debit the same balances, so the contrast isolates what force adds.",
+            "source": "Larkfield scenario ledger (fictional)"
+          }
+        ],
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "Journey 3's refund: money going back by the studio's choice, from a balance already paid out.",
+          "introduces": "Money going back by the issuer's choice, with a fee, a deadline and a count the refund did not have.",
+          "form": "sentence",
+          "placement": "both"
+        }
+      },
+      {
+        "id": "p05",
+        "controlling_idea": "The chapter goes through the dispute in date order (2 February, 24 February, 3 March, 5 March to 12 May), says what the win left unchanged, sets the whole out as a step table, reads it again on Stripe and ends by closing Part IX.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The journey's place in the part.",
+          "introduces": "The order in which it is told.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "sale",
+      "heading": "2 February: Three Things Settled Before Anyone Disputed Anything",
+      "controlling_idea": "By the time Bram de Wit's payment was marked paid, three things that would decide a dispute about it were already fixed: no liability shift, the balance a chargeback would debit, and the evidence that existed.",
+      "function": "cause_effect",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "Shows each of the three settings being made at the sale by a mechanism that was not thinking about disputes."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "The closed record first, then the three settings one per paragraph in the order the payment met them (authentication, split, the booking app's own data), so the reader holds all three before the claim arrives."
+      },
+      "transition_in": {
+        "relationship": "time",
+        "carries_over": "The introduction's claim that the loss was assigned when the payment was made.",
+        "introduces": "The day of the sale and what each system recorded on it.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p06",
+          "controlling_idea": "On 2 February the payment for Bram de Wit's pass was approved, split and marked paid, the studio was paid on 4 February, and every Larkfield record of it was closed.",
+          "function": "context",
+          "organization": "narration",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "€120.00 split into €117.47 for Studio Noord and €2.53 for Larkfield, provider cost €0.73 leaving Larkfield €1.80 (illustrative); sales day plus two business days puts the payout on Thursday 4 February 2027; payment record store state 'paid'.",
+              "shows": "Establishes the state of every record before the dispute, so the reopening is visible.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ]
+        },
+        {
+          "id": "p07",
+          "controlling_idea": "The payment carried no liability shift, because Adyen requested the low-risk exemption for it and the issuer granted it, so a fraud dispute would stay on the merchant side.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen on a transaction-risk-analysis exemption requested by the merchant or its acquirer: 'If the exemption is granted, the chargeback liability stays with you.' Each payment response reports the request in `additionalData.scaExemptionRequested`.",
+              "shows": "The first setting was made by the provider's default at authentication and is visible on the payment.",
+              "source": "Adyen documentation, SCA exemptions, n.d., accessed 2026-11, https://docs.adyen.com/online-payments/psd2-sca-compliance-and-implementation-guide/sca-exemptions"
+            },
+            {
+              "kind": "scenario",
+              "what": "Bram's payment went unchallenged because Adyen requested the exemption and the issuer granted it; the pass was his first purchase as a member (illustrative).",
+              "shows": "Ties the documented rule to this payment.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The closed record of the sale.",
+            "introduces": "The first of three settings inside it: authentication and who carries a fraud loss.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p08",
+          "controlling_idea": "The split sent with the payment also said where a chargeback would be booked: by Larkfield's instruction, Studio Noord's balance account for both the amount and the fee, where Adyen's default is the platform's liable balance account.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: by default it 'withdraws the disputed funds from your platform's liable balance account'; `deductFromOneBalanceAccount` 'Deducts the full amount from the balance account specified in `targetAccount`'; 'Use this logic if you want to make your user liable for all chargeback-related events on the payment'; chargeback fees are booked 'By default' to the liable balance account unless `costAllocationAccount` names another.",
+              "shows": "The loss bearer is an instruction on each payment, written before any chargeback exists.",
+              "source": "Adyen for Platforms documentation, Split chargebacks, n.d., accessed 2026-11, https://docs.adyen.com/platforms/online-payments/split-transactions/split-chargebacks"
+            },
+            {
+              "kind": "fact",
+              "what": "On Stripe the counterpart is the charge type: for charges created on the platform the balance debited is the 'Platform’s balance, with or without `on_behalf_of`'.",
+              "shows": "Shows the same decision made by a different kind of setting on the other provider.",
+              "source": "Stripe documentation, Disputes on Connect platforms, n.d., accessed 2026-11, https://docs.stripe.com/connect/disputes"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The first setting, made by the provider's default.",
+            "introduces": "The second setting, made by Larkfield's own integration: the balance a chargeback debits.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p09",
+          "controlling_idea": "The evidence that could answer a claim was created as a by-product of the sale and of two check-ins, in the booking app, a system the payment never passes through.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "The booking app holds Bram's logged-in purchase session and his check-ins to two classes on 4 and 11 February 2027; the payment record store and the booking app share the member id and Larkfield's payment ID.",
+              "shows": "The third setting is a fact about what was recorded, and only a shared identifier links it to the payment.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Two settings on the payment itself.",
+            "introduces": "A third thing fixed at the sale that sits outside the payment system: the evidence.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "debit",
+      "heading": "24 February: The Claim Arrives as a Debit",
+      "controlling_idea": "The claim crosses three parties Larkfield cannot see and reaches it as a notification with a deadline and a debit of €135.00 from the studio's balance, each of which has to become a record of Larkfield's own that day.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "S2"
+        ],
+        "how": "Follows the claim to the two records it must become (a dispute record from the notification, ledger entries from the report) and names what fails at each hand-off."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The claim's path in the order it travels: the cardholder and issuer, the notification, the debit, what can go wrong with the debit, the ledger. The ledger comes last because it is written from the report that lists the debit."
+      },
+      "transition_in": {
+        "relationship": "time",
+        "carries_over": "The three settings left on the payment of 2 February.",
+        "introduces": "Three weeks later, the claim that puts them to use.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p10",
+          "controlling_idea": "Bram de Wit's claim goes from him to his bank, and from the bank through Mastercard to Adyen, without any record reaching the merchant side and without anyone there being asked.",
+          "function": "process",
+          "organization": "process",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen's timeframes table gives the bank 120 calendar days from the transaction date to initiate a chargeback for Mastercard and for Visa; Visa's rules give '120 calendar days from the Transaction Processing Date' for most conditions; a 'not recognized' claim is a fraud dispute (Mastercard code 4837, No Cardholder Authorization, as Adyen lists it).",
+              "shows": "The first steps of the journey are outside every system the merchant controls, and the time allowed for them is a network rule.",
+              "source": "Adyen documentation, Dispute timeframes, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/understanding-disputes/dispute-timeframes; Visa Core Rules and Visa Product and Service Rules, 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf"
+            }
+          ]
+        },
+        {
+          "id": "p11",
+          "controlling_idea": "Adyen's notification of chargeback is the one message that starts the defense period, so the hand-off that matters is from that webhook to a dispute record with an owner and a deadline, which for a Mastercard at Adyen is 40 days later, 5 April.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen on NOTIFICATION_OF_CHARGEBACK: 'This webhook message marks the start of the defense period.' For Mastercard: 'You must provide your defense documents within **40 days**.' 24 February plus 40 days is 5 April 2027.",
+              "shows": "The deadline hangs on one delivery, and its length is the provider's published figure.",
+              "source": "Adyen documentation, Dispute flow, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/understanding-disputes/dispute-process-and-flow; Adyen documentation, Mastercard chargebacks, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/chargeback-guidelines/mastercard-chargebacks"
+            },
+            {
+              "kind": "fact",
+              "what": "On Stripe the same moment is a Dispute object whose deadline is the field `evidence_details.due_by`, which can be read again.",
+              "shows": "Shows where the confirming record sits on the other provider.",
+              "source": "Stripe API reference, The Dispute object, n.d., accessed 2026-11, https://docs.stripe.com/api/disputes/object"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The claim's path to Adyen.",
+            "introduces": "The first record of it that Larkfield receives, and what Larkfield must make of it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p12",
+          "controlling_idea": "With the notification comes the debit: €120.00 and the €15.00 fee leave Studio Noord's balance account under the logic sent on 2 February, before anyone has read any evidence.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'Adyen processes the chargeback and debits the payment amount and the chargeback processing fee from your account'; for Mastercard 'The chargeback debit usually occurs a few days after you receive the NoC'. Adyen publishes no amount for the fee.",
+              "shows": "The debit precedes any judgement, and the fee's size is known only from the contract.",
+              "source": "Adyen documentation, Dispute flow, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/understanding-disputes/dispute-process-and-flow; Adyen documentation, Mastercard chargebacks, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/chargeback-guidelines/mastercard-chargebacks"
+            },
+            {
+              "kind": "scenario",
+              "what": "The studio received €117.47 for the sale and is debited €120.00 plus €15.00; Larkfield keeps its €2.53 fee; the ledger places the notification and the debit on the same day.",
+              "shows": "Puts the documented behavior in this dispute's numbers.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The notification and its deadline.",
+            "introduces": "The money movement that accompanies it and whose balance it lands on.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p13",
+          "controlling_idea": "The booking of that debit can go wrong without any error: a wrong or closed balance account sends it to Larkfield's liable balance account, and a studio balance that cannot cover it leaves Larkfield standing behind it.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'The API request validates only the format of the split instructions, **not** the balance accounts specified in the request'; if the balance account does not exist or belongs to a closed account holder, 'the full transaction and its fees are booked to your platform's liable balance account'. Of the liable balance account: 'Funds can be deducted from this account if your users' balance accounts incur negative balances due to refunds and chargebacks.'",
+              "shows": "The instruction of 2 February is confirmed only by the booking it produces three weeks later.",
+              "source": "Adyen for Platforms documentation, Split chargebacks, n.d., accessed 2026-11, https://docs.adyen.com/platforms/online-payments/split-transactions/split-chargebacks; Adyen for Platforms documentation, Account structure, n.d., accessed 2026-11, https://docs.adyen.com/platforms/account-structure-resources"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The debit as it happened, on the studio's balance.",
+            "introduces": "The ways the same hand-off fails silently, and who pays then.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p14",
+          "controlling_idea": "Larkfield's ledger books the debit from the provider's report and not from the webhook: two entries dated 24 February, one for the amount and one for the fee, both tied to a dispute record that says they can still be reversed.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen's Balance Platform Accounting Report 'tracks all balance changes on all balance accounts in your balance platform, including liable accounts and the accounts of your users' and has transfer types for a chargeback, a chargeback reversal and a second chargeback.",
+              "shows": "The report is the record from which the entries are written, and it has a line for each later movement too.",
+              "source": "Adyen for Platforms documentation, Balance Platform Accounting Report, n.d., accessed 2026-11, https://docs.adyen.com/platforms/reports-and-fees/balance-platform-accounting-report"
+            },
+            {
+              "kind": "scenario",
+              "what": "Under K3: +120.00 on 'owed to Studio Noord' and −120.00 on 'funds at provider'; +15.00 and −15.00 on the same accounts for the fee. In 2025 chargeback fees had no entries: €73,500 of the unexplained €412,000.",
+              "shows": "Shows the entries and what their absence cost.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The debit at the provider.",
+            "introduces": "The same debit in Larkfield's own books, and the channel it is read from.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "answer",
+      "heading": "3 March: One Answer, Sent Once",
+      "controlling_idea": "Larkfield has two real choices, accept or defend, makes the choice by a policy written in advance, and sends on 3 March the only answer the rules allow, built from what the booking app already held.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "S3"
+        ],
+        "how": "Shows the single submission, its deadline on each provider and why its contents had to exist before the claim."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The decision, the submission, then what happens to a team that cannot make the submission in time; the failure comes last because it is defined by the deadline the second paragraph gives."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "A dispute record with a deadline of 5 April and a debit already booked.",
+        "introduces": "What the merchant side can do about it, and when.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p15",
+          "controlling_idea": "The choice on 24 February is between accepting and defending; a refund is not a third option, and defending has a price of its own.",
+          "function": "analysis",
+          "organization": "classification",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'A chargeback fee is charged for every booked chargeback', and one reason it gives for accepting is that the amount 'does not outweigh the risk of losing the chargeback fee for the second booked chargeback'. Stripe: 'You can’t issue a refund outside the dispute process while the dispute is open.'",
+              "shows": "A failed defense can cost a second fee on Adyen, and a refund during a dispute would pay the cardholder twice.",
+              "source": "Adyen documentation, Manage disputes, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/manage-disputes; Stripe documentation, How disputes work, n.d., accessed 2026-11, https://docs.stripe.com/disputes/how-disputes-work"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen auto-defends 'Chargebacks with a fraud reason code for which there was a liability shift'.",
+              "shows": "Had the payment of 2 February been authenticated, this step would not have been Larkfield's.",
+              "source": "Adyen documentation, Manage disputes, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/manage-disputes"
+            }
+          ]
+        },
+        {
+          "id": "p16",
+          "controlling_idea": "On 3 March Larkfield submits its defense once: the logged-in purchase and the two check-ins, which neither provider lets it amend afterwards.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'Submitting the defense documents is irreversible' and 'There is no opportunity later in the process to provide information or to update information you provided.' Stripe: 'You’ve only one opportunity to submit your response.'",
+              "shows": "Both providers document a single submission.",
+              "source": "Adyen documentation, Mastercard chargebacks, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/chargeback-guidelines/mastercard-chargebacks; Stripe documentation, Respond to disputes, n.d., accessed 2026-11, https://docs.stripe.com/disputes/responding"
+            },
+            {
+              "kind": "fact",
+              "what": "Deadlines for the merchant: Adyen 40 days for Mastercard, 18 days for Visa (9 in the United States and Canada since 21 July 2025); Stripe 'usually 7-21 days, depending on the card network'; the Visa rules give the acquirer 30 calendar days.",
+              "shows": "The deadline that binds is the provider's, and it differs by network and provider.",
+              "source": "Adyen documentation, Dispute timeframes, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/understanding-disputes/dispute-timeframes; Stripe documentation, How disputes work, n.d., accessed 2026-11, https://docs.stripe.com/disputes/how-disputes-work; Visa Core Rules and Visa Product and Service Rules, 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The decision to defend.",
+            "introduces": "The submission itself, its contents and its deadline.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p17",
+          "controlling_idea": "A team that has to assemble evidence after the notification, or that never sees the notification, loses by default when the defense period ends.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen on DISPUTE_DEFENSE_PERIOD_ENDED: 'You have not defended the dispute within the timeframe, or the defense period ended because you accepted liability for the chargeback and will not defend the dispute.'",
+              "shows": "A missed deadline is recorded as an event, and it ends the case.",
+              "source": "Adyen documentation, Dispute flow, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/understanding-disputes/dispute-process-and-flow"
+            },
+            {
+              "kind": "scenario",
+              "what": "The Silent Webhook of 14 September 2026 dropped events for 9 hours; under K2 open disputes are swept against the provider's own record.",
+              "shows": "A notification can be missed, so the deadline needs a second source.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A defense sent 33 days before the deadline from records that already existed.",
+            "introduces": "The same step for a team without the records or without the notification.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "provisional",
+      "heading": "5 March to 12 May: The Money Returns Before the Verdict",
+      "controlling_idea": "Adyen credits the €120.00 back two days after the defense, while the issuer is still reviewing it; the credit could have been taken again, and the dispute is won only when the issuer's time runs out on 12 May.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "S4"
+        ],
+        "how": "Separates the favorable event (the reversal) from the outcome (the expiry of the issuer's time) and shows the branch that would have reversed the credit."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The credit, the branch that could have followed it, then what did follow; the branch sits in the middle because it is what makes the credit provisional and the final event meaningful."
+      },
+      "transition_in": {
+        "relationship": "time",
+        "carries_over": "The defense submitted on 3 March.",
+        "introduces": "What comes back, and how long it stays uncertain.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p18",
+          "controlling_idea": "On 5 March a chargeback reversal credits €120.00 to Studio Noord's balance account, and both Adyen's wording and Larkfield's ledger treat it as provisional.",
+          "function": "description",
+          "organization": "description",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen on CHARGEBACK_REVERSED: 'This stage is not final and a second chargeback can be presented by the issuing bank, resulting in losing the chargeback case'; for Mastercard: 'The issuer is still reviewing the defense. If they accept, this is the final status.'",
+              "shows": "The credit arrives before the issuer has decided.",
+              "source": "Adyen documentation, Dispute flow, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/understanding-disputes/dispute-process-and-flow; Adyen documentation, Mastercard chargebacks, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/chargeback-guidelines/mastercard-chargebacks"
+            },
+            {
+              "kind": "table",
+              "what": "Ledger entries of the dispute: 24 February amount (+120.00 owed to Studio Noord, −120.00 funds at provider); 24 February fee (+15.00, −15.00); 5 March reversal (+120.00 funds at provider, −120.00 owed to Studio Noord); 12 May no entry, the dispute record changes state.",
+              "shows": "Every money movement is an entry, and the outcome is a state change on the dispute record, not an edit of an entry.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ]
+        },
+        {
+          "id": "p19",
+          "controlling_idea": "Until the issuer's time ran out it could have rejected the defense, and Larkfield would then have received a second chargeback, final, for the €120.00 again.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen for Mastercard: the issuer escalates 'by filing a Pre-Arbitration case within **45 days** of the date that the defense was uploaded'; 'The Pre-Arbitration case is accepted when the response time expires'; 'If the case is accepted, the dispute is lost, and you receive a second chargeback'; in scheme arbitration 'you can incur a fee of up to USD 600'.",
+              "shows": "The route by which a provisional credit is taken back, and the cost of fighting further.",
+              "source": "Adyen documentation, Mastercard chargebacks, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/chargeback-guidelines/mastercard-chargebacks"
+            },
+            {
+              "kind": "reasoning",
+              "what": "3 March plus 45 days is 17 April 2027. A lost defense costs the studio €135.00 by the ledger's count, and Adyen's statement that a fee is charged for every booked chargeback means a second fee may apply.",
+              "shows": "Sizes the branch that did not happen.",
+              "source": "Adyen documentation, Manage disputes, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/manage-disputes"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The credit of 5 March.",
+            "introduces": "What could still have undone it, and by when.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "controlling_idea": "The dispute is won on 12 May 2027 by an event that moves no money and does not say whether the issuer accepted the defense or let its time run out.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen on ISSUER_RESPONSE_TIMEFRAME_EXPIRED: 'The issuer either accepted your defense of the dispute, or did not respond in time.' Its timeframes table gives 70 days from the defense date for the final decision on a Mastercard dispute.",
+              "shows": "The outcome is the absence of a second chargeback, reported as a non-financial event.",
+              "source": "Adyen documentation, Dispute flow, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/understanding-disputes/dispute-process-and-flow; Adyen documentation, Dispute timeframes, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/understanding-disputes/dispute-timeframes"
+            },
+            {
+              "kind": "scenario",
+              "what": "Outcome chosen for the ledger: the event arrives on Wednesday 12 May 2027, 70 days after the defense (illustrative); the dispute record is closed as won and the payment row returns to 'paid'.",
+              "shows": "States the outcome of the €120 dispute.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "The branch in which the credit is taken again.",
+            "introduces": "The branch that happened: nothing came, and the win was declared by a clock.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "after-win",
+      "heading": "What Winning Did Not Change: The Fee, the Count and the Open Window",
+      "controlling_idea": "The win returned €120.00 and left three things as they were: the studio is €15.00 poorer, the dispute is in Mastercard's count for February, and the payment can still be disputed until 2 June.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "Takes the three residues of a won dispute one at a time and says what would have changed each."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "Money, count, what would have changed either, then time: the money result first because it answers the chapter's question, the count second because it is the residue a merchant least expects, the remedy third because it needs both, and the window last because it looks forward to the part's closing."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "A dispute marked won on 12 May.",
+        "introduces": "What the win left unchanged.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p21",
+          "controlling_idea": "In money, Studio Noord carried €135.00 for nine days and €15.00 for good, by an instruction Larkfield sent on 2 February, with Larkfield's liable balance account behind it had the studio's balance been short.",
+          "function": "analysis",
+          "organization": "description",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "24 February −€135.00; 5 March +€120.00; net −€15.00 for the studio. Larkfield kept its €2.53 fee (€1.80 after the provider's cost). Under Larkfield's terms the studio carries a dispute's fee.",
+              "shows": "Answers who ended up carrying what.",
+              "source": "Larkfield scenario ledger (fictional)"
+            },
+            {
+              "kind": "figure",
+              "what": "The studio's balance as a line: down €135 on 24 February, up €120 on 5 March as a dashed segment, solid from 12 May, ending €15 lower.",
+              "shows": "Makes the gap between the favorable event and the outcome visible.",
+              "source": "Illustration placeholder 45-studio-balance-line"
+            }
+          ]
+        },
+        {
+          "id": "p22",
+          "controlling_idea": "In the network's count nothing came back: Mastercard assigns the chargeback to February, the month it was received, and counts it whatever the outcome.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'monitoring programs don’t consider dispute outcomes'; 'Both networks assign a dispute or fraud report to the month in which they received it, regardless of when the original payment occurred'; 'Mastercard calculates the ratio of disputes or fraud to the total number of payments in the previous month'.",
+              "shows": "The count is taken on receipt and never revised by the result.",
+              "source": "Stripe documentation, Card monitoring programs, n.d., accessed 2026-11, https://docs.stripe.com/disputes/monitoring-programs"
+            },
+            {
+              "kind": "fact",
+              "what": "Mastercard's Excessive Chargeback Merchant level as both providers render it: 100 to 299 chargebacks and a rate of 1.5 to 2.99%. Larkfield's 4,900 disputes of 2025 are about 408 a month against about 1.2 million online card payments a month (assumption), about 0.03%.",
+              "shows": "Gives the threshold and Larkfield's distance from it.",
+              "source": "Stripe documentation, Card monitoring programs, n.d., accessed 2026-11, https://docs.stripe.com/disputes/monitoring-programs; Adyen documentation, Dispute and fraud monitoring, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/dispute-and-fraud-monitoring; Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The money, most of which came back.",
+            "introduces": "The count, none of which did.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p23",
+          "controlling_idea": "What would have changed the loss is authentication at the sale, and what would have changed the count is a dispute that never arrived; the public record does not say which entity the networks count for a studio on a platform.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: Mastercard counts a chargeback 'regardless of whether it was hidden due to a refund' and regardless of liability shift; Visa's fact sheet says the VAMP ratio 'Excludes disputes resolved through pre-dispute solutions'; Stripe lists €40.00 per Mastercard resolution in the Netherlands.",
+              "shows": "Authentication moves the loss and not the count; only prevention lowers the count.",
+              "source": "Stripe documentation, Card monitoring programs, n.d., accessed 2026-11, https://docs.stripe.com/disputes/monitoring-programs; Visa Acquirer Monitoring Program fact sheet, 2025, https://corporate.visa.com/content/dam/VCOM/corporate/visa-perspectives/security-and-trust/documents/visa-acquirer-monitoring-program-fact-sheet-2025.pdf; Stripe pricing, Netherlands, n.d., accessed 2026-11, https://stripe.com/en-nl/pricing"
+            },
+            {
+              "kind": "scenario",
+              "what": "Larkfield's rule of April 2027: request 3-D Secure on a new member's first typed-card purchase of €100 or more; Bram's pass was such a purchase.",
+              "shows": "The policy change that this dispute produced.",
+              "source": "Larkfield scenario ledger (fictional)"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen shows monitoring-program standing 'only on your company account'; Stripe says Visa 'identifies an account by the static component of its statement descriptor and its acquiring bank'.",
+              "shows": "Marks where the evidence about the counted entity stops.",
+              "source": "Adyen documentation, Dispute and fraud monitoring, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/dispute-and-fraud-monitoring; Stripe documentation, Card monitoring programs, n.d., accessed 2026-11, https://docs.stripe.com/disputes/monitoring-programs"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "A loss of €15.00 and a count that winning did not remove.",
+            "introduces": "What would have prevented each, and where the record is silent.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p24",
+          "controlling_idea": "The payment is not closed by the win either: it stays disputable until 2 June 2027, so its record has to be able to reopen.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "120 days from 2 February 2027 is 2 June 2027. Stripe: 'In extremely rare cases, you might receive more than one dispute per payment'; Adyen: American Express 'can reopen a dispute that was previously closed in your favor'.",
+              "shows": "A won dispute does not shorten the window or rule out another.",
+              "source": "Larkfield scenario ledger (fictional); Stripe documentation, How disputes work, n.d., accessed 2026-11, https://docs.stripe.com/disputes/how-disputes-work; Adyen documentation, Dispute timeframes, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/understanding-disputes/dispute-timeframes"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Two things the win left unchanged.",
+            "introduces": "A third: the time during which the payment can still come back.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "step-table",
+      "heading": "The Whole Dispute in Twelve Rows",
+      "controlling_idea": "Laid out as twelve steps, the dispute shows that after the claim Larkfield decides only one thing, and that almost every row is confirmed only by a later record from another party.",
+      "function": "synthesis",
+      "advances_thesis": {
+        "supports": [
+          "S6"
+        ],
+        "how": "Puts every step, record, promise and failure in one table with the chapter that owns each mechanism, on Adyen."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "The dispute told in date order.",
+        "introduces": "The same dispute as a table of hand-offs.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p25",
+          "controlling_idea": "The twelve rows give, for each step, the party that acts, the record it produces, the promise that record makes and the failure that can occur there, with the chapter that owns the mechanism.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Step table of twelve rows (sale and authentication; split with chargeback logic; evidence at the sale; cardholder's claim; chargeback through the network; notification; debit and fee; ledger entries; defense; chargeback reversal; issuer's time expires; count and open window), columns Step | Party or system | Message or record | Promise made | What can fail here → chapter.",
+              "shows": "The whole journey in the part's reading device.",
+              "source": "Adyen documentation, Dispute flow, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/understanding-disputes/dispute-process-and-flow; Adyen documentation, Mastercard chargebacks, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/chargeback-guidelines/mastercard-chargebacks; Adyen for Platforms documentation, Split chargebacks, n.d., accessed 2026-11, https://docs.adyen.com/platforms/online-payments/split-transactions/split-chargebacks; Larkfield scenario ledger (fictional)"
+            }
+          ]
+        },
+        {
+          "id": "p26",
+          "controlling_idea": "Read down the promise column, the table shows where a record was easy to mistake for a fact: the payment marked paid, the notification delivered once, the split accepted without validation and the credit of 5 March.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "figure",
+              "what": "Sequence figure: cardholder, issuer, network, provider, platform and studio balance as columns; arrows for the claim, the chargeback, the notice, the debit of €135, the single defense, the credit of €120 and the final state.",
+              "shows": "Shows the order of messages and that the money moves before the answer.",
+              "source": "Illustration placeholder 45-dispute-sequence"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The table of twelve rows.",
+            "introduces": "What reading one column of it shows.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "on-stripe",
+      "heading": "The Same Dispute on Stripe: One Object, and the Platform Pays First",
+      "controlling_idea": "Had Studio Noord been on Stripe, five of the twelve rows would hold a different record: one Dispute object in place of the events, Larkfield's platform balance debited first, money returned only on a win, and a lost status that can still change.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S6",
+          "S4"
+        ],
+        "how": "Reads the rows that differ on the other provider and says which record an integration waits for on each."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The differing rows side by side first, then the one with the largest consequence (whose balance pays), then where the comparison cannot be completed from public sources."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The twelve rows as Adyen records them.",
+        "introduces": "The rows that change on Stripe.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p27",
+          "controlling_idea": "On Stripe the dispute is one Dispute object with a status, the money moves when it is created and when it ends, and the last status is no more final than Adyen's reversal.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows that differ: the record (events keyed by references vs a Dispute object with a status); the deadline (40 days Mastercard, 18 Visa vs `evidence_details.due_by`, 'usually 7-21 days'); when money returns (on the reversal, provisionally vs only on a win); the fee (non-refundable, amount in the contract vs €20.00 received and €20.00 countered at Netherlands list price); what is not final (CHARGEBACK_REVERSED vs `lost`, which can become `won`).",
+              "shows": "Names, per row, the record an integration should wait for on each provider.",
+              "source": "Stripe documentation, How disputes work, n.d., accessed 2026-11, https://docs.stripe.com/disputes/how-disputes-work; Stripe API reference, The Dispute object, n.d., accessed 2026-11, https://docs.stripe.com/api/disputes/object; Stripe pricing, Netherlands, n.d., accessed 2026-11, https://stripe.com/en-nl/pricing; Adyen documentation, Dispute flow, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/understanding-disputes/dispute-process-and-flow; Adyen documentation, Dispute timeframes, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/understanding-disputes/dispute-timeframes"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'These funds are held for the entire duration of the dispute'; 'in rare cases the status can change from `lost` to `won`'.",
+              "shows": "On Stripe a credit is an outcome, and an outcome can still change.",
+              "source": "Stripe documentation, How disputes work, n.d., accessed 2026-11, https://docs.stripe.com/disputes/how-disputes-work"
+            }
+          ]
+        },
+        {
+          "id": "p28",
+          "controlling_idea": "The same Larkfield terms produce a different first payer on Stripe, because there the charge type decides: a dispute on a destination charge debits Larkfield's platform balance, and getting the studio's share back is a second step that Larkfield has to time.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: the balance debited for the disputed amount on indirect charges is the 'Platform’s balance, with or without `on_behalf_of`'; 'If you challenge the dispute, wait for the dispute outcome before reversing the transfer'; 'Regardless of a dispute’s outcome, Stripe doesn’t automatically refund the application fee'.",
+              "shows": "On Stripe the platform fronts the dispute and recovery is its own decision.",
+              "source": "Stripe documentation, Disputes on Connect platforms, n.d., accessed 2026-11, https://docs.stripe.com/connect/disputes"
+            },
+            {
+              "kind": "scenario",
+              "what": "Larkfield's Stripe studios are legacy Custom connected accounts charged by destination charges with `on_behalf_of`; at list price the debit would be €120.00 plus €20.00.",
+              "shows": "Applies the documented rule to Larkfield's configuration.",
+              "source": "Larkfield scenario ledger (fictional); Stripe pricing, Netherlands, n.d., accessed 2026-11, https://stripe.com/en-nl/pricing"
+            }
+          ],
+          "transition_in": {
+            "relationship": "emphasis",
+            "carries_over": "Five rows that differ.",
+            "introduces": "The one with the largest consequence: whose balance is debited first.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p29",
+          "controlling_idea": "The comparison stops where the public record does: Adyen's chargeback fee, Mastercard's own rule text and a call that returns a dispute's state on Adyen were not available, and the pairing of the two vocabularies is this book's own.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen's terms (clause 8.2) call the chargeback fee non-refundable and leave the amount to the merchant agreement; its pricing page lists none and its Canadian fee disclosure shows CAD 24.00; Mastercard's rule documents returned HTTP 403 (ruling 17); the Disputes API pages read describe actions on a dispute and no read call; neither company publishes a mapping to the other's terms.",
+              "shows": "Marks which cells of the comparison rest on documents and which are open.",
+              "source": "Adyen pricing page and Disputes API, n.d., accessed 2026-11; consistency ruling 17"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What the two providers document.",
+            "introduces": "What neither documents, and what this chapter therefore leaves open.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "Everything the merchant side could do about Bram de Wit's dispute it had done by 2 February: the exemption that left the loss with the merchant, the instruction that named the studio's balance, the session and check-ins that became the defense. Everything after 24 February was reading other parties' records in the right order and booking them as provisional: a notification, a debit, a credit that was not yet an outcome, an expiry that was. A dispute is therefore prepared at the sale and only recorded afterwards.",
+    "so_what": "A team that treats disputes as support cases finds out who pays, with what evidence and against which deadline on the day the money has already left. A team that has read this journey sets the chargeback logic or charge type knowing it is choosing who pays, stores the authentication outcome and the evidence with every sale, books the debit from the report the day it arrives, and keeps its own count per network.",
+    "callback": {
+      "to": "The hook: Studio Noord's balance falling by €135.00 on 24 February 2027 with nobody having decided anything.",
+      "how": "The reader can now say who had decided it and when: Adyen's exemption request and Larkfield's chargeback logic, both on 2 February. They can also say what became of the €135.00: €120.00 back on 5 March, final on 12 May; €15.00 gone; one chargeback in February's count for good."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Take one ordinary payment, one failed renewal, one refund made after payout and one dispute from your own system and fill in a step table for each. For every row write the record that confirms the row before it. Start work at the rows where that cell is empty."
+    },
+    "hand_off": {
+      "to": "part-10",
+      "relationship": "cause_effect",
+      "carries_over": "Four journeys that showed the same payment recorded in two vocabularies: a retrievable object on Stripe and a reference plus events on Adyen, a charge type against an instruction on the payment, one status against a provisional credit.",
+      "introduces": "The companies themselves as the subject: their histories, licenses, figures and stated strategies, and whether one explanation accounts for the differences the reader has now seen."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The dispute on both providers.",
+      "introduces": "What holds across it, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p30",
+        "form": "list",
+        "controlling_idea": "Established: the debit precedes the ruling on both providers, the merchant side answers once against the provider's deadline, the networks count a dispute on receipt whatever its outcome, and the booking of a chargeback follows the chargeback logic on Adyen and the charge type on Stripe.",
+        "function": "synthesis"
+      },
+      {
+        "id": "p31",
+        "form": "list",
+        "controlling_idea": "Depends on context: whether to defend, whose balance should be debited first, and how much authentication to request, each of which turns on amounts, on the sellers and on distance from a threshold.",
+        "function": "synthesis",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What the documents establish.",
+          "introduces": "What changes with the situation.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p32",
+        "form": "list",
+        "controlling_idea": "The author's synthesis: a dispute is prepared at the sale and only recorded afterwards, and an outcome should be a state on a dispute record, never an edit to an entry.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is established and what depends on context.",
+          "introduces": "The author's own judgement, labeled as such.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p33",
+        "form": "list",
+        "controlling_idea": "Seven questions let the reader test whether a system is ready for its next chargeback.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The take-aways.",
+          "introduces": "Questions that apply them.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p34",
+        "controlling_idea": "The four journeys end in the same place by different roads: in each, the first success message came from the step that made a promise, and the news of whether it was kept came later, from another party, on another channel, into another system.",
+        "function": "synthesis",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "The four pairs: the approval on Mila's screen on 9 March against the settlement report two days on; the decline of 1 April against a membership whose state no payment record holds; the split of 9 March against a refund debited on 18 March from a balance already paid out; a payment closed in February against a chargeback three weeks later.",
+            "shows": "Sets the four journeys side by side on the one thing they share.",
+            "source": "Larkfield scenario ledger (fictional)"
+          },
+          {
+            "kind": "figure",
+            "what": "Four short timelines, one per journey, each with a first message at the left and a later record at the right, and a gap between them.",
+            "shows": "Makes the common shape of the four journeys visible.",
+            "source": "Illustration placeholder 45-four-journeys-one-gap"
+          }
+        ],
+        "transition_in": {
+          "relationship": "conclusion_summary",
+          "carries_over": "The fourth journey and its questions.",
+          "introduces": "What all four journeys of Part IX have in common.",
+          "form": "paragraph",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p35",
+        "controlling_idea": "Together the four set one number that no single journey states, and they account for the €412,000 that opened the part: a payment's record has to stay open, and its ledger entries correctable, until the slowest later report can no longer arrive.",
+        "function": "synthesis",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "The Unexplained €0.4 Million of year-end 2025: €317,200 of refunds after payout, €73,500 of chargeback fees, €21,300 of rounding; none of them a failed payment. Journey 3 produced the first as a ledger entry and Journey 4 the second. The slowest report for a card payment is a dispute: 120 days, to 2 June for Bram's payment and about 7 July for Mila's.",
+            "shows": "Returns to the part's opening and shows that its causes were later records that never reached the ledger.",
+            "source": "Larkfield scenario ledger (fictional)"
+          }
+        ],
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The pattern the four journeys share.",
+          "introduces": "The number that follows from it and the part's opening difference of €412,000.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p36",
+        "controlling_idea": "The cheapest improvements to a payment system are therefore at its hand-offs, and the way to find them is to walk one payment of each kind through a step table.",
+        "function": "recommendation",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Keel: K1 one key per business event, K2 the provider's record over the webhook, K3 a ledger entry for every movement with a reconciliation run when each provider's reports are ready, K5 renewals paced and retried by decline code, K6 verification as state; K8 adds no orchestration product.",
+            "shows": "Larkfield's repair program is mostly work on hand-offs.",
+            "source": "Larkfield scenario ledger (fictional)"
+          }
+        ],
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "Failures that sit between mechanisms.",
+          "introduces": "Where to spend first, and an exercise that finds the gaps.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p37",
+        "controlling_idea": "The four journeys showed the same payment recorded in two vocabularies without saying where the difference comes from, which is the question Part X takes up with the two companies as its subject.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "Two providers that put the confirming record in different places.",
+          "introduces": "The companies themselves, and whether one explanation accounts for the differences.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "The dispute lifecycle in general: reason-code families, Visa's two flows, pre-dispute products, monitoring-program thresholds and fines, and the payer's rights outside cards.",
+      "covered_in": [
+        "refunds-reversals-and-disputes"
+      ]
+    },
+    {
+      "topic": "How 3-D Secure works, the exemptions and when the liability shift applies.",
+      "covered_in": [
+        "three-d-secure-and-sca"
+      ]
+    },
+    {
+      "topic": "How a provider scores a payment for fraud and how dispute labels train the models.",
+      "covered_in": [
+        "payment-fraud-and-risk"
+      ]
+    },
+    {
+      "topic": "The account models, who is the merchant and who stands behind a negative seller balance.",
+      "covered_in": [
+        "platform-payment-models"
+      ]
+    },
+    {
+      "topic": "Split instructions, transfer reversals, payout schedules and recovery of a seller's shortfall.",
+      "covered_in": [
+        "splits-balances-and-platform-payouts"
+      ]
+    },
+    {
+      "topic": "Ledger design and the reconciliation job.",
+      "covered_in": [
+        "payment-ledgers",
+        "payment-reconciliation-and-reporting"
+      ]
+    },
+    {
+      "topic": "The webhook receiver's contract and the payment record's states.",
+      "covered_in": [
+        "payment-webhooks-and-events",
+        "payment-state-machines"
+      ]
+    },
+    {
+      "topic": "Why the two providers differ, as companies.",
+      "covered_in": [
+        "part-10",
+        "stripe-and-adyen-bets-compared"
+      ]
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "Adyen's chargeback fee amount is contractual (terms clause 8.2: non-refundable, set in the merchant agreement; CAD 24.00 in Canada's standard disclosure); the €15.00 is the ledger's illustration.",
+    "Adyen's documentation says 'A chargeback fee is charged for every booked chargeback', so a defended and lost dispute may cost two fees; chapters 4 and 25 and the ledger count €135.00 for a lost dispute (one fee). This chapter keeps €135.00 and states the possible second fee in the branch; a reviewer should decide whether the earlier pages need a note.",
+    "The journal-spec thesis gives the merchant's deadline as '18 days at Adyen for a Visa card'; Bram de Wit's card is a Mastercard (ledger), for which Adyen's deadline is 40 days. The chapter states both and uses 40 days for the dates.",
+    "Adyen's Mastercard page gives the issuer 45 days from the defense to file pre-arbitration, and its timeframes table gives 70 days from the defense for the final decision; the chapter states both and places the final event at 70 days.",
+    "Which entity Mastercard and Visa count in their monitoring programs for a studio on a platform (the studio, the platform's merchant account, or both) is not stated in the pages read.",
+    "Mastercard's own rules were not readable (ruling 17); every Mastercard figure is Adyen's or Stripe's rendering.",
+    "Journeys 1 to 3 and the Part IX opening were not yet written when this page was drafted; the part closing relies on their journal-spec entries and the ledger."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "Outcome of the €120 dispute: won. The defense of 3 March is followed by a chargeback reversal on 5 March and by ISSUER_RESPONSE_TIMEFRAME_EXPIRED on 12 May 2027; the studio keeps the loss of the €15.00 fee. Chosen because it demonstrates the two beliefs a loss cannot (winning returns the money and leaves the count; the favorable event is not the outcome), keeps every figure of chapters 4 and 25 valid, and lets the losing branch be stated with its documented cost.",
+      "rejected": [
+        "Lost by second chargeback: it would force a choice between the ledger's €135.00 and the €150.00 that Adyen's 'fee for every booked chargeback' implies.",
+        "Accepted without defense: the ledger already records a defense submitted on 3 March."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Tell the journey in date order from 2 February and place the step table after the narrative.",
+      "rejected": [
+        "Open with the step table as a map: twelve rows of event names before any date or amount.",
+        "Start at 24 February and flash back to the sale: it would present the loss assignment as a discovery, not a decision."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Show Stripe in one or two sentences at each step and collect the rows that differ in a short closing section with a table, since Studio Noord is on Adyen in the ledger.",
+      "rejected": [
+        "Two full step tables, one per provider: most rows would repeat.",
+        "A 'Where They Differ' section: journeys do not have one (style guide)."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Carry the part's closing as three paragraphs under their own heading inside the conclusion region, after the take-aways and questions and directly before the hand-off to Part X, so the part ends on its own synthesis.",
+      "rejected": [
+        "A body section before 'What to Take Away': the part-level view would be followed by a step back down to the single dispute."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "No separate 'When it goes wrong' section: each step's failure is told at the step and collected in the table's last column, as the part's reading device requires.",
+      "rejected": [
+        "A failure section repeating chapter 4's table."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/PLAN.md",
+      "contributed": "The contract for Journey 4 and the part."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/journal-spec.json",
+      "contributed": "Intent, acceptance criteria, thesis and role, copied unchanged; the part's closing; the transitions of this page and of Part X."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/_research/scenario-ledger.md",
+      "contributed": "The €120 dispute and every addition that mentions it (chapters 4, 5, 12, 25, 33, 35), the €412,000 breakdown, Keel decisions."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/_research/consistency-issues.md",
+      "contributed": "Rulings 7, 10, 12, 15, 17, 22 and 23."
+    },
+    {
+      "kind": "internal",
+      "ref": "refunds-reversals-and-disputes, three-d-secure-and-sca, platform-payment-models, splits-balances-and-platform-payouts, payment-ledgers, payment-reconciliation-and-reporting, payment-fraud-and-risk",
+      "contributed": "The mechanisms the journey walks through and the provider facts already established there."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen documentation, n.d., accessed 2026-11 (dispute flow, Mastercard chargebacks, dispute timeframes, manage disputes, Disputes API, dispute and fraud monitoring, SCA exemptions, split chargebacks, account structure, Balance Platform Accounting Report)",
+      "contributed": "The events of a Mastercard dispute, deadlines, the provisional reversal, the fee per booked chargeback, the chargeback logic and its fallback; re-fetched on 17 November 2026."
+    },
+    {
+      "kind": "external",
+      "ref": "Stripe documentation and pricing, n.d., accessed 2026-11 (how disputes work, responding, Connect disputes, monitoring programs, the Dispute object, arbitration, Netherlands pricing)",
+      "contributed": "The Dispute object, the debit at creation, the single submission, the balance debited per charge type, what the monitoring programs count, list fees; re-fetched on 17 November 2026."
+    },
+    {
+      "kind": "external",
+      "ref": "Visa Core Rules and Visa Product and Service Rules, 24 October 2026; Visa Acquirer Monitoring Program fact sheet, 2025",
+      "contributed": "The 120-day limit, the acquirer's 30 days, the exclusion of pre-dispute resolutions from the VAMP ratio."
+    }
+  ],
+  "length": {
+    "target_words": 5000,
+    "max_words": 6500
+  },
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "After the flow rubric: the deadline's length and date stated where the defense period starts (p11), the charge type named in p28, and the step-table section's controlling idea corrected. Notes not acted on: moving the question of which entity the networks count from p23 to p22; opening the 3 March section on the decision of 24 February."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Initial outcome spec written from the PLAN contract, the journal-spec entry, the ledger and the chapters the journey walks through; provider quotations re-fetched on this date. Status draft."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('within 18 days at Adyen for a Visa card' -> 'within a deadline counted in days (at Adyen, 40 for a Master')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('(18 days for Visa outside the US and Canada at Adyen; 'usual' -> '(at Adyen 18 days for Visa outside the US and Canada and 40 ')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 81 claims checked (70 confirmed, 1 corrected, 8 hedged, 0 unsupported and removed or relabeled, 1 unreachable; 1 restated from chapter 25 and not re-checked at source); the sentence that a missed Adyen notification is found only in the Customer Area was corrected to Adyen's daily Dispute transaction details report, and the fee and monitoring statements were made specific (fee types per event, cost of a won and a lost defense as illustration, Mastercard's programs named)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation after verification (parts-9-10): intent, thesis and role re-synced with the corrected journal-spec entry; unit descriptions brought into line with the verified prose and the rulings. No unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: three statements of absence re-tested with a wide search (documentation and help-center sitemaps, adyen.com legal and license pages, web search). Overturned: the wait before the liable account is debited (30 days, reserved compensation account; ruling 41a) and whether the chargeback fee is returned (terms clause 8.2: non-refundable). Narrowed: the fee amount (contractual; CAD 24.00 in Adyen Canada's standard fee disclosure). Four sources added; units unchanged."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('Adyen's chargeback fee is not published (Stripe's' -> 'Adyen's chargeback fee amount is contractual, with only CAD ')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('Adyen does not publish its chargeback fee, so the €15 is ill' -> 'Adyen's terms (clause 8.2) call the chargeback fee non-refun')."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Sweep of rulings 46 to 48: intent and thesis how_why no longer say Adyen's chargeback fee is not published; the amount is contractual (terms, clause 8.2), with CAD 24.00 in Adyen Canada's fee disclosure, as the prose already says (46f). Prose and units unchanged."
+    }
+  ]
+}

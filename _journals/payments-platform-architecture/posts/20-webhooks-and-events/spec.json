@@ -1,0 +1,1471 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "payment-webhooks-and-events",
+  "journal": "payments-platform-architecture",
+  "part": "part-4",
+  "title": "The Provider Calls You: Webhooks and Events",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "Why a provider can only promise at-least-once delivery, and what follows: duplicates, no guaranteed order, a retry window.",
+        "The two documented delivery contracts side by side as of November 2026. Stripe: any 2xx returned quickly, retries for up to three days, order not guaranteed, events readable through the API for 30 days, a signature over timestamp and body, snapshot and thin events. Adyen: a 2xx within 10 seconds, a per-endpoint retry queue for up to 30 days, a timestamp or sequence number to restore order, a signature over eight fields for the Standard webhook, and, in its Checkout API for online payments, no call to read a payment back.",
+        "That neither company has published how its webhook sender is built."
+      ],
+      "believe": [
+        "The webhook is the doorbell and the provider's record is the truth: an event says that something changed, and the state is read from the provider.",
+        "The absence of an event is not evidence that nothing happened."
+      ],
+      "can_do": [
+        "Build a receiver that verifies, stores, acknowledges and only then processes, removes duplicates, and does not depend on arrival order.",
+        "Write the recovery plan for an endpoint outage of a given length at each provider.",
+        "Add a sweep that resolves every payment still pending after a set time by reading the provider's record or report."
+      ]
+    },
+    "audience": {
+      "who": "An engineer or architect new to payments who has to build or review the receiving side of a payment provider integration.",
+      "already_knows": [
+        "HTTP, queues, retries, HMAC and what a webhook endpoint is.",
+        "The payment as a long-lived record with states, and that Adyen's Checkout API has no call that returns an online payment (payment-state-machines).",
+        "The unknown outcome and idempotency keys (idempotency-and-retries).",
+        "API version pinning (payment-api-versioning).",
+        "That a settlement report is complete and late while a webhook is prompt and may be missing (payment-reconciliation-and-reporting)."
+      ],
+      "does_not_know": [
+        "The documented delivery terms of Stripe and Adyen: acknowledgement, retry windows, order, duplicates, signatures.",
+        "Snapshot and thin events, event destinations.",
+        "What a receiver must build because of those terms."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given an endpoint outage longer than one provider's retry window and shorter than the other's, the reader writes the recovery steps for each.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "Your webhook endpoint was down from Friday 18:00 to Wednesday 09:00. One provider retries each event for up to three days and keeps events readable through its API for 30 days. The other queues all events for your endpoint for up to 30 days and has no call that returns a payment by its identifier. For each provider, what do you do on Wednesday morning?",
+        "expected": "First provider: events from the early part of the outage are past their retries and will not come again, so list the events for the outage period from the API, feed them through the same handler, and then read every payment still pending. Second provider: the queued events arrive in a burst once the endpoint acknowledges, so the receiver must store and acknowledge quickly and process afterwards; because an online payment cannot be read back through the Checkout API, the settlement report is the check. Both: remove duplicates and do not trust arrival order."
+      },
+      {
+        "id": "AC-2",
+        "statement": "Given two events for one payment in an implausible order, the reader says what may be concluded and what the handler does.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "Your receiver gets a 'refunded' event for a payment and, one second later, a 'captured' event for the same payment. What can you conclude about the order in which the two things happened, and what should the handler do with each?",
+        "expected": "Nothing can be concluded from arrival order. The handler reads the current state from the provider where it can, or orders by the provider's own sequence number or event time where one is given, applies only transitions its own state machine allows, and ignores an event it has already processed."
+      },
+      {
+        "id": "AC-3",
+        "statement": "The chapter's account of what building a webhook sender involves is labeled as reference-architecture inference and states that neither Stripe nor Adyen has published its sender design.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      },
+      {
+        "id": "AC-4",
+        "statement": "The Larkfield worked example uses the ledger's figures for the Silent Webhook (14 September 2026; 9 hours; 3,200 memberships; 460 support tickets) and shows which part of the harm retries repaired and which part Keel decision K2 addresses.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "major"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "How does a provider tell millions of endpoints what happened, and what may a receiver assume?",
+    "claim": "A provider tells its endpoints by sending each event again until the endpoint acknowledges it or a retry window closes, and the only delivery guarantee a receiver gets from that is that an event it has not acknowledged will be sent again while the window is open. It may not assume that an event arrives once, in order, with current data, or at all after the window, so a webhook is a notice to store and then confirm against the provider's own record (the object read back by identifier where the API allows it, the settlement report where it does not), and is not the final word on a payment.",
+    "disputed_by": "The view that a signed webhook is the provider's authoritative statement of what happened, so a handler can update its state directly from the payload and treat the order of arrival as the order of events.",
+    "so_what": "The receiver is designed around what it cannot assume: it stores and acknowledges before any business logic, removes duplicates, reads state back where the provider allows it, and runs a sweep for everything still pending. The recovery plan differs by provider: at Stripe an outage longer than three days is repaired by reading events back from the API within 30 days; at Adyen the queue holds events for up to 30 days and releases them together, and since its Checkout API has no call that returns a payment, the stored events are the integrator's working record until the settlement report confirms them, which makes storing before acknowledging carry more weight.",
+    "how_why": "The sender cannot know that a receiver has processed an event, only that it answered, so it repeats until it gets an answer; repetition produces duplicates and, with retries at different times, disorder; and no sender retries forever. The documented terms (accessed November 2026): Stripe retries for up to three days with exponential backoff, says it does not guarantee order, and recommends fetching the object because a snapshot can be stale; Adyen requires a 2xx within 10 seconds, moves all events for a failing endpoint to a retry queue for up to 30 days, and tells receivers to check the timestamp or a sequence number. Larkfield's Silent Webhook lasted 9 hours at its Stripe receiver, well inside the three-day window, so the documented retries cover every event it missed; the harm was that 3,200 memberships read as unpaid in the meantime, because the absence of an event was taken as a fact. How either sender is built (fan-out, isolating slow endpoints, storing the backlog) is not public, and the chapter marks that section as inference.",
+    "supporting_claims": [
+      {
+        "id": "C1",
+        "claim": "A sender knows only that an endpoint answered, so it repeats each event until it is acknowledged or a window closes; duplicates, disorder, stale payloads and, after the window, silence all follow from that."
+      },
+      {
+        "id": "C2",
+        "claim": "The two documented contracts differ on every term: Stripe takes any 2xx returned quickly, retries for up to three days, disclaims order and keeps events readable for 30 days; Adyen requires a 2xx within 10 seconds, queues a failing endpoint's events for up to 30 days, points to a timestamp or sequence number, and has no call in its Checkout API that returns an online payment."
+      },
+      {
+        "id": "C3",
+        "claim": "A signature proves who sent a message and that the signed part is unchanged, not that the message is new or current: Stripe signs a timestamp and the body, Adyen's Standard webhook signs eight fields and no timestamp."
+      },
+      {
+        "id": "C4",
+        "claim": "An event carries a picture of the object or a pointer to it: a snapshot is tied to an API version and can be stale, a thin event has no version and must be fetched, and an event bus changes the transport without changing the delivery terms."
+      },
+      {
+        "id": "C5",
+        "claim": "Neither Stripe nor Adyen has published how its webhook sender is built; fan-out, isolation of slow endpoints and backlog storage can be described only as reference-architecture inference."
+      },
+      {
+        "id": "C6",
+        "claim": "The receiver's design follows from what it may not assume: verify, store and acknowledge before any business logic, remove duplicates, ignore arrival order, confirm against the provider's record (the object at Stripe, the settlement report at Adyen) and sweep what stays pending."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Covers the outcomes that arrive after the response, which the three request-side chapters cannot, and states what the integrator must build because delivery is at-least-once and time-limited.",
+    "supports": [
+      "P4-4"
+    ]
+  },
+  "flow": {
+    "pattern": "problem_solution",
+    "additional_patterns": [
+      {
+        "pattern": "prerequisite_order",
+        "applies_to": "at-least-once before contracts, signatures and payload; all three before sender and receiver: the general limits, then each provider's terms, then the machinery on each side"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "contracts, signatures, payload and where-they-differ: each term read at both providers, then gathered in one table"
+      },
+      {
+        "pattern": "problem_solution",
+        "applies_to": "sender to receiver: each limit of the sender is the problem one step of the receiver solves"
+      }
+    ],
+    "rationale": "The reader meets an incident in which the provider did everything it documents and members were still turned away, so the question 'what may a receiver assume?' is felt before any term is defined. The limits of at-least-once delivery come next because they hold for any sender and give the reader the four limits (count, order, freshness, window) that the two providers' terms then make specific. The contracts, the signature and the payload are the terms themselves, in the order a message meets them: delivered, authenticated, opened. The sender section follows the terms because its only evidence is those terms seen from outside, and it precedes the receiver because the sender's choice between holding later events and delivering them independently explains why one provider's recovery is a burst and the other's is disorder, which the receiver's steps and the failure section then use; dropping it would leave those two behaviors as unexplained quirks. The comparison table comes after the receiver's contract so that its last column can say what an integrator does, not only what differs. The worked example and the failures come last because they use every earlier section. Putting the receiver's contract first, as a checklist, would give the reader steps without the reasons that let them adapt the steps to a third provider."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "On 14 September 2026 members who had paid for their memberships were turned away at the studio door. The provider had recorded every payment. No money was missing. A certificate on one receiving endpoint had expired, and for nine hours Larkfield's records waited for messages that could not get in."
+    },
+    "bridge": {
+      "from_reader_world": "An engineer who has built webhook consumers for other products treats them as a convenience: a callback that saves polling.",
+      "to_topic": "In payments the callback carries outcomes that exist nowhere in the API response, so the integrator's endpoint becomes a server that the correctness of its records depends on, under delivery terms the provider sets."
+    },
+    "thesis_statement": {
+      "text": "A provider sends each event again until the endpoint acknowledges it or a retry window closes, and that is the whole delivery guarantee; a webhook is a notice to store and then confirm against the provider's own record, not the final word on a payment.",
+      "placement": "KEY POINTS callout and paragraph p03"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p05",
+      "promises": [
+        {
+          "promise": "Start from Larkfield's nine hours without events.",
+          "kept_in": [
+            "scene"
+          ]
+        },
+        {
+          "promise": "Explain why any sender can promise only at-least-once delivery within a window.",
+          "kept_in": [
+            "at-least-once"
+          ]
+        },
+        {
+          "promise": "Read the two documented delivery contracts term by term, then the signatures.",
+          "kept_in": [
+            "contracts",
+            "signatures"
+          ]
+        },
+        {
+          "promise": "Compare what an event can carry: a snapshot, a thin event, a message on an event bus.",
+          "kept_in": [
+            "payload"
+          ]
+        },
+        {
+          "promise": "Say what building a sender involves and that neither company has published its design.",
+          "kept_in": [
+            "sender"
+          ]
+        },
+        {
+          "promise": "Set out the receiver's contract.",
+          "kept_in": [
+            "receiver"
+          ]
+        },
+        {
+          "promise": "Compare the two providers.",
+          "kept_in": [
+            "where-they-differ"
+          ]
+        },
+        {
+          "promise": "Replay the Silent Webhook under Keel decision K2 and go through the ways a receiver fails.",
+          "kept_in": [
+            "in-practice",
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "function": "context",
+        "controlling_idea": "On 14 September 2026 Larkfield turned members away at check-in for memberships they had paid for, although the provider had recorded every payment correctly and no money was lost: what failed was a notification.",
+        "evidence": [
+          {
+            "kind": "case",
+            "what": "The Silent Webhook (scenario ledger): 14 September 2026, the Stripe webhook receiver's TLS certificate expired, events failed for 9 hours, 3,200 memberships were shown as unpaid, 460 support tickets, no money lost.",
+            "shows": "A failure with no lost money and no provider error still cost trust, because a notice was treated as the record."
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "function": "context",
+        "controlling_idea": "In the three previous chapters the integrator called and the provider answered; here the direction is reversed, the provider calls with its own rules for acknowledgement, retry, order and authenticity, and the integrator is the server whose reliability matters.",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "Chapter 18's unknown outcome (a response that never arrives) and chapter 19's pinned version (which also fixes the shape of what the provider sends) both reappear on the receiving side.",
+            "shows": "Places the chapter as the contrast to the request-side chapters and says what carries over."
+          }
+        ],
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "Three chapters of request and response, the unknown outcome and the pinned version.",
+          "introduces": "The reversed direction: the provider is the client and the integrator the server.",
+          "form": "paragraph",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "function": "claim",
+        "controlling_idea": "A provider sends each event again until the endpoint acknowledges it or a retry window closes, and that is the only delivery guarantee; a receiver may not assume once, in order, current or delivered after the window, so a webhook is a notice to store and then confirm against the provider's own record.",
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "The integrator as a server that can be down, slow or wrong.",
+          "introduces": "The chapter's claim about what delivery guarantees and what follows for the receiver.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "function": "context",
+        "controlling_idea": "In the journey of Mila's class pass this chapter covers the message that follows the approval at 19:42 on 9 March 2027, the notification that moves Larkfield's record to paid, and every later message about the same payment.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's class pass (scenario ledger): EUR 120.00 on Tuesday 9 March 2027 at 19:42 at Studio Noord, on Adyen; the refund request of 18 March; chapter 8's addition that on Adyen the row becomes paid on the AUTHORISATION webhook.",
+            "shows": "Shows that the state Larkfield displays for the recurring payment depends on an event arriving."
+          }
+        ],
+        "transition_in": {
+          "relationship": "example",
+          "carries_over": "The claim that a webhook is a notice to confirm.",
+          "introduces": "Where such notices occur for the book's recurring payment.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p05",
+        "function": "transition",
+        "controlling_idea": "The chapter goes from Larkfield's nine hours without events, through why delivery can only be at-least-once, the two documented contracts, signatures, what an event carries, what building a sender involves, and the receiver's contract, to the comparison of the two providers, the worked example and the failures.",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "Where the chapter sits in the payment's journey.",
+          "introduces": "The order of the sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: Nine Hours Without Events",
+      "controlling_idea": "The Silent Webhook was two failures, a delivery failure that the provider's retries repaired and a reading of silence as 'unpaid' that nothing repaired, and the second is the one Larkfield has to design for.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "C1",
+          "C6"
+        ],
+        "how": "Poses the chapter's question in an incident where the provider kept its documented promise and the harm happened anyway."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "What happened, what repaired itself and what did not, then the question Femke asks in 2027."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The claim that a webhook is a notice and not the record.",
+        "introduces": "The incident in which Larkfield treated it as the record.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p06",
+          "function": "context",
+          "controlling_idea": "Before Keel, Larkfield's Stripe webhook receiver was the only writer of the paid state for payments on Stripe, so when its certificate expired on 14 September 2026 and events failed for 9 hours, 3,200 renewed memberships read as unpaid and members were turned away at check-in.",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "Scenario ledger: Silent Webhook, 14 September 2026, 9 hours, 3,200 memberships, 460 support tickets, no money lost; the Stripe receiver predates the payment service; the payment record store is fed by webhooks through an inbox table.",
+              "shows": "The record changed only when an event got through, so a receiver outage became a wrong business state."
+            }
+          ]
+        },
+        {
+          "id": "p07",
+          "function": "analysis",
+          "controlling_idea": "Two different things failed in those nine hours: delivery, which Stripe's documented retries repaired once the certificate was renewed, and Larkfield's reading of a missing event as the fact 'unpaid', which nothing repaired during the nine hours.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe documentation (https://docs.stripe.com/webhooks (n.d., accessed 2026-11)): 'Stripe attempts to deliver events to your destination for up to three days with an exponential back off in live mode.' Nine hours is inside three days.",
+              "shows": "The provider's contract covered every missed event; the harm came from what Larkfield assumed while waiting."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Nine hours in which the rows said unpaid.",
+            "introduces": "The separation of the delivery failure from the reading of silence.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p08",
+          "function": "claim",
+          "controlling_idea": "Femke de Graaf's question for Keel decision K2 is what the receiver may assume about each provider's deliveries, and what Larkfield must build itself for everything it may not assume.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Keel K2 (scenario ledger): 'The provider's record is the truth; the webhook is the doorbell. Receivers verify, persist and acknowledge; a state change is confirmed against the provider's own record (the payment object where the API lets Larkfield read it, the settlement report where it does not); a job sweeps everything still pending.'",
+              "shows": "K2 states the rule; the chapter supplies the documented contracts that justify each of its steps."
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "A harm that the provider's retries could not prevent.",
+            "introduces": "The design question whose answer is the receiver's contract.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "at-least-once",
+      "heading": "Why a Sender Can Promise Only At-Least-Once",
+      "controlling_idea": "A sender can observe that an endpoint answered and nothing more, so it repeats until it gets an answer or a window closes, and duplicates, disorder, stale data and eventual silence all follow from that one fact.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "C1"
+        ],
+        "how": "Derives the limits of delivery from the sender's position, before any provider's terms are read."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "Event and webhook are defined first; at-least-once follows from what the sender can see; its consequences follow from repetition; the window follows from cost. Each paragraph uses the term the previous one defined."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Larkfield's question: what may a receiver assume?",
+        "introduces": "Why any sender, whatever its quality, can promise only repetition within a window.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p09",
+          "function": "definition",
+          "controlling_idea": "An event is the provider's record that the state of something changed, and a webhook is the delivery of that event as an HTTP request to an endpoint the integrator registered; events exist because many payment outcomes arrive after the API response.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe API reference (https://docs.stripe.com/api/events, n.d., accessed 2026-11): 'When the state of another API resource changes, Stripe creates an Event object that contains all the relevant information associated with that action'. Adyen (https://docs.adyen.com/development-resources/webhooks, n.d., accessed 2026-11): 'Many flows in Adyen integrations are asynchronous, meaning the final status of a resource is not known immediately after you make an API request.'",
+              "shows": "Both companies define the event as the carrier of outcomes the response could not contain."
+            },
+            {
+              "kind": "example",
+              "what": "Outcomes that arrive later: a bank-transfer or direct-debit payment confirmed after the customer leaves, a capture rejected days later (Adyen CAPTURE_FAILED, chapter 8), a dispute, a payout.",
+              "shows": "Makes concrete which facts only an event can bring."
+            }
+          ]
+        },
+        {
+          "id": "p10",
+          "function": "cause_effect",
+          "controlling_idea": "The sender can see only the HTTP response, not whether the receiver processed the event, and its acknowledgement can be lost on the way back, so the sender repeats until it gets an answer: delivery is at-least-once, never exactly-once.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "The mirror image of chapter 18's lost response: there the integrator could not tell whether its request was processed; here the provider cannot tell whether its event was.",
+              "shows": "At-least-once is a consequence of the network, not a weakness of one provider."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The webhook as an HTTP request from the provider.",
+            "introduces": "What the provider can and cannot learn from the response, and the delivery guarantee that follows.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "function": "cause_effect",
+          "controlling_idea": "Repetition produces duplicates, retries at different times produce disorder, and the time between creating and processing an event makes its payload a picture of the past.",
+          "evidence": [
+            {
+              "kind": "example",
+              "what": "Event 1 fails and is retried a minute later while event 2 is delivered at once: the receiver sees 2 then 1, and the object in event 1's payload is older than the provider's current state.",
+              "shows": "Three of the four things a receiver may not assume come from repetition and time alone."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Sending again until acknowledged.",
+            "introduces": "What repetition does to count, order and freshness.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p12",
+          "function": "claim",
+          "controlling_idea": "No sender retries forever, so every delivery contract has a window after which an unacknowledged event is not sent again, and the absence of an event is therefore not evidence that nothing happened.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "What a webhook promises / what it does not promise: that an unacknowledged event is sent again while the window is open, that a signed event came from the provider; not once-only, not in order, not current data, not delivery after the window, not an event for every change.",
+              "shows": "Summarizes the section as the list of assumptions the receiver must not make."
+            },
+            {
+              "kind": "figure",
+              "what": "Conceptual figure: a doorbell beside a record book; the bell says something changed, the book says what is true.",
+              "shows": "Makes the chapter's central distinction memorable."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Duplicates, disorder and staleness.",
+            "introduces": "The fourth limit, the window, and what silence means.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "contracts",
+      "heading": "The Two Delivery Contracts, Term by Term",
+      "controlling_idea": "Stripe and Adyen each document the terms of delivery (what counts as an acknowledgement, how long and how an event is retried, what is said about order and duplicates, and what can be read back) and they differ on every one.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "C2"
+        ],
+        "how": "Supplies the documented terms on which the thesis's 'window' and 'provider's own record' depend, per provider, with dates."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "One paragraph per term of the contract, in the order a delivery meets them: acknowledgement, retry, order, duplicates, reading back. Both providers are read on each term so the difference is visible where it occurs."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The general limits of at-least-once delivery.",
+        "introduces": "The two providers' documented versions of those limits.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p13",
+          "function": "comparison",
+          "controlling_idea": "Both providers count a 2xx status as the acknowledgement; Stripe says it must come quickly and publishes no number of seconds, Adyen gives 10 seconds, and until 2024 Adyen acknowledged by a response body instead of a status code.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (https://docs.stripe.com/webhooks (n.d., accessed 2026-11)): the endpoint 'must quickly return a successful status code (2xx) before any complex logic that could cause a timeout'. Adyen (https://docs.adyen.com/development-resources/webhooks/handle-webhook-events (n.d., accessed 2026-11)): 'If Adyen does not receive this response within 10 seconds, for example because your server is down, we mark the webhook as Failing and put it in a retry queue.'",
+              "shows": "The acknowledgement rule is the same in kind; only Adyen states the deadline."
+            },
+            {
+              "kind": "source",
+              "what": "Adyen knowledge hub, Beppe Catanese, 'Optimizing Webhook Integration: a new approach to accept events from the Adyen platform' (https://www.adyen.com/knowledge-hub/webhooks-accept-2xx, 2024-05-01): receivers 'must accept a webhook within 10 seconds' under the old rule too; 'All integrations built with Adyen have been accepting webhooks by responding with a response body containing the string '[accepted]'; existing webhooks 'are not automatically updated and keep functioning as before'.",
+              "shows": "An older Adyen webhook may still be acknowledged by body text, which an integrator inheriting one must check."
+            }
+          ]
+        },
+        {
+          "id": "p14",
+          "function": "comparison",
+          "controlling_idea": "Stripe retries each event for up to three days with exponential backoff and does not publish the intervals; Adyen moves a failing endpoint's events to a retry queue and retries for up to 30 days at published intervals, then releases the queue in a short time when the endpoint recovers.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (https://docs.stripe.com/webhooks (n.d., accessed 2026-11)): 'for up to three days with an exponential back off in live mode'; 'We retry event deliveries created in a sandbox three times over the course of a few hours.'",
+              "shows": "Stripe's window and the fact that a sandbox does not reproduce it."
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen (https://docs.adyen.com/development-resources/webhooks/troubleshoot (n.d., accessed 2026-11)): 'we automatically try to send the webhook for up to 30 days at the following retry intervals' (30 seconds, 30 seconds, 1 minute, 2 minutes, 5 minutes, 10 minutes, 15 minutes, 30 minutes, 1 hour, 2 hours, 4 hours, 8 hours); 'If a retry is successful, we continue with the next webhook in the queue'; a 429 'can happen after you fix a failing endpoint, as the queued webhooks are sent in a short timeframe'. Configure page (https://docs.adyen.com/development-resources/webhooks/configure-and-manage (n.d., accessed 2026-11)): 'all webhook events to your endpoint go to the retry queue'.",
+              "shows": "Adyen's window is ten times longer, is per endpoint, and ends in a burst."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "What counts as an acknowledgement.",
+            "introduces": "What each provider does when it does not get one.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p15",
+          "function": "comparison",
+          "controlling_idea": "Stripe states outright that order is not guaranteed and that its creation timestamp must not be used to order events; Adyen tells receivers to check the timestamp and offers a sequence number on its platform transfer webhooks but not on the Standard webhook, its main payments webhook, and no Adyen page read for this chapter either guarantees or disclaims delivery order.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (https://docs.stripe.com/webhooks (n.d., accessed 2026-11)): 'Stripe doesn't guarantee the delivery of events in the order that they're generated'; 'Snapshot events record created in seconds, so distinct events can share a timestamp. Don't use created to determine event order or whether you've already processed an event.'",
+              "shows": "Stripe gives no field to order by and says so."
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen (https://docs.adyen.com/development-resources/webhooks/handle-webhook-events (n.d., accessed 2026-11)): 'To ensure you are processing events in the correct chronological order, always check the timestamp. Some webhooks also contain unique identifiers such as sequenceNumber'. Transfer webhook specification (Adyen OpenAPI, BalancePlatformTransferNotification-v4): the sequence number 'can help you restore the correct sequence of events even if they arrive out of order'.",
+              "shows": "Adyen puts ordering on the receiver too, and gives a field for it in the platform webhooks."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Retries at different times.",
+            "introduces": "What each provider says about the order that results.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p16",
+          "function": "comparison",
+          "controlling_idea": "Both providers say duplicates happen; a Stripe event has its own identifier to deduplicate on, while an Adyen Standard webhook item has none and is identified by its event code and PSP reference.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (https://docs.stripe.com/webhooks (n.d., accessed 2026-11)): 'Webhook endpoints might occasionally receive the same event more than once'; 'In some cases, two separate Event objects are generated and sent. To identify these duplicates, use the ID of the object in data.object along with the event.type.'",
+              "shows": "Two kinds of duplicate at Stripe, with a key for each."
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen (https://docs.adyen.com/development-resources/webhooks/handle-webhook-events (n.d., accessed 2026-11)): duplicates 'have the same values in the eventCode and pspReference fields, while the eventDate and other fields can be different. Your server should use the details from the latest webhook event.'",
+              "shows": "Adyen's deduplication key is a pair of business fields, and a duplicate may carry newer data."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Disorder as one consequence of retries.",
+            "introduces": "Duplicates as the other, and the identity each provider gives an event.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p17",
+          "function": "comparison",
+          "controlling_idea": "After the retries end, Stripe lets an integrator read events back through its API for 30 days and list those not delivered, while Adyen's Checkout API has no call that returns an online payment, so recovery there runs through the retry queue, the Customer Area and reports.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe (https://docs.stripe.com/api/events, n.d., accessed 2026-11): 'You can access events through the Retrieve Event API for 30 days.' Manage page (https://docs.stripe.com/events/manage-webhook-endpoints (n.d., accessed 2026-11)): list events with delivery_success=false and ending_before to process the backlog; 'Stripe still considers manually processed events as undelivered and continues its automatic retry schedule.'",
+              "shows": "Stripe pairs a short push window with a longer pull window."
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen Checkout API v72 OpenAPI specification (https://github.com/Adyen/adyen-openapi): 28 paths, three GET operations (payment links, sessions, stored payment methods), none returning a payment by PSP reference (consistency ruling 12). Troubleshoot page (https://docs.adyen.com/development-resources/webhooks/troubleshoot (n.d., accessed 2026-11)): Retry and Ignore in the Customer Area; alerts 'after 5 retry attempts' and 'after 7 days of a webhook failing'.",
+              "shows": "On Adyen there is no pull path for the state of an online payment, only a longer push window."
+            },
+            {
+              "kind": "figure",
+              "what": "Structural figure: sender, endpoint, the 2xx acknowledgement, a failed attempt, retries with growing gaps, the end of the window.",
+              "shows": "Shows the one loop both contracts are versions of."
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "Events that were never acknowledged.",
+            "introduces": "What each provider offers once its automatic retries are not enough.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "signatures",
+      "heading": "Proving Who Sent It: Signatures and Replay Protection",
+      "controlling_idea": "A webhook endpoint is public, so a receiver must prove each message came from the provider; a signature proves origin and integrity for exactly the bytes it covers, and Stripe's covers a timestamp and the whole body while Adyen's Standard webhook signature covers eight fields and no timestamp.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "C3"
+        ],
+        "how": "Separates what a valid signature establishes (the provider sent this) from what it does not (that it is new, or that it is the current state)."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "The threat first, then each provider's answer to it, the second read against the first."
+      },
+      "transition_in": {
+        "relationship": "additional_support",
+        "carries_over": "The delivery terms: acknowledgement, retry, order, duplicates.",
+        "introduces": "The remaining term of the contract: how the receiver knows the sender.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p18",
+          "function": "explanation",
+          "controlling_idea": "Anyone who learns the endpoint's URL can post a message that says a payment succeeded, so the receiver verifies a signature: a keyed hash (HMAC) that it recomputes with a secret shared with the provider.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (https://docs.stripe.com/webhooks (n.d., accessed 2026-11)): 'Without verification, an attacker could send fake webhook events to your endpoint to trigger actions like fulfilling orders, granting account access, or modifying records.'",
+              "shows": "States the threat in the provider's own words."
+            }
+          ]
+        },
+        {
+          "id": "p19",
+          "function": "description",
+          "controlling_idea": "Stripe signs the timestamp and the unmodified request body with HMAC-SHA256, sends both in one header, and regenerates them for every delivery attempt, which lets a receiver reject old messages without rejecting retries.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe (https://docs.stripe.com/webhooks (n.d., accessed 2026-11)): Stripe-Signature header with t and v1; signed payload is the timestamp, a '.', and 'the unmodified HTTP request body'; 'Our libraries have a default tolerance of 5 minutes'; 'If Stripe retries an event ... then we generate a new signature and timestamp for the new delivery attempt'.",
+              "shows": "Replay protection is part of the scheme: the timestamp is inside the signed bytes."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "Signature verification as the defense.",
+            "introduces": "Stripe's scheme and what it covers.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "function": "comparison",
+          "controlling_idea": "Adyen's Standard webhook signature covers eight fields of the notification and travels inside the payload, with no signed timestamp and no documented tolerance window; Adyen also lets the receiver authenticate the sender by OAuth 2.0 or basic authentication and publishes no IP address list.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen (https://docs.adyen.com/development-resources/webhooks/secure-webhooks/verify-hmac-signatures (n.d., accessed 2026-11)): concatenate pspReference, originalReference, merchantAccountCode, merchantReference, value, currency, eventCode, success with ':'; HMAC-SHA256; signature in additionalData.hmacSignature; for other webhooks the signature is in a header. Secure webhooks page (https://docs.adyen.com/development-resources/webhooks/secure-webhooks (n.d., accessed 2026-11)): OAuth 2.0 'strongly recommended and supported for the Standard webhook and all Balance Platform webhook types'; 'Basic authentication only guarantees that the webhook event was sent by Adyen, not that it wasn't modified during transmission'; 'We do not provide a list of IP addresses.'; the page offers the domain out.adyen.com for an allowlist.",
+              "shows": "Adyen signs the money-relevant fields and adds transport-level authentication of the sender."
+            },
+            {
+              "kind": "reasoning",
+              "what": "INFERENCE block: because no timestamp is signed, a captured Standard webhook would verify again if replayed; deduplication on event code and PSP reference, plus TLS and endpoint authentication, is then the defense. Adyen does not say this; it is the author's reading of the field list.",
+              "shows": "Marks the consequence as inference and tells the receiver what carries the load."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Stripe's signature over timestamp and body.",
+            "introduces": "Adyen's signature over eight fields, and its other mechanisms.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "payload",
+      "heading": "What the Event Carries: Snapshots, Thin Events and Event Buses",
+      "controlling_idea": "An event can carry a picture of the object or only a pointer to it, and can travel by HTTP or through a cloud event bus; the picture is versioned and can be stale, the pointer is unversioned and costs a read, and the bus changes the transport without changing the delivery contract.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "C4"
+        ],
+        "how": "Explains why 'current data' is not among the things a receiver may assume, and what the documented alternatives trade."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "Three designs in the order they appeared (snapshot, thin event, event bus), then a table that sets them side by side."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "A verified message from the provider.",
+        "introduces": "What that message contains, and how the choice of content changes the receiver's work.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p21",
+          "function": "definition",
+          "controlling_idea": "A snapshot event carries a copy of the object as it was when the event was created, in the shape of one API version, so it can be out of date when processed and it ties the receiver to a version; Stripe's original format and Adyen's webhooks are of this kind.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (https://docs.stripe.com/events/how-events-work (n.d., accessed 2026-11)): 'Because this snapshot can be stale by the time your application processes it, fetch the latest version of the resource from the API before acting on the data.' Webhooks page: 'The API version in your account settings when the event occurs dictates the API version, and therefore the structure of an Event sent to your destination.' Adyen (https://docs.adyen.com/development-resources/webhooks, n.d., accessed 2026-11): 'Webhook messages contain a snapshot of the resource so your system can update its state accordingly.'",
+              "shows": "Both providers send snapshots; Stripe itself tells receivers not to act on one without reading the object."
+            }
+          ]
+        },
+        {
+          "id": "p22",
+          "function": "definition",
+          "controlling_idea": "A thin event carries only the event's type and identifiers, so the receiver must fetch the current object; it has no version to pin, and Stripe recommends it for new integrations as of November 2026, though its coverage of payment event types should be checked in the catalog before relying on it.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (https://docs.stripe.com/events/how-events-work (n.d., accessed 2026-11)): 'For new integrations, use thin events. Thin events are unversioned, fully typed in the Stripe SDKs, and let your integration fetch the latest resource state.' Stripe developer blog (https://stripe.dev/blog/event-notification-handlers-thin-events, 2026-06-24): 'Stripe's solution to the maintenance problem is thin events, which are unversioned JSON payloads'; the same post offers 'early access to thin events for v1 resources'. Changelog 2024-09-30: thin events first shipped with the v2 Events API ('The Meters API is the first API to use thin events'). Thin event catalog (https://docs.stripe.com/api/v2/core/events/event-types, n.d., accessed 2026-11): lists public thin events for v1 resources, among them v1.payment_intent.succeeded and v1.charge.refunded.",
+              "shows": "Thin events remove the stale snapshot and the payload version, and as of mid-2026 were not yet general for every v1 resource."
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "A snapshot that can be stale and is tied to a version.",
+            "introduces": "The notice that carries no state at all.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p23",
+          "function": "description",
+          "controlling_idea": "Stripe can also deliver events to Amazon EventBridge or Azure Event Grid instead of an HTTP endpoint, which removes the public endpoint and the signature check from the integrator's code but keeps the three-day retry and the absence of an ordering guarantee; no destination other than HTTP was found in Adyen's documentation.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe (https://docs.stripe.com/events/how-events-work (n.d., accessed 2026-11)): 'Stripe pushes events to your configured destinations, which can be webhook endpoints, Amazon EventBridge, or Azure Event Grid.' EventBridge page (https://docs.stripe.com/event-destinations/eventbridge, n.d., accessed 2026-11): same automatic-retry and event-ordering statements. Stripe developer blog (https://stripe.dev/blog/growing-your-stripe-integration-with-event-destinations, 2024-10-31): 'Event Destinations is now in GA'; merchants 'can trust each event is from Stripe without needing to verify webhook signatures in their code'. Adyen configure page (https://docs.adyen.com/development-resources/webhooks/configure-and-manage (n.d., accessed 2026-11)): delivery formats JSON, HTTP POST or SOAP.",
+              "shows": "The bus is a different transport under the same delivery terms."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Two payload formats over HTTP.",
+            "introduces": "A second transport.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p24",
+          "function": "comparison",
+          "controlling_idea": "The three designs trade the same things against each other: a snapshot saves a read and can mislead, a thin event is always confirmed and costs a read per event, and a bus moves the endpoint's availability to a cloud provider without removing duplicates or disorder.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Design / what the receiver gets / what it costs / when it fits: snapshot event; thin event; event bus destination. The last column is the author's judgement.",
+              "shows": "Gives the reader the comparison in one place and marks the recommendation as judgement."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "Snapshot, thin event and bus, each described.",
+            "introduces": "What each costs and when each is the right choice.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "sender",
+      "heading": "What Building the Sender Involves, and What Nobody Has Published",
+      "controlling_idea": "Neither Stripe nor Adyen has published how its webhook sender is built; the documented contracts show a few of its properties from outside, and the rest of this section is reference-architecture inference.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "C5"
+        ],
+        "how": "States where the evidence stops and keeps the account of fan-out, isolation and backlog apart from documented fact."
+      },
+      "flow": {
+        "pattern": "large_to_small",
+        "rationale": "What is known (nothing about internals, a few visible properties), then the parts any sender needs, then the one design choice the two contracts make visible."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "The contracts and formats as the receiver sees them.",
+        "introduces": "The machinery on the sending side that would produce them, and how little of it is public.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p25",
+          "function": "claim",
+          "controlling_idea": "Neither company has published its sender design, and what the documentation shows from outside is limited to a few properties: events are created asynchronously, each destination has its own secret, version, retry state and delivery log, and Adyen holds a queue per endpoint.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe (https://docs.stripe.com/events/how-events-work (n.d., accessed 2026-11) and webhooks page): 'Events are delivered asynchronously'; a new signature per attempt; a delivery log per destination with the next retry time; 'a maximum of 16 event destinations per livemode or sandbox account'. Adyen (https://docs.adyen.com/development-resources/webhooks/troubleshoot (n.d., accessed 2026-11), https://docs.adyen.com/development-resources/webhooks/configure-and-manage (n.d., accessed 2026-11)): a Failing status per endpoint, a retry queue per endpoint.",
+              "shows": "These are the only sender-side facts on the public record; no engineering post from either company describes the delivery system."
+            }
+          ]
+        },
+        {
+          "id": "p26",
+          "function": "explanation",
+          "controlling_idea": "As a reference architecture and not a description of either company, a sender needs five things: an event written durably with the state change it reports, a fan-out from each event to the destinations subscribed to it, delivery state per destination, isolation so that one slow endpoint cannot delay the others, and storage for the backlog sized by the retry window.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Each part answers a failure: an event lost between the state change and its recording; one event owed to several destinations; a retry schedule that belongs to a destination, not to an event; a destination that takes ten seconds per request; a destination that is down for the whole window.",
+              "shows": "Shows why the documented contract has the terms it has (a timeout, a window, a per-destination log) without claiming how either company implements them."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The few properties visible from outside.",
+            "introduces": "The parts that any sender meeting such a contract would need, labeled as inference.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p27",
+          "function": "analysis",
+          "controlling_idea": "The choice a sender cannot avoid is what to do with later events while an earlier one is failing: hold them behind it, which keeps their order and delays everything, or deliver each independently, which keeps events flowing and gives up order; the first explains a burst on recovery and a queue blocked by one bad message, the second explains disorder.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "INFERENCE block: Adyen's wording ('all webhook events to your endpoint go to the retry queue', 'we continue with the next webhook in the queue') reads like a per-endpoint queue released in order; Stripe's ('Stripe doesn't guarantee the delivery of events in the order that they're generated', retries per event) reads like independent deliveries. Neither company states this, and neither documents how a slow endpoint is isolated.",
+              "shows": "Connects the documented difference in retry behavior to a design choice, as labeled inference."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "Isolation and backlog as requirements.",
+            "introduces": "The one trade-off between them that the two contracts appear to resolve differently.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "receiver",
+      "heading": "The Receiver's Contract: Verify, Store, Acknowledge, Confirm, Sweep",
+      "controlling_idea": "Because delivery is at-least-once, unordered, possibly stale and time-limited, the receiver verifies, stores and acknowledges before any business logic, removes duplicates, ignores arrival order, confirms state against the provider's record and sweeps what stays pending.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "C6"
+        ],
+        "how": "Turns each thing the receiver may not assume into a step it performs, which is the thesis's 'so what'."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The steps in the order a message meets them: verify, store and acknowledge; then deduplicate; then order; then confirm; then the sweep for messages that never came. Each step assumes the one before."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "A sender that can promise only repetition within a window, by either design.",
+        "introduces": "What the receiver does about each missing guarantee.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p28",
+          "function": "process",
+          "controlling_idea": "The receiver does four things in a fixed order (verify the signature on the raw body, store the message, return 2xx, process later), because any business logic before the acknowledgement turns a bug or a slow dependency into failed deliveries.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen (https://docs.adyen.com/development-resources/webhooks/handle-webhook-events (n.d., accessed 2026-11)): '1. Verify the webhook message ... 2. Store the webhook message in your database or a queue so you can process it later. 3. Accept the webhook message ... 4. Process the data and apply your business logic. Make sure that you acknowledge the webhook before applying any business logic, because errors in your business logic could lead to failing webhooks.' Stripe (https://docs.stripe.com/webhooks (n.d., accessed 2026-11)): 'you must return a 200 response before updating a customer's invoice as paid in your accounting system'.",
+              "shows": "Both providers prescribe the same order, and Adyen gives the reason."
+            },
+            {
+              "kind": "table",
+              "what": "Requirements for the receiver: time to acknowledge (Adyen 10 seconds; Stripe 'quickly', no number); availability (higher than the rest of the system, since retries end); durability of the stored message before 2xx; what happens on failure (the event is retried within the window, then not at all). Larkfield's own targets are labeled as assumptions.",
+              "shows": "States the receiver's requirements where the flow is discussed."
+            }
+          ]
+        },
+        {
+          "id": "p29",
+          "function": "process",
+          "controlling_idea": "The stored message gets a unique key so that a repeat changes nothing: the event ID at Stripe, with object ID and event type as a second check, and at Adyen the event code with the PSP reference for Standard webhooks and the transfer ID with the sequence number for transfer webhooks.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "The duplicate rules quoted in the contracts section (Stripe webhooks page; Adyen handle-webhook-events page) and the transfer webhook's data.id and sequenceNumber (Adyen OpenAPI, BalancePlatformTransferNotification-v4).",
+              "shows": "One integration on two providers needs three deduplication keys."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "A message stored and acknowledged.",
+            "introduces": "How the store recognizes a message it already has.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p30",
+          "function": "process",
+          "controlling_idea": "The handler never treats arrival order as the order of events: where the provider lets it read the object it reads the current state, and where it cannot it orders by the provider's sequence number or event time and applies only the transitions its own state machine allows.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "A 'captured' event arriving after a 'refunded' event for the same payment: nothing follows from the arrival order; a state machine with no transition from refunded to captured keeps the later-arriving event and does not move the state (chapter 8).",
+              "shows": "Answers the out-of-order case without needing an ordering guarantee."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "Duplicates removed.",
+            "introduces": "Distinct events in the wrong order.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p31",
+          "function": "claim",
+          "controlling_idea": "An event is confirmed against the provider's own record before the business acts on it: on Stripe by reading the object, and on Adyen, where an online payment cannot be read back through the Checkout API, the stored events are the working record until the settlement report confirms them, which is why storing before acknowledging carries more weight there.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe (https://docs.stripe.com/events/how-events-work (n.d., accessed 2026-11)): 'fetch the latest version of the resource from the API before acting on the data'. Adyen: no GET for a payment by its PSP reference in Checkout API v72 (rulings 12 and 29: true of the Checkout API for online payments); 'Adyen does not send a webhook message when a payment settles successfully' (https://docs.adyen.com/development-resources/webhooks/webhook-types, n.d., accessed 2026-11); the settlement report as the confirming record (chapter 15).",
+              "shows": "The confirming record differs by provider, and on Adyen a lost stored event cannot be rebuilt from an API read."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "An order of events the receiver cannot fully trust.",
+            "introduces": "The record that settles what is true.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p32",
+          "function": "recommendation",
+          "controlling_idea": "A sweep job takes every payment that has been pending longer than a set time and resolves it from the provider's record or report, and until then the system shows the payment as unknown and not as failed, because the receiver cannot learn from the event stream that an event is missing.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "After the retry window an event is not sent again (three days at Stripe, up to 30 at Adyen); a receiver that only reacts never notices. On Stripe the sweep reads the object or lists undelivered events; on Adyen it waits for the report and raises anything the report does not explain.",
+              "shows": "The sweep is the step that covers silence, the one failure no event can report."
+            },
+            {
+              "kind": "figure",
+              "what": "Structural figure: the receiver as a pipeline (verify, store, acknowledge, process, confirm) with a sweep loop over pending payments.",
+              "shows": "Shows the receiver's contract as one flow."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Events confirmed when they arrive.",
+            "introduces": "What covers the events that never arrive.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "On the public record the two delivery contracts differ in seven aspects: the stated deadline, the retry window, what is said about order, the identity of an event, what the signature covers, the payload and its destinations, and whether state can be read back.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "C2",
+          "C3",
+          "C4"
+        ],
+        "how": "Sets the documented terms side by side and says what an integrator does differently on each."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "The contracts, signatures, formats and the receiver's steps.",
+        "introduces": "The same facts as one comparison.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p33",
+          "function": "comparison",
+          "controlling_idea": "Seven aspects of the two contracts can be compared from documentation accessed in November 2026, and the last column of the table is the author's reading, not either company's statement.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Aspect / Stripe / Adyen / what the difference suggests: acknowledgement; retry window and schedule; order; duplicate identity; signature; payload and destinations; reading state back. Every cell is a fact cited earlier in the chapter.",
+              "shows": "The required comparison, with inference confined to the last column."
+            }
+          ]
+        },
+        {
+          "id": "p34",
+          "function": "recommendation",
+          "controlling_idea": "On Stripe the integrator plans for a short push window and a longer pull window and reads the object after every event; on Adyen it plans for a long queue that arrives as a burst, stores every message before acknowledging, and takes the settlement report as the check.",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The differences in the table.",
+            "introduces": "What an integrator does differently on each provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: The Silent Webhook Replayed Under K2",
+      "controlling_idea": "Replayed against the documented contract, the Silent Webhook shows that retries repaired the records and that K2's sweep and confirmation address the nine hours in which the records were wrong; Mila's class pass shows the same receiver on Adyen, where an online payment cannot be read back.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "C6"
+        ],
+        "how": "Applies the receiver's contract to the ledger's incident and to the recurring payment, on both providers."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The incident as it happened, then the same outage under K2, then a later payment on the other provider."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "What an integrator does differently on each provider.",
+        "introduces": "Larkfield doing it: once on Stripe for the incident, once on Adyen for Mila's pass.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p35",
+          "function": "example",
+          "controlling_idea": "In the Silent Webhook the outage lasted 9 hours against a retry window of three days, so every missed event was delivered again after the certificate was renewed and the 3,200 rows corrected themselves; the retries repaired the data and could not repair the morning.",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "Scenario ledger: 14 September 2026, 9 hours, 3,200 memberships, 460 support tickets. Stripe documentation: retries 'for up to three days'.",
+              "shows": "Separates the part of the harm the provider's contract covered from the part it could not."
+            }
+          ]
+        },
+        {
+          "id": "p36",
+          "function": "example",
+          "controlling_idea": "Under K2 the same outage would leave the rows wrong for at most the sweep interval instead of nine hours, because a job reads the PaymentIntent of every renewal still pending and the check-in screen shows an unconfirmed renewal as 'being checked', not as unpaid.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Keel K2 (scenario ledger) and chapter 8's ledger addition (on Stripe a row moves only after the PaymentIntent is re-read). Local illustrative details, labeled as assumptions: a sweep every 15 minutes over renewals pending longer than 30 minutes; the check-in screen admits a member whose renewal is being checked.",
+              "shows": "Shows which part of the 460 tickets K2 addresses: the reading of silence as a fact."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The outage as it happened.",
+            "introduces": "The same outage with K2's sweep and confirmation in place.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p37",
+          "function": "example",
+          "controlling_idea": "For Mila's class pass on Adyen the receiver stores the AUTHORISATION notification under its event code and PSP reference, acknowledges inside the 10 seconds, and moves the row to paid; since an online payment cannot be read back through the Checkout API, that stored message is Larkfield's working record until the settlement report for the batch confirms it.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Mila's class pass (scenario ledger): EUR 120.00, 9 March 2027, 19:42, Studio Noord on Adyen, payout Thursday 11 March; chapter 8: paid on AUTHORISATION success with automatic capture; chapter 15: the reconciliation job writes ledger entries only from report lines.",
+              "shows": "The same contract on the provider where the event is the only prompt and the report the only check."
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "K2 on Stripe: confirm by reading the object.",
+            "introduces": "K2 on Adyen: confirm by the report, with the stored event as the working record.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong: Long Outages, Bursts, Disorder and Forgery",
+      "controlling_idea": "The receiver's failures are an outage longer than a retry window, a burst or a poison message on recovery, events that contradict each other's order, and verification that fails or is switched off; each has a recovery that follows from the provider's documented terms.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "C1",
+          "C6"
+        ],
+        "how": "Tests the receiver's contract against the cases where the delivery guarantee runs out."
+      },
+      "flow": {
+        "pattern": "order_of_importance",
+        "rationale": "From the failure that loses events for good (an outage past the window), through the ones that delay them (burst, poison message), to the ones that mislead (disorder) and the one that opens the door (verification switched off)."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "A nine-hour outage well inside the retry window.",
+        "introduces": "The outages and faults that the window does not cover.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p38",
+          "function": "analysis",
+          "controlling_idea": "The recovery plan for an endpoint outage depends on its length measured against each provider's windows: inside the retry window the events come again, between three and 30 days at Stripe they must be read back from the Events API, and at Adyen they arrive from the queue as a burst and are checked against the settlement report.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Outage length (under 3 days; 3 to 30 days; over 30 days) by provider: what the provider does, what the integrator does. Built from the retry and retention terms cited in the contracts section; the over-30-days rows say that the events are gone as full payloads (Stripe keeps summaries only) and that Adyen's documentation does not say what happens to the queue after 30 days.",
+              "shows": "Lets the reader write the recovery steps for a given outage, which is acceptance criterion AC-1."
+            },
+            {
+              "kind": "figure",
+              "what": "Conceptual figure: one outage bar laid against two timelines, Provider A with a 3-day retry window and a 30-day read-back window, Provider B with a 30-day queue.",
+              "shows": "Makes the two windows comparable at a glance."
+            }
+          ]
+        },
+        {
+          "id": "p39",
+          "function": "analysis",
+          "controlling_idea": "Recovery itself can fail: the queued events arrive in a short time and a receiver that processes inline answers 429 or times out, and a single message that makes the handler return an error keeps failing while, on Adyen, the endpoint's other events wait in the queue.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen (https://docs.adyen.com/development-resources/webhooks/troubleshoot (n.d., accessed 2026-11)): a 429 'can happen after you fix a failing endpoint, as the queued webhooks are sent in a short timeframe. Ensure your server can handle the load.' A 422: 'We recommend acknowledging receipt with [200 OK] first, and performing business logic separately.'",
+              "shows": "The provider documents both failure modes and gives the same remedy: store, acknowledge, process later."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "An outage that has ended.",
+            "introduces": "What can go wrong while the backlog is delivered.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p40",
+          "function": "example",
+          "controlling_idea": "When a 'refunded' event arrives one second before a 'captured' event for the same payment, nothing can be concluded about which happened first; the handler stores both, reads the object or orders by the provider's own sequence or event time, and applies only allowed transitions.",
+          "evidence": [
+            {
+              "kind": "example",
+              "what": "The pair refunded-then-captured: on Stripe the handler retrieves the PaymentIntent and its refunds and writes what it finds; on Adyen it compares eventDate (outside the Standard webhook's signed fields) and its own state machine, and keeps the event it cannot apply for review.",
+              "shows": "Works acceptance criterion AC-2 through on both providers."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Events that arrive late or in a burst.",
+            "introduces": "Events that arrive in an order that cannot be true.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p41",
+          "function": "recommendation",
+          "controlling_idea": "When signature verification fails for genuine messages, the cause is usually a changed body, a rotated secret or a wrong clock, and the repair is to fix that cause, never to switch verification off to restore delivery.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe (https://docs.stripe.com/webhooks (n.d., accessed 2026-11)): verification needs 'the unmodified HTTP request body'; 'Any manipulation to the raw body of the request causes the verification to fail'; a 5-minute default tolerance that depends on an accurate clock. Adyen (https://docs.adyen.com/development-resources/webhooks/secure-webhooks (n.d., accessed 2026-11)): after generating a new HMAC key 'make sure that you can still accept webhook events signed with your previous HMAC key for some time'.",
+              "shows": "Names the documented causes so the reader can diagnose without weakening the check."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Genuine events misread.",
+            "introduces": "Genuine events rejected, and the temptation that follows.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "Every step of the receiver's contract is the answer to one thing the sender cannot promise: store-then-acknowledge answers the deadline, the unique key answers repetition, the read of the object or the sequence number answers disorder and staleness, and the sweep answers the window. The two providers differ in which of these steps carries the most weight, not in whether the steps are needed.",
+    "so_what": "A team that updates state directly from payloads has records that are right while its endpoint is up and the events arrive in order; a team that stores, confirms and sweeps has records that become right again after any outage shorter than the provider's windows, and knows what to do after a longer one.",
+    "callback": {
+      "to": "The members turned away on 14 September 2026.",
+      "how": "The provider's retries delivered every event; what would have kept the doors open was a receiver that treated nine hours of silence as 'unknown, go and read' instead of 'unpaid'."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "For each provider, write down the acknowledgement deadline, the retry window, the read-back window and the deduplication key, then check that the receiver stores before it acknowledges, that state is confirmed against the provider's record, and that a sweep covers everything still pending."
+    },
+    "hand_off": {
+      "to": "payment-developer-platform",
+      "relationship": "cause_effect",
+      "carries_over": "The integrator this part has produced: retries with stored keys, a read of the provider's record after every event, a sweep over pending payments and a rehearsal before each upgrade.",
+      "introduces": "The consequence: all of it is traffic on a shared API, sent with credentials, rehearsed in a test environment and subject to limits."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The failures of a receiver and their recoveries.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p42",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Established: delivery is at-least-once within a window at both providers, both prescribe acknowledging before processing, both document duplicates, and neither has published its sender."
+      },
+      {
+        "id": "p43",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Depends on context: snapshot or thin events, HTTP endpoint or event bus, how often to sweep, and how much to rely on Adyen's longer queue all depend on volume, on the provider and on what a wrong state costs for how long.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What the documentation establishes.",
+          "introduces": "What changes with the integrator's situation.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p44",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "The author's synthesis: design the receiver from the list of things it may not assume, treat silence as unknown and never as a fact, and take the provider's two windows, not its uptime, as the measure of the contract.",
+        "transition_in": {
+          "relationship": "additional_support",
+          "carries_over": "What is established and what depends.",
+          "introduces": "The author's own position.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p45",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "Eight questions let the reader test a webhook integration or a provider's delivery contract in a design review.",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The author's position.",
+          "introduces": "Questions that apply it.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p46",
+        "function": "transition",
+        "controlling_idea": "Everything this chapter and the two before it asked the integrator to build (retries with stored keys, a read after every event, a sweep, an upgrade rehearsal) is traffic on a shared API, sent with credentials, rehearsed in a test environment and subject to limits, and the next chapter covers those terms.",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The receiver, the sweep and the reads they cause.",
+          "introduces": "The consequence: that traffic meets keys, sandboxes and rate limits.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "The payment state machine and the mapping of each provider's event types to states.",
+      "covered_in": [
+        "payment-state-machines"
+      ]
+    },
+    {
+      "topic": "Resolving a request whose outcome is unknown, and idempotency keys.",
+      "covered_in": [
+        "idempotency-and-retries"
+      ]
+    },
+    {
+      "topic": "API version pinning and the webhook endpoint's version during an upgrade.",
+      "covered_in": [
+        "payment-api-versioning"
+      ]
+    },
+    {
+      "topic": "Rate limits met by the reads a receiver makes, API keys and test environments.",
+      "covered_in": [
+        "payment-developer-platform"
+      ]
+    },
+    {
+      "topic": "Settlement reports and the daily close.",
+      "covered_in": [
+        "payment-reconciliation-and-reporting"
+      ]
+    },
+    {
+      "topic": "Dispute and verification webhooks in detail.",
+      "covered_in": [
+        "refunds-reversals-and-disputes",
+        "platform-onboarding-and-verification"
+      ]
+    },
+    {
+      "topic": "Event-driven architecture inside a merchant's own systems.",
+      "covered_in": [
+        "events-consistency-and-reconciliation"
+      ]
+    },
+    {
+      "topic": "A catalog of event types of either provider."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "How either company's sender is built (queues, isolation of slow endpoints, backlog storage) is not public.",
+    "Stripe publishes no acknowledgement timeout in seconds and no retry intervals.",
+    "Adyen's documentation neither guarantees nor disclaims delivery order, and does not say what follows the twelfth retry interval or what happens to a queue after 30 days.",
+    "Whether Stripe still disables an endpoint that keeps failing was not found on the pages read in November 2026; the chapter does not state it.",
+    "Resolved in the verification pass of 17 November 2026: Stripe's thin event catalog lists v1 payment event types (v1.payment_intent.*, v1.charge.*, v1.refund.*); a June 2026 Stripe post still offered early access, so the coverage is recent. The catalog page carries no preview or general-availability label.",
+    "Whether Adyen relies on TLS and deduplication alone against replay of a Standard webhook is the author's reading, not a documented statement.",
+    "Resolved by ruling 20: the Silent Webhook is Monday 14 September 2026; the certificate expired shortly after midnight, events failed for 9 hours, and members were turned away on Monday morning. The chapter names Monday."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "Signatures get their own section, apart from the delivery terms, because what a signature covers is a separate claim (C3) with its own inference about replay.",
+      "rejected": [
+        "One long contracts section with six terms."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The sender section is short (three paragraphs) and wholly labeled as inference beyond a list of externally visible properties, since no engineering source from either company exists.",
+      "rejected": [
+        "A component-by-component sender design presented as how the providers work.",
+        "Dropping the section, which the chapter contract and AC-3 require."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Thin events are presented as Stripe's stated direction with a caveat on coverage of payment event types.",
+      "rejected": [
+        "Stating that payment_intent events are available as thin events."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Larkfield's sweep interval, pending threshold and silence alert are local illustrative details labeled as assumptions; they are not appended to the ledger as canonical numbers.",
+      "rejected": [
+        "Adding numeric sweep parameters to the scenario ledger."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Flow rubric (sound with notes). Acted on: the Standard/transfer webhook distinction is introduced in the order paragraph; the 'unknown, not failed' state is part of the sweep step; the sender's hold-or-independent choice is tied to burst, blocking and disorder; the flow rationale no longer claims a one-for-one mapping. Not acted on, left for the author: merging the refunded-before-captured example into the receiver's order step (kept in the failure section because acceptance criterion AC-2 is answered there); shrinking the first paragraph of the worked example; folding the paragraph after the comparison table into the table (the style guide requires it).",
+      "rejected": [
+        "Reordering or cutting units after a 'sound with notes' verdict without the author's decision."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The chapter dates the Silent Webhook Monday 14 September 2026 (ruling 20): the certificate expired shortly after midnight and members were turned away on Monday morning.",
+      "rejected": [
+        "Naming any other weekday for 14 September 2026, as an earlier ledger line did."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Verification pass: the thin-event caveat now says that the thin event catalog lists v1 payment types as of November 2026, and keeps the June 2026 early-access offer as evidence that the coverage is recent.",
+      "rejected": [
+        "Keeping the caveat as if payment event types were still in early access."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "PLAN.md, chapter contract 20",
+      "contributed": "Scope, owned terms, Larkfield thread."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-stripe-payments-and-api.md, Part 5 and section 4.4",
+      "contributed": "Verified quotations on Stripe events, delivery, signing, event destinations; the statement that nothing is public on the sender."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-adyen-payments-and-api.md, Part 6 and sections 1.4, 2.2, 5.5",
+      "contributed": "Verified quotations on Adyen acknowledgement, retry queue, duplicates, ordering, HMAC, and the absence of a payment GET."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-reliability-and-scale.md, section 6.2",
+      "contributed": "Confirmation that neither company has published its sender design."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md and consistency-issues.md (rulings 4 and 12)",
+      "contributed": "The Silent Webhook, Keel K2, Mila's class pass; ownership of the receiver's contract."
+    },
+    {
+      "kind": "external",
+      "ref": "docs.stripe.com: webhooks, events/how-events-work, events/manage-webhook-endpoints, api/events, event-destinations/eventbridge (n.d., fetched 2026-11-17)",
+      "contributed": "Stripe's delivery contract, signing scheme, formats, retention and destinations."
+    },
+    {
+      "kind": "external",
+      "ref": "stripe.dev/blog: event-notification-handlers-thin-events (2026-06-24); growing-your-stripe-integration-with-event-destinations (2024-10-31)",
+      "contributed": "Motive for thin events and their status; Event Destinations general availability."
+    },
+    {
+      "kind": "external",
+      "ref": "docs.adyen.com/development-resources/webhooks: overview, handle-webhook-events, troubleshoot, configure-and-manage, secure-webhooks, verify-hmac-signatures, webhook-types (fetched 2026-11-17)",
+      "contributed": "Adyen's delivery contract, retry queue, security mechanisms."
+    },
+    {
+      "kind": "external",
+      "ref": "adyen.com/knowledge-hub/webhooks-accept-2xx (2024-05-01); github.com/Adyen/adyen-openapi (CheckoutService-v72, BalancePlatformTransferNotification-v4)",
+      "contributed": "The change from '[accepted]' to 2xx; no payment GET; the transfer webhook's sequence number."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: 7 statements of absence re-tested with a wide search (documentation sitemaps, support and help centers, company sites, engineering posts, web search). All hold; two sentences now say what was searched. No unit or evidence changed."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "First version, written from the chapter contract, the Stripe, Adyen and scale research briefs and the scenario ledger; intent, thesis and role copied from the journal spec."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 72 claims checked (65 confirmed, 4 corrected, 3 hedged, 0 unsupported and removed or relabeled, 0 unreachable); the thin-event caveat now says Stripe's catalog lists v1 payment event types as of November 2026, and the Silent Webhook is dated Monday 14 September 2026 (ruling 20), with 'no call that returns a payment' scoped to the Checkout API for online payments (ruling 29)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('and no call to read a payment back.' -> 'and, in its Checkout API for online payments, no call to rea')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('because a payment cannot be read back, the settlement report' -> 'because an online payment cannot be read back through the Ch')."
+    }
+  ],
+  "length": {
+    "target_words": 5900,
+    "max_words": 6500
+  }
+}

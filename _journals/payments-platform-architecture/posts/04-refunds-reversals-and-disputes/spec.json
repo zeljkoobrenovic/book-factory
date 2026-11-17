@@ -1,0 +1,1650 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "refunds-reversals-and-disputes",
+  "journal": "payments-platform-architecture",
+  "part": "part-1",
+  "title": "Money Flowing Backward: Refunds, Reversals and Disputes",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "The difference between canceling an authorization, a reversal, a refund and a chargeback, and who starts each.",
+        "The stages of a card dispute, the four families of dispute reasons, and that the merchant's evidence is submitted once against a deadline.",
+        "What pre-dispute tools and network monitoring programs are, and that monitoring counts disputes whatever their outcome.",
+        "How disputes differ outside cards, and how Stripe and Adyen each represent a dispute and move the money."
+      ],
+      "believe": [
+        "A paid-out payment is provisional for months, and a refund is a new payment in the other direction that can fail."
+      ],
+      "can_do": [
+        "Given a payment and its state, choose between cancel, reversal and refund and say what each costs.",
+        "Given a dispute notification, say what the deadline is read from, what evidence must already exist, and when the money leaves and may return on each provider.",
+        "Say how long the financial record of a payment must stay open."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a customer-service case the chapter does not contain, the reader chooses the right backward flow and names its failure mode.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A hotel took a card approval for €300 on Monday for a stay that the guest cancels on Tuesday, before the hotel has collected anything. A second guest, already charged €300 and paid out to the hotel last month, also wants the money back. What should the hotel do in each case, and what can go wrong in the second?",
+        "expected": "First case: cancel or reverse the approval, so no payment ever appears and no money moves. Second case: a refund, which is a new transaction funded from the hotel's balance; it can be delayed or fail, the original fees are generally not returned, and if the guest asks the bank instead it becomes a dispute."
+      },
+      {
+        "id": "AC-2",
+        "statement": "Given a dispute that arrives after payout, the reader says who decides, what the merchant may do and what stays true even if the merchant wins.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A language school is told that a €500 course fee paid ten weeks ago has been disputed by the student's bank. The school has proof the student attended. Who decides the outcome, how many times can the school make its case, and what cost remains even if it wins?",
+        "expected": "The student's bank decides under the card network's rules, with the network as arbiter if escalated; the school submits its evidence once, before a deadline; even on a win it has had the money withheld or taken in the meantime, may pay a dispute fee, and the dispute still counts in the network's monitoring ratio."
+      },
+      {
+        "id": "AC-3",
+        "statement": "Visa rules are cited from the dated rulebook; Mastercard cycles, deadlines and thresholds are attributed to the provider that reports them and not presented as Mastercard's own text; thresholds and fees carry an 'as of' date; Adyen's dispute fee is stated as set by contract, with the one amount on its site (CAD 24.00, in Adyen Canada's fee disclosure) named.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "How does money go back, who decides, and why can a payment be undone months later?",
+    "claim": "Money goes back by three routes that are not variations of one 'undo': a reversal, which the merchant sends, cancels the issuer's promise before any money has moved; a refund is a new transaction that the merchant starts and that can itself fail; and a dispute is started by the cardholder's issuer and ruled on by that issuer under the network's rules, with the network as arbiter at the last stage and the merchant allowed one submission of evidence. A payment can be undone months later because those rules give the issuer its own clock, up to 120 days from the transaction for most Visa dispute conditions, and that clock runs regardless of settlement and payout.",
+    "disputed_by": "The view that a refund is the original payment run in reverse, that the merchant and its provider decide what goes back, and that a payment the provider has paid out is final.",
+    "so_what": "The merchant's record of a payment has to stay open in its financial effect for at least the dispute window, backward flows need their own states and ledger entries instead of a 'refunded' flag, and the evidence for a dispute has to be captured at the time of sale because the single submission comes with a deadline of days.",
+    "how_why": "Each route belongs to a different party and a different point on the timeline: before capture only a promise exists, so it can be canceled and no payment ever appears; after capture the money has moved, so sending it back is a second payment with its own funding and failure; and the dispute right belongs to the cardholder through the issuer, under Visa's four categories of conditions (rules edition of 24 October 2026), where monitoring programs count every dispute whatever its outcome. The two providers model the dispute differently (both n.d., accessed November 2026): Stripe gives it one Dispute object, debits the amount and a published fee when it is created and returns the amount only on a win; Adyen reports a series of events against the payment, in which a defended chargeback can be credited back provisionally and taken again by a second chargeback, and adds a reversal call for a payment whose capture state is unknown. Adyen's dispute fee is set by contract (the one amount on its site is CAD 24.00, in Adyen Canada's fee disclosure), and Mastercard's rules are known here only as the two providers report them.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "The three backward routes differ by who starts them and by where the payment is on its timeline: a cancel or reversal (the merchant, before capture) withdraws a promise, a refund (the merchant, after capture) is a new transaction, and a dispute (the cardholder, through the issuer, after the money has moved) is a claim the merchant did not start and does not decide."
+      },
+      {
+        "id": "S2",
+        "claim": "A refund is a second payment with its own funding, its own asynchronous outcome and its own failures; it is not the original payment run in reverse, and the original fees generally stay paid."
+      },
+      {
+        "id": "S3",
+        "claim": "A card dispute is ruled on by the issuer under the network's rules and on the issuer's clock (120 days from processing for most Visa conditions, longer where the service is delivered later); the money is taken before the claim is judged, and the merchant answers once, against a deadline of days, with evidence that must already exist."
+      },
+      {
+        "id": "S4",
+        "claim": "What surrounds a dispute does not follow its outcome: fraud reports and disputes count in the networks' monitoring ratios whoever wins, and outside cards the payer's right to take money back ranges from none to unconditional, by payment method."
+      },
+      {
+        "id": "S5",
+        "claim": "A payment's record therefore has to stay open in its financial effect for months, with backward flows held as records of their own (states, both references, ledger entries, deadlines), and what those records must hold differs by provider: Stripe gives one Dispute object with one debit and at most one return, Adyen a series of events in which a credit can be provisional."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Shows that the chain of promises has no final link: after authorization, settlement and payout the payment can still be withdrawn, which is what 'no single message makes it final' means in J1.",
+    "supports": [
+      "P1-4"
+    ]
+  },
+  "flow": {
+    "pattern": "prerequisite_order",
+    "additional_patterns": [
+      {
+        "pattern": "chronological",
+        "applies_to": "three-routes, refund-second-payment, dispute-lifecycle: the routes in the order they become possible on the payment's timeline"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "outside-cards, designs, where-they-differ"
+      },
+      {
+        "pattern": "problem_solution",
+        "applies_to": "scene opens the problem; designs answers it; when-it-goes-wrong shows the answer missing"
+      }
+    ],
+    "rationale": "The reader meets a chargeback on a payment recorded as paid before any term is defined, so the vocabulary arrives as the answer to a question already asked. The three routes are separated first because every later section is about one of them; the refund comes before the dispute because it is the simpler mechanism and because the dispute section needs the reader to know what a refund is when the two collide. The programs and the non-card methods follow the dispute because both are defined against it. Only then can the two design decisions be stated, since their options are the states and costs the earlier sections established, and the provider comparison follows the designs because its rows are the facts the record model needs. The worked dispute comes after the comparison so that it can be read on both providers, and the failures close the body because each is a missing piece of the design. Starting with definitions would lose the engineer who thinks a refund is an undo; putting the provider table before the lifecycle would present rows the reader cannot yet read."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "On Thursday 11 March 2027 Studio Noord has the money for Mila's €120 class pass in its bank account: approved, captured, settled, paid out. Her bank can still take the €120 back until at least July, and neither the studio, Larkfield nor Adyen decides whether it does. In what sense was the payment ever finished?"
+    },
+    "bridge": {
+      "from_reader_world": "An engineer's model of undo: a status goes from paid to refunded, by the same parties and along the same path as the payment, and a transaction that has been committed and paid out is done.",
+      "to_topic": "In card payments money goes back by three different routes with three different owners, and the one the merchant does not start can arrive months after payout; the chapter asks who decides each and what a system has to keep open for it."
+    },
+    "thesis_statement": {
+      "text": "Money goes back by three routes that are not one undo: the merchant cancels a promise before any money has moved (a reversal), the merchant starts a new transaction that can fail (a refund), or the cardholder's bank takes the money back under the network's rules (a dispute), which it may do for about 120 days and sometimes far longer, whatever has been settled and paid out.",
+      "placement": "KEY POINTS callout, first bullet, and paragraphs p02 and p03"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p05",
+      "promises": [
+        {
+          "promise": "Start from the €120 chargeback that reached Larkfield three weeks after a sale it had recorded as paid.",
+          "kept_in": [
+            "scene"
+          ]
+        },
+        {
+          "promise": "Tell the three routes apart: cancel or reversal, refund and dispute, by who starts each and when.",
+          "kept_in": [
+            "three-routes"
+          ]
+        },
+        {
+          "promise": "Show why a refund is a second payment that can wait, fail or collide with a dispute.",
+          "kept_in": [
+            "refund-second-payment"
+          ]
+        },
+        {
+          "promise": "Follow a card dispute through its stages: who decides, on which clock, with which reasons, and what the merchant may submit.",
+          "kept_in": [
+            "dispute-lifecycle"
+          ]
+        },
+        {
+          "promise": "Explain what happens before and above a dispute (fraud reports, rapid resolution, monitoring programs) and how the payer's rights differ outside cards.",
+          "kept_in": [
+            "before-and-above",
+            "outside-cards"
+          ]
+        },
+        {
+          "promise": "Compare the ways to record a backward flow and to answer one, and what each costs.",
+          "kept_in": [
+            "designs"
+          ]
+        },
+        {
+          "promise": "Set Stripe's and Adyen's documented handling of a dispute side by side, then run the €120 dispute through both.",
+          "kept_in": [
+            "where-they-differ",
+            "in-practice"
+          ]
+        },
+        {
+          "promise": "List the ways backward flows go wrong and how each is detected and repaired.",
+          "kept_in": [
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "Studio Noord has been paid for Mila's €120 pass, and her bank can still take the money back for months without the studio, Larkfield or Adyen deciding whether it does.",
+        "function": "context",
+        "organization": "narration",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's class pass: bought 9 March 2027, payout 11 March 2027; 120 calendar days from 9 March is 7 July 2027.",
+            "shows": "A payment that is finished by every forward measure is still open in the backward direction.",
+            "source": "Larkfield scenario ledger (fictional)"
+          },
+          {
+            "kind": "fact",
+            "what": "Visa dispute time limit for most conditions: '120 calendar days from the Transaction Processing Date'.",
+            "shows": "The length of the open period is a network rule, not a provider setting.",
+            "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf"
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "Money goes back by three routes that are not variations of one undo: a cancel or reversal withdraws the issuer's promise, a refund is a new transaction the merchant starts, and a dispute is the issuer taking the money back under the network's rules.",
+        "function": "claim",
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "The paid-out payment that can still be undone.",
+          "introduces": "The three routes by which it can be undone, and who owns each.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "Because the dispute right runs on the issuer's own clock, regardless of settlement and payout, the merchant's record of a payment has to stay open for months and the evidence for a dispute has to exist before anyone asks for it.",
+        "function": "cause_effect",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The dispute as the route the merchant does not start.",
+          "introduces": "What that does to the merchant's records: an open financial effect and evidence captured at the sale.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "controlling_idea": "On the journey of Mila's class pass this chapter covers everything after the payout of 11 March 2027: the days and months in which the €120 can travel back.",
+        "function": "context",
+        "transition_in": {
+          "relationship": "place",
+          "carries_over": "The chapter's subject.",
+          "introduces": "Its position on the recurring payment's journey.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p05",
+        "controlling_idea": "The chapter starts with a €120 chargeback at Larkfield, separates the three routes back, shows why a refund is a second payment, follows a card dispute through its stages, covers what happens before and above a dispute and outside cards, compares how to record and answer backward flows, sets Stripe and Adyen side by side, works the €120 dispute through with dates, and ends with what goes wrong.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The chapter's place in the journey.",
+          "introduces": "The order in which the argument is made.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: A €120 Payment Comes Back",
+      "controlling_idea": "A chargeback reached Larkfield three weeks after a sale it had recorded as paid, nobody at Larkfield had started it, and the first questions were who decided, what Larkfield may do and by when.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S1",
+          "S3"
+        ],
+        "how": "Shows the route the merchant does not start arriving after payout, before the vocabulary is defined."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The sale, the notification, the questions it raised, then the evidence that it was not a one-off: the reader meets the problem in the order Larkfield did."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The introduction's claim that a paid-out payment can still be taken back.",
+        "introduces": "One payment at Larkfield where that happened.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p06",
+          "controlling_idea": "On 24 February 2027 a chargeback arrived for a €120 pass that Bram de Wit bought at Studio Noord on 2 February, which the studio had long been paid for and which Larkfield's payment record store showed as paid.",
+          "function": "context",
+          "organization": "narration",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "The €120 dispute: Dutch Mastercard credit card, bought 2 February 2027, disputed as 'not recognized', chargeback on 24 February 2027 with a €15.00 dispute fee (illustrative).",
+              "shows": "The backward flow arrives 22 days after the sale and after the payout, on a record with no state for it but one word.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ]
+        },
+        {
+          "id": "p07",
+          "controlling_idea": "Nobody at Larkfield had started this, so the first questions were who had decided it, whether Larkfield or the studio could answer, by when, and where the €120 and the €15 belonged in the books.",
+          "function": "context",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Jonas Weber (risk and compliance) owns disputes; Priya Raman (finance) owns the close; Aylin Demir (support) hears from the studio owner, Ines Bakker. Under Larkfield's terms the studio carries a lost dispute and its fee.",
+              "shows": "Each question belongs to a different person, and none of them can be answered from a status field.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The chargeback on a payment recorded as paid.",
+            "introduces": "The questions it forces: who decided, what may be done, by when, and how it is booked.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p08",
+          "controlling_idea": "Bram's dispute was not an exception: backward flows that had no records of their own were most of the Unexplained €0.4 Million.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "statistic",
+              "what": "Year-end 2025: €412,000 difference, of which refunds after payout €317,200 and chargeback fees €73,500 (4,900 disputes at the illustrative €15.00).",
+              "shows": "Refunds and disputes that arrive after payout are common enough to produce an audit finding when they are not recorded as events of their own.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "One dispute and its questions.",
+            "introduces": "The scale of the same gap across a year.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "three-routes",
+      "heading": "Three Routes Back, Three Different Owners",
+      "controlling_idea": "Which route applies is decided by where the payment is on its timeline and by who starts it, and the three routes have different owners.",
+      "function": "definition",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "Defines cancel or reversal, refund and dispute as three things with three owners, which is the thesis's first claim."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The routes are defined in the order they become possible on the payment's timeline: before capture, after capture, after the cardholder complains. Defining the dispute first would leave the reader without the refund it is so often confused with."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The words 'refund', 'chargeback' and 'dispute', used in the scene without definition.",
+        "introduces": "Their definitions, and the route that comes before both.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p09",
+          "controlling_idea": "The route money takes back depends on two things, how far the payment has travelled and who starts the return, and that gives three routes with three owners.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Route / who starts it / when it is possible / what happens to the money / who decides / what the cardholder sees: cancel or reversal, refund, dispute.",
+              "shows": "Set side by side, the three routes share no column, so one status word cannot stand for them."
+            }
+          ]
+        },
+        {
+          "id": "p10",
+          "controlling_idea": "A cancel or reversal withdraws an authorization before capture, so no money moves and no payment appears on the cardholder's statement.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa glossary: an Authorization Reversal is 'A V.I.P. System message that cancels an Approval Response.'",
+              "shows": "The network defines a reversal as a message about a promise, not about money.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf"
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe: cancel a payment 'before it's completed at no cost'. Adyen: 'After a payment has been captured, you can no longer cancel it.'",
+              "shows": "Both providers offer the route only before capture.",
+              "source": "Stripe documentation, Refund and cancel payments, n.d., accessed 2026-11, https://docs.stripe.com/refunds; Adyen documentation, Cancel, n.d., accessed 2026-11, https://docs.adyen.com/online-payments/cancel"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The first row of the table.",
+            "introduces": "The route that exists only while the payment is still a promise.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "controlling_idea": "A refund is a new transaction, started by the merchant after capture, that credits the cardholder with money the merchant's side has to supply.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa glossary: a Credit Transaction is 'A Transaction or a Faster Refund, representing a Merchant's refund or price adjustment credited to a Cardholder's account.' Adyen: 'You can only refund a payment after it has been captured.'",
+              "shows": "The rulebook's own word for a refund is a transaction, and the provider allows it only once money has moved.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf; Adyen documentation, Refund, n.d., accessed 2026-11, https://docs.adyen.com/online-payments/refund"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A route that withdraws a promise.",
+            "introduces": "A route that sends money, because the promise has already been kept.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p12",
+          "controlling_idea": "A dispute is a transaction the cardholder's issuer returns to the acquirer, the chargeback is the money taken back with it, and the merchant neither starts it nor rules on it.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa glossary: a Dispute is 'A Transaction that an Issuer returns to an Acquirer.' Stripe: the outcome 'is at the sole discretion of the account owner's bank'.",
+              "shows": "Network and provider both place the decision with the issuer.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf; Stripe documentation, How disputes work, n.d., accessed 2026-11, https://docs.stripe.com/disputes/how-disputes-work"
+            },
+            {
+              "kind": "figure",
+              "what": "Figure: one payment's timeline (authorization, capture, settlement, payout, day 120) with the three routes drawn back from the points where each becomes possible.",
+              "shows": "The routes are positions on the timeline, with the dispute reaching back from far to the right of payout."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The two routes the merchant starts.",
+            "introduces": "The route the cardholder starts through the issuer.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "refund-second-payment",
+      "heading": "A Refund Is a Second Payment, and It Can Fail",
+      "controlling_idea": "A refund has its own funding, its own asynchronous outcome, its own cost and its own failures, and it can collide with a dispute on the same payment.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "S2"
+        ],
+        "how": "Takes the refund apart into funding, outcome, cost and collision, each documented by both providers, to show it is not the original payment in reverse."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "Four properties that make a refund a payment of its own are grouped first (where its money comes from, how its outcome arrives, what it costs, and how it borders on the reversal when the state of the original is unknown), and the collision with a dispute comes last because it needs the reader to know that a refund can stay pending for days. Putting the collision earlier would describe two flows in flight before the reader knows a refund can be in flight at all."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The refund, defined as a new transaction.",
+        "introduces": "What being a new transaction means in practice: funding, outcome, cost and failure.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p13",
+          "controlling_idea": "A refund is paid from the merchant's current balance at the provider, not from the original payment, so it can wait or fail when that balance is short.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'Refunds use your available Stripe balance (not including pending amounts)'; if it does not cover the refund, 'Stripe holds the refund as pending for card transactions (refunds for other payment method types fail)', and after 45 days it fails with `insufficient_funds`.",
+              "shows": "The original €120 has been paid out; the refund needs new money.",
+              "source": "Stripe documentation, Refund and cancel payments, n.d., accessed 2026-11, https://docs.stripe.com/refunds"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen lists the refund failure reason 'Insufficient in-process funds on account': 'There is not enough balance on your merchant account to process the refund.'",
+              "shows": "The same dependency on the merchant's balance exists at Adyen.",
+              "source": "Adyen documentation, Refund, n.d., accessed 2026-11, https://docs.adyen.com/online-payments/refund"
+            }
+          ]
+        },
+        {
+          "id": "p14",
+          "controlling_idea": "A refund's outcome arrives in two stages, the provider accepting the request and the scheme and issuer processing it, and the second can fail days after the first succeeded.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'The refund process is asynchronous'; a REFUND webhook with success true means 'we sent the refund request to the card scheme', but 'in rare cases the refund can be rejected by the card scheme, or reversed', which 'can happen even a few days after you submit the refund request' (REFUND_FAILED, REFUNDED_REVERSED).",
+              "shows": "Even a success message is a promise about a later event.",
+              "source": "Adyen documentation, Refund, n.d., accessed 2026-11, https://docs.adyen.com/online-payments/refund"
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe: a Refund object has status pending, requires_action, succeeded, failed or canceled; 'A refund can fail if the customer's bank or card issuer can't process it', and the money returns to the balance in a process that 'can take up to 30 days'.",
+              "shows": "Stripe models the same late failure as a status on its own object.",
+              "source": "Stripe documentation, Refund and cancel payments, n.d., accessed 2026-11, https://docs.stripe.com/refunds; Stripe API reference, The Refund object, n.d., accessed 2026-11, https://docs.stripe.com/api/refunds/object"
+            },
+            {
+              "kind": "table",
+              "what": "What the API answers at once / what is true later / can it fail after 'success', for cancel, refund and dispute.",
+              "shows": "Each backward route repeats the book's gap between the instant answer and the slow truth."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "Where the refund's money comes from.",
+            "introduces": "How and when the merchant learns whether it arrived.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p15",
+          "controlling_idea": "A refund does not undo the cost of the original payment, and the customer may wait days or weeks to see it.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'Stripe's processing fees from the original transaction aren't returned.' Adyen's public price list has a 'Payment method refund fee' column.",
+              "shows": "The merchant pays for the sale and may pay again for the refund.",
+              "source": "Stripe documentation, Refund and cancel payments, n.d., accessed 2026-11, https://docs.stripe.com/refunds; Adyen pricing, n.d., accessed 2026-11, https://www.adyen.com/pricing"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen: 'It can take up to 40 business days before the funds are returned to the shopper's account, depending on the payment method.' Stripe's page says a customer 'sees the refund as a credit approximately 5-10 business days later, depending upon the bank'.",
+              "shows": "The delay is the issuer's and the method's, so 'where is my refund?' contacts arrive while the refund is in flight.",
+              "source": "Adyen documentation, Refund, n.d., accessed 2026-11, https://docs.adyen.com/online-payments/refund; Stripe documentation, Refund and cancel payments, n.d., accessed 2026-11, https://docs.stripe.com/refunds"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The two-stage outcome.",
+            "introduces": "What the refund costs and how long the customer waits.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p16",
+          "controlling_idea": "When a payment is very recent or its capture state is unknown, the two providers offer different tools: Stripe may process an early refund as a reversal, and Adyen has a separate reversal request that cancels or refunds according to the payment's state.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'Some refunds—those issued shortly after the original charge—appear in the form of a reversal instead of a refund. In the case of a reversal, the original charge drops off the customer's statement'.",
+              "shows": "On Stripe the merchant asks for a refund and the system decides whether it becomes a reversal.",
+              "source": "Stripe documentation, Refund and cancel payments, n.d., accessed 2026-11, https://docs.stripe.com/refunds"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'If you are not sure if a payment has been captured, you can use a reversal to return the funds to the shopper'; it cancels an uncaptured payment and refunds a captured one. A cancel by the merchant's own reference is possible 'up to 24 hours after authorization'.",
+              "shows": "On Adyen the unknown state has its own request, and a payment whose identifier never arrived can still be canceled for a day.",
+              "source": "Adyen documentation, Reversal, n.d., accessed 2026-11, https://docs.adyen.com/online-payments/reversal; Adyen documentation, Cancel, n.d., accessed 2026-11, https://docs.adyen.com/online-payments/cancel"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The ordinary refund of a captured payment.",
+            "introduces": "The case where the merchant does not know whether there is anything to refund.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p17",
+          "controlling_idea": "Because a refund and a dispute are started by different parties, both can be in flight for the same payment, and the customer can be reimbursed twice unless something stops one of them.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'You can't issue a refund outside the dispute process while the dispute is open', and a pending refund can fail with `charge_for_pending_refund_disputed`.",
+              "shows": "Stripe blocks the second reimbursement on its side.",
+              "source": "Stripe documentation, How disputes work, n.d., accessed 2026-11, https://docs.stripe.com/disputes/how-disputes-work; Stripe documentation, Refund and cancel payments, n.d., accessed 2026-11, https://docs.stripe.com/refunds"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen says such disputes 'can be auto-defended if more than 90 percent of the captured transaction amount was refunded'. Visa: 'Effective for Disputes processed on or after 24 April 2027 Before initiating a Dispute, the Issuer must validate and reconcile all credits and debits processed by the same Merchant' and dispute only the net amount.",
+              "shows": "Provider and network both treat the refund-then-dispute collision as a known case, the network from April 2027 by rule.",
+              "source": "Adyen documentation, Manage disputes, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/manage-disputes; Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Refunds that stay pending for days.",
+            "introduces": "What happens when the cardholder goes to the bank in the meantime.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "dispute-lifecycle",
+      "heading": "How a Card Dispute Runs: The Issuer Decides, on the Issuer's Clock",
+      "controlling_idea": "A card dispute is ruled on by the issuer under the network's rules, within time limits that start from the transaction or the expected delivery and not from payout, and the merchant answers once against a deadline of days.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "S3"
+        ],
+        "how": "Establishes who decides, how long the right lasts, what reasons exist, which stages follow and how little the merchant may do, from the dated Visa rulebook and both providers' documentation."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "Who decides comes first because every later rule is that party's; the clock next because it explains 'months later'; the reasons before the stages because the stages differ by reason family; the merchant's single answer and its evidence after the stages they belong to; friendly fraud last because it needs the reader to know that fraud is a reason and that the issuer accepts the cardholder's word."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The routes the merchant starts and controls.",
+        "introduces": "The route it does not start, taken step by step.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p18",
+          "controlling_idea": "In a dispute the issuer rules, the network's rules say on what grounds and in what order, the network itself decides only if the case reaches arbitration, and the provider relays.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa glossary: Arbitration is 'A process where Visa determines financial liability between Members for Interchange Transactions that are presented and have completed the Dispute cycle.' Stripe: 'Stripe facilitates your case, but doesn't have influence over the outcome'.",
+              "shows": "The parties to the ruling are the two member banks and the network; the merchant and its provider are not among them.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf; Stripe documentation, How disputes work, n.d., accessed 2026-11, https://docs.stripe.com/disputes/how-disputes-work"
+            }
+          ]
+        },
+        {
+          "id": "p19",
+          "controlling_idea": "The issuer's time limit counts from the transaction, or from the date the cardholder expected the service, and can therefore run long past payout.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Visa time limits: '120 calendar days from the Transaction Processing Date' (for example condition 10.4); 75 calendar days for the authorization conditions; for 13.1 Merchandise/Services Not Received also '120 calendar days from the last date that the Cardholder expected to receive the merchandise or services', 'Not to exceed 540 calendar days from the Transaction Processing Date'.",
+              "shows": "The window is anchored to events the merchant's payout schedule has nothing to do with, and prepaid services stretch it.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen documents 120 calendar days for Visa and Mastercard and 'In some cases for Visa and Mastercard ... a maximum of 540 calendar days'.",
+              "shows": "The provider's rendering agrees with the rulebook and extends the same figures to Mastercard, whose own text was not readable.",
+              "source": "Adyen documentation, Dispute timeframes, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/understanding-disputes/dispute-timeframes"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The issuer as the party that rules.",
+            "introduces": "How long the issuer has to start.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "controlling_idea": "Dispute reasons fall into four families (fraud, authorization, processing errors and consumer disputes), and the family decides what evidence could answer the claim.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Family / Visa category and example conditions / Mastercard code as Adyen lists it / what the cardholder is saying: 10 Fraud (10.4 Other Fraud – Card-Absent Environment; 4837 No Cardholder Authorization), 11 Authorization (11.3 No Authorization/Late Presentment), 12 Processing Errors (12.6 Duplicate Processing/Paid by Other Means), 13 Consumer Disputes (13.1 Merchandise/Services Not Received, 13.2 Cancelled Recurring Transaction, 13.6 Credit Not Processed; 4853 Cardholder Dispute).",
+              "shows": "Four families cover every condition, and each asks the merchant a different question.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf; Adyen documentation, Dispute reason codes, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/understanding-disputes/dispute-reason-codes"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The time the issuer has.",
+            "introduces": "The grounds on which it may act.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p21",
+          "controlling_idea": "After the dispute the steps depend on the family: in consumer and processing disputes the merchant's side answers with a dispute response (the representment) and the issuer must escalate, while in fraud and authorization disputes the merchant's answer is itself the pre-arbitration attempt.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Visa Tables 11-2 and 11-3: categories 10 and 11 run dispute, pre-arbitration attempt by the acquirer (30 calendar days), pre-arbitration response, arbitration; categories 12 and 13 run dispute, dispute response by the acquirer, pre-arbitration by the issuer, arbitration. Adyen names the two flows Allocation and Collaboration.",
+              "shows": "The stages are fixed by rule and differ by reason family.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf; Adyen documentation, Visa chargebacks, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/chargeback-guidelines/visa-chargebacks"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen's rendering of Mastercard: notification of chargeback, chargeback, information supplied, chargeback reversed, pre-arbitration, second chargeback, scheme arbitration. Stripe: the inquiry ('retrieval') phase is one that 'Mastercard and Visa no longer use'.",
+              "shows": "Mastercard's cycle is known here through a provider, and the retrieval step survives mainly on other networks.",
+              "source": "Adyen documentation, Mastercard chargebacks, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/chargeback-guidelines/mastercard-chargebacks; Stripe documentation, How disputes work, n.d., accessed 2026-11, https://docs.stripe.com/disputes/how-disputes-work"
+            },
+            {
+              "kind": "figure",
+              "what": "Figure: the dispute as a flow from the cardholder's complaint through issuer, network, acquirer or provider to the merchant, with the single response, the issuer's ruling, pre-arbitration and arbitration.",
+              "shows": "The merchant appears once on the path, as the sender of one response."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The reason families.",
+            "introduces": "The stages a dispute passes through, which differ by family.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p22",
+          "controlling_idea": "The merchant's evidence is submitted once, and the deadline for it is a matter of days set by the provider inside the network's limit.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'You've only one opportunity to submit your response'; time to respond is 'usually 7-21 days, depending on the card network'; the Dispute object carries `evidence_details.due_by`.",
+              "shows": "One submission, with the exact deadline as a field to read, not a number to remember.",
+              "source": "Stripe documentation, Respond to disputes, n.d., accessed 2026-11, https://docs.stripe.com/disputes/responding; Stripe documentation, How disputes work, n.d., accessed 2026-11, https://docs.stripe.com/disputes/how-disputes-work; Stripe API reference, The Dispute object, n.d., accessed 2026-11, https://docs.stripe.com/api/disputes/object"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen: response to a Visa chargeback within 18 days, or 9 days for payments processed locally in the United States and Canada from 21 July 2025; Mastercard: 'You must provide your defense documents within 40 days. There is no opportunity later in the process to provide information or to update information you provided.'",
+              "shows": "The provider's deadline is shorter than the 30 calendar days the Visa rules give the acquirer and changes by network and region.",
+              "source": "Adyen documentation, Dispute timeframes, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/understanding-disputes/dispute-timeframes; Adyen documentation, Mastercard chargebacks, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/chargeback-guidelines/mastercard-chargebacks"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The dispute response as one stage.",
+            "introduces": "How many times and by when the merchant may make it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p23",
+          "controlling_idea": "A single submission with a deadline of days means the evidence must already exist when the dispute arrives, which makes it a by-product of the sale and not of the dispute.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa glossary: Compelling Evidence is information provided 'in a Dispute Response or pre-Arbitration that attempts to prove that the Cardholder participated in the Transaction, received goods or services, or otherwise benefited from the Transaction'. Stripe, for Visa 10.4: 'Stripe automatically evaluates your transaction history to determine eligibility with Visa Compelling Evidence 3.0.'",
+              "shows": "What counts as evidence is proof of participation and delivery, and one accepted form of it is the history of earlier payments, none of which can be created afterwards.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf; Stripe documentation, Respond to disputes, n.d., accessed 2026-11, https://docs.stripe.com/disputes/responding"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "One submission, days to make it.",
+            "introduces": "Where the evidence has to come from.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p24",
+          "controlling_idea": "Friendly fraud is a dispute by the genuine cardholder, and it arrives with the same reason code as a dispute over a stolen card.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'Friendly fraud—also known as \"first-party misuse\" or \"first-party fraud\"—occurs when a legitimate cardholder makes a purchase, but then disputes it at a later date. This can either be accidental, because they didn't recognize the transaction on their statement, or deliberate'.",
+              "shows": "A 'not recognized' dispute does not say whether the card was stolen or the cardholder forgot, so only the merchant's evidence can separate them.",
+              "source": "Stripe documentation, Types of fraud, n.d., accessed 2026-11, https://docs.stripe.com/disputes/prevention/fraud-types"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "Evidence that the cardholder took part.",
+            "introduces": "The kind of dispute that evidence exists to answer.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "before-and-above",
+      "heading": "Before the Dispute and Above It: Fraud Reports, Rapid Resolution and Monitoring Programs",
+      "controlling_idea": "Around the dispute sit two things that do not follow its outcome: signals and services that act before it exists, and network programs that count it whoever wins.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S4"
+        ],
+        "how": "Shows that the merchant's exposure is measured in counts of fraud reports and disputes, not in disputes lost, so winning is not the measure."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "Fraud report, then pre-dispute resolution, then the monthly count: the order in which they happen to one payment. The conclusion that the count ignores outcomes comes last because it depends on knowing what is counted."
+      },
+      "transition_in": {
+        "relationship": "additional_support",
+        "carries_over": "The dispute itself, from start to arbitration.",
+        "introduces": "What happens before it exists and what is counted above it.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p25",
+          "controlling_idea": "A fraud report is a message from the issuer that a cardholder reported fraud; it is not a dispute and moves no money, but it often precedes one and a refund does not erase it.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen, Notification of Fraud: 'This is not a dispute, and no money is withdrawn from your account.' Stripe: early fraud warnings 'include Visa TC40 reports and Mastercard's System to Avoid Fraud Effectively (SAFE) reports'; 'about 40% of Visa and Mastercard EFWs become fraud disputes'; 'Proactively refunding a flagged payment doesn't affect the fraud warning.'",
+              "shows": "Both providers surface the report as its own event, and Stripe's own figure says most do not become disputes.",
+              "source": "Adyen documentation, Dispute process and flow, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/understanding-disputes/dispute-process-and-flow; Stripe documentation, How disputes work, n.d., accessed 2026-11, https://docs.stripe.com/disputes/how-disputes-work"
+            }
+          ]
+        },
+        {
+          "id": "p26",
+          "controlling_idea": "Pre-dispute resolution lets a merchant set rules under which a complaint is refunded automatically before it becomes a dispute, in exchange for the amount and a fee.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa glossary: Rapid Dispute Resolution is 'A pre-dispute resolution service that provides the ability for Merchants and Payment Facilitators to automate the acceptance of liability for a disputed Transaction.' Adyen: 'When a dispute is rapidly resolved, it is resolved through a refund and does not become a chargeback.'",
+              "shows": "The service is defined by the network as accepting liability early.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf; Adyen documentation, Visa chargebacks, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/chargeback-guidelines/visa-chargebacks"
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe: 'Stripe integrates directly with Verifi and Ethoca'; 'Resolved disputes don't count towards your dispute rate and don't incur a dispute received fee'; Netherlands price list: '€20.00 per Visa resolution', '€40.00 per Mastercard resolution'.",
+              "shows": "What is bought is the count and the dispute fee, not the money.",
+              "source": "Stripe documentation, Dispute prevention, n.d., accessed 2026-11, https://docs.stripe.com/disputes/prevention-preview; Stripe pricing, Netherlands, n.d., accessed 2026-11, https://stripe.com/en-nl/pricing"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The fraud report as an early signal.",
+            "introduces": "A service that acts on the cardholder's complaint before it is a dispute.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p27",
+          "controlling_idea": "A dispute monitoring program is a network scheme that counts a merchant's fraud reports and disputes against its sales each month and fines or restricts those above a threshold.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa fact sheet (2025): 'VAMP Ratio = Count of [Fraud (TC40) + Disputes (TC15)] ÷ Count of Settled Transactions (TC05)' on card-not-present transactions; acquirer 'Above Standard if its VAMP ratio is ≥50bps and ... Excessive if ≥70bps'; Excessive Merchant at ≥220 bps with a monthly count ≥1,500, 'reduced to >=150bps in AP, Canada, EU, and U.S. regions on 1 April 2026'.",
+              "shows": "The program is a ratio of counts with published thresholds that changed twice in a year.",
+              "source": "Visa Acquirer Monitoring Program Overview (fact sheet), Visa, 2025, https://corporate.visa.com/content/dam/VCOM/corporate/visa-perspectives/security-and-trust/documents/visa-acquirer-monitoring-program-fact-sheet-2025.pdf"
+            },
+            {
+              "kind": "table",
+              "what": "Program / what is counted / threshold as of November 2026 / source: Visa VAMP merchant, Visa VAMP acquirer, Mastercard Excessive Chargeback Merchant (100–299 chargebacks and 1.5–2.99%, as Stripe and Adyen report it).",
+              "shows": "The Mastercard figures are the providers' rendering, and every figure carries a date.",
+              "source": "Visa Acquirer Monitoring Program Overview (fact sheet), Visa, 2025, https://corporate.visa.com/content/dam/VCOM/corporate/visa-perspectives/security-and-trust/documents/visa-acquirer-monitoring-program-fact-sheet-2025.pdf; Stripe documentation, Card monitoring programs, n.d., accessed 2026-11, https://docs.stripe.com/disputes/monitoring-programs; Adyen documentation, Dispute and fraud monitoring, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/dispute-and-fraud-monitoring"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "What happens to one complaint before it is a dispute.",
+            "introduces": "What the network does with all of a merchant's disputes together.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p28",
+          "controlling_idea": "The programs count a dispute when it is received and do not look at refunds or outcomes, so winning disputes does not lower the ratio; only fewer disputes and pre-dispute resolution do.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'Monitoring programs don't consider refunds when identifying disputes' and 'don't consider dispute outcomes'; 'The same fraudulent transaction might appear in both the TC40 and TC15 reports. Any transaction that appears in both reports will be counted twice for the VAMP count.' Visa fact sheet: the ratio 'Excludes disputes resolved through pre-dispute solutions'.",
+              "shows": "The one exclusion the network publishes is pre-dispute resolution, which is why the choice of how to answer a claim is also a choice about the ratio.",
+              "source": "Stripe documentation, Card monitoring programs, n.d., accessed 2026-11, https://docs.stripe.com/disputes/monitoring-programs; Visa Acquirer Monitoring Program Overview (fact sheet), Visa, 2025, https://corporate.visa.com/content/dam/VCOM/corporate/visa-perspectives/security-and-trust/documents/visa-acquirer-monitoring-program-fact-sheet-2025.pdf"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The ratio and its thresholds.",
+            "introduces": "What does and does not move it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "outside-cards",
+      "heading": "Outside Cards: From No Right to Take It Back to an Unconditional One",
+      "controlling_idea": "The payer's right to take money back is a property of the payment method, and outside cards it runs from none to unconditional.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S4"
+        ],
+        "how": "Shows that the card dispute is one point on a range, so a design that assumes it for every method is wrong in both directions."
+      },
+      "flow": {
+        "pattern": "order_of_importance",
+        "rationale": "The range first, then the strongest payer right (direct debit, where Larkfield has 21% of online volume), then the methods with none or with their own judge, then the vocabulary trap that only makes sense once both ends are known."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The card dispute and the programs built on it.",
+        "introduces": "Payment methods where the payer's right is stronger, weaker or judged by someone else.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p29",
+          "controlling_idea": "Whether and for how long a payer can take money back is set by the payment method's own rules or by law, and neither provider can change it.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Method / payer's right / window / can the merchant contest: card (dispute under network rules, 120 days and more, one response); SEPA Direct Debit (unconditional refund 8 weeks; unauthorized 13 months; no); iDEAL (none); PayPal and Klarna (the method's provider decides; typically up to 180 days as Stripe documents).",
+              "shows": "The same question has four different answers across the methods one checkout offers.",
+              "source": "Directive (EU) 2015/2366 (PSD2), 25 November 2015, Articles 71, 76 and 77, http://publications.europa.eu/resource/celex/32015L2366 (evidence age: 11 years; in force); Stripe documentation, SEPA Direct Debit, n.d., accessed 2026-11, https://docs.stripe.com/payments/sepa-debit; Adyen documentation, SEPA Direct Debit, n.d., accessed 2026-11, https://docs.adyen.com/payment-methods/sepa-direct-debit; Stripe documentation, iDEAL | Wero, n.d., accessed 2026-11, https://docs.stripe.com/payments/ideal; Stripe documentation, How disputes work, n.d., accessed 2026-11, https://docs.stripe.com/disputes/how-disputes-work"
+            }
+          ]
+        },
+        {
+          "id": "p30",
+          "controlling_idea": "A SEPA Direct Debit can be taken back without a reason for eight weeks and as unauthorized for thirteen months, and the merchant cannot contest it on either provider.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "PSD2 Article 77: the payer can request the refund 'for a period of 8 weeks from the date on which the funds were debited'; Article 71: notification 'no later than 13 months after the debit date'.",
+              "shows": "The right is statute, not provider policy.",
+              "source": "Directive (EU) 2015/2366 (PSD2), 25 November 2015, Articles 71, 76 and 77, http://publications.europa.eu/resource/celex/32015L2366 (evidence age: 11 years; in force)"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'You can't submit evidence or counter a SEPA Direct Debit dispute through Stripe'; such disputes 'are final and can't be appealed'. Adyen: 'You cannot defend SEPA chargebacks. These will always result in the shopper receiving a refund.'",
+              "shows": "Both providers pass the rule through unchanged.",
+              "source": "Stripe documentation, SEPA Direct Debit, n.d., accessed 2026-11, https://docs.stripe.com/payments/sepa-debit; Adyen documentation, SEPA Direct Debit, n.d., accessed 2026-11, https://docs.adyen.com/payment-methods/sepa-direct-debit"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The range of payer rights.",
+            "introduces": "Its strongest case, the direct debit.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p31",
+          "controlling_idea": "At the other end an iDEAL payment cannot be disputed through the payer's bank at all, and for PayPal and Klarna the judge is the method's own provider, not a card issuer.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'Customers can't dispute iDEAL | Wero payments with their bank'; for local payment methods 'The LPM provider, such as Klarna or PayPal, decides the dispute instead of a card issuer', with 'up to 180 days to file a dispute'.",
+              "shows": "No dispute right and a different judge are both normal outside cards.",
+              "source": "Stripe documentation, iDEAL | Wero, n.d., accessed 2026-11, https://docs.stripe.com/payments/ideal; Stripe documentation, How disputes work, n.d., accessed 2026-11, https://docs.stripe.com/disputes/how-disputes-work"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A method where the payer's right is unconditional.",
+            "introduces": "Methods where there is none, or where someone other than a bank rules.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p32",
+          "controlling_idea": "The two providers use different words for the same non-card events, so an integrator who maps both to 'dispute' will count things that are not disputes.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen calls a SEPA return a chargeback and lists among its causes 'There were insufficient funds in the shopper's bank account'; Stripe calls a payer's SEPA return a dispute.",
+              "shows": "A failed collection and a customer's objection can arrive under one name on one provider, which is the failure pattern A Card by Any Other Name.",
+              "source": "Adyen documentation, SEPA Direct Debit, n.d., accessed 2026-11, https://docs.adyen.com/payment-methods/sepa-direct-debit; Stripe documentation, SEPA Direct Debit, n.d., accessed 2026-11, https://docs.stripe.com/payments/sepa-debit"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Rights that differ by method.",
+            "introduces": "What that does to a cross-provider data model.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "designs",
+      "heading": "Two Design Decisions: How to Record a Backward Flow and How to Answer One",
+      "controlling_idea": "An integrator makes two decisions about backward flows: whether they are flags on the payment or records of their own, and which of four answers to give a claim, each with a different cost.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "Turns the mechanism into the design consequence the thesis states: backward flows need their own states and ledger entries, and the answer to a claim is a costed choice."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "The flag and what it loses, then the record model that fixes it; then the four answers and the trade-off between them, ending in the author's rule. The record model comes first because the four answers are states of those records."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "Three routes, their owners, their clocks and the counts above them.",
+        "introduces": "What a merchant's system has to hold and decide because of them.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p33",
+          "controlling_idea": "A flag or a status on the payment cannot represent a backward flow, because a backward flow has an amount, a time, a state and an outcome of its own and there can be several per payment.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: the disputed amount 'might be lower or higher than the amount of the original charge' (currency conversion, partial disputes, several recurring charges disputed as one), and 'In extremely rare cases, you might receive more than one dispute per payment.' Adyen: multiple partial refunds up to the captured amount.",
+              "shows": "Amount and multiplicity alone already exceed what one status word can hold.",
+              "source": "Stripe documentation, How disputes work, n.d., accessed 2026-11, https://docs.stripe.com/disputes/how-disputes-work; Adyen documentation, Refund, n.d., accessed 2026-11, https://docs.adyen.com/online-payments/refund"
+            },
+            {
+              "kind": "scenario",
+              "what": "Larkfield's five-state vocabulary ends in `refunded` and `disputed`; until Keel, refunds after payout and chargeback fees had no ledger entries of their own.",
+              "shows": "The flag design is the one Larkfield had when the €412,000 difference appeared.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ]
+        },
+        {
+          "id": "p34",
+          "controlling_idea": "I would hold each refund and each dispute as a record of its own, linked to the payment by both providers' references, with its own states, its own deadline and a ledger entry for every movement of money.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Keel decision K3: fees, splits, refunds, disputes, payouts and returns are ledger entries; the 'to recover from studio' clearing account must return to zero.",
+              "shows": "The record model is what K3 requires, and the clearing account is where an open dispute is visible until it is resolved.",
+              "source": "Larkfield scenario ledger (fictional)"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen webhooks for a modification carry `originalReference` (the payment) and `pspReference` (the modification); a Stripe Dispute carries the `charge` it belongs to and its `balance_transactions`.",
+              "shows": "Both providers supply the two references the link needs.",
+              "source": "Adyen documentation, Refund, n.d., accessed 2026-11, https://docs.adyen.com/online-payments/refund; Stripe API reference, The Dispute object, n.d., accessed 2026-11, https://docs.stripe.com/api/disputes/object"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "What a flag loses.",
+            "introduces": "The record model that keeps it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p35",
+          "controlling_idea": "A merchant can answer a customer's claim in four ways (refund before it reaches the bank, resolve it automatically before it becomes a dispute, accept the dispute, or contest it), and they differ in fee, in effort and in whether the claim counts in the monitoring ratio.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Answer / what it costs beyond the amount / counts in the monitoring ratio? / effort / when it is right: refund first; pre-dispute resolution (per-resolution fee; excluded from the Visa ratio); accept (dispute fee; counts); contest (dispute fee, on Stripe a countered fee returned on a win; counts whatever the outcome; one evidence package).",
+              "shows": "Only one of the four answers both avoids the dispute fee and stays out of the count, and it gives the money up.",
+              "source": "Stripe pricing, Netherlands, n.d., accessed 2026-11, https://stripe.com/en-nl/pricing; Stripe documentation, Dispute prevention, n.d., accessed 2026-11, https://docs.stripe.com/disputes/prevention-preview; Stripe documentation, Card monitoring programs, n.d., accessed 2026-11, https://docs.stripe.com/disputes/monitoring-programs; Visa Acquirer Monitoring Program Overview (fact sheet), Visa, 2025, https://corporate.visa.com/content/dam/VCOM/corporate/visa-perspectives/security-and-trust/documents/visa-acquirer-monitoring-program-fact-sheet-2025.pdf"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The records that hold a backward flow.",
+            "introduces": "The decisions those records move through.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p36",
+          "controlling_idea": "My rule is to decide by amount against fee, by whether the evidence already exists and by how far the account is from a monitoring threshold, and to make that decision once as policy, not case by case under a deadline.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe on early fraud warnings: 'It's likely not worthwhile to refund EFWs on charges more than 35 percent higher than your dispute fee.'",
+              "shows": "A provider publishes the same amount-against-fee reasoning as a rule of thumb, which is its analysis and not a general law.",
+              "source": "Stripe documentation, How disputes work, n.d., accessed 2026-11, https://docs.stripe.com/disputes/how-disputes-work"
+            },
+            {
+              "kind": "figure",
+              "what": "Figure: a calendar strip for one payment with payout at day 2 and the dispute window still open to day 120, the paid-out amount drawn as held on a long string.",
+              "shows": "The conceptual point of the chapter: paid out is a position on the calendar, not the end of it."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "Four answers and their costs.",
+            "introduces": "The author's rule for choosing among them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "Stripe represents a dispute as one object with one debit and at most one return, while Adyen reports a series of events in which a credit can be provisional, and the two differ in when the money leaves, where the deadline is read and what is public about the fee.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "Sets the two documented models side by side, the part of the thesis that says what the integrator's records must hold on each provider."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The table first, on the same aspects for both providers, then what an integrator does differently; the advice is unreadable without the rows it summarizes."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The record model and the four answers, stated for any provider.",
+        "introduces": "How each of the two providers supplies the facts those records need.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p37",
+          "controlling_idea": "On seven aspects of a backward flow the two providers document different shapes, timings and prices.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Aspect / Stripe / Adyen / what the difference suggests: shape of a dispute (Dispute object with a status; series of webhook events against the payment plus action endpoints); when the money leaves (at creation, amount plus fee; 'a few days after you receive the NoC, or after you defend'); when it returns (only on a win; on CHARGEBACK_REVERSED, provisionally, and not immediately for Visa Allocation); where the deadline is read (`evidence_details.due_by`; published table, 18 or 9 days Visa, 40 Mastercard); dispute fee (€20.00 received, €20.00 countered, NL list; a chargeback processing fee, amount not public); unknown capture state (no separate request; reversal request, cancel by merchant reference for 24 hours); after the 'final' state (late win from lost to won; second chargeback after a reversed one).",
+              "shows": "Every cell is a documented statement or 'not public'; the last column is the author's reading.",
+              "source": "Stripe API reference, The Dispute object, n.d., accessed 2026-11, https://docs.stripe.com/api/disputes/object; Stripe documentation, How disputes work, n.d., accessed 2026-11, https://docs.stripe.com/disputes/how-disputes-work; Stripe pricing, Netherlands, n.d., accessed 2026-11, https://stripe.com/en-nl/pricing; Stripe documentation, Refund and cancel payments, n.d., accessed 2026-11, https://docs.stripe.com/refunds; Adyen documentation, Dispute process and flow, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/understanding-disputes/dispute-process-and-flow; Adyen documentation, Dispute timeframes, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/understanding-disputes/dispute-timeframes; Adyen documentation, Visa chargebacks, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/chargeback-guidelines/visa-chargebacks; Adyen documentation, Disputes API, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/disputes-api; Adyen documentation, Reversal, n.d., accessed 2026-11, https://docs.adyen.com/online-payments/reversal; Adyen documentation, Cancel, n.d., accessed 2026-11, https://docs.adyen.com/online-payments/cancel"
+            },
+            {
+              "kind": "figure",
+              "what": "Figure: the same lost-then-won dispute as two balance lines, Provider A with one step down at the start and one step up at the end, Provider B with a step down, a provisional step up and a possible second step down.",
+              "shows": "The difference an integrator's ledger has to absorb is the number and finality of money movements."
+            }
+          ]
+        },
+        {
+          "id": "p38",
+          "controlling_idea": "On Stripe an integrator mirrors one object and must allow a lost dispute to reopen; on Adyen it must assemble the dispute from events and treat a returned amount as provisional until the last event.",
+          "function": "recommendation",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The seven differences.",
+            "introduces": "What an integrator does differently on each provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: Bram's €120, Day by Day",
+      "controlling_idea": "Run with dates, the €120 dispute shows the money leaving before anyone has judged the claim, one answer due within weeks, an outcome that stays provisional, and a record that has to stay open into June.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S5"
+        ],
+        "how": "Applies the lifecycle and the provider differences to the ledger's dispute, with the dates and amounts that make 'months later' concrete."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The events in date order on Adyen, then the evidence Larkfield answers with, then the same dispute on Stripe, then how long the record and the exposure stay open. The Stripe comparison follows the Adyen run because it is told as differences from it."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The two providers' documented models.",
+        "introduces": "One dispute run through them with Larkfield's dates and amounts.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p39",
+          "controlling_idea": "On Adyen the dispute reaches Larkfield as a sequence of events over weeks, and the €120 and the fee leave the studio's balance before the claim has been judged.",
+          "function": "process",
+          "organization": "narration",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Date / event / money / what Larkfield records: 2 Feb 2027 sale €120.00; 24 Feb notification of chargeback (defense period starts); chargeback booked, €120.00 and €15.00 (illustrative) debited; defense submitted once; chargeback reversed, €120.00 back provisionally; then either the issuer accepts or a second chargeback takes it again.",
+              "shows": "The dates and amounts of the ledger's dispute laid on Adyen's documented stages.",
+              "source": "Larkfield scenario ledger (fictional); Adyen documentation, Dispute process and flow, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/understanding-disputes/dispute-process-and-flow; Adyen documentation, Mastercard chargebacks, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/chargeback-guidelines/mastercard-chargebacks"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen for Platforms: by default 'Adyen withdraws the disputed funds from your platform's liable balance account'; `platformChargebackLogic` can book it to one balance account or by the split ratio.",
+              "shows": "Which balance the debit lands on is a setting the platform chose at payment time, and Larkfield's terms put it on the studio.",
+              "source": "Adyen documentation, Split chargebacks (Adyen for Platforms), n.d., accessed 2026-11, https://docs.adyen.com/platforms/online-payments/split-transactions/split-chargebacks"
+            }
+          ]
+        },
+        {
+          "id": "p40",
+          "controlling_idea": "Larkfield can answer because the booking app already holds the evidence that Bram used the pass, and it gets exactly one submission to send it.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Bram's account shows the purchase from a logged-in session and check-ins to classes at Studio Noord with the pass after 2 February 2027 (local detail; the check-in records are Larkfield's own).",
+              "shows": "Proof that the cardholder took part and received the service is a by-product of the product, available on the day the notification arrives.",
+              "source": "Larkfield scenario ledger (fictional)"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen, Mastercard: defense documents within 40 days of the notification; 'There is no opportunity later in the process to provide information or to update information you provided.'",
+              "shows": "The deadline and the single submission are the provider's documented terms for this network.",
+              "source": "Adyen documentation, Mastercard chargebacks, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/chargeback-guidelines/mastercard-chargebacks"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The notification and the debit.",
+            "introduces": "What Larkfield can do about it and how often.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p41",
+          "controlling_idea": "Had Studio Noord been on Stripe, the same dispute would be one Dispute object, the amount and a received fee would leave at creation, and nothing would come back unless the dispute was won.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: 'Debits the disputed amount, plus a dispute fee, from your Stripe account'; 'These funds are held for the entire duration of the dispute'; Netherlands list fees €20.00 received and €20.00 countered, the latter returned on a win. On Connect the balance debited depends on the charge type: the connected account's for direct charges, the platform's otherwise.",
+              "shows": "Stripe's version has two money movements where Adyen's can have three or four, and its list fee differs from the ledger's illustrative €15.00.",
+              "source": "Stripe documentation, How disputes work, n.d., accessed 2026-11, https://docs.stripe.com/disputes/how-disputes-work; Stripe pricing, Netherlands, n.d., accessed 2026-11, https://stripe.com/en-nl/pricing; Stripe documentation, Disputes on Connect platforms, n.d., accessed 2026-11, https://docs.stripe.com/connect/disputes"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The dispute on Adyen.",
+            "introduces": "The same dispute on Stripe.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p42",
+          "controlling_idea": "The payment's financial effect stays open until at least 2 June 2027, and across Larkfield about €156 million of paid-out online card volume is inside the 120-day window at any time.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "2 February 2027 plus 120 days is 2 June 2027. Online card volume is 52% of €910 million, about €473 million a year; 120/365 of that is about €156 million (the author's arithmetic on ledger figures; an amount that is still disputable, not an expected loss).",
+              "shows": "The open window is a standing balance of provisional money, which is what a platform's exposure figure has to measure.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "One dispute on two providers.",
+            "introduces": "How long the record stays open, and what that adds up to across the platform.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong",
+      "controlling_idea": "Backward flows fail in the gap between a provider's first answer and the later truth: a movement nobody can tie to its payment, a deadline or a failure that arrives as a missed message, and a state treated as final that was not.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S5"
+        ],
+        "how": "Shows the cost of treating backward flows as flags or as finished, and the detection that the record model makes possible."
+      },
+      "flow": {
+        "pattern": "order_of_importance",
+        "rationale": "The overview table first, then the three failures in the order of what they cost Larkfield: the untraceable movement (an audit finding), the missed message (a dispute lost by default, a customer never refunded), the state closed too early (a ledger that is wrong again)."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The dispute handled as designed.",
+        "introduces": "The same flows when a link, a message or a state is missing.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p43",
+          "controlling_idea": "Each backward flow has a first answer and a later truth, and the failures happen between the two.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Failure / how it shows / detection / recovery: refund accepted then failed; refund and dispute on one payment; movement with no link to its payment; dispute notification missed; provisional credit treated as final; lost dispute treated as closed; unpaid direct debit counted as a dispute.",
+              "shows": "Seven failures, each paired with a check that a nightly job can run."
+            }
+          ]
+        },
+        {
+          "id": "p44",
+          "controlling_idea": "A refund or a chargeback that cannot be tied to its original payment is the Orphaned Refund, and it is what Larkfield's €412,000 mostly consisted of.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "statistic",
+              "what": "Refunds after payout €317,200 and chargeback fees €73,500 of the €412,000 (year-end 2025).",
+              "shows": "The movements were real and visible at the providers; what was missing was the link and the entry.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The table of failures.",
+            "introduces": "The one that became Larkfield's audit finding.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p45",
+          "controlling_idea": "A missed message turns into a dispute lost by default or a customer who never receives a refund, so open disputes and pending refunds are swept against the provider's own record instead of waiting for a webhook.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "The Silent Webhook of 14 September 2026: the Stripe receiver failed for 9 hours. Keel decision K2: the webhook is the doorbell; a job sweeps everything still pending.",
+              "shows": "A dispute notification is exactly the kind of event that outage would have swallowed, and its deadline does not wait.",
+              "source": "Larkfield scenario ledger (fictional)"
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe exposes Dispute and Refund objects with status and `due_by`; Adyen reports a failed refund by REFUND_FAILED webhook and in its payment accounting report.",
+              "shows": "Each provider has a record the sweep can read: an object on Stripe, a report on Adyen.",
+              "source": "Stripe API reference, The Dispute object, n.d., accessed 2026-11, https://docs.stripe.com/api/disputes/object; Stripe API reference, The Refund object, n.d., accessed 2026-11, https://docs.stripe.com/api/refunds/object; Adyen documentation, Refund, n.d., accessed 2026-11, https://docs.adyen.com/online-payments/refund"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "A movement that arrived and could not be placed.",
+            "introduces": "A message that did not arrive at all.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p46",
+          "controlling_idea": "A favorable event is not always the last one, so a dispute record must be able to reopen after it looked closed.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen, CHARGEBACK_REVERSED: 'This stage is not final and a second chargeback can be presented by the issuing bank'. Stripe: 'in rare cases the status can change from `lost` to `won`', a 'late win'.",
+              "shows": "Both providers document a change after an apparently final state, in opposite directions.",
+              "source": "Adyen documentation, Dispute process and flow, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/understanding-disputes/dispute-process-and-flow; Stripe documentation, How disputes work, n.d., accessed 2026-11, https://docs.stripe.com/disputes/how-disputes-work"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Messages that go missing.",
+            "introduces": "Messages that arrive and are read as more final than they are.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "The three routes, the issuer's clock, the monitoring count and the two providers' models are one fact seen from four sides: a payment's forward path ends at payout, but its financial effect does not, because the right to send money back belongs to parties and clocks the merchant does not control. What a merchant controls is whether each backward flow has a record, a deadline, evidence and a ledger entry.",
+    "so_what": "A team that records backward flows as flags finds them at the year-end close; a team that records them as events with their own states can say on any day how much paid-out money is still provisional, which disputes are due this week, and which refunds have not arrived.",
+    "callback": {
+      "to": "The introduction's question about Mila's €120 on 11 March 2027: in what sense was the payment ever finished?",
+      "how": "The reader can now answer: it was finished as a forward payment and open as a liability until at least 7 July, and for a ten-class pass possibly longer, because the window can count from the date the service was expected."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Give refunds and disputes records of their own with both references, read every deadline from the provider, capture evidence at the sale, decide the refund-resolve-accept-contest policy in advance, and keep a figure for paid-out volume still inside the dispute window. Nine questions to ask follow."
+    },
+    "hand_off": {
+      "to": "payment-economics",
+      "relationship": "cause_effect",
+      "carries_over": "The full chain in both directions: an issuer that promises and can take the money back, a network that guarantees settlement, an acquirer or provider that pays out and stands behind the merchant.",
+      "introduces": "What each party charges for the promise it carries, who sets that price, and what the provider's own share leads it to build."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The failures and their repairs.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p47",
+        "form": "list",
+        "controlling_idea": "Established: the three routes have different owners, the issuer rules a dispute under network rules within limits that start from the transaction, a refund is a separate transaction that can fail, and monitoring programs count disputes whatever their outcome.",
+        "function": "synthesis"
+      },
+      {
+        "id": "p48",
+        "form": "list",
+        "controlling_idea": "Depends on context: whether to refund first, resolve early, accept or contest; how long to keep a record open; and how much of the provider's dispute model to mirror.",
+        "function": "synthesis",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What the field agrees on.",
+          "introduces": "What changes with the situation.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p49",
+        "form": "list",
+        "controlling_idea": "The author's synthesis: 'paid' is a position on a calendar and not an end state, and the exposure figure that follows from it belongs on a platform's dashboard.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is established and what depends on context.",
+          "introduces": "The author's own judgement, labeled as such.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p50",
+        "form": "list",
+        "controlling_idea": "Nine questions let the reader test how a system or a provider handles money flowing backward.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The take-aways.",
+          "introduces": "Questions that apply them.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p51",
+        "controlling_idea": "With the chain complete in both directions, the next question is what each party charges for the promise it carries.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "Issuer, network and provider, each able to send money forward or take it back.",
+          "introduces": "The price of each party's promise, and what the provider's share leads it to build.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "The authorization reversal as a message, holds and their expiry, incremental and partial authorization.",
+      "covered_in": [
+        "payment-authorization"
+      ]
+    },
+    {
+      "topic": "Capture, clearing, settlement and payout mechanics.",
+      "covered_in": [
+        "clearing-and-settlement",
+        "payouts-and-money-movement"
+      ]
+    },
+    {
+      "topic": "What a refund or a dispute costs in interchange, scheme fees and provider pricing.",
+      "covered_in": [
+        "payment-economics"
+      ]
+    },
+    {
+      "topic": "The 3-D Secure liability shift and which fraud disputes it moves to the issuer.",
+      "covered_in": [
+        "three-d-secure-and-sca"
+      ]
+    },
+    {
+      "topic": "Fraud scoring, card testing and how dispute labels train risk models.",
+      "covered_in": [
+        "payment-fraud-and-risk"
+      ]
+    },
+    {
+      "topic": "Who bears a seller's refund or lost dispute on a platform, and the mechanics of splits, transfer reversals and negative balances.",
+      "covered_in": [
+        "platform-payment-models",
+        "splits-balances-and-platform-payouts"
+      ]
+    },
+    {
+      "topic": "Ledger design and reconciliation jobs for backward flows.",
+      "covered_in": [
+        "payment-ledgers",
+        "payment-reconciliation-and-reporting"
+      ]
+    },
+    {
+      "topic": "Dispute rights and refund windows of each local payment method in detail.",
+      "covered_in": [
+        "local-payment-methods"
+      ]
+    },
+    {
+      "topic": "The full end-to-end dispute journey with every message.",
+      "covered_in": [
+        "journey-dispute"
+      ]
+    },
+    {
+      "topic": "American Express, Discover, Cartes Bancaires and other networks' dispute rules beyond a mention."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "Mastercard's own Chargeback Guide and Transaction Processing Rules were not readable (HTTP 403); Mastercard cycles, deadlines and Excessive Chargeback Program thresholds are reported as Stripe and Adyen render them.",
+    "Adyen's chargeback fee is set in the contract and non-refundable (terms, clause 8.2); the one published amount is CAD 24.00 in Adyen Canada's fee disclosure. Its refund fee amounts were not found.",
+    "'Visa Claims Resolution' and its 2018 date do not appear by name in the Visa rule text; the chapter uses the rulebook's own terms and says so.",
+    "Ethoca alerts and Verifi's Cardholder Dispute Resolution Network could not be read from their owners' current pages; they are mentioned only through Stripe's and Adyen's documentation.",
+    "Adyen documents no endpoint that returns a dispute's current state on the pages read; whether one exists elsewhere was not established.",
+    "Whether Bram's February payment carried a 3-D Secure liability shift is not a ledger fact; the worked example assumes it did not and says so."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "Use Visa's rulebook terms (dispute, dispute response, pre-arbitration, arbitration) as the primary vocabulary and give 'chargeback' and 'representment' as the older and still common names, because the rulebook is the only primary network source that was readable.",
+      "rejected": [
+        "Organize the lifecycle around 'Visa Claims Resolution' and Mastercard's cycle names, which could not be verified in primary text."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Treat designs and trade-offs as one section with two decisions (record model, answer policy), since the realistic design choices for an integrator are these two and each has a table.",
+      "rejected": [
+        "Separate 'designs' and 'trade-offs' sections, which would split each decision from its comparison."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Work the €120 dispute on Adyen (Studio Noord's provider in the ledger) and give the Stripe version as 'had Studio Noord been on Stripe', leaving the dispute's outcome open as two branches so the journey chapter can fix it.",
+      "rejected": [
+        "Fixing a won or lost outcome here, which belongs to journey-dispute."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Flow rubric (sound with notes): acted on the notes about declarations (the refund section is now declared as grouping, the provider comparison has a declared flow) and about terms (pre-arbitration and reason code are defined where first used; the last failure paragraph carries the failure instance, not the rule). Not acted on, left to the author: moving the unknown-capture-state paragraph (p16) next to the reversal definition, and merging p22 with p23 and p27 with p28; each pair holds two controlling ideas (a rule and its consequence) that the acceptance probes test separately.",
+      "rejected": [
+        "Reordering after a sound verdict, which would require a new rubric run for no change in verdict class."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Give platform liability one sentence and two links (consistency ruling 7).",
+      "rejected": [
+        "Explaining Connect charge types and Adyen split logic here."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/PLAN.md",
+      "contributed": "The chapter contract: question, coverage, owned terms, Larkfield thread."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/journal-spec.json",
+      "contributed": "Intent, acceptance criteria, thesis, role and the neighbours' transitions, copied unchanged."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/_research/scenario-ledger.md",
+      "contributed": "The €120 dispute, Mila's class pass, the Unexplained €0.4 Million and its breakdown, Keel decisions K2 and K3, volumes."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/_research/consistency-issues.md",
+      "contributed": "Rulings 7, 12, 15 and 17."
+    },
+    {
+      "kind": "external",
+      "ref": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf",
+      "contributed": "Definitions (dispute, dispute response, arbitration, authorization reversal, credit transaction, compelling evidence, rapid dispute resolution), the four categories, process tables 11-2 and 11-3, time limits, the 24 April 2027 netting rule."
+    },
+    {
+      "kind": "external",
+      "ref": "Visa Acquirer Monitoring Program Overview (fact sheet), Visa, 2025, https://corporate.visa.com/content/dam/VCOM/corporate/visa-perspectives/security-and-trust/documents/visa-acquirer-monitoring-program-fact-sheet-2025.pdf",
+      "contributed": "The VAMP ratio, exclusions and thresholds."
+    },
+    {
+      "kind": "external",
+      "ref": "Stripe documentation and pricing, n.d., accessed 2026-11 (refunds, how disputes work, responding, arbitration, Dispute and Refund objects, monitoring programs, dispute prevention, SEPA Direct Debit, iDEAL, fraud types, Connect disputes, Netherlands pricing)",
+      "contributed": "Stripe's refund funding and failure rules, dispute object and money movement, fees, monitoring statements, non-card dispute rules."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen documentation and pricing, n.d., accessed 2026-11 (refund, reversal, cancel, dispute process and flow, dispute timeframes, Visa and Mastercard chargebacks, manage disputes, Disputes API, reason codes, monitoring, SEPA Direct Debit, split chargebacks)",
+      "contributed": "Adyen's modification model, dispute stages and events, deadlines, auto-defense, monitoring statements, platform chargeback logic."
+    },
+    {
+      "kind": "external",
+      "ref": "Directive (EU) 2015/2366 (PSD2), 25 November 2015, Articles 71, 76 and 77, http://publications.europa.eu/resource/celex/32015L2366 (evidence age: 11 years; in force)",
+      "contributed": "The eight-week and thirteen-month rights for direct debits."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 89 claims checked (81 confirmed, 2 corrected, 4 hedged, 0 unsupported and removed or relabeled, 2 unreachable); the \"usually 7-21 days\" response time was attributed to Stripe's page on responding and is on its page on how disputes work, and 29 inline external links were reduced to plain text under ruling 22."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Initial outcome spec written from the PLAN contract and the cards, stripe-api, adyen-api, acquiring and platforms research briefs; every quotation re-fetched from its source on this date. Status draft."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: 3 statements of absence re-tested with a wide search (0 overturned, 1 narrowed, 2 hold; table in _research/absence-audit/04-refunds-reversals-and-disputes.md). Narrowed: Adyen's terms call the chargeback fee non-refundable and set its amount in the contract; no amount is published."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Ruling 46(f) applied: Adyen's chargeback fee is contractual and 'non-refundable' (terms, clause 8.2); the one published amount is CAD 24.00 in Adyen Canada's fee disclosure. Prose, table cell and Sources note updated to match chapter 45."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('Adyen's dispute fee is stated as not public' -> 'Adyen's dispute fee is stated as set by contract, with the o')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('Adyen's dispute fee is not public, and Mastercard's' -> 'Adyen's dispute fee is set by contract (the one amount on it')."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Sweep of rulings 46-48: acceptance criterion 3 and thesis how_why no longer call Adyen's dispute fee 'not public': it is set by contract, with CAD 24.00 in Adyen Canada's fee disclosure (ruling 46f). Prose unchanged."
+    }
+  ],
+  "length": {
+    "target_words": 5500,
+    "max_words": 6500
+  }
+}

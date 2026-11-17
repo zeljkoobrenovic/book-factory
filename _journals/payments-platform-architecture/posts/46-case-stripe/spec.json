@@ -1,0 +1,1404 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "case-stripe",
+  "journal": "payments-platform-architecture",
+  "part": "part-10",
+  "title": "Case: Stripe, the Developer Platform That Became Financial Infrastructure",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "The history in dated steps: launch in 2011, Connect in October 2012, Billing, Issuing and Terminal in 2018, Tax and Revenue Recognition in 2021; acquisitions separated into announced and completed (TaxJar and Recko 2021, Lemon Squeezy 2024, Bridge completed February 2025, Metronome completed January 2026, OpenRouter and Parafin announced and not confirmed closed on 17 November 2026); the self-description moving from 'economic infrastructure for the internet' to 'the programmable financial services company'.",
+        "The regulated layer as Stripe documents it: e-money institutions in the UK (2017 page) and Ireland (2019), state money-transmitter licenses in the US, 'Stripe is not a bank', and an acquirer disclosure (accessed November 2026) that names Stripe entities as acquirer in the EEA, the UK and much of Asia-Pacific, other named acquirers, most of them banks, in markets that include the United States, Canada, Japan, India and Thailand, and a Stripe limited-purpose bank, in business since 28 May 2026, among the six US acquirers.",
+        "The published figures with what they are: 'total volume' of $1.9 trillion in 2025, undefined and renamed between letters; 'more than 5 million businesses directly or via platforms'; a Revenue suite 'on track' for a $1 billion run rate; 'robustly profitable' with no measure named; no revenue, margin or headcount since November 2022; valuations that are prices from funding rounds and tender offers.",
+        "The documented engineering record and its age: API versioning and idempotency (2017), the payments API's first ten years (2020), the Ledger (2024, 2026), reliability figures from the 2023 letter, hosting on AWS (2023), and where it stops (sponsor-bank shares, the internals behind the newer products, which regions it runs in)."
+      ],
+      "believe": [
+        "Stripe is not a thin layer over other people's banks in every market, and not a bank in any; which it is depends on the country and the product.",
+        "What a builder can take from Stripe is its interface discipline, which is documented and works at any size, not its scale machinery or its product count."
+      ],
+      "can_do": [
+        "Say, for a given country, who Stripe names as the acquirer and what kind of regulated entity stands behind a Stripe balance, and what Stripe does not publish about either.",
+        "Read a Stripe figure and state what it measures, who selected it and what it cannot be compared with.",
+        "Separate, in Stripe's engineering publications, practices to adopt from machinery sized for Stripe, with the age of each source."
+      ]
+    },
+    "audience": {
+      "who": "A software engineer or architect who integrates with or evaluates Stripe, or is building a payment service, and knows the company by reputation.",
+      "already_knows": [
+        "The mechanisms of Parts I to VIII: acquiring, licenses and safeguarding, ledgers, API design, idempotency, versioning, webhooks, billing, fraud, platforms, reliability.",
+        "Larkfield, its two providers and the Keel decisions."
+      ],
+      "does_not_know": [
+        "Stripe's history by date, which purchases have closed, and what its published figures measure.",
+        "Who Stripe names as acquirer per country and what kind of regulated entity it is.",
+        "Which of Stripe's engineering publications are old and which later documents confirm them."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given the claim that Stripe does not touch the money, the reader answers from Stripe's own legal pages, by region, and says what remains unpublished.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A colleague says: 'Stripe is software on top of banks; it never acquires a payment or holds funds itself.' Using only this chapter: what does Stripe's own record show, region by region, and what does it leave unsaid?",
+        "expected": "Stripe's acquirer disclosure names a Stripe entity as the acquirer (the network member that submits the merchant's card transactions and receives the money for them) in the EEA, the UK and much of Asia-Pacific; those entities are e-money institutions regulated in Ireland and the UK, which may hold customer funds as safeguarded balances but are not banks. In the United States, Canada, Japan, India and Thailand Stripe is a payment facilitator or aggregator under named acquirers, most of them banks (card companies in Japan), and the US list now also has Stripe's own Georgia limited-purpose bank, in business since 28 May 2026. 'Stripe is not a bank': deposit accounts in its treasury product are provided by a partner bank. A direct technical connection to a card network, which Stripe announced for six networks in 2020, is not the same as being the acquirer of record. Not public: the share of volume per acquirer, which merchants the Georgia bank acquires for and how much it processes, the names of the safeguarding banks, and Stripe's reasons for the partner-bank model."
+      },
+      {
+        "id": "AC-2",
+        "statement": "Given a sentence that misuses Stripe's published numbers, the reader corrects each figure from the chapter.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "An investment memo says: 'Stripe's revenue grew 34% to $1.9 trillion in 2025, it employs about 7,000 people, and its market capitalization is $159 billion.' Using only this chapter: correct the sentence.",
+        "expected": "$1.9 trillion is 'total volume' generated by businesses running on Stripe, up 34%: the value of payments moved, of which a provider keeps a small fraction, not revenue; the letters do not define it and the metric's name changed between years. Stripe has never published revenue or margin; its letters say 'profitable' without naming a measure. 'Almost 7,000' is from a company email of November 2022, the last official headcount. $159 billion is the price of a February 2026 tender offer for employees' shares, not a market capitalization; Stripe is private."
+      },
+      {
+        "id": "AC-3",
+        "statement": "The reader separates the Stripe practices a small payments team should adopt from the machinery it should not copy, with the reason and the age of the evidence.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A payments team of twelve at a travel-booking company wants to 'build like Stripe' and proposes sharding its database and deploying hundreds of times a day. Using only this chapter: what should the team take from Stripe's record, what should it leave, and why?",
+        "expected": "Take: an idempotency key on every money-moving request; dated API versions that a client pins and upgrades on a schedule; a payment object with explicit states that a client can read again after a timeout; an immutable double-entry ledger whose clearing accounts must return to zero, checked continuously. Leave: the database platform and its shards, a test fleet of about 1.4 million tests, about 400 deploys a day of one core service, rollouts inspected against tens of thousands of metrics. Reason: the first group is about correctness at the interface and holds at any volume; the second answers Stripe's volume and engineer count. Several of the sources are from 2017 to 2020 and may describe replaced systems; the chapter says which later documents confirm them."
+      },
+      {
+        "id": "AC-4",
+        "statement": "A reader of the introduction alone (the callouts and the paragraphs before the first section heading) can predict the chapter's sections and the kind of evidence it uses.",
+        "check": "intro_predicts_content",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "After reading only the introduction: what will this chapter establish about Stripe, in what order, and from what kinds of source?",
+        "expected": "How to read the case and where sources were unreachable; history and acquisitions by date; the interface as the first product; the suite; licenses, partner banks and charters; the figures and what they are; the documented engineering record; what transfers and what does not; where the evidence stops. Sources: annual letters, press releases, legal and documentation pages, engineering posts, each dated, with trade press named as such."
+      }
+    ]
+  },
+  "thesis": {
+    "question": "What does Stripe's dated public record show about how a developer platform became financial infrastructure, and which of its practices can a builder use?",
+    "claim": "Stripe's record shows a company that made the developer's interface its first product and then widened from it in two directions: outward into a suite of billing, tax and finance products, several of them bought, and downward into the regulated layer, which it holds as a non-bank assembled per market from e-money licenses, named acquirers, most of them partner banks, and, since 2025, narrow charters. A builder can use the interface discipline Stripe has documented (idempotency keys, dated versions, a payment object whose state can be read again, a ledger whose clearing accounts must empty) and should not copy its sharded data platform, its deploy rate or its product count.",
+    "disputed_by": "Two opposite views, each held by experienced engineers: that Stripe is a thin software layer over other companies' banks and acquirers, suited to startups, and so has little to teach about the money path; and that Stripe is the model architecture, so that a serious payments team should reproduce its sharded data platform, its deploy rate and its breadth.",
+    "so_what": "A team evaluating Stripe asks which entity acquires and which holds funds in each country it sells in, treats the named acquirer as data that can change, and tests the integration between Stripe products that arrived by acquisition instead of assuming it. A team building its own payment service takes the four interface practices into its design and budgets nothing for imitating Stripe's infrastructure.",
+    "how_why": "Stripe's 2022 letter lists 'simple, reliable, secure, and developer-friendly APIs' among the ways it pursues its mission, and its engineering posts (2017, 2020) describe the API as something designed, versioned and corrected over years: idempotency keys and dated versions in 2017 posts, the payment object and its states in 2020, and the Ledger with clearing accounts that return to zero in 2024. Those four practices concern correctness at the interface and work at any volume; the data platform and the deploy rate answer Stripe's volume and engineer count, which a builder does not have. The products around it came in dated steps and partly by purchase: tax (TaxJar, 2021), reconciliation (Recko, 2021), stablecoins (Bridge, 2025), usage billing (Metronome, 2026). The regulated layer is visible in legal pages, not in strategy statements: Stripe entities, regulated as e-money institutions in Ireland and the UK, are the named acquirer in the EEA, the UK and much of Asia-Pacific; other acquirers, most of them banks, are named for markets that include North America, Japan, India and Thailand; a Georgia limited-purpose bank of Stripe's own appears in the US list (the state regulator's bulletin dates its approval to 30 June 2025 and its start of business to 28 May 2026), and a February 2026 letter from the US regulator of national banks gives Bridge preliminary conditional approval for a trust charter. Stripe has not said why it uses partner banks, what share each acquirer carries, or what it earns: it publishes volume ($1.9 trillion in 2025, undefined) and customer counts, never revenue. The chapter stops where those documents stop.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "The dated record shows an order of construction: an API for developers in 2011, a product for platforms in 2012, a suite of billing, issuing, in-person, tax and finance products from 2018, and from 2020 a series of purchases that must be read as announced or completed."
+      },
+      {
+        "id": "S2",
+        "claim": "Stripe treated the interface as a product with a history: its own posts describe idempotency keys and dated versions (2017), a payment object redesigned around explicit states (2018 to 2020) and a ledger whose clearing accounts must empty (2024), and later documents confirm each."
+      },
+      {
+        "id": "S3",
+        "claim": "The regulated layer is a non-bank assembled per market: Stripe e-money institutions are the named acquirer in the EEA, the UK and much of Asia-Pacific, other acquirers, most of them banks, are named in markets that include the United States, Canada, Japan, India and Thailand, and two narrow charters were added in 2025 and 2026; Stripe has published neither its reasons nor any share of volume."
+      },
+      {
+        "id": "S4",
+        "claim": "Every published Stripe figure is selected by the company and most are undefined: 'total volume' is not revenue, 'profitable' names no measure, the last headcount is from 2022 and a valuation is the price of a funding round or a tender offer."
+      },
+      {
+        "id": "S5",
+        "claim": "The engineering record divides into practices about correctness at the interface, which hold at any volume, and machinery sized for Stripe's volume and engineer count, which a builder should not copy; several sources are six to nine years old, and the record stops at named places."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Supplies the first company's record on its own terms, including the facts that do not fit the 'abstraction only' reading, so that the comparison in chapter 48 rests on dated documents and not on Stripe's reputation.",
+    "supports": [
+      "P10-1"
+    ]
+  },
+  "flow": {
+    "pattern": "grouping",
+    "additional_patterns": [
+      {
+        "pattern": "chronological",
+        "applies_to": "history, and the order history, interface, suite, regulated-layer, which follows the order in which Stripe built them"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "transfers"
+      }
+    ],
+    "rationale": "The sections follow the order in which Stripe built: dates, then the interface that came first, then the products around it, then the permissions under them. The figures come after the things they count, and the engineering record after the figures because its numbers borrow them. Sorting what transfers needs every earlier section, and the limits of the evidence come last so that they qualify the whole. Moving the regulated layer before the suite would hide that licenses followed products; moving the figures first would invite reading volume as the story."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "Two sentences from Stripe's own pages, both current in November 2026: 'Stripe is not a bank', in its treasury documentation, and, in its acquirer disclosure for the European Economic Area, 'Payment Method Acquirer is Stripe Technology Europe, Ltd.' An engineer who has heard that Stripe is software on top of other people's banks has to explain the second; one who wants to 'build like Stripe' has to say which Stripe."
+    },
+    "bridge": {
+      "from_reader_world": "Engineers know Stripe as an API and a set of client libraries, and carry one of two opinions about it: a thin layer for startups, or the architecture to imitate.",
+      "to_topic": "Both opinions are claims about a company's record, and the record is public only in part: letters, press releases, legal pages, documentation and engineering posts, each with a date."
+    },
+    "thesis_statement": {
+      "text": "Stripe's record shows a company that made the developer's interface its first product and then widened from it in two directions: outward into a suite of billing, tax and finance products, several of them bought, and downward into the regulated layer, which it holds as a non-bank assembled per market from e-money licenses, named acquirers, most of them partner banks, and, since 2025, narrow charters. A builder can use the interface discipline Stripe has documented (idempotency keys, dated versions, a payment object whose state can be read again, a ledger whose clearing accounts must empty) and should not copy its sharded data platform, its deploy rate or its product count.",
+      "placement": "KEY POINTS bullets and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p04",
+      "promises": [
+        {
+          "promise": "Say how the evidence is labeled, when it was read and which sources could not be reached.",
+          "kept_in": [
+            "method"
+          ]
+        },
+        {
+          "promise": "Give the history and the acquisitions by date, announced kept apart from completed.",
+          "kept_in": [
+            "history"
+          ]
+        },
+        {
+          "promise": "Show the interface as the first product.",
+          "kept_in": [
+            "interface"
+          ]
+        },
+        {
+          "promise": "Describe the suite around it: what was built, what was bought.",
+          "kept_in": [
+            "suite"
+          ]
+        },
+        {
+          "promise": "Set out licenses, partner banks and charters by region.",
+          "kept_in": [
+            "regulated-layer"
+          ]
+        },
+        {
+          "promise": "Read the published figures for what each one is.",
+          "kept_in": [
+            "figures"
+          ]
+        },
+        {
+          "promise": "Go through the documented engineering record with the age of each source.",
+          "kept_in": [
+            "engineering"
+          ]
+        },
+        {
+          "promise": "Separate what transfers to a builder from what does not.",
+          "kept_in": [
+            "transfers"
+          ]
+        },
+        {
+          "promise": "State where the evidence stops.",
+          "kept_in": [
+            "evidence-stops"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "function": "context",
+        "organization": "illustration",
+        "controlling_idea": "Two current sentences from Stripe's own pages, 'Stripe is not a bank' and a disclosure naming a Stripe company as the acquirer in Europe, do not fit either common opinion about the company.",
+        "evidence": [
+          {
+            "kind": "quotation",
+            "what": "'Stripe is not a bank. Checking accounts are provided exclusively by Fifth Third Bank, National Association, Member FDIC' (Stripe documentation, Treasury, https://docs.stripe.com/treasury.md, n.d., accessed 2026-11).",
+            "shows": "The company states that it does not hold a banking license."
+          },
+          {
+            "kind": "quotation",
+            "what": "'European Economic Area: Payment Method Acquirer is Stripe Technology Europe, Ltd.' (Stripe, 'Acquirer Disclosure & Acquirer Terms', https://stripe.com/en-us/legal/acquirer-disclosure, n.d., accessed 2026-11).",
+            "shows": "In Europe the regulated party that submits card transactions is a Stripe company, which the 'software over banks' opinion cannot explain."
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "function": "claim",
+        "controlling_idea": "Stripe's record shows a company that made the developer's interface its first product and then widened outward into a suite and downward into the regulated layer as a non-bank assembled per market; a builder can use its documented interface discipline and should not copy its scale machinery or product count.",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "The thesis claim from the journal spec, stated in plain words with the two directions named.",
+            "shows": "Gives the reader the claim before the evidence."
+          }
+        ],
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "The two sentences that fit neither opinion.",
+          "introduces": "The reading that fits both: an order of construction with two directions of widening.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "function": "context",
+        "controlling_idea": "The case bears on Mila's class pass because Larkfield (fictional) runs 44% of its member payment volume on Stripe, and the answer to 'who acquired this payment' would differ by studio country had the pass been sold there.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Scenario ledger: Mila's ten-class pass for EUR 120.00 on 9 March 2027 at Studio Noord, which is on Adyen; Stripe carries 44% of 2026 member payment volume (EUR 493M) and the United Kingdom, the United States and Belgium; chapter 6's acquirer inventory names Stripe Technology Europe, Ltd. for NL/DE/BE and Stripe Payments UK, Ltd. for the UK.",
+            "shows": "Ties a company chapter to the book's recurring payment without inventing provider behavior."
+          }
+        ],
+        "transition_in": {
+          "relationship": "example",
+          "carries_over": "The claim about Stripe.",
+          "introduces": "Where the recurring payment meets this company.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "function": "transition",
+        "controlling_idea": "The chapter goes from how to read the case, through history, interface, suite, regulated layer, figures and engineering record, to what transfers and where the evidence stops, using letters, press releases, legal and documentation pages and engineering posts, each dated.",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The claim and its bearing on Larkfield.",
+          "introduces": "The order of the sections and the kinds of source.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "method",
+      "heading": "How to Read This Case",
+      "controlling_idea": "The case rests on documents Stripe published, read on 17 November 2026, each labeled by kind and age, and some sources could not be reached.",
+      "function": "definition",
+      "advances_thesis": {
+        "supports": [
+          "S4",
+          "S5"
+        ],
+        "how": "Sets the rule that a sentence about Stripe is worth its source, which the figures and engineering sections depend on."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "Labels first, then the gaps: the reader needs the labels to read the gaps."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The roadmap's promise of dated sources.",
+        "introduces": "The labels, the cut-off date and the holes in the reading.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p05",
+          "function": "definition",
+          "controlling_idea": "Every statement in the case is a documented fact with its year, a trade-press report named as such, or the author's inference in a marked block; Stripe is private, so its numbers come from letters and press releases, never from audited accounts.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Research cut-off 17 November 2026; the style guide's evidence labels; evidence older than about three years carries an 'Evidence age' mark.",
+              "shows": "Tells the reader how to weigh each sentence."
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe publishes annual letters (2022 to 2025 letters read as PDFs) and newsroom releases; no financial statements.",
+              "shows": "Explains why the figures section can only quote and define."
+            }
+          ]
+        },
+        {
+          "id": "p06",
+          "function": "context",
+          "controlling_idea": "Several sources could not be reached or verified, and the case says so instead of filling the gaps: a European licenses page, launch dates of three products and current headcount; the Georgia charter dates come from the regulator's bulletin.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Research limitations: Stripe's European licenses page returned 404 (re-tested 2026-11-17); the Georgia charter dates come from the Georgia Department of Banking and Finance's May 2026 bulletin and Stripe's MALPB terms, with the trade-association item (ICBA, 2025-07-08) used only for what the charter permits; launch dates of Radar (2016), Treasury (2020) and Link not verified from a dated Stripe page; newsroom pages were served in a Netherlands locale with British spelling; no official headcount after 2022-11-03.",
+              "shows": "Marks which facts in later sections are secondary or missing."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What was read and how it is labeled.",
+            "introduces": "What could not be read.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "history",
+      "heading": "The History in Dated Steps: 2010 to 2026",
+      "controlling_idea": "Stripe's products arrived in a datable order: an API in 2011, platforms in 2012, a cluster of new products in 2018 and 2021, and from 2020 purchases that are either announced or completed.",
+      "function": "evidence",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "Supplies the dates on which 'interface first, then suite, then regulated layer' rests."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "Launches, then purchases, then how the company's description of itself changed; inside the first two groups the items run by date, and the third is read against both."
+      },
+      "transition_in": {
+        "relationship": "sequence",
+        "carries_over": "The rules for reading the evidence.",
+        "introduces": "The record itself, starting with dates.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p07",
+          "function": "evidence",
+          "organization": "narration",
+          "controlling_idea": "Stripe launched in 2011 with a payments API, added Connect for platforms in October 2012, and added most of today's product names in two clusters, 2018 and 2021.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Dated steps, each from a Stripe release or post: launch 2011 (Stripe annual letter for 2023, published 2024-03-13 (https://stripe.com/annual-updates/2023): 'when Stripe launched in 2011'); Connect October 2012 (https://stripe.com/blog/the-new-connect, 2015-03-23); Atlas 2016-02-24; Billing 2018-04-05; Issuing 2018-07-26; Terminal 2018-09-17; Capital 2019-09-05; Tax 2021-06-10; Identity 2021-07-14; Revenue Recognition 2021-09-21; Financial Connections 2022-05-04; Tempo unveiled September 2025 and mainnet 2026-03-18 (all at https://stripe.com/newsroom/news/ and https://tempo.xyz/blog/mainnet).",
+              "shows": "The order is payments, platforms, then products around the payment; seven years pass between launch and the first cluster."
+            },
+            {
+              "kind": "quotation",
+              "what": "Investor quotes in Stripe releases: 'partners since 2010' (2026-02-24) and 'When we first partnered with Stripe in 2010' (2024-02-28).",
+              "shows": "Dates the company's start to 2010 without a founding document."
+            }
+          ]
+        },
+        {
+          "id": "p08",
+          "function": "evidence",
+          "controlling_idea": "From 2020 Stripe bought companies to fill named gaps, and on 17 November 2026 two of the purchases were announced and not confirmed closed.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Acquisitions with status: Paystack (agreement 2020-10-15); TaxJar ('will acquire', 2021-04-27); Bouncer (2021-05-14); Recko ('will acquire', 2021-10-20); Lemon Squeezy (announced by Lemon Squeezy 2024-07-26; site banner: shutting down 2027-03-31); Bridge (announced October 2024, completed 2025-02-04); Privy (July 2025, per 2026-02-24 release); Metronome (completed 2026-01-14); OpenRouter (agreement 2026-08-19); Parafin (agreement 2026-09-30, 'expected to close in the coming months'). Sources: https://stripe.com/newsroom/news/ slugs paystack-joining-stripe, taxjar, bouncer, recko, stripe-completes-bridge-acquisition, stripe-2025-update, stripe-completes-metronome-acquisition, stripe-agrees-to-acquire-openrouter, stripe-agrees-to-acquire-parafin; https://www.lemonsqueezy.com/blog/stripe-acquires-lemon-squeezy.",
+              "shows": "At least ten named purchases in six years; the status column keeps announced apart from completed."
+            },
+            {
+              "kind": "fact",
+              "what": "The newsroom list re-read on 17 November 2026 shows no completion release for OpenRouter or Parafin.",
+              "shows": "Supports 'not confirmed closed' as of the cut-off."
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "The products Stripe launched.",
+            "introduces": "The products it bought, from 2020, with their status.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p09",
+          "function": "analysis",
+          "controlling_idea": "The first line of Stripe's press releases changed from 'economic infrastructure for the internet' to 'the programmable financial services company', and the OpenRouter agreement shows the company describing its market as wider than payments.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'which builds economic infrastructure for the internet' (Series H release, 2021-03-14); 'a financial infrastructure platform for businesses' (2024-02-28); 'the programmable financial services company' (2025-12-11 and later), all at https://stripe.com/newsroom/news/.",
+              "shows": "The self-description moved from infrastructure to financial services in four years."
+            },
+            {
+              "kind": "quotation",
+              "what": "'Stripe is building the economic infrastructure for AI' (Patrick Collison, OpenRouter release, 2026-08-19); OpenRouter is 'a leading AI model gateway and routing platform'.",
+              "shows": "A purchase that is not a payments company, in the company's own words."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "What Stripe launched and bought.",
+            "introduces": "What it called itself while doing so.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "interface",
+      "heading": "The Interface Was the First Product",
+      "controlling_idea": "Stripe's first customers were developers at young companies, and its own posts describe the API as something designed, versioned and corrected over years.",
+      "function": "evidence",
+      "advances_thesis": {
+        "supports": [
+          "S2"
+        ],
+        "how": "Documents the four interface practices the thesis says a builder can use, with the age of each source and its later confirmation."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "First customers, then the API's redesign, then the two 2017 practices, then how the interface is governed today."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "The dated order in which products arrived.",
+        "introduces": "What came first in that order and how Stripe treated it.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p10",
+          "function": "evidence",
+          "controlling_idea": "Stripe started with self-service customers at technology companies and a published price, and says so; enterprises came later and pricing by negotiation with them.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Stripe grew up with companies in the technology sector' and the fourth of its 'four primary ways': 'Lowering the costs of scaling by providing simple, reliable, secure, and developer-friendly APIs and services' (Stripe annual letter for 2022, published 2023-04-05 (PDF linked from https://stripe.com/annual-updates/2022)).",
+              "shows": "The company names the developer interface as a way it pursues its mission."
+            },
+            {
+              "kind": "quotation",
+              "what": "'Stripe's enterprise user base has compounded since 2019' (Series I release, 2023-03-15); 'In many cases, the 'long tail' is much of the dog' (release of 2026-02-24).",
+              "shows": "Enterprise came second; small and international customers remain central."
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe pricing page (https://stripe.com/pricing, n.d., accessed 2026-11, Netherlands edition): a published standard rate per successful card charge and 'Design a custom package' with 'IC+ pricing' among the custom options.",
+              "shows": "The default is a blended published price; interchange-plus is available on request."
+            }
+          ]
+        },
+        {
+          "id": "p11",
+          "function": "evidence",
+          "controlling_idea": "The payments API was redesigned once, from a synchronous charge to a payment object with explicit states, and Stripe published what the old design got wrong and what the new one cost.",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "Michelle Bu, 'Stripe's payments APIs: The first 10 years', https://stripe.dev/blog/payment-api-design, 2020-12-15: Tokens and Charges 2011; Sources 2015; PaymentIntents and PaymentMethods 2018; 'rolling out this change took almost two years'.",
+              "shows": "Dates the redesign and its length."
+            },
+            {
+              "kind": "quotation",
+              "what": "'Charges and Tokens were foundational in the API because they were the first APIs we had, not because they were the right abstraction for global payments'; 'PaymentIntents is also objectively a harder integration for users who only care about accepting card payments in the US and Canada' (same post).",
+              "shows": "Stripe states both the error and the price of the correction."
+            },
+            {
+              "kind": "fact",
+              "what": "Current documentation (https://docs.stripe.com/payments/older-apis.md, n.d., accessed 2026-11) confirms the end state: Charges, Tokens and Sources get no further development.",
+              "shows": "A six-year-old source confirmed by current documents."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "Who the first customers were.",
+            "introduces": "What they were given, and how it was rebuilt.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p12",
+          "function": "evidence",
+          "controlling_idea": "Two 2017 posts describe idempotency keys and dated API versions, and current documentation confirms both while changing the release cadence.",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "Brandur Leach, 'Designing robust and predictable APIs with idempotency', https://stripe.com/blog/idempotency, 2017-02-22; current reference https://docs.stripe.com/api/idempotent_requests.md (n.d., accessed 2026-11): keys kept at least 24 hours.",
+              "shows": "The practice is nine years old and still the documented behavior of API v1."
+            },
+            {
+              "kind": "source",
+              "what": "Brandur Leach, 'APIs as infrastructure: future-proofing Stripe with versioning', https://stripe.com/blog/api-versioning, 2017-08-05: 'rolling versions that are named with the date they're released'; 'almost a hundred backwards-incompatible upgrades over the past six years'. 'Introducing Stripe's new API release process', https://stripe.com/blog/introducing-stripes-new-api-release-process, 2024-10-01: two named major releases a year.",
+              "shows": "Dated versions and pinning hold; the cadence was replaced in 2024."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The redesign of the payment object.",
+            "introduces": "Two older practices that surround every call to it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p13",
+          "function": "evidence",
+          "controlling_idea": "In 2026 Stripe described automated checks that every API change must pass, and a second namespace, v2, runs beside v1 without replacing it; payments remain in v1.",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "Mikael Mello and Anna Mason, 'How API changes flow into Stripe's developer products', https://stripe.dev/blog/how-api-changes-flow-into-stripes-developer-products, 2026-06-15: 'we've codified a set of design patterns that all APIs must follow'; v2 introduced in 2024.",
+              "shows": "The only current first-party account of how the interface is governed."
+            },
+            {
+              "kind": "fact",
+              "what": "https://docs.stripe.com/api-v2-overview.md (n.d., accessed 2026-11): 'You can use any combination of APIs in the /v1 or /v2 namespace in the same integration'; payment objects are absent from the v2 resources listed in the changelog of 2026-10-28.",
+              "shows": "Shows the redesign-by-addition pattern continuing, and its limit."
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "The practices of 2017 to 2020.",
+            "introduces": "What Stripe has said about the interface since 2024.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "suite",
+      "heading": "The Suite: Built, Bought and Sold Together",
+      "controlling_idea": "Around the payment Stripe sells named products, some built and some bought, and several of them can be used without Stripe processing the payment.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "Shows the outward widening and that parts of the suite arrived by purchase, which is why integration between them has to be tested."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "What the suite is, then its parts by origin, then the parts that detach from payments, then the newest additions."
+      },
+      "transition_in": {
+        "relationship": "additional_support",
+        "carries_over": "The interface as first product.",
+        "introduces": "The products built and bought around it.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p14",
+          "function": "evidence",
+          "controlling_idea": "Stripe sells named products with separate prices and reports that most of its largest customers use more than payments; its Revenue suite is the one group for which it gives a run rate.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Seventy-five percent of these global winners use Stripe for more than just payments' (Series I release, 2023-03-15, of the one hundred businesses handling more than $1 billion a year).",
+              "shows": "The suite is sold as a suite, by Stripe's own count."
+            },
+            {
+              "kind": "quotation",
+              "what": "'Stripe's Revenue and Finance Automation Suite, with Billing at its core, has now passed a $500 million revenue run rate. Billing is being used by more than 300,000 companies' (Stripe annual letter for 2024, published 2025-02-27 (https://stripe.com/annual-updates/2024)); 'Metronome joins our Revenue suite, which is on track to hit an annual run rate of $1 billion this year' (Stripe annual letter for 2025, published 2026-02-24 (https://stripe.com/annual-updates/2025)).",
+              "shows": "The only revenue-like statement Stripe makes, and it is a run rate for one product group."
+            }
+          ]
+        },
+        {
+          "id": "p15",
+          "function": "comparison",
+          "controlling_idea": "Tax, reconciliation, usage billing, merchant of record, stablecoins and platform credit each pair something Stripe built with something it bought, and the documentation shows the seams.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Product area, built, bought, state: tax (Stripe Tax 2021; TaxJar 2021); reconciliation (Recko 2021); usage billing (Meters API; Metronome completed 2026-01-14; docs: 'Metronome is Stripe's primary usage-based billing platform and the recommended starting point for all new integrations', https://docs.stripe.com/billing/subscriptions/usage-based.md, n.d., accessed 2026-11); merchant of record (Managed Payments, API changelog 2026-04-22; Lemon Squeezy bought 2024, shutting down 2027-03-31); stablecoins (Bridge 2025, Privy 2025; stablecoin balances in preview); platform credit (Capital 2019; Parafin announced 2026-09-30).",
+              "shows": "Each row is a place where two code bases met; two usage-billing paths are documented side by side."
+            },
+            {
+              "kind": "quotation",
+              "what": "'Metronome handles metering, rating, and billing, while Stripe handles payment collection, tax calculation, and revenue recognition' (https://docs.stripe.com/billing/subscriptions/usage-based/compare-metronome.md, n.d., accessed 2026-11).",
+              "shows": "Stripe documents the division of labor between a bought product and a built one."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The suite as Stripe counts it.",
+            "introduces": "Where each part came from.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p16",
+          "function": "evidence",
+          "controlling_idea": "Fraud scoring and billing can both be used with other processors, in-person and platform products share the payment object, and Stripe publishes a volume for none of them.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "'Radar can evaluate payments from any processor in real time and return risk signals' (https://docs.stripe.com/radar/multiprocessor.md, n.d., accessed 2026-11); October 2024: 'the ability to manage subscriptions with Stripe while processing transactions with other payments providers' (https://stripe.com/blog/our-biggest-ever-upgrades-to-stripe-billing, 2024-10-29).",
+              "shows": "Two suite products are documented as separable from Stripe's payment processing."
+            },
+            {
+              "kind": "fact",
+              "what": "Terminal: a Terminal payment is a PaymentIntent, listed in 24 countries (https://docs.stripe.com/terminal.md and supported-card-brands page, n.d., accessed 2026-11); no Terminal volume published. 'More than 18,000 platforms build on Stripe' (Parafin release, 2026-09-30).",
+              "shows": "What is shared is the object model; what is missing is any volume by product."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Products joined to the payment by purchase.",
+            "introduces": "Products that can be detached from it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p17",
+          "function": "evidence",
+          "controlling_idea": "The additions of 2025 and 2026 furthest from card payments are stablecoin infrastructure: an orchestration company, a wallet company, a blockchain Stripe helped start and stablecoin balances that are still in preview.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Bridge completed 2025-02-04; 'In July, Stripe acquired Privy'; 'In September, we unveiled Tempo, a blockchain purpose-built for payments, incubated together with Paradigm' (Stripe annual letter for 2025, published 2026-02-24 (https://stripe.com/annual-updates/2025)); Tempo mainnet 2026-03-18; stablecoin balances 'in public preview' in the United States (https://docs.stripe.com/financial-accounts/stablecoins.md, n.d., accessed 2026-11).",
+              "shows": "Dated and labeled by release phase; chapter 50 owns the detail."
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "The suite as it stood by 2024.",
+            "introduces": "What was added in 2025 and 2026.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "regulated-layer",
+      "heading": "The Regulated Layer: A Non-Bank Assembled per Market",
+      "controlling_idea": "By its own legal pages Stripe is the acquirer in some regions and a payment facilitator under named banks in others, is not a bank anywhere, and has not published why or in what proportions.",
+      "function": "evidence",
+      "advances_thesis": {
+        "supports": [
+          "S3"
+        ],
+        "how": "Carries the fact that contradicts 'abstraction only' and the facts that support 'not a bank', region by region."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "Terms, then regions where Stripe acquires, then regions where banks do, then the wire-versus-membership caution, then the new charters, then what is unpublished."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The products, which are visible in releases.",
+        "introduces": "The permissions under them, which are visible only in legal pages.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p18",
+          "function": "definition",
+          "controlling_idea": "Three terms decide the question: the acquirer is the network member that submits a merchant's card transactions and receives the money; an e-money institution is a licensed non-bank that may hold customer balances apart from its own funds; a partner bank lends its membership or its deposit accounts to a non-bank.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Definitions as owned by chapters 6 (acquiring-and-network-connectivity) and 16 (licences-and-safeguarding), restated in one clause each.",
+              "shows": "A cold reader can follow the regional table without the earlier chapters."
+            }
+          ]
+        },
+        {
+          "id": "p19",
+          "function": "evidence",
+          "controlling_idea": "In the EEA, the United Kingdom and much of Asia-Pacific the named acquirer is a Stripe company, and the European ones are e-money institutions.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Region, Stripe's stated role, acquirer named, from Stripe, 'Acquirer Disclosure & Acquirer Terms', https://stripe.com/en-us/legal/acquirer-disclosure, n.d., accessed 2026-11: EEA: Stripe Technology Europe, Ltd.; UK, Gibraltar, Switzerland: Stripe Payments UK, Ltd.; Australia, New Zealand, Singapore, Malaysia, Hong Kong, Brazil: a Stripe entity; United States: payment facilitator of Cross River Bank, Deutsche Bank Trust Company Americas, Fifth Third Bank, Pathward N.A., PNC Bank N.A. and Stripe MALPB; Canada: Peoples Trust Company, PNC Bank Canada; Japan: Sumitomo Mitsui Card; India: payment aggregator of RBL Bank; Thailand: Bank of Ayudhya; Mexico: both acquirer and payment facilitator; UAE: independent sales organization of Network International.",
+              "shows": "One undated page answers 'who acquires' per country; re-read on 17 November 2026."
+            },
+            {
+              "kind": "quotation",
+              "what": "'STEL is authorised as an electronic money institution by the Central Bank of Ireland (reference number: C187865) to ... acquire payment transactions' (https://stripe.com/stel/legal, 2019-04-05); 'SPUKL is authorised as an electronic money institution by the U.K. Financial Conduct Authority (reference number: 900461)' (https://stripe.com/gb/legal/spukl, 2017-01-26).",
+              "shows": "The acquiring entities are licensed non-banks; both pages are old and both entities appear in the current disclosure."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The three terms.",
+            "introduces": "The regions where the acquirer is Stripe.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "function": "evidence",
+          "controlling_idea": "In the United States, Canada, Japan, India and Thailand a named bank or card company is the acquirer and Stripe is a payment facilitator or aggregator; US balances rest on state money-transmitter licenses and partner banks.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Same disclosure page: 'Stripe, LLC is a Payment Facilitator of the following Payment Method Acquirers' (five banks and Stripe MALPB).",
+              "shows": "The US answer is mostly banks."
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe Payments Company 'is a U.S. state-licensed money transmitter' (https://stripe.com/en-us/legal/spc, updated 2025-11-18); licenses in 53 jurisdictions by the count made in chapter 16 (https://stripe.com/legal/spc/licenses); 'Stripe is not a bank' (https://docs.stripe.com/treasury.md); a US card program's issuer is Celtic Bank (https://stripe.com/legal/celtic-spend-card).",
+              "shows": "Each function in the US has its own license or partner."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Regions where Stripe is the acquirer.",
+            "introduces": "Regions where a bank is.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p21",
+          "function": "analysis",
+          "controlling_idea": "A direct technical connection to a card network, which Stripe announced for six networks in 2020, is not the same as being the acquirer of record.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Stripe now processes card transactions through direct integrations with all six major card networks in North America, Latin America, Europe and Asia Pacific' (https://stripe.com/en-ca/newsroom/news/direct-platform, 2020-04-23).",
+              "shows": "A statement about message exchange, six and a half years old, that says nothing about membership."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Who holds the membership.",
+            "introduces": "Who runs the wire, which is a different fact.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p22",
+          "function": "evidence",
+          "controlling_idea": "In 2025 and 2026 Stripe added two narrow charters, a Georgia bank that may acquire and a conditionally approved national trust bank for its stablecoin subsidiary, and neither takes deposits from the public.",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "Georgia Department of Banking and Finance, May 2026 bulletin (https://dbf.georgia.gov/financial-institutions-bulletin-2026): 'Stripe MALPB', Atlanta, approval date 30 June 2025, begin business date 28 May 2026. Stripe MALPB Acquirer Terms (https://stripe.com/legal/stripe-malpb-acquirer-terms, last updated 2026-05-28): 'a Georgia Merchant Acquirer Limited Purpose Bank', 'a member of the Networks, and a Payment Method Acquirer for Visa and Mastercard Transactions'; 'Stripe MALPB, 505 N Angier Avenue NE, Atlanta, GA' in the acquirer disclosure. ICBA news item, 2025-07-08 (secondary source), https://www.icba.org/w/georgia-approves-stripe-application-to-form-malpb: the charter 'will allow the financial services company to obtain direct membership with Visa and Mastercard and to process payments without a sponsoring bank'; such banks 'may not solicit or accept deposits from the general public'.",
+              "shows": "The approval and start dates are primary (regulator and Stripe's own terms); what the charter permits is from a secondary source."
+            },
+            {
+              "kind": "source",
+              "what": "OCC Corporate Decision #1365, https://www.occ.treas.gov/topics/charters-and-licensing/interpretations-and-decisions/2026/cd1365.pdf, 12 February 2026: 'The OCC has granted preliminary conditional approval only' for Bridge National Trust Bank.",
+              "shows": "A second narrow charter, not final at the cut-off."
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "The structure as it stood until 2025.",
+            "introduces": "What was added in 2025 and 2026.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p23",
+          "function": "analysis",
+          "controlling_idea": "Stripe has not published why it uses partner banks, what share of volume each acquirer carries, which merchants its Georgia bank acquires for, or which banks hold safeguarded funds.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Searched and not found: the four annual letters and the newsroom carry no statement of reasons; the acquirer disclosure gives no shares; the safeguarding pages name no banks (chapter 16). The nearest statement is a spokesperson quoted by trade press in April 2025 (Banking Dive, secondary source) calling the Georgia application an extension of work to expand the number of banking and other partners.",
+              "shows": "Marks the boundary between the documented structure and any explanation of it."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What the legal pages state.",
+            "introduces": "What no page states.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "figures",
+      "heading": "The Figures, and What Each One Is",
+      "controlling_idea": "Stripe publishes volume, customer counts, a run rate and prices from funding rounds and tender offers; it has never published revenue or margin, and each published figure has a definition problem.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "S4"
+        ],
+        "how": "Lets the reader correct a sentence that misuses Stripe's numbers."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "Volume first because it is the most misused, then counts and run rate, then valuation and headcount, then what cannot be compared."
+      },
+      "transition_in": {
+        "relationship": "additional_support",
+        "carries_over": "What Stripe does not publish about its regulated layer.",
+        "introduces": "What it does publish about its size, and what those numbers are.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p24",
+          "function": "evidence",
+          "controlling_idea": "'Total volume' of $1.9 trillion in 2025 is the value of payments made by businesses on Stripe, not revenue; the letters do not define it, and its name changed between years.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Letter wording by year: 2022 'more than $817 billion in total volume', up 26%; 2023 '$1 trillion in total payment volume', up 25%; 2024 '$1.4 trillion in total payment volume', up 38%; 2025 '$1.9 trillion in total volume, up 34% from 2024' (Stripe annual letter for 2022, published 2023-04-05 (PDF linked from https://stripe.com/annual-updates/2022); Stripe annual letter for 2023, published 2024-03-13 (https://stripe.com/annual-updates/2023); Stripe annual letter for 2024, published 2025-02-27 (https://stripe.com/annual-updates/2024); Stripe annual letter for 2025, published 2026-02-24 (https://stripe.com/annual-updates/2025)).",
+              "shows": "Four years of the same kind of figure under two names, with no definition in any letter."
+            },
+            {
+              "kind": "reasoning",
+              "what": "A provider keeps a small fraction of the value it moves as fees; Adyen's 2025 report shows 17.0 basis points of processed volume as net revenue, which is Adyen's ratio and cannot be applied to Stripe.",
+              "shows": "Shows the order of magnitude of the error in reading volume as revenue, without inventing a Stripe revenue."
+            }
+          ]
+        },
+        {
+          "id": "p25",
+          "function": "analysis",
+          "controlling_idea": "The customer count, the suite's run rate and the word 'profitable' are each narrower than they sound.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'more than 5 million businesses directly or via platforms' (Stripe annual letter for 2025, published 2026-02-24 (https://stripe.com/annual-updates/2025)); 'on track to hit an annual run rate of $1 billion this year' (same); 'robustly cashflow positive in 2023' (Stripe annual letter for 2023, published 2024-03-13 (https://stripe.com/annual-updates/2023)), 'profitable in 2024' (Stripe annual letter for 2024, published 2025-02-27 (https://stripe.com/annual-updates/2024)), 'robustly profitable' (Stripe annual letter for 2025, published 2026-02-24 (https://stripe.com/annual-updates/2025)).",
+              "shows": "The count includes businesses reached through platforms; a run rate is a pace, not a year's total; no letter names a profit measure."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The volume figure.",
+            "introduces": "The other three figures the letters give.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p26",
+          "function": "evidence",
+          "controlling_idea": "Stripe's valuations are prices at which employees' shares were bought, and its last official headcount is from November 2022.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "$95B Series H (2021-03-14); $50B Series I (2023-03-15); tender offers at $65B (2024-02-28), $91.5B (2025-02-27) and $159B (2026-02-24), all from Stripe releases at https://stripe.com/newsroom/news/.",
+              "shows": "Primary sources for every valuation, and a fall and recovery inside five years."
+            },
+            {
+              "kind": "quotation",
+              "what": "'which will return us to our February headcount of almost 7,000 people' (Patrick Collison's email, 2022-11-03, https://stripe.com/newsroom/news/ceo-patrick-collisons-email-to-stripe-employees).",
+              "shows": "The only official headcount, four years old."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Figures about the business.",
+            "introduces": "Figures about the company's price and size.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p27",
+          "function": "recommendation",
+          "controlling_idea": "Stripe's figures cannot be ranked against Adyen's processed volume or any listed company's revenue, and a team planning cost or capacity needs contractual numbers.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stripe's 'total volume' is undefined; Adyen's processed volume, PayPal's total payment volume and Block's gross payment volume each have their own rules (chapters 47 and 49).",
+              "shows": "Different measures under similar names."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Undefined and selected figures.",
+            "introduces": "What a reader may and may not do with them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engineering",
+      "heading": "The Engineering Record, and How Old It Is",
+      "controlling_idea": "Stripe has published a handful of first-party accounts of its own systems; the newest describe the ledger, the database platform and deployment practice, and nothing describes regions.",
+      "function": "evidence",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "Gives the documented basis, with ages, for sorting practices from machinery."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "The shape of the record first, then four groups from the money record outward: ledger, data store, how code is changed, where it runs."
+      },
+      "transition_in": {
+        "relationship": "additional_support",
+        "carries_over": "What the letters say about size.",
+        "introduces": "What the engineering posts say about how the systems are built.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p28",
+          "function": "evidence",
+          "controlling_idea": "Most of Stripe's engineering blog is integration guidance for customers; the accounts of its own systems are few, and their ages run from months to nine years.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Source, date, what it documents, later confirmation: idempotency post (2017-02-22; current API reference); versioning post (2017-08-05; 2024 release process, 2026 API-changes post); payments API history (2020-12-15; current docs); Ledger post (2024-02-16; fee-credits post 2026-04-16); DocDB post (2024-06-06; database-fleet post 2026-07-16); 2023 annual letter section on reliability (2024-03-13; proxy post 2026-08-26 restates the availability target); AWS release (2023-01-23; AWS observability post 2024-10-24).",
+              "shows": "Each old source is paired with the newer document that confirms or updates it."
+            },
+            {
+              "kind": "fact",
+              "what": "The stripe.dev blog index listed 128 posts on 17 November 2026, 28 tagged Engineering and 7 Infrastructure (https://stripe.dev/blog).",
+              "shows": "Sizes the record."
+            }
+          ]
+        },
+        {
+          "id": "p29",
+          "function": "evidence",
+          "controlling_idea": "The Ledger is an immutable double-entry log, fed by many systems, in which a clearing account that does not return to zero is the signal of an error; a 2026 post shows the design still in use.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'We built Ledger, an immutable and auditable log, as a trustworthy system of record for all of our financial data'; 'intermediate (clearing) pipes are empty'; 'Each day, Ledger sees five billion events and 99.99% of our dollar volume is fully ingested and verified within four days' (Ilya Ganelin, https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement, 2024-02-16).",
+              "shows": "The practice (clearing accounts must empty) and the scale (five billion events a day) in one source."
+            },
+            {
+              "kind": "source",
+              "what": "Pratik Gupta and Sai Samant, https://stripe.dev/blog/how-we-built-stripe-credits-a-programmable-auditable-way-to-pay-your-stripe-fees, 2026-04-16: financial accounts 'backed by a real bank account' and a ledger lifecycle 'submitted → prepared → disbursed'.",
+              "shows": "Confirms in 2026 that money movement is built on ledger accounts."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The list of sources.",
+            "introduces": "The first of them in detail: the ledger.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p30",
+          "function": "evidence",
+          "controlling_idea": "Stripe's operational data sits in a document database platform built on MongoDB and split across about 2,000 shards, with in-house proxies and a system for moving data between shards without downtime.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'It serves over five million queries per second'; '5,000+ collections distributed over 2,000+ database shards' (Jimmy Morzaria and Suraj Narkhede, https://stripe.dev/blog/how-stripes-document-databases-supported-99.999-uptime-with-zero-downtime-data-migrations, 2024-06-06).",
+              "shows": "Machinery whose size answers Stripe's load."
+            },
+            {
+              "kind": "quotation",
+              "what": "'A MongoDB shard—one of 2,000 that collectively processed $1.9 trillion in payments in 2025' (https://stripe.dev/blog/how-stripe-uses-graph-search-and-state-machines-to-auto-remediate-a-global-database-fleet, 2026-07-16).",
+              "shows": "The 2024 account still holds in 2026."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The ledger.",
+            "introduces": "The store under the product systems.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p31",
+          "function": "evidence",
+          "controlling_idea": "The 2023 letter gives the deployment figures usually quoted (about 400 deploys a day of one core service, about 1.4 million tests, rollouts checked against 55,000 metrics), and 2026 posts give a monorepo of about 50 million lines of Ruby and an availability target of 99.9995%.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'approximately 400 times in a typical day'; 'a battery of around 1.4 million tests'; 'Each progressive rollout is inspected against 55,000 different metrics' (Stripe annual letter for 2023, published 2024-03-13 (https://stripe.com/annual-updates/2023)).",
+              "shows": "The scale of the change machinery, from the company's own letter."
+            },
+            {
+              "kind": "fact",
+              "what": "'our monorepo is the order of 50 million lines of Ruby code' (https://stripe.dev/blog/selective-test-execution-at-stripe-fast-ci-for-a-50m-line-ruby-monorepo, 2026-04-09); 'we target 99.9995% reliability' (https://stripe.dev/blog/building-a-data-plane-from-scratch-stripes-own-high-performance-distributed-proxy, 2026-08-26); the metric's formula is not given.",
+              "shows": "Current figures for code size and target, with the definition gap stated."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "How data is stored and moved.",
+            "introduces": "How code is changed and what availability is aimed for.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p32",
+          "function": "evidence",
+          "controlling_idea": "Stripe said in 2023 that it runs on AWS, and has published nothing about which regions, how many, or whether its API is served from more than one at a time.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Stripe has long relied on AWS to provide the core compute infrastructure on which Stripe is built'; 'We couldn't run without AWS—and we wouldn't want to' (David Singleton, then chief technology officer; https://stripe.com/newsroom/news/amazon-and-stripe, 2023-01-23).",
+              "shows": "The hosting fact, almost four years old, consistent with a 2024 AWS blog post and current security documentation."
+            },
+            {
+              "kind": "fact",
+              "what": "For payments, no first-party source names an AWS region, a region count or a failover design (searched: documentation and support sitemaps, stripe.com, stripe.dev, web search; chapter 39). One two-region design is on record for another system: usage-event processing for billing runs 'in two geographic regions simultaneously' with automatic failover (Stripe blog, 2025-01-28).",
+              "shows": "Marks where the engineering record stops."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What is published about change and availability.",
+            "introduces": "What is and is not published about where it all runs.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "transfers",
+      "heading": "What Transfers to a Builder, and What Does Not",
+      "controlling_idea": "Four interface practices transfer to a team of any size because they concern correctness; the data platform, the test fleet, the deploy rate and the product count answer Stripe's scale and do not.",
+      "function": "recommendation",
+      "advances_thesis": {
+        "supports": [
+          "S5",
+          "S2"
+        ],
+        "how": "Turns the record into the thesis's second sentence: what to use and what not to copy."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The table first, then the take side, then the leave side, then one fictional company's version."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "The record, section by section.",
+        "introduces": "A sorting of it by whether a builder can use it.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p33",
+          "function": "comparison",
+          "controlling_idea": "Set side by side, each lesson from the record either concerns correctness at an interface or concerns capacity, and only the first kind transfers without Stripe's volume.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Lesson, Evidence, Transfers?: idempotency key on every money-moving request (2017 post; current reference) yes; dated versions pinned and upgraded on a schedule (2017 post; 2024 release process) yes; a payment object with explicit states that can be read again (2020 post; current docs) yes; immutable double-entry ledger with clearing accounts checked for zero (2024 post) yes, at small scale; sharded document database with a data movement platform (2024, 2026 posts) no; about 400 deploys a day behind 1.4 million tests and 55,000 metrics (2023 letter) no, the principle of staged rollout yes; a suite of twenty-odd products (releases) no; a regulated layer assembled per market (legal pages) not to copy, but to ask about.",
+              "shows": "The whole case in the form the style guide asks for."
+            }
+          ]
+        },
+        {
+          "id": "p34",
+          "function": "recommendation",
+          "controlling_idea": "A small payments team should take the four interface practices, because each protects a money movement from being duplicated, lost or misread and none needs volume to pay for itself.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Idempotency keys prevent a retried timeout from charging twice; a pinned dated version prevents a silent change of field meaning; a readable payment object resolves an unknown outcome; clearing accounts that must empty expose a missing or late movement. Chapters 18, 19, 8 and 12 own the mechanisms.",
+              "shows": "Each practice maps to a failure pattern the book names, independent of scale."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The table's 'yes' rows.",
+            "introduces": "Why they hold at any size.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p35",
+          "function": "recommendation",
+          "controlling_idea": "The same team should leave the shards, the test fleet, the deploy rate and the product count, because each answers a load or an engineer count the team does not have, and several of the sources may describe systems since replaced.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "2,000 shards serve five million queries a second; 1.4 million tests guard a 50-million-line code base changed by thousands of engineers; a twelve-person team has neither the load nor the people, and the 2017 to 2020 posts carry age marks.",
+              "shows": "Names the reason for each 'no' row."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What to take.",
+            "introduces": "What to leave, and why.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p36",
+          "function": "example",
+          "controlling_idea": "Larkfield (fictional) took the practices and none of the machinery: its Keel decisions K1, K2, K3 and K7 are the four practices at the size of one payment service, and its acquirer inventory records the Stripe entity or bank per market as data.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Scenario ledger: K1 one writer, one key; K2 the provider's record is the truth; K3 a ledger entry for every movement, clearing accounts return to zero; K7 versions upgraded on a calendar; chapter 6's acquirer inventory (Stripe Technology Europe, Ltd. for NL/DE/BE; Stripe Payments UK, Ltd.; in the US one of six named acquirers, an open question put to Stripe).",
+              "shows": "A worked instance of the take side, with no claim about Stripe's behavior."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The general sorting.",
+            "introduces": "One company's version of it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "evidence-stops",
+      "heading": "Where the Evidence Stops",
+      "controlling_idea": "Seven things a reader would want to know about Stripe are not in the public record as of 17 November 2026.",
+      "function": "synthesis",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S4",
+          "S5"
+        ],
+        "how": "States the limits of the case so that chapter 48 does not compare what was never published."
+      },
+      "flow": {
+        "pattern": "order_of_importance",
+        "rationale": "Money first (revenue, volume definition, acquirer shares), then structure (reasons, pending deals), then systems (internals, regions)."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "What the record supports.",
+        "introduces": "What it does not contain.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p37",
+          "form": "list",
+          "function": "synthesis",
+          "controlling_idea": "The record is silent on revenue and margin, on what 'total volume' counts, on acquirer shares and safeguarding banks, on Stripe's reasons for partner banks, on whether two purchases and one charter are final, on the internals behind most products, and on regions.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "The open questions of the companies, acquiring, ledger, API and scale briefs, each checked against the sources re-read on 17 November 2026.",
+              "shows": "Seven bullets, each a named absence."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "Read by date, Stripe is neither of the two things engineers say it is. The interface came first and is the best-documented part; the regulated layer came later, is real, differs by country and is the worst-documented part. What a builder can use is on the well-documented side, and what a buyer must ask about is on the other.",
+    "so_what": "A team evaluating Stripe asks, per country, which entity acquires and which holds funds, records the named bank as data that can change, and tests the joins between products that arrived by purchase. A team building its own payment service adopts the four interface practices and budgets nothing for imitating Stripe's infrastructure.",
+    "callback": {
+      "to": "The two sentences of the opening: 'Stripe is not a bank' and 'Payment Method Acquirer is Stripe Technology Europe, Ltd.'",
+      "how": "Both are true at once because the answer is per market and per function: a licensed non-bank that acquires in Europe and works under banks in the United States."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Before the next provider review, write one row per country you sell in: acquirer of record, entity that holds the balance, license type, date read. Before the next design review, check your own payment service against the four practices."
+    },
+    "hand_off": {
+      "to": "case-adyen",
+      "relationship": "contrast",
+      "carries_over": "Stripe's order of construction: the interface first, then products around it, then the regulated layer assembled per market as a non-bank, with volume and customer counts as its only public numbers.",
+      "introduces": "A company that built in the other order (the acquiring license and the platform first, the bank next, adjacent software last and by purchase) and that reports audited figures."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The limits of the evidence.",
+      "introduces": "What holds, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p38",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Established: the dated order of products and purchases, the per-country acquirer disclosure and e-money licenses, the absence of revenue from every letter, and the four interface practices as Stripe documented them."
+      },
+      {
+        "id": "p39",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Depends on context: how much the partner-bank structure matters to a buyer, how far to rely on products joined by purchase, and how much of the ledger design a small team needs.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is settled.",
+          "introduces": "What changes with the buyer's or builder's situation.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p40",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "The author's synthesis: Stripe's record is an order of construction, the label 'the abstraction' fits its origin and not its present, and the part worth imitating is the cheapest part.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is established and what depends.",
+          "introduces": "The author's own position, returning to the two opening sentences.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p41",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "Eight questions let the reader test a Stripe evaluation or their own payment service against the case.",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The take-aways.",
+          "introduces": "Questions that apply them.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p42",
+        "function": "transition",
+        "controlling_idea": "Stripe built the interface first and the regulated layer afterward; the next case is a company that built in the other order and reports audited figures.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "Stripe's order of construction and its unaudited numbers.",
+          "introduces": "Adyen's opposite order and its audited accounts.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "The mechanisms themselves: API object models, idempotency, versioning, webhooks, the ledger, acquiring, licenses, billing, fraud.",
+      "covered_in": [
+        "payment-api-design",
+        "idempotency-and-retries",
+        "payment-api-versioning",
+        "payment-webhooks-and-events",
+        "payment-ledgers",
+        "acquiring-and-network-connectivity",
+        "licences-and-safeguarding",
+        "subscriptions-and-billing-engines",
+        "payment-fraud-and-risk"
+      ]
+    },
+    {
+      "topic": "Adyen's record.",
+      "covered_in": [
+        "case-adyen"
+      ]
+    },
+    {
+      "topic": "The bet-by-bet comparison of the two companies and what a customer should do with each difference.",
+      "covered_in": [
+        "stripe-and-adyen-bets-compared"
+      ]
+    },
+    {
+      "topic": "Agent payments, stablecoin law and instant payments in detail.",
+      "covered_in": [
+        "payments-what-is-moving"
+      ]
+    },
+    {
+      "topic": "Any revenue, margin or headcount estimate for Stripe from press reports of investor material."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "Whether the OpenRouter and Parafin acquisitions have closed: no completion release on 17 November 2026.",
+    "Whether Bridge National Trust Bank has final OCC approval (none found on 17 November 2026), and which merchants and how much volume Stripe's Georgia bank, in business since 28 May 2026, acquires.",
+    "The launch dates of Radar, Treasury and Link from a dated Stripe page; the case leaves them out of the dated table.",
+    "Resolved in the verification pass of 17 November 2026: Adyen's Annual Report 2025 (take rate 17.0 basis points), the AWS observability post of 24 October 2024 and the Banking Dive report of 7 April 2025 were fetched and confirmed."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "No 'Stripe and Adyen: Where They Differ' section and no Larkfield scene section: the style guide's case anatomy replaces both, and Larkfield appears in one journey paragraph and one paragraph of the transfers section.",
+      "rejected": [
+        "A Larkfield scene, which would add a fictional frame to a chapter about a real company's record.",
+        "A comparison table, which chapter 48 owns."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The suite section comes before the regulated layer, following the order in which Stripe built them.",
+      "rejected": [
+        "Leading with the regulated layer because AC-1 is about it: the reader needs the product dates to see that licenses followed products."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Trade-press facts (the Georgia approval, the spokesperson's remark) are used only where a primary trace exists or the sentence names the source as secondary.",
+      "rejected": [
+        "Using trade-press dates for when the Georgia bank began business."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "_research/brief-companies-and-bets.md",
+      "contributed": "Part 1: dated history, acquisitions, letters, valuations, self-description, licenses, hosting, headcount; open questions."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-acquiring-methods-and-terminals.md",
+      "contributed": "Sections 1.4 and 1.6: acquirer disclosure, regulated entities, charters, direct network connections; 3.7 Terminal."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-ledgers-and-money-movement.md",
+      "contributed": "Sections 1.1, 1.2, 5.5 and 5.6: Ledger, fee credits, entities and partner banks, charter status."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-stripe-payments-and-api.md",
+      "contributed": "API history, design practice, v2, idempotency and versioning posts with their later confirmations."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-reliability-and-scale.md",
+      "contributed": "Inventory of engineering sources, DocDB, deployment figures, hosting, what is not public about regions."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-billing-and-revenue.md",
+      "contributed": "Metronome, Managed Payments, Revenue suite, Billing with other processors."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/consistency-issues.md",
+      "contributed": "Rulings 11, 16, 21 and 22."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "Larkfield's provider split, Keel decisions, the acquirer inventory."
+    }
+  ],
+  "length": {
+    "max_words": 6500
+  },
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 83 claims checked (64 confirmed, 11 corrected, 7 hedged, 0 unsupported, 0 unreachable, 1 not checked); the Georgia bank is now given from the regulator's bulletin and Stripe's own terms (approved 30 June 2025, in business since 28 May 2026), and the date of Stripe's 'programmable financial services company' wording, the non-bank acquirers and Mexico, the Adyen take rate and the engineering record (root-cause analyses, scheduling post, QCon talk on regions and retries) were corrected."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes). Notes acted on: the history section is declared a grouping, the engineering section's reason no longer claims a payment's path, the 2025 to 2026 additions paragraph no longer repeats the OpenRouter purchase, 'acquirer' is glossed in the journey paragraph and the Keel decisions and acquirer inventory carry pointers. Notes not acted on: merging 'Where the Evidence Stops' into the conclusion (the style guide requires the section); moving the self-description paragraph next to the author's synthesis; the remark that the figures-before-engineering dependency is weak."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "First version, written from the PLAN contract, the journal spec entry and the research briefs."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation after verification (parts-9-10): intent, thesis and role re-synced with the corrected journal-spec entry; unit descriptions brought into line with the verified prose and the rulings. No unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: statements of absence re-tested with a wide search (documentation and support sitemaps, stripe.com, stripe.dev, web search). Narrowed: 'nothing about a single code base' (a Ruby monorepo of about 50 million lines is on record; which products live in it is not); 'no failover design' (a two-region active-active design with failover is published for usage-based billing events, 28 January 2025; none for payments); 'how the balance relates to the Ledger' (the April 2026 Stripe Credits post names Money Movement and Storage, financial accounts and the three-phase transfer). Holds: event delivery internals, idempotency key storage, total-volume definition, shares per acquirer, reasons for the partner-bank model. Two sources added; units unchanged."
+    }
+  ]
+}

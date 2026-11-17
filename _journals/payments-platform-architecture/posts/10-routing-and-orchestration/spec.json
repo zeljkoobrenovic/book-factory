@@ -1,0 +1,1586 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "payment-routing-and-orchestration",
+  "journal": "payments-platform-architecture",
+  "part": "part-2",
+  "title": "More Than One Provider: Routing and Orchestration",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "The difference between routing inside one provider (among acquirers and networks, including least-cost routing of US debit) and routing across providers, and the ways to do the second: an in-house payment service, a dedicated orchestrator, or one provider's orchestration product.",
+        "What Stripe documents for routing to other processors (Orchestration, announced May 2025 and in private preview in November 2026; Vault and Forward) with its stated exclusions, and what Adyen documents (routing among acquirers and networks, a forward endpoint for stored cards, a multi pay-in pilot for platforms) and that no Adyen product for routing payments to other providers was found.",
+        "Why stored cards and network tokens are the hard part of leaving or adding a provider."
+      ],
+      "believe": [
+        "A routing layer unifies the authorization request; disputes, settlement, balances, method coverage and stored cards remain one set per provider.",
+        "First-attempt routing needs evidence per segment that a small or mid-sized business does not have, and below that scale a simple rule with a rehearsed switch is the sound design."
+      ],
+      "can_do": [
+        "For a stated business, decide between one provider, two providers with a rehearsed switch, and rule-based routing, and list what each adds to operations.",
+        "Write the exit questions to settle before adding a second provider: who holds the card vault, under whose identifier network tokens are issued, and how cards leave."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a business the chapter does not contain, the reader chooses a multi-provider stage and justifies it by volume per segment and operating cost, not by the number of providers.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A language-learning app takes 400,000 card payments a year, 85% of them in two countries, through one provider that had two short outages last year. The CTO proposes buying an orchestration product and routing each payment to whichever of three providers has the best approval rate. Using only this chapter, what do you recommend and why?",
+        "expected": "Not rule-based routing across three: the volume per issuer or segment is too small to choose routes on evidence, and each provider adds its own integration, disputes, settlement, reconciliation and warm-up. The outages argue for a second provider with a plain, rehearsed failover and a settled answer on where the cards are stored; an orchestrator also becomes a new single point of failure and an extra hop."
+      },
+      {
+        "id": "AC-2",
+        "statement": "Given a cross-provider retry, the reader says when it is safe.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A payment to provider A times out with no answer. Your routing layer is configured to retry failed payments on provider B. Should it retry this one? Answer from this chapter.",
+        "expected": "No, not yet: a timeout is an unknown outcome, not a failure. A retry on another provider is safe only when the first attempt is known to have failed; otherwise the customer can be charged twice across two providers that cannot see each other. Find out the first attempt's outcome first."
+      },
+      {
+        "id": "AC-3",
+        "statement": "Products in preview or pilot are labeled as such with the date checked, the merchant evidence is attributed to the one public account it comes from, and the chapter says that no audited comparison of multi-provider and single-provider approval rates is public.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "When and how should payments be routed across acquirers or providers, and what does it cost?",
+    "claim": "Routing each payment across providers pays for itself only where a business has enough payments in each segment (issuer, country, card type) for a difference in approval rate between routes to be measurable; below that, the use of a second provider is a failover that is triggered deliberately and has been rehearsed. In both cases the routing layer unifies the authorization request and nothing after it: disputes, settlement, balances, method coverage and stored cards stay one set per provider, and running those sets is what a second provider costs.",
+    "disputed_by": "The view that several providers mean higher approval and lower risk, so a business that can afford it should put an orchestration layer in front of several providers and send each payment to the best performer.",
+    "so_what": "Before adding a provider, a team decides who holds the card vault and how cards and network tokens leave it, staffs a second back office for disputes and settlement, and keeps the routing rule as simple as its evidence allows. Larkfield's rule, 'the studio's provider' with a rehearsed switch (K8), is the claim applied.",
+    "how_why": "Stripe's documentation for its own Orchestration product lists what routing does not carry: disputes and settlement stay in the other processor's dashboard, non-card methods and several Stripe products are excluded, a routed payment creates no balance movement at Stripe, and a failed payment is not retried on another processor once 3-D Secure has been attempted. The one detailed merchant account found, given by Canva at a Stripe event in 2026, reports that the gain came from where traffic is sent first and that the price was about six months per provider integration, months of warming up each merchant account and close to thirty people. On the two companies: Stripe offers routing to other processors, Adyen among them, in private preview since May 2025, and a forwarding proxy out of its vault; Adyen documents routing among acquirers and networks (a US debit product since September 2024), a forward endpoint and a multi pay-in pilot, and no product for routing payments to other providers was found. That Stripe is willing to be the control layer over competitors and Adyen is not is the author's reading of those documents. Adyen's terms (13 June 2025) describe a service that shares network tokens for use with other payment providers, with the cryptogram still supplied by Adyen; no Stripe statement on whether its tokens can follow a merchant was found, and the scale at which routing pays is not publicly quantified.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "Routing inside one provider (among its acquiring routes and networks, including least-cost routing of US debit) changes cost and approval without adding a contract or a back office, and is a different decision from routing across providers."
+      },
+      {
+        "id": "S2",
+        "claim": "A routing layer across providers unifies the authorization request, the rules and the attempt record; disputes, settlement, balances, method coverage and provider-specific features stay one set per provider, as Stripe's documentation of its own Orchestration product states."
+      },
+      {
+        "id": "S3",
+        "claim": "Stored cards and network tokens are the hard part: a provider token works only at its vault, the documented ways out are a per-request forward and a provider-to-provider export, and on whether network tokens survive a move only Adyen's terms describe a sharing service (2025), with the cryptogram still supplied by Adyen."
+      },
+      {
+        "id": "S4",
+        "claim": "Per-payment routing pays only where each segment has enough payments to measure a difference between routes; below that scale the sound design is a fixed assignment with a failover that is triggered deliberately and rehearsed."
+      },
+      {
+        "id": "S5",
+        "claim": "Stripe documents a product for routing to other processors (private preview since May 2025) and a forwarding proxy out of its vault; Adyen documents routing among its own routes, a forward endpoint and a multi pay-in pilot, and no product for routing payments to other providers was found."
+      },
+      {
+        "id": "S6",
+        "claim": "A retry on another provider is safe only when the first attempt is known to have failed, because two providers share no idempotency key and cannot see each other's attempts."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Tests the obvious remedy for dependence on one provider's stack and shows what remains per provider when the request is unified, which is the money and the records that Part III takes up.",
+    "supports": [
+      "P2-5"
+    ]
+  },
+  "flow": {
+    "pattern": "problem_solution",
+    "additional_patterns": [
+      {
+        "pattern": "prerequisite_order",
+        "applies_to": "two-kinds, what-routing-unifies, vault-and-tokens: each supplies terms the next one uses (routing rule, the layer and its reach, the vault)"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "designs, where-they-differ"
+      },
+      {
+        "pattern": "assertion_evidence_reasoning",
+        "applies_to": "when-routing-pays"
+      },
+      {
+        "pattern": "chronological",
+        "applies_to": "when-it-goes-wrong"
+      }
+    ],
+    "rationale": "The reader arrives with a remedy already in mind, so the chapter opens with it as a proposal at Larkfield and tests it in the order the proposal would be examined in a design review. First what 'routing' means, because much of what the proposer wants exists inside one provider. Then what a layer across providers can share, from the most precise public inventory, and then the stored cards, which are the part of the remainder that is hardest to move; both must precede the designs, which differ mainly in who holds the vault and who runs the layer. Only then does the evidence for when routing pays make sense, because it is evidence about stages. The two companies come after the general argument so that their documented positions are read against it, Larkfield's rule is the claim applied, and the failures close the body because they are what the rule and the rehearsal exist to prevent. Putting the companies first would turn the chapter into a product comparison; putting the evidence before the anatomy would leave the reader unable to say what the thirty people at Canva were doing."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "For forty minutes on a Friday evening your one payment provider approves four card payments in five instead of nine in ten. Nothing is down; one connection in one country is degraded. In the review on Monday everyone proposes the same remedy: add a second provider and a layer that sends each payment to whichever provider is performing best. Why does a remedy that obvious take a team of thirty at the merchant that has given the most detailed public account of it?"
+    },
+    "bridge": {
+      "from_reader_world": "An engineer already removes single points of failure by adding a second instance and a load balancer, and already routes requests by measured health.",
+      "to_topic": "A payment provider is not a stateless instance: it holds the stored cards, the money, the disputes and the records of every payment it took, so the question becomes what a routing layer in front of two providers can share and what stays behind each of them."
+    },
+    "thesis_statement": {
+      "text": "Routing each payment across providers pays only where every segment (issuer, country, card type) has enough payments for a difference between routes to be measured; below that, a second provider is a failover you trigger on purpose and have rehearsed. Either way the layer unifies the authorization request and nothing after it: disputes, settlement, balances, method coverage and stored cards stay one set per provider.",
+      "placement": "KEY POINTS callout (bullets 1 and 2) and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p04",
+      "promises": [
+        {
+          "promise": "Start from Larkfield's proposal to route every card payment to the better-performing of its two providers, and return to it with the rule Larkfield keeps instead.",
+          "kept_in": [
+            "scene",
+            "in-practice"
+          ]
+        },
+        {
+          "promise": "Separate routing inside one provider, including least-cost routing of US debit, from routing across providers.",
+          "kept_in": [
+            "two-kinds"
+          ]
+        },
+        {
+          "promise": "Show what a routing layer consists of, and use Stripe's documentation of its own Orchestration product to list what the layer does not carry.",
+          "kept_in": [
+            "what-routing-unifies"
+          ]
+        },
+        {
+          "promise": "Explain why stored cards and network tokens are the hard part of adding or leaving a provider.",
+          "kept_in": [
+            "vault-and-tokens"
+          ]
+        },
+        {
+          "promise": "Lay out the three stages of running more than one provider and the three ways to build the layer.",
+          "kept_in": [
+            "designs"
+          ]
+        },
+        {
+          "promise": "Weigh the one detailed public merchant account against the arithmetic of segments, and say where the evidence stops.",
+          "kept_in": [
+            "when-routing-pays"
+          ]
+        },
+        {
+          "promise": "Compare what Stripe and Adyen each document.",
+          "kept_in": [
+            "where-they-differ"
+          ]
+        },
+        {
+          "promise": "Go through the ways multi-provider setups fail, starting with a double charge across two providers.",
+          "kept_in": [
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "A degraded provider makes one remedy look obvious: a second provider and a layer that sends each payment to whichever is performing best.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "The hook: forty minutes at four approvals in five instead of nine in ten, with nothing formally down (a hypothetical addressed to the reader, not a report about any provider).",
+            "shows": "The reader meets the remedy as their own team would propose it, before the chapter tests it."
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "The remedy holds only in part: routing per payment pays where each segment has enough volume to measure a difference, a second provider is otherwise a rehearsed failover, and in both cases the layer unifies the authorization request and nothing after it.",
+        "function": "claim",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "The remedy everyone proposes.",
+          "introduces": "The chapter's claim, and the bill for a second provider: a second set of disputes, settlement, balances and stored cards.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "In the journey of Mila's class pass, routing is the lookup that happens before authorization, and everything after it stays with the provider the lookup chose.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's class pass: EUR 120.00, 9 March 2027 at 19:42, Studio Noord on Adyen, payout 11 March.",
+            "shows": "One routing decision fixes where every later record of the payment lives.",
+            "source": "scenario-ledger.md (Larkfield, fictional)"
+          }
+        ],
+        "transition_in": {
+          "relationship": "place",
+          "carries_over": "The authorization request as the only thing a routing layer unifies.",
+          "introduces": "Where that sits in the recurring payment: at 19:42 on 9 March 2027 the payment service maps Studio Noord to Adyen, and the settlement, the payout of 11 March and any later refund or dispute follow from that one choice.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "controlling_idea": "The chapter goes from Larkfield's proposal, through the two kinds of routing, the anatomy of a routing layer, the vault, the designs and the evidence for when routing pays, to the two companies, Larkfield's rule and the failures.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "Where routing sits in the payment's journey.",
+          "introduces": "The order of the sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: The Proposal to Route Every Payment",
+      "controlling_idea": "Larkfield already has two providers and a one-line routing rule, and the proposal to replace the rule with per-payment routing raises the three questions the chapter answers.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S4"
+        ],
+        "how": "Poses the choice between a simple rule with a switch and per-payment routing on a business whose numbers the reader knows."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "The proposal, then the rule it would replace, then the questions it raises. Asking the questions first would leave the reader without the two designs they are about; describing the existing rule first would hide why anyone wants to change it."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The remedy of the introduction, a second provider and a layer that picks the best one.",
+        "introduces": "A company that already has the second provider and is asked to add the layer.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p05",
+          "controlling_idea": "In February 2027 Larkfield's CTO proposes buying an orchestration product and sending each online card payment to whichever of Stripe and Adyen approves more.",
+          "function": "context",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield, fictional: 6,200 studios; Stripe carried 44% (EUR 493M) and Adyen 56% (EUR 627M) of 2026 member payment volume; the split is by studio.",
+              "shows": "The company has two providers already, so the proposal is only about the layer between them.",
+              "source": "scenario-ledger.md (Larkfield, fictional)"
+            }
+          ]
+        },
+        {
+          "id": "p06",
+          "controlling_idea": "Larkfield's routing rule today is a lookup, 'the studio's provider', with a manual per-studio override, inside a payment service with one adapter per provider.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger: 'There is no orchestration product: the payment service's routing rule is \"the studio's provider\", with a manual per-studio override'; the payment service was built in 2024 by Tom Hendriks.",
+              "shows": "The baseline design is the simplest possible routing layer, which the rest of the chapter measures the alternatives against.",
+              "source": "scenario-ledger.md (Larkfield, fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The proposal to route each payment by performance.",
+            "introduces": "What exists instead: a rule that never looks at the payment, only at the studio.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p07",
+          "controlling_idea": "Femke de Graaf answers the proposal with three whiteboard questions (distinct from the exit questions of the vault section): what would the layer unify, where would the stored cards live, and does Larkfield have the evidence to choose a route per payment.",
+          "function": "claim",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The proposal set against the existing rule.",
+            "introduces": "The three questions that organize the chapter.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "two-kinds",
+      "heading": "Two Kinds of Routing: Inside a Provider and Across Providers",
+      "controlling_idea": "Routing inside one provider changes the acquirer, network or connection a payment uses and leaves the merchant with one contract and one back office; routing across providers is a different decision because it multiplies the back office.",
+      "function": "definition",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "Separates the routing a provider does for the merchant from the routing the thesis is about, so that the cost claim is made about the right thing."
+      },
+      "flow": {
+        "pattern": "small_to_large",
+        "rationale": "The reader meets routing first where it is cheap (inside one provider, where the documented example is US debit) and then where it is expensive (across providers). Starting with orchestration would hide that much of what merchants want from routing is available without a second provider."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Femke's first question, what a layer would unify.",
+        "introduces": "The word 'routing' itself, which covers two decisions with very different costs.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p08",
+          "controlling_idea": "Routing is the choice of path for one payment, a routing rule is the stated condition that makes the choice, and the choice exists at two levels that differ in what the merchant must operate afterwards.",
+          "function": "definition"
+        },
+        {
+          "id": "p09",
+          "controlling_idea": "Inside one provider, routing chooses among the provider's own acquiring routes, networks and connections, and the merchant keeps one contract, one set of reports and one place for disputes.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe guide 'Optimizing authorization rates' (https://stripe.com/guides/optimizing-authorization-rates, n.d., accessed 2026-11-17): 'If processor downtime does occur, Stripe can dynamically route payments to the best connections. For example, Stripe automatically shifts volume when Visa's US data centres go down for maintenance.'",
+              "shows": "A provider already fails over between its own connections without the merchant doing anything."
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen documentation (uplift-enablement, n.d., accessed 2026-11-17): the feature routes 'each transaction to the highest-converting or lowest-cost acquirer or network', is 'off by default' and needs 'at least two available routes'.",
+              "shows": "Adyen exposes the same kind of choice as a setting the merchant turns on.",
+              "source": "Adyen documentation, 'Enable Adyen Uplift', https://docs.adyen.com/partners/uplift-enablement.md, n.d., accessed 2026-11-17"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The two levels of routing.",
+            "introduces": "The first level, with what each company documents about it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "controlling_idea": "Least-cost routing sends a debit payment over whichever of the card's two networks costs the merchant less, and in the United States the merchant's right to choose rests on Regulation II.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Regulation II 'prohibits all issuers and networks from restricting the number of networks over which debit transactions may be processed to less than two unaffiliated networks, and from inhibiting a merchant's ability to direct the routing of a debit transaction over any network that the issuer has enabled to process it'.",
+              "shows": "The merchant's choice of network is a legal right, which is why providers can sell it as a product.",
+              "source": "Federal Reserve, 'Regulation II (Debit Card Interchange Fees and Routing)', https://www.federalreserve.gov/paymentsystems/regii-about.htm, n.d., accessed 2026-11-17"
+            },
+            {
+              "kind": "fact",
+              "what": "The Federal Reserve's 2022 update says issuers 'should enable at least two payment card networks to process all debit card transactions, including \"card-not-present\" transactions, such as online payments', effective 1 July 2023.",
+              "shows": "The choice applies to online payments only since 2023, which dates the products that followed.",
+              "source": "Federal Reserve press release, 3 October 2022, https://www.federalreserve.gov/newsevents/pressreleases/bcreg20221003a.htm (evidence age: 4 years)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "Routing among networks inside a provider.",
+            "introduces": "The best-documented case: US debit cards, which by rule work on two unaffiliated networks.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "controlling_idea": "Adyen sells first-attempt debit routing as a named product with merchant-set objectives and a before-and-after pilot figure, while Stripe documents a US debit network only as a path for retrying a decline.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen, 9 September 2024: 'In a pilot of over 20 enterprise merchants ... Adyen achieved an average of 26% cost savings with a 0.22% uplift in authorization rates against earlier debit performance.'",
+              "shows": "The figure is a vendor claim measured against earlier performance, not against a control group, and 'cost savings' is not defined.",
+              "source": "Adyen press release, 'Adyen's Intelligent Payment Routing Achieves 26% Cost Savings for Enterprise Businesses', https://www.adyen.com/press-and-media/adyens-intelligent-payment-routing-usdebit, 2024-09-09"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen documentation: for the US and Australia the merchant chooses 'balance conversion and cost (recommended), prioritize cost, or prioritize conversion'; routing follows 'Any routing priorities set for your merchant account. For example, 1: PULSE and 2: Visa'.",
+              "shows": "The merchant holds a routing rule inside the provider.",
+              "source": "Adyen documentation, 'Enable Adyen Uplift', https://docs.adyen.com/partners/uplift-enablement.md, n.d., accessed 2026-11-17; Adyen documentation, 'Network tokenization', https://docs.adyen.com/online-payments/network-tokenization.md, n.d., accessed 2026-11-17"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe documentation 'Payments optimization' (https://docs.stripe.com/payments/analytics/optimization.md, n.d., accessed 2026-11-17): Adaptive Acceptance 'might automatically retry an eligible transaction on a US debit network (also known as PINless network) after it's declined on an international network'. No Stripe page on first-attempt least-cost routing of US debit was found; Stripe's support site documents it for Australian merchants.",
+              "shows": "On the public record Stripe uses the second network to recover a decline, not to choose the cheaper route first."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The legal basis for choosing a debit network.",
+            "introduces": "What each company has built on it, and the limit of what was found for Stripe.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p13",
+          "controlling_idea": "Routing across providers, which the industry calls payment orchestration, puts a layer in front of two or more providers for three stated motives (redundancy, performance and cost, reach into new countries), and failover is its simplest use.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "Alex Ginet of Stripe at Stripe Sessions 2026 names the three motives: 'redundancy and reliability', 'performance and cost optimization', 'geo expansion'.",
+              "shows": "The motives are the vendor's own framing of why merchants ask for it; the chapter tests the first two.",
+              "source": "Stripe Sessions 2026 talk 'More PSPs, more problems? When adding multiple processors pays off' (Alex Ginet and Jon Krauss of Stripe, Joshua Barton of Canva), transcript at https://stripe.com/sessions/2026/more-psps-more-problems, event held April 2026"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Routing inside one provider, which adds no back office.",
+            "introduces": "The second level, which is the subject of the rest of the chapter.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "what-routing-unifies",
+      "heading": "What a Routing Layer Unifies, and What It Leaves Per Provider",
+      "controlling_idea": "A routing layer gives the merchant one request, one rule set and one attempt record, and everything that happens after authorization (disputes, settlement, balances, method coverage, provider-specific features) stays with the provider that took the payment.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S2"
+        ],
+        "how": "Establishes the second half of the thesis from the most precise public inventory there is: Stripe's documentation of what its own orchestration product does not carry."
+      },
+      "flow": {
+        "pattern": "assertion_evidence_reasoning",
+        "rationale": "The layer's parts in general, then one documented product read closely as evidence, then the general table. The table needs the documented exclusions before it, or it would be the author's assertion; the product needs the anatomy before it, or its rule engine and records would have no place to sit."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Orchestration as a layer in front of several providers.",
+        "introduces": "What that layer is made of and where its reach ends.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p14",
+          "controlling_idea": "A routing layer has five parts: one payment API, a rule engine, an adapter per provider, a store of card credentials that every adapter can use, and a record of every attempt.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "figure",
+              "what": "Illustration placeholder 10-routing-layer-anatomy: the five parts above a line, and below it, per provider, disputes, settlement, balance and reports.",
+              "shows": "The reader sees the line the section argues for before the evidence for it."
+            },
+            {
+              "kind": "reasoning",
+              "what": "Industry practice; the same parts appear in Larkfield's payment service (ledger) and in the vendors' self-descriptions cited in the designs section.",
+              "shows": "The anatomy is not specific to one product."
+            }
+          ]
+        },
+        {
+          "id": "p16",
+          "controlling_idea": "Stripe's Orchestration, announced in May 2025 and still in private preview in November 2026, routes card payments to Adyen, Braintree or Worldpay by ordered rules with one main and one optional retry processor.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "'Orchestration is in private preview' (checked 17 November 2026); announced 7 May 2025 ('We previewed Stripe Orchestration', Stripe blog, https://stripe.com/blog/top-product-updates-sessions-2025). Feature table lists Adyen, Braintree and Worldpay WPG.",
+              "shows": "Dates the product and its status, as AC-3 requires.",
+              "source": "Stripe documentation, 'Orchestration', https://docs.stripe.com/payments/orchestration.md, n.d., accessed 2026-11-17; Stripe documentation, 'Supported Orchestration features', https://docs.stripe.com/payments/orchestration/feature-support.md, n.d., accessed 2026-11-17"
+            },
+            {
+              "kind": "quotation",
+              "what": "'Stripe executes the conditions in order, from left to right, and applies the first action that matches a payment's condition.' Conditions: amount, BIN, card country, card issuer, card type, currency, metadata. 'You can only have one active set of rules in each sandbox and in live mode.'",
+              "shows": "A routing rule in practice is a short ordered list over a handful of payment attributes.",
+              "source": "Stripe documentation, 'Manage rules', https://docs.stripe.com/payments/orchestration/rules.md, n.d., accessed 2026-11-17"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The parts of a layer and the line under them.",
+            "introduces": "One product whose documentation states precisely what it does and does not carry.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p17",
+          "controlling_idea": "Stripe's documentation says the contract, the fees, the liability, the disputes and the settlement of a routed payment stay with the other processor, and that non-card methods and several Stripe products are outside the feature.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'your third-party processor continues to act as the processor for payments routed to it. All related activity (including payment processing fees and liability for transaction losses) remain subject to the terms that you agreed to with that processor.'",
+              "shows": "The commercial relationship is not unified.",
+              "source": "Stripe documentation, 'Orchestration', https://docs.stripe.com/payments/orchestration.md, n.d., accessed 2026-11-17"
+            },
+            {
+              "kind": "quotation",
+              "what": "'Orchestration feature support doesn't include non-card payments or Link, Capital, Connect, Terminal, or Organizations.' 'Orchestration also doesn't support disputes or settlement-related activity. To manage these activities, access your third-party processor's dashboard.'",
+              "shows": "Disputes, settlement and method coverage stay per provider, in the vendor's own words.",
+              "source": "Stripe documentation, 'Orchestration', https://docs.stripe.com/payments/orchestration.md, n.d., accessed 2026-11-17"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What Orchestration routes.",
+            "introduces": "What its documentation says it does not carry.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p18",
+          "controlling_idea": "Because a routed payment moves no money through Stripe, it creates no Charge and no balance movement there, and Stripe's analytics cannot report an authorization rate for it.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Stripe creates Payment Records and Payment Attempt Records instead of Charges for payments routed to other processors.' 'Stripe only creates Balance Transactions for payment volume processed on Stripe ... If your back-end systems assume there's always a Balance Transaction after a successful payment, that's no longer true.'",
+              "shows": "Adding a route changes the shape of the records for all volume, which is integration work the routing layer does not absorb.",
+              "source": "Stripe documentation, 'Route payments to multiple processors', https://docs.stripe.com/payments/orchestration/route-payments.md, n.d., accessed 2026-11-17"
+            },
+            {
+              "kind": "quotation",
+              "what": "'You can't specify an authorization rate if you set the processor filter to a non-Stripe processor. Stripe doesn't have access to non-Stripe data.' (https://docs.stripe.com/payments/analytics/acceptance.md, n.d., accessed 2026-11-17)",
+              "shows": "Even the comparison of routes is only partly unified."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Settlement staying with the other processor.",
+            "introduces": "The effect on the records a merchant's own systems read.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p19",
+          "controlling_idea": "Set side by side, the layer unifies the request, the rules and the attempt record (and the credential store only if the layer itself holds the vault, which the next section takes up), and leaves per provider the contract, the merchant account, disputes, settlement, the balance, payouts, reports and non-card methods: that second set is what a second provider costs.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Table 'Unified by the layer / Stays per provider' with the chapter that owns each per-provider item.",
+              "shows": "Turns one vendor's exclusions into the general statement of the thesis and points at Part III."
+            },
+            {
+              "kind": "quotation",
+              "what": "Joshua Barton of Canva, 2026: 'when you're doing chargebacks or you're doing refunds, your operations team now has to go into a second portal.'",
+              "shows": "A merchant that built its own layer reports the same line from the operating side.",
+              "source": "Stripe Sessions 2026 talk 'More PSPs, more problems? When adding multiple processors pays off' (Alex Ginet and Jon Krauss of Stripe, Joshua Barton of Canva), transcript at https://stripe.com/sessions/2026/more-psps-more-problems, event held April 2026"
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The documented inclusions and exclusions of one product.",
+            "introduces": "The general line between what any routing layer shares and what stays per provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "vault-and-tokens",
+      "heading": "The Hard Part: Stored Cards and Network Tokens",
+      "controlling_idea": "Whoever holds the card vault decides where stored cards can be charged, the documented ways out are a per-request forward and a provider-to-provider export, and on network tokens only Adyen's terms describe a sharing service for use with other providers (2025), while no Stripe statement was found.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S3"
+        ],
+        "how": "Shows why stored cards are the per-provider asset that is hardest to share or move, and so the first thing to decide before a second provider."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "Provider token before vault location, vault location before the two ways out, card numbers before network tokens, and the limit of the evidence last, because each step uses the term the one before it defined."
+      },
+      "transition_in": {
+        "relationship": "emphasis",
+        "carries_over": "Stored cards as one of the things that stay per provider.",
+        "introduces": "Why this one is harder than the rest: for a subscription business the stored cards are the revenue.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p20",
+          "controlling_idea": "A provider token is a reference into one provider's card vault, so a card stored at one provider cannot be charged at another, and a merchant that never held the card numbers cannot copy them itself.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield, fictional: recurring memberships are 61% of online volume, about 940,000 renewals a month, all charged against stored credentials; K4 keeps card numbers out of Larkfield's systems.",
+              "shows": "For a business like this the vault holds most of the revenue, and the design that protects it from card data is also what ties it to the vault's owner.",
+              "source": "scenario-ledger.md (Larkfield, fictional)"
+            }
+          ]
+        },
+        {
+          "id": "p21",
+          "controlling_idea": "The vault can live in three places: at one of the providers, at an independent vault or orchestrator in front of them, or at every provider separately.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "figure",
+              "what": "Illustration placeholder 10-where-the-vault-lives: three small panels, the card safe at one provider, in front of both, and one at each.",
+              "shows": "Makes the vault's location the visible design decision."
+            },
+            {
+              "kind": "quotation",
+              "what": "Spreedly homepage (https://www.spreedly.com/, n.d., accessed 2026-11-17), a vendor self-description: 'Hold every credential in your own vault, use it with any provider, and change processors without asking a customer to re-enter a card.'",
+              "shows": "The independent vault is the orchestrators' central selling point."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "A token that only works where the vault is.",
+            "introduces": "The three places the vault can be, and what each makes easy or hard.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p22",
+          "controlling_idea": "Both companies document a forwarding proxy out of their vault: the merchant sends a request with placeholders, the provider inserts the card details and sends it to a third party, and neither proxy is self-service.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'The Vault and Forward API allows you to tokenize and store card details in Stripe's PCI-compliant vault and route that data to supported processors or endpoints'; it 'is available only to businesses with a dedicated Stripe account team'; the supported destinations are a published list that includes Adyen, Braintree, Checkout, Worldpay and Spreedly; 'the Vault and Forward API doesn't confirm or capture PaymentIntents'.",
+              "shows": "Stripe lets its vault feed other processors, by arrangement, as a proxy that is not itself a payment.",
+              "source": "Stripe documentation, 'Forward card details to third-party API endpoints', https://docs.stripe.com/payments/vault-and-forward.md, n.d., accessed 2026-11-17"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'You can forward payment details that you stored with Adyen to a PCI compliant third party, like a payment service provider (PSP). We support forwarding card details, and network tokens.' Enabling it requires contacting Adyen's support team; no destination list is published on the page.",
+              "shows": "Adyen documents the same mechanism, and includes network tokens.",
+              "source": "Adyen documentation, 'Forward payment details', https://docs.adyen.com/online-payments/tokenization/forward-payment-details.md, n.d., accessed 2026-11-17"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The vault held at one provider.",
+            "introduces": "The first documented way to use those cards elsewhere: one request at a time.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p23",
+          "controlling_idea": "The second way out is a bulk transfer of card numbers from one provider to another, which Stripe documents as a policy with conditions and Adyen documents only in the inbound direction.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'We believe our customers own the sensitive data they entrust to Stripe.' 'we can only transfer your card data to another PCI DSS Level 1-compliant payment processor'; the recipient's PGP key 'must be 4096 bits or greater'; 'Stripe doesn't export your account's payment history, subscriptions, or other objects'; credentials saved through Link are excluded.",
+              "shows": "Export is a provider-to-provider process under PCI rules, and it moves cards, not history.",
+              "source": "Stripe documentation, 'Request a payment data export', https://docs.stripe.com/get-started/data-migrations/pan-export.md, n.d., accessed 2026-11-17"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen documentation 'Import data from another payment provider' (https://docs.adyen.com/development-resources/migrating-payment-data.md, n.d., accessed 2026-11-17): 'migrating payment data usually takes 10 days or more'. An export article is listed in Adyen's help center, but its link redirects and the procedure could not be read on 17 November 2026.",
+              "shows": "A move is measured in weeks, so it is a migration and cannot serve as a failover."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Forwarding, which borrows a card for one request.",
+            "introduces": "Export, which moves the cards themselves, and how long it takes.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p24",
+          "controlling_idea": "A network token is issued to the party that requested it, so a token requested by a provider is that provider's to use, and a merchant that wants tokens it can take anywhere has to be the requestor itself or use a vault that requests them in the merchant's name.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'Network tokenization is only applicable for payments acquired by Adyen. It cannot be used with external acquirer connections'; the alternative mode is 'Manage network tokens yourself'.",
+              "shows": "The provider-managed token stays inside the provider; the portable option is the merchant's own.",
+              "source": "Adyen documentation, 'Network tokenization', https://docs.adyen.com/online-payments/network-tokenization.md, n.d., accessed 2026-11-17"
+            },
+            {
+              "kind": "quotation",
+              "what": "Spreedly documentation (https://developer.spreedly.com/docs/network-tokenization, n.d., accessed 2026-11-17), a vendor self-description: 'Spreedly has completed integrations with Visa and Mastercard allowing merchants to request network tokens using their merchant-specific TRID.'",
+              "shows": "An independent vault's answer is a token requestor identifier that belongs to the merchant."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Card numbers, which can be exported.",
+            "introduces": "Network tokens, which are bound to whoever asked the network for them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p25",
+          "controlling_idea": "Stripe's export page is silent on network tokens and Adyen's terms describe a sharing service that still needs Adyen's cryptogram (2025), and neither documents under whose identifier it provisions tokens, so the three exit questions (who holds the vault, under whose identifier tokens are issued, how cards leave) have to be put to each provider before the second one is added.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe's export page does not mention network tokens; Adyen's forward page requires an Adyen token for the same card as a fallback 'in case we cannot find a network token'. Adyen's Additional Services Terms (last updated 13 June 2025; owner: network-tokens): a Network Token Sharing Service shares network tokens with customers 'to store and/or use to process payments with other payment providers'; a customer-initiated payment elsewhere needs a one-time cryptogram retrieved from Adyen. No Stripe statement found.",
+              "shows": "The export and forward pages describe card numbers leaving; only Adyen's terms speak of tokens following, and then with Adyen still in each cardholder payment.",
+              "source": "Stripe documentation, 'Request a payment data export', https://docs.stripe.com/get-started/data-migrations/pan-export.md, n.d., accessed 2026-11-17; Adyen documentation, 'Forward payment details', https://docs.adyen.com/online-payments/tokenization/forward-payment-details.md, n.d., accessed 2026-11-17"
+            },
+            {
+              "kind": "reasoning",
+              "what": "INFERENCE block: tokens requested under a provider's identifier probably do not transfer unless a sharing service such as Adyen's was enabled, so the benefits of tokens would have to be rebuilt at the new provider.",
+              "shows": "Labeled inference, because no Stripe or card-network document states it."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The forward, the export and the requestor rule.",
+            "introduces": "Where the public record stops, and the questions that follow from it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "designs",
+      "heading": "Three Stages, and Three Ways to Build the Layer",
+      "controlling_idea": "Running more than one provider comes in three stages distinguished by what the routing decision looks at, and the layer for the later stages can be built in-house, bought from a dedicated orchestrator or taken from one provider, each with a different owner of the vault and of the risk.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S4",
+          "S2"
+        ],
+        "how": "Names the options the thesis chooses among, so that the evidence in the next section can be applied to a stage and not to 'multi-provider' as one thing."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "Stages first, because the builders differ only for the later stages; then the three builders in order of who holds the vault: the merchant, a neutral third party, one of the providers."
+      },
+      "transition_in": {
+        "relationship": "sequence",
+        "carries_over": "The layer's reach and the vault's location.",
+        "introduces": "The realistic designs that combine them.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p26",
+          "controlling_idea": "There are three stages: one provider with its internal routing, two providers with a fixed assignment and a switch, and rules that choose a provider per payment; the number of providers matters less than what the rule looks at.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Joshua Barton of Canva, 2026: 'we didn't think we had an orchestration system yet because it was just two. It's really when we put the third PSP in that we started to think, hold on, we need some more sophisticated logic here because it's not only just fallback anymore'.",
+              "shows": "A merchant describes the stages as it lived through them.",
+              "source": "Stripe Sessions 2026 talk 'More PSPs, more problems? When adding multiple processors pays off' (Alex Ginet and Jon Krauss of Stripe, Joshua Barton of Canva), transcript at https://stripe.com/sessions/2026/more-psps-more-problems, event held April 2026"
+            }
+          ]
+        },
+        {
+          "id": "p27",
+          "controlling_idea": "Built in-house, the layer gives full control of rules and retries and makes the merchant responsible for the adapters, the card data and the separate integrations that keep stored cards usable.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Jon Krauss of Stripe, 2026: 'If you want maximum conversion, maximum authorization rate, you need to use things like network tokenization, card account updater, and those are independent integrations themselves with the schemes.'",
+              "shows": "What an in-house layer takes on beyond the adapters.",
+              "source": "Stripe Sessions 2026 talk 'More PSPs, more problems? When adding multiple processors pays off' (Alex Ginet and Jon Krauss of Stripe, Joshua Barton of Canva), transcript at https://stripe.com/sessions/2026/more-psps-more-problems, event held April 2026"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The stages.",
+            "introduces": "The first way to build the layer for stages two and three.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p28",
+          "controlling_idea": "A dedicated orchestrator sells the adapters and an independent vault as a service and in exchange becomes a new hop and a new single point of failure whose integrations are only as deep as the vendor made them.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "Vendor self-descriptions, each n.d., accessed 2026-11-17: Primer (https://primer.io/) 'Route payments to a secondary processor in the event of a failure'; Gr4vy (https://gr4vy.com/) 'Vendor-agnostic data vault'; Hyperswitch (https://github.com/juspay/hyperswitch, Apache 2.0 licensed) routes 'to the PSP with the highest predicted auth rate'; Spreedly as in the vault section.",
+              "shows": "The category exists and promises exactly the remedy of the introduction; these are marketing statements, not results."
+            },
+            {
+              "kind": "quotation",
+              "what": "Jon Krauss of Stripe, 2026: 'there are added milliseconds to the end-to-end transaction flow' and an orchestrator 'creates concentration risk with the orchestrator themselves'.",
+              "shows": "A vendor of such a layer names latency and availability as its two risks.",
+              "source": "Stripe Sessions 2026 talk 'More PSPs, more problems? When adding multiple processors pays off' (Alex Ginet and Jon Krauss of Stripe, Joshua Barton of Canva), transcript at https://stripe.com/sessions/2026/more-psps-more-problems, event held April 2026"
+            },
+            {
+              "kind": "quotation",
+              "what": "Joshua Barton of Canva, 2026: 'a lot of orchestrators out there will tell you they connect to 400 PSPs ... It's all about the quality of the integration to the PSPs and depth of that integration'; and 'If they don't have the five nines uptime ... you're bringing Stripe's uptime down because the orchestrator's how you get there.'",
+              "shows": "A buyer's two tests for an orchestrator: depth of integration and availability.",
+              "source": "Stripe Sessions 2026 talk 'More PSPs, more problems? When adding multiple processors pays off' (Alex Ginet and Jon Krauss of Stripe, Joshua Barton of Canva), transcript at https://stripe.com/sessions/2026/more-psps-more-problems, event held April 2026"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Building the layer.",
+            "introduces": "Buying it from a company whose only product it is.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p29",
+          "controlling_idea": "A provider's own orchestration product removes the extra vendor and keeps the vault where it already is, and its documented defaults send a payment back to the host whenever a rule or a feature does not apply.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'If you don't have active rules, payments route to Stripe'; 'Link transactions are automatically excluded from your routing rules and always processed on Stripe'; with error protection, on an unsupported feature 'we route the payment to Stripe instead of the originally determined payment processor'.",
+              "shows": "The host is the default route; a reader should see that as a design fact, whatever the motive.",
+              "source": "Stripe documentation, 'Manage rules', https://docs.stripe.com/payments/orchestration/rules.md, n.d., accessed 2026-11-17; Stripe documentation, 'Route payments to multiple processors', https://docs.stripe.com/payments/orchestration/route-payments.md, n.d., accessed 2026-11-17; Stripe documentation, 'Supported Orchestration features', https://docs.stripe.com/payments/orchestration/feature-support.md, n.d., accessed 2026-11-17"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A neutral orchestrator.",
+            "introduces": "An orchestrator that is also one of the routes.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "when-routing-pays",
+      "heading": "When Routing Pays: One Merchant's Account and the Arithmetic of Segments",
+      "controlling_idea": "The one detailed public account says the gain came from first-attempt routing by fine segments at a price of months and about thirty people, and simple statistics show why that gain is out of reach when segments are small.",
+      "function": "evidence",
+      "advances_thesis": {
+        "supports": [
+          "S4"
+        ],
+        "how": "Supplies the evidence and the reasoning for the first half of the thesis: routing per payment pays only with measurable volume per segment."
+      },
+      "flow": {
+        "pattern": "assertion_evidence_reasoning",
+        "rationale": "The merchant's account (motive, gain, price), then the arithmetic that explains why the gain depends on scale, then the limits of the evidence, then the rule and its table. Giving the rule first would present a judgement before the one account it rests on."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "Three stages and three builders to choose among.",
+        "introduces": "The evidence for choosing, which is thin and comes mostly from one merchant.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p30",
+          "controlling_idea": "Canva, which built its layer in-house over five providers, says it went multi-provider for redundancy and that the redundancy paid off in partial degradations, not in full outages.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Joshua Barton, Canva, at Stripe Sessions 2026: 'the real reason why we did this was redundancy. We accept payments in over 190 countries'; 'If a network goes down in Mexico or if a payment method goes down in Indonesia, that's not included in your five-nines uptime.'",
+              "shows": "The motive was availability, and the case that mattered is the introduction's: degraded, not down.",
+              "source": "Stripe Sessions 2026 talk 'More PSPs, more problems? When adding multiple processors pays off' (Alex Ginet and Jon Krauss of Stripe, Joshua Barton of Canva), transcript at https://stripe.com/sessions/2026/more-psps-more-problems, event held April 2026"
+            }
+          ]
+        },
+        {
+          "id": "p31",
+          "controlling_idea": "Canva reports that the larger gain came from where the first attempt was sent, and that the useful signal moved from country to issuer to separate merchant accounts.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'the real power is where you send the traffic the first time'; 'country is not the real signal. It's going to be BIN and issuer'; 'you had a mid for good traffic, a mid for bad traffic'.",
+              "shows": "First-attempt routing works at the level of issuer and merchant account, which is a statement about how much data it needs.",
+              "source": "Stripe Sessions 2026 talk 'More PSPs, more problems? When adding multiple processors pays off' (Alex Ginet and Jon Krauss of Stripe, Joshua Barton of Canva), transcript at https://stripe.com/sessions/2026/more-psps-more-problems, event held April 2026"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Redundancy as the motive.",
+            "introduces": "The gain Canva did not expect, and how fine the routing had to become to get it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p32",
+          "controlling_idea": "The price Canva names is about six months of engineering per provider, contracts and verification before that, three months or more of warming up each new merchant account, and close to thirty people.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'it takes maybe six months or more to integrate a new PSP'; 'you're spending three-plus months warming up'; 'once you start including operational people, it's close to 30 people just working on this'; verdict: 'it's worth it, so do it'.",
+              "shows": "The cost is concrete and so is the merchant's verdict, for a company of Canva's scale.",
+              "source": "Stripe Sessions 2026 talk 'More PSPs, more problems? When adding multiple processors pays off' (Alex Ginet and Jon Krauss of Stripe, Joshua Barton of Canva), transcript at https://stripe.com/sessions/2026/more-psps-more-problems, event held April 2026"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The gain.",
+            "introduces": "What it cost.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p33",
+          "controlling_idea": "To detect a difference of half a percentage point between two routes at a 90% approval rate takes about 57,000 payments on each route in the segment being compared, which is why routing by issuer needs a very large merchant.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Standard sample size for comparing two proportions at 5% significance and 80% power: n per group is about 16 x p x (1-p) / d squared; with p = 0.90 and d = 0.005, n is about 57,600. The 90% baseline is an assumption.",
+              "shows": "The requirement is per segment and per test, so it multiplies with every issuer, country and card type the rule distinguishes."
+            },
+            {
+              "kind": "quotation",
+              "what": "Alex Ginet of Stripe, 2026, an illustration: 'a business running about a hundred million dollar a year' that finds 'half a percent more authorization rate' gains '$500,000 in revenue'.",
+              "shows": "The vendor's own example uses half a point, the size of difference the arithmetic is about.",
+              "source": "Stripe Sessions 2026 talk 'More PSPs, more problems? When adding multiple processors pays off' (Alex Ginet and Jon Krauss of Stripe, Joshua Barton of Canva), transcript at https://stripe.com/sessions/2026/more-psps-more-problems, event held April 2026"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Routing that works per issuer and merchant account.",
+            "introduces": "The arithmetic of how many payments a segment needs before a route can be chosen on evidence.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p34",
+          "controlling_idea": "The evidence stops at one merchant speaking at a provider's event: no audited comparison of multi-provider and single-provider approval rates is public, and neither provider publishes the scale at which routing pays.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "The talk is a session at Stripe's own conference that also presents Stripe Orchestration; no other detailed, verifiable merchant account of multi-provider routing results was found in the research for this chapter.",
+              "shows": "The public record on outcomes is one account, as AC-3 requires the chapter to say.",
+              "source": "Stripe Sessions 2026 talk 'More PSPs, more problems? When adding multiple processors pays off' (Alex Ginet and Jon Krauss of Stripe, Joshua Barton of Canva), transcript at https://stripe.com/sessions/2026/more-psps-more-problems, event held April 2026"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What one account and some arithmetic establish.",
+            "introduces": "What they do not, and what was looked for and not found.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p35",
+          "controlling_idea": "The rule I draw is staged: stay on one provider until an outage or a missing market forces a second, run two with a fixed assignment and a rehearsed switch, and add per-payment rules only for segments large enough to test.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Trade-off table: stage | routing decision | what it adds to operations | right when.",
+              "shows": "Lets the reader place a business on a stage by its volume per segment and its operating capacity (AC-1)."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The account, the arithmetic and their limits.",
+            "introduces": "The author's rule, with what each stage adds to operations and when it is right.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "Stripe documents a product for routing payments to other processors, Adyen among them, and Adyen documents routing only among its own routes; both offer a way to forward stored cards out, and both are building ways for platforms to consolidate funds acquired elsewhere.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "States what each anchor company has documented about multi-provider routing, with dates and preview status, and keeps the reading of the difference labeled as the author's."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The table of documented facts, then the reading of it, then what an integrator does. Giving the reading first would present inference about two real companies before the facts it reads; giving the advice first would leave it without grounds."
+      },
+      "transition_in": {
+        "relationship": "place",
+        "carries_over": "A staged rule that holds on any provider.",
+        "introduces": "The two companies: what each documents about the stages and the layer.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p36",
+          "controlling_idea": "On five aspects (routing to another provider, routing inside the provider, forwarding stored cards, bulk export, consolidating other providers' funds for platforms) the documented positions differ most on the first.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "The required four-column table; every Stripe and Adyen cell is a fact cited earlier in the chapter or 'not found in public documentation'; the last column is the author's reading.",
+              "shows": "The comparison in one place, with preview and pilot status and dates."
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen Multi pay-in 'is currently in pilot phase' and lets a platform 'combine payments processed by Adyen with third-party acquired volume', with funds to be allocated 'within 24 hours'. Stripe, 29 April 2026: 'We previewed the ability for marketplaces that sell in Europe to continue using multiple payment providers while making unified payouts through Stripe' (https://stripe.com/blog/everything-we-announced-at-sessions-2026).",
+              "shows": "Both companies accept other providers' money into their platform balances; that is consolidation of funds, not routing of authorizations.",
+              "source": "Adyen documentation, 'Multi pay-in', https://docs.adyen.com/marketplaces/multi-pay-in.md, n.d., accessed 2026-11-17"
+            }
+          ]
+        },
+        {
+          "id": "p37",
+          "controlling_idea": "Stripe's stated reason for helping merchants use its competitors is an 'open architecture', Adyen's public argument is a single platform, and the reading that Stripe is willing to be the control layer over other processors while Adyen is not is mine.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Jon Krauss of Stripe, 2026: 'Stripe Orchestration is an investment in a broader strategy of an open architecture. You're not going to have to be locked into Stripe.'",
+              "shows": "Stripe's own explanation.",
+              "source": "Stripe Sessions 2026 talk 'More PSPs, more problems? When adding multiple processors pays off' (Alex Ginet and Jon Krauss of Stripe, Joshua Barton of Canva), transcript at https://stripe.com/sessions/2026/more-psps-more-problems, event held April 2026"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen product page (https://www.adyen.com/uplift, n.d., accessed 2026-11-17): 'Unlike fragmented legacy architectures, Adyen brings payments onto one single platform'.",
+              "shows": "Adyen's public argument points the other way."
+            },
+            {
+              "kind": "reasoning",
+              "what": "INFERENCE block: holding the vault, checkout, billing and fraud layers may matter more to Stripe than carrying every authorization; Adyen's economics rest on carrying the payment itself.",
+              "shows": "Labeled inference about motive; no document states it."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The documented difference on routing to other providers.",
+            "introduces": "The reasons each company gives, and the author's labeled reading.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p38",
+          "controlling_idea": "An integrator on Stripe should treat Orchestration as a preview with a documented list of exclusions and decide separately about the vault; an integrator on Adyen should expect to build or buy the layer elsewhere and ask early how cards and tokens leave.",
+          "function": "recommendation",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The difference and its reading.",
+            "introduces": "What to do differently on each.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: One Rule and a Rehearsed Switch",
+      "controlling_idea": "Larkfield keeps the rule 'the studio's provider' because a studio's money and verification live at one provider and its segments are too small and too confounded to choose routes on evidence, and it spends its effort on a switch it rehearses every quarter.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S4",
+          "S2",
+          "S3"
+        ],
+        "how": "Applies the whole claim to the ledger's numbers: the rule kept simple, the per-provider sets that the switch has to respect, and the stored cards that do not follow."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "Why the rule is per studio, why per-payment routing has no evidence behind it here, what the switch moves and does not, and how the rehearsal answers the exit questions. The rehearsal comes last because it tests the limits the three paragraphs before it establish; placed first, it would read as ceremony, since the reader would not yet know that the balance and the stored cards do not follow the switch."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The staged rule and the two companies' documented positions.",
+        "introduces": "Larkfield's answer to the proposal of the opening scene: decision K8.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p39",
+          "controlling_idea": "On a platform the routing rule is per studio because each studio's balance, payouts and verified account exist at one provider, so sending one payment elsewhere would need a second account for that studio.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger: the studio's money sits in the provider's regulated balance until payout; 'The split is by studio, not by payment'; 1,140 studios in NL and DE are on Stripe online while using Adyen terminals at the front desk.",
+              "shows": "Larkfield's rule follows from where the studio's money is, and the 1,140 studios show a platform can run one provider online and another at the counter.",
+              "source": "scenario-ledger.md (Larkfield, fictional)"
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe's Orchestration feature support 'doesn't include ... Connect'.",
+              "shows": "The documented product would not cover Larkfield's member payments in any case.",
+              "source": "Stripe documentation, 'Orchestration', https://docs.stripe.com/payments/orchestration.md, n.d., accessed 2026-11-17"
+            }
+          ]
+        },
+        {
+          "id": "p40",
+          "controlling_idea": "Larkfield's card volume cannot support per-payment routing: about 1.2 million online card payments a month spread over five countries, and the provider is tied to the country and the studio, so its own data cannot compare the two providers on like payments.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger arithmetic: cards are 52% of EUR 910M online volume; applying 52% to 27.6M online payments gives about 14.4M card payments a year, 1.2M a month (assumption: share by count equals share by volume). Stripe carries UK, US and Belgium, Adyen the Netherlands and Germany.",
+              "shows": "A test of 57,000 payments per route would need a segment of about a tenth of all card payments to finish in a month, and the two providers do not see the same countries.",
+              "source": "scenario-ledger.md (Larkfield, fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The structural reason for a per-studio rule.",
+            "introduces": "The statistical reason, from the ledger's numbers.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p41",
+          "controlling_idea": "If the switch were thrown for Studio Noord, Mila's class pass would move to Stripe at once because a wallet payment brings its own credential, and her EUR 49 membership renewal would not, because it rests on a card stored at Adyen.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger: the pass is paid from a phone wallet on 9 March 2027; the membership was set up on 12 January 2027 by typing the card and renews on the 1st as a merchant-initiated payment. New canonical detail (appended to the ledger): the 50 largest studios keep a verified account on both providers; the switch moves payments that bring their own credential; stored-card renewals stay with the original provider.",
+              "shows": "The switch is a failover for new payments and not a migration of stored cards, which is the vault section applied.",
+              "source": "scenario-ledger.md (Larkfield, fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "A rule that stays per studio.",
+            "introduces": "What the K8 switch does to the two recurring payments of the book.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p42",
+          "controlling_idea": "The quarterly rehearsal sends real payments for each of the 50 largest studios through the second provider and follows them to payout, refund and reconciliation, and it keeps Larkfield's answers to the three exit questions current.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger K8: 'the switch is rehearsed quarterly for the 50 largest studios; no orchestration product is added'; K3: the reconciliation job covers both providers.",
+              "shows": "The rehearsal exercises exactly the per-provider sets the routing layer does not unify.",
+              "source": "scenario-ledger.md (Larkfield, fictional)"
+            },
+            {
+              "kind": "table",
+              "what": "Table: exit question | Larkfield's answer in 2027.",
+              "shows": "The can-do of the chapter, worked for one company."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "What the switch moves.",
+            "introduces": "How Larkfield knows it works, and what the rehearsal checks beyond the authorization.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong",
+      "controlling_idea": "Multi-provider setups fail in three ways of their own: a retry on a second provider after an unknown outcome, a failover never exercised, and money flowing backward to a provider nobody is watching.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "S6",
+          "S2"
+        ],
+        "how": "Shows that the only unified part, the authorization request, is also where a second provider adds a new way to charge twice, and that the per-provider remainder is where the later failures surface."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "In the order they occur: the retry at the moment of authorization, the failover on the day of an outage, the refunds and disputes weeks later. The order also runs from the failure that costs money at once to the one that surfaces last, so reversing it would open the section with its least urgent case."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "A switch that is rehearsed.",
+        "introduces": "What happens to routing layers that are not, or that retry too eagerly.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p43",
+          "controlling_idea": "A timeout is an unknown outcome, so retrying it on a second provider can charge the customer twice across two providers that cannot see each other, and a cross-provider retry is safe only when the first attempt is known to have failed.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: if 3D Secure 'authentication is attempted on the first attempt on your main processor and your customer doesn't authenticate successfully, or authenticates successfully but the payment attempt still fails, Orchestration doesn't retry the transaction on the retry processor.'",
+              "shows": "The documented product declines to retry in a case where the first attempt's state is not clean.",
+              "source": "Stripe documentation, 'Cross-processor retries with Orchestration', https://docs.stripe.com/payments/orchestration/retries.md, n.d., accessed 2026-11-17"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe Vault and Forward: 'you might unintentionally use them to capture a payment on Stripe that was already captured on another processor'; 'Use a different and unique key for Stripe and any idempotency keys you provide on the underlying third-party request.'",
+              "shows": "Idempotency keys do not cross providers, so nothing downstream will catch the duplicate.",
+              "source": "Stripe documentation, 'Forward card details to third-party API endpoints', https://docs.stripe.com/payments/vault-and-forward.md, n.d., accessed 2026-11-17"
+            },
+            {
+              "kind": "scenario",
+              "what": "The Double Charge, 1 November 2026: 1,840 members charged twice after a timeout was retried with a new key, EUR 71,300 refunded.",
+              "shows": "The same failure inside one provider; across two there is not even a shared key to fix it with.",
+              "source": "scenario-ledger.md (Larkfield, fictional)"
+            },
+            {
+              "kind": "figure",
+              "what": "Illustration placeholder 10-cross-provider-retry: a request that times out at Provider A, a retry sent to Provider B, and one customer with two holds.",
+              "shows": "Shows why 'failed' and 'unknown' must be different states."
+            }
+          ]
+        },
+        {
+          "id": "p45",
+          "controlling_idea": "A failover that has never carried traffic fails on the day it is needed: the second merchant account is cold, a feature the payment uses is missing there, or the authentication was set up for the other acquirer.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: an unsupported feature 'fails with a 400 error code orchestration_unsupported'; 'For transactions that involve a 3D Secure request, you're responsible for providing Stripe with the Acquirer BIN that corresponds to the processor you route those transactions to.'",
+              "shows": "Feature gaps and authentication set-up are per provider and surface only when traffic moves.",
+              "source": "Stripe documentation, 'Supported Orchestration features', https://docs.stripe.com/payments/orchestration/feature-support.md, n.d., accessed 2026-11-17; Stripe documentation, 'Route payments to multiple processors', https://docs.stripe.com/payments/orchestration/route-payments.md, n.d., accessed 2026-11-17"
+            },
+            {
+              "kind": "quotation",
+              "what": "Joshua Barton of Canva, 2026: 'you're spending three-plus months warming up'.",
+              "shows": "A merchant account that has seen no traffic does not perform like one that has.",
+              "source": "Stripe Sessions 2026 talk 'More PSPs, more problems? When adding multiple processors pays off' (Alex Ginet and Jon Krauss of Stripe, Joshua Barton of Canva), transcript at https://stripe.com/sessions/2026/more-psps-more-problems, event held April 2026"
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "A retry at the moment of payment.",
+            "introduces": "The switch on the day of an outage.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p46",
+          "controlling_idea": "After any switch, refunds and disputes go back to the provider that took the original payment, so both back offices and both reconciliations must stay staffed for as long as the dispute window runs.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'For payments routed to third-party processors, those processors administer the refunds.'",
+              "shows": "The backward flow follows the original route, even under one dashboard.",
+              "source": "Stripe documentation, 'Orchestration', https://docs.stripe.com/payments/orchestration.md, n.d., accessed 2026-11-17"
+            },
+            {
+              "kind": "scenario",
+              "what": "The refund after payout (Mila's EUR 84.00 on 18 March 2027) and the EUR 120 dispute of 24 February 2027 would each arrive at the provider that took the payment, whichever provider the studio is on by then.",
+              "shows": "Ledger examples of money flowing backward to the old route.",
+              "source": "scenario-ledger.md (Larkfield, fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "The day of the switch.",
+            "introduces": "The weeks and months after it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "The routing layer, the vault, the stages and the failures are one fact seen four ways: a payment provider is not a stateless route but the holder of the cards, the money and the records of every payment it took. Routing can be shared because it happens before any of that exists; everything created by the payment stays where it was created. The decision to add a provider is therefore a decision to run a second back office and to settle where the cards live, and the routing rule is the smallest part of it.",
+    "so_what": "A team that accepts this stops asking 'which provider performs best?' first. It asks who holds the vault and how cards and tokens leave, staffs disputes and reconciliation for two providers, counts its payments per segment, and keeps the rule as simple as that count allows. For most businesses that means a fixed assignment and a switch that has been rehearsed.",
+    "callback": {
+      "to": "The forty minutes at four approvals in five, and the remedy proposed on Monday.",
+      "how": "The reader can now split the remedy in two: the second provider with a rehearsed switch answers the forty minutes; the layer that picks 'the best' provider per payment answers a different question, one that needs a volume per segment most teams do not have, and the thirty people are the per-provider work the layer never touched."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Before adding a provider, write down the three exit answers (who holds the vault, under whose identifier network tokens are issued, how cards leave), name the owner of the second provider's disputes, settlement and reconciliation, and choose the stage by payments per segment. Eight questions to take into the review follow."
+    },
+    "hand_off": {
+      "to": "in-person-payments",
+      "relationship": "contrast",
+      "carries_over": "Every payment so far was made at a distance, with only the provider's software between the merchant and the network, and Larkfield's 1,140 studios show a platform can run one provider online and another at the counter.",
+      "introduces": "The card in the room: a physical device in the payment path, and what it takes to join a counter payment to an online one."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The failures of multi-provider setups.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p47",
+        "form": "list",
+        "controlling_idea": "Established: providers route inside their own networks, US debit routing is a merchant right under Regulation II, a provider token works only at its vault, and Stripe's own documentation lists disputes, settlement and non-card methods as outside its orchestration product.",
+        "function": "synthesis"
+      },
+      {
+        "id": "p48",
+        "form": "list",
+        "controlling_idea": "Depends on context: whether to add a second provider, who should hold the vault, whether to build or buy the layer, and when per-payment rules are worth having.",
+        "function": "synthesis",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is established.",
+          "introduces": "What holds only under stated conditions.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p49",
+        "form": "list",
+        "controlling_idea": "The author's synthesis: a provider is a place where cards, money and records live, so decide the exit before the entry and keep the routing rule as simple as the evidence per segment allows.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "Conditional recommendations.",
+          "introduces": "The author's own position.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p50",
+        "form": "list",
+        "controlling_idea": "Eight questions let the reader test a multi-provider proposal or a provider's orchestration offer.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The positions.",
+          "introduces": "The questions that apply them in a design review or a provider evaluation.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p51",
+        "controlling_idea": "Everything so far assumed a payment made at a distance; the next chapter puts the card in the room.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "Routing between providers that are both reached over the internet.",
+          "introduces": "A device in the payment path, and Larkfield's studios that already use one provider online and another at the counter.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "Why issuers decline and what a provider does inside the authorization call (retries, message formatting, network retry limits).",
+      "covered_in": [
+        "authorization-optimization"
+      ]
+    },
+    {
+      "topic": "What an acquirer is licensed to do and which entity acquires in which country.",
+      "covered_in": [
+        "acquiring-and-network-connectivity"
+      ]
+    },
+    {
+      "topic": "How vaults, provider tokens and PCI scope work; how network tokens and cryptograms work.",
+      "covered_in": [
+        "tokenization-vaulting-and-pci",
+        "network-tokens"
+      ]
+    },
+    {
+      "topic": "Balances, settlement reports and reconciliation across providers in detail.",
+      "covered_in": [
+        "balances-and-funds-flows",
+        "payment-reconciliation-and-reporting"
+      ]
+    },
+    {
+      "topic": "Idempotency keys and the handling of an unknown outcome within one provider.",
+      "covered_in": [
+        "idempotency-and-retries"
+      ]
+    },
+    {
+      "topic": "Availability engineering, health signals and circuit breakers for provider calls.",
+      "covered_in": [
+        "payment-reliability-and-availability"
+      ]
+    },
+    {
+      "topic": "In-person least-cost routing and terminals.",
+      "covered_in": [
+        "in-person-payments"
+      ]
+    },
+    {
+      "topic": "Interchange and network fees that make one debit network cheaper than another.",
+      "covered_in": [
+        "payment-economics"
+      ]
+    },
+    {
+      "topic": "A ranking or review of orchestration vendors; they appear only as contrast, by their own descriptions."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "Whether network tokens provisioned by Stripe survive an export to another processor, and under whose token requestor identifier each company provisions them: not documented. Adyen's terms (13 June 2025) describe a Network Token Sharing Service; whether it covers a full exit is not stated.",
+    "When Stripe Orchestration leaves private preview, its price, and processors beyond Adyen, Braintree and Worldpay WPG.",
+    "Adyen's export procedure (an article is listed in its help center but could not be read on 17 November 2026), its timeline and fees, and the destinations its forward endpoint supports: no readable public documentation found.",
+    "Whether Stripe offers first-attempt least-cost debit routing beyond the documented retry on a US debit network.",
+    "Whether Visa and Mastercard count a retry through a second acquirer against the same retry limits: network rule texts were not readable.",
+    "The scale at which per-payment routing pays: no audited or independent figure is public; the chapter gives arithmetic and one merchant account."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "Use Stripe's Orchestration documentation as the main evidence for what a routing layer does not unify, because it is the only primary source that lists the exclusions precisely; say that it is one product in private preview.",
+      "rejected": [
+        "Arguing the line from orchestrator marketing pages",
+        "Arguing it from Larkfield alone"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Give the scale claim as arithmetic (sample size per segment) plus Canva's account, and state plainly that no public figure for the break-even scale exists.",
+      "rejected": [
+        "Quoting a volume threshold",
+        "Using Stripe's illustrative $100M example as evidence"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Place the trade-off table at the end of the evidence section, after the designs, because 'when each design is right' depends on that evidence.",
+      "rejected": [
+        "A trade-off table inside the designs section"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Treat dedicated orchestrators in one paragraph by their own descriptions and Canva's two buyer tests; no vendor comparison.",
+      "rejected": [
+        "A vendor-by-vendor table"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Explain K8's switch as moving payments that bring their own credential while stored-card renewals stay with the original provider; record this in the ledger as an addition that explains K8 without changing it.",
+      "rejected": [
+        "Assuming Larkfield duplicated its card vault at both providers"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/PLAN.md, contract 10",
+      "contributed": "Scope, the Larkfield thread and the terms the chapter owns."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/journal-spec.json, entry payment-routing-and-orchestration",
+      "contributed": "Intent, acceptance criteria, thesis and role, copied unchanged."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/_research/brief-optimization-routing-orchestration.md, parts 7 to 9",
+      "contributed": "The verified claims and their URLs; every load-bearing one was fetched again on 17 November 2026."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/_research/scenario-ledger.md",
+      "contributed": "Larkfield's providers, routing rule, K8, volumes and the recurring payments."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/_research/consistency-issues.md, rulings 8 and 11",
+      "contributed": "Glosses for 'provider token' and 'balance' with links; the qualification on who acquires."
+    },
+    {
+      "kind": "external",
+      "ref": "Stripe documentation: Orchestration (overview, routing, rules, retries, feature support), Vault and Forward, payment data export; n.d., accessed 2026-11-17",
+      "contributed": "What Stripe's routing product carries and excludes; the forward proxy; the export policy."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen documentation: Forward payment details, Multi pay-in, Network tokenization, Enable Adyen Uplift; n.d., accessed 2026-11-17",
+      "contributed": "Adyen's forward endpoint, the pilot, the acquired-only limit on network tokens, routing settings."
+    },
+    {
+      "kind": "external",
+      "ref": "Stripe Sessions 2026, 'More PSPs, more problems?', Ginet, Krauss (Stripe) and Barton (Canva), April 2026",
+      "contributed": "The one detailed merchant account and the vendor's statement of trade-offs."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen press release on Intelligent Payment Routing, 2024-09-09; Federal Reserve Regulation II page and press release of 2022-10-03",
+      "contributed": "Least-cost routing of US debit: the claim and the legal basis."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 96 claims checked (81 confirmed, 8 corrected, 6 hedged, 0 unsupported and removed or relabeled, 0 unreachable, 1 not checked); the page said no Stripe page describes first-attempt least-cost routing and no Adyen export procedure was found: Stripe's support site documents automatic least-cost routing in Australia, and Adyen's help center lists an export article whose link redirects, so it could not be read."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "While drafting, to keep the page under its length limit: the requirements paragraph of what-routing-unifies was dropped (its two vendor quotations moved to the orchestrator paragraph, its unknown-outcome point is made in when-it-goes-wrong) and the older Shopify and Uber posts were dropped as evidence. No unit was reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "After the flow rubric (sound with notes): pattern labels and reasons corrected for scene, what-routing-unifies, where-they-differ, in-practice and when-it-goes-wrong; the two debit-routing paragraphs merged as the rubric suggested; the stacked-retries paragraph dropped (the rubric found it out of the declared order, and the length limit needed it); the credential store qualified in p19. Not acted on, for the author: moving the three stages into two-kinds, and placing where-they-differ before when-routing-pays (the style guide fixes its position after the trade-offs)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "First version, written from PLAN contract 10, the journal-spec entry and the optimization brief."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation after verification: journal-spec entry and spec body brought into line with the verified page and consistency rulings (journal entry know[1] (ch9 row 57, ch10 row 73: the guide does not say 'its own'; external acquirer connections are documented) re-synced; journal entry thesis.how_why (same) re-synced; journal entry thesis.how_why (ruling 31a wording, as chapters 22 and 23) re-synced; ruling 28 / K3; ruling 31b; ruling 31a; ch10 verification row 66). No unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: 5 statements of absence re-tested with a wide search (0 overturned, 0 narrowed, 5 hold; table in _research/absence-audit/10-routing-and-orchestration.md). Adyen's export article still redirects to the general tokenization page at a second help-center address; no text changed."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('No Stripe or Adyen page read says whether network tokens sur' -> 'Adyen's terms (13 June 2025) describe a service that shares ')."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Sweep of rulings 46-48: the statements that neither company says whether network tokens survive a move are replaced by chapter 23's finding (Adyen's Network Token Sharing Service, Additional Services Terms of 13 June 2025; no Stripe statement) in the key point, the exit paragraph, the inference block, the thesis how_why, one supporting claim, one section and one paragraph controlling idea, evidence and the open question (ruling 48d). Source added. No unit added or dropped."
+    }
+  ],
+  "length": {
+    "target_words": 5300,
+    "max_words": 6500
+  }
+}

@@ -1,0 +1,1503 @@
+{
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "invoicing-collections-and-dunning",
+  "journal": "payments-platform-architecture",
+  "part": "part-6",
+  "title": "From Invoice to Cash: Invoicing, Collections and Dunning",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "The invoice's states as Stripe documents them (draft, open, paid, void, uncollectible), what finalization fixes, and why corrections are credit notes.",
+        "What dunning and involuntary churn are; the difference between a hard and a soft decline for retry purposes; why direct debit needs its own retry rules.",
+        "What each provider documents for recovery: Stripe's Smart Retries on invoices (for new accounts, up to 8 retries within 2 weeks by default) and automatic card updates; Adyen's Auto Rescue on payments (a rescue window of one calendar month by default for cards) and its account updater, with Adyen's documentation pages cited as undated."
+      ],
+      "believe": [
+        "What is being recovered is a debt on an invoice, not a failed payment.",
+        "Published recovery and churn percentages are vendor claims, nearly all without a stated baseline (Adyen's 2020 retry experiment is the exception), and the chapter's argument does not depend on them."
+      ],
+      "can_do": [
+        "Design a dunning policy that branches on decline type and payment method and ends in a defined subscription state.",
+        "Correct a finalized invoice without editing it.",
+        "On a provider that holds no invoice, say how retry results are tied back to the invoice in their own system."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given two failed renewals with different causes in a case the chapter does not contain, the reader prescribes different handling and gives the reason.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A streaming service has two failed renewals of €9.99. The first card payment came back 'stolen card'. The second, a SEPA Direct Debit (a bank debit the customer authorized in advance), came back days later as 'insufficient funds'. What should the collection process do in each case, and why not the same thing?",
+        "expected": "Stolen card is a hard decline: retrying that card cannot succeed, so the process asks the customer for a new payment method and retries only once one exists. Insufficient funds on a direct debit can be retried, but the failure arrives days late and the number of retries is capped, so it needs its own, slower schedule. In both cases the debt is the same invoice."
+      },
+      {
+        "id": "AC-2",
+        "statement": "The reader corrects a finalized invoice by a credit note or by voiding and reissuing, and can say why editing is not allowed.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "An invoice for €500 was finalized yesterday with the wrong customer address and €50 too much. What do you do, and why can you not just fix the invoice?",
+        "expected": "Issue a credit note for the €50, or void the invoice and issue a corrected copy for the address; a finalized invoice is kept as it was issued because tax rules commonly require it to be retained unchanged."
+      },
+      {
+        "id": "AC-3",
+        "statement": "No involuntary-churn share or recovery rate appears without attribution to the vendor that published it, and the chapter states that no independent measurement was found.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "What happens between 'an amount is owed' and 'it has been paid', especially when the first attempt fails?",
+    "claim": "Between owed and paid stands the invoice: once finalized it is frozen, and it is then collected as one debt through as many attempts, payment methods and partial payments as it takes, so recovery acts on the debt and not on the failed payment. Which party holds the invoice decides what a provider can recover: Stripe retries an invoice it holds (Smart Retries, by default up to 8 retries within 2 weeks on new accounts), while Adyen's Auto Rescue retries a payment linked to the billing cycle only by a reference the merchant supplies, and the invoice stays in the merchant's system.",
+    "disputed_by": "The view that a failed renewal is a payment problem solved by charging the card again on a fixed schedule, and that the invoice is a PDF produced afterwards for the customer's records.",
+    "so_what": "The reader models retries against the invoice, so that a new card, a bank transfer or a partial payment can all settle the same debt; separates hard from soft declines before scheduling anything; gives direct debit its own schedule; and, on Adyen, plans to hold the invoice state and join Auto Rescue results to it by reference.",
+    "how_why": "Finalization assigns the number and freezes the fields that matter for tax, which Stripe's documentation explains by the requirement to retain invoices as issued; every later change is a credit note. Because the debt outlives any one attempt, the useful questions are whether another attempt can succeed at all (Stripe schedules but does not execute retries on hard declines until a new payment method appears; SEPA and Bacs debits get at most 2 retries in 30 days) and whether the credential can be repaired first (Stripe's network-dependent automatic card updates; Adyen's Real Time Account Updater, which checks for new card details and retries inside the same refused payment). The public record on the retry logic is one engineering post each: Stripe's of 23 January 2024 on Smart Retries ('more than 500 attributes') and Adyen's of 3 December 2020 on Auto Rescue (a contextual bandit; 'about 6% more orders than the baseline' in one experiment); neither publishes the model now running or the timing for a given decline. Stripe's recovery figures and the one customer result Adyen has published for Auto Rescue are vendor claims without definitions, and no independent measurement of involuntary churn was found, so the chapter quotes no churn share.",
+    "supporting_claims": [
+      {
+        "id": "C1",
+        "claim": "An invoice is a numbered record of a debt that is frozen when it is finalized; every later change is a new document (a credit note, or a void and a reissue), because tax rules commonly require the invoice to be kept as issued."
+      },
+      {
+        "id": "C2",
+        "claim": "The invoice outlives every payment made against it: one debt is collected through as many attempts, payment methods and partial payments as it takes, so dunning has to be modeled against the invoice and started by a failed attempt, not by a missing payment."
+      },
+      {
+        "id": "C3",
+        "claim": "Whether another attempt can succeed is decided by the decline type and the payment method: a hard decline needs a new credential, a soft decline needs time inside the networks' limits, a direct debit needs its own slower and capped schedule, and repairing the credential or asking the customer comes before retrying."
+      },
+      {
+        "id": "C4",
+        "claim": "Which party holds the invoice decides what a provider can recover: Stripe's Smart Retries retry an invoice Stripe holds, while Adyen's Auto Rescue retries a payment tied to the billing cycle only by a reference the merchant supplies, so on Adyen the invoice and its state stay in the merchant's system."
+      },
+      {
+        "id": "C5",
+        "claim": "The public record of the retry logic is thin and dated and offers no independent measurement of involuntary churn: each company has one engineering post on its model (2024, 2020), Stripe's documentation names two example signals, Adyen's says 'smart logic' and 'optimal times', and the published recovery figures are vendor claims without definitions."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Supplies the invoice's state machine and the collection process, the place where the part's 'late' failure is handled on purpose, and the clearest documented consequence of where the billing engine sits on each provider.",
+    "supports": [
+      "P6-3",
+      "P6-5"
+    ]
+  },
+  "flow": {
+    "pattern": "problem_solution",
+    "additional_patterns": [
+      {
+        "pattern": "prerequisite_order",
+        "applies_to": "the-invoice, attempts-against-a-debt, can-another-attempt-succeed: the debt, then the attempts against it, then the decision about the next attempt; each uses the terms of the one before."
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "designs and where-they-differ"
+      }
+    ],
+    "rationale": "The reader first sees a collection process that knew only payments and emailed 7,900 people in error, so the invoice arrives as the missing object and not as paperwork. The three middle sections follow Femke's three questions in the only order that works: an attempt cannot be described before the debt it is made against, and the choice of the next step cannot be described before attempts and their outcomes exist. Bank transfers follow as the case where the customer, not the merchant, starts the payment, which stretches the same model. Only then can the designs be compared, because they differ in who holds the object the earlier sections defined; the two-company table follows the designs because its first rows are those designs as products. Larkfield's case comes after the comparison because it uses both providers, and the failures come last because each is a broken link between a payment and the debt. Moving the comparison before the mechanism would leave 'retries an invoice' and 'retries a payment' as slogans."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "On 1 April 2027 the card payment for Mila Janssen's €49.00 membership is declined: not enough money in the account. On 4 April the studio's platform charges the same card again and the bank approves. Everyone calls this 'the payment was retried'. But the payment of 1 April failed and stays failed; the charge of 4 April is a different payment with its own identifier. What was retried, then? Something outlived the failure and was still there to be paid three days later."
+    },
+    "bridge": {
+      "from_reader_world": "An engineer sees a failed renewal as a failed request: call the payment API again on a schedule until it returns success, then generate a PDF for the customer.",
+      "to_topic": "What is being collected is a debt with a number, an amount and a period, which exists before the first attempt and after the last, and the process that chases it has to know why an attempt failed, which payment method it used and where the chase ends."
+    },
+    "thesis_statement": {
+      "text": "Between owed and paid stands the invoice: once finalized it is frozen, and it is then collected as one debt through as many attempts, payment methods and partial payments as it takes. Which party holds the invoice decides what a provider can recover: Stripe retries an invoice it holds, Adyen's Auto Rescue retries a payment the merchant ties to its own invoice by a reference.",
+      "placement": "KEY POINTS bullets 1 and 3, and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p04",
+      "promises": [
+        {
+          "promise": "Start from 7,900 failure emails Larkfield sent about payments nobody had attempted, and come back to them with one record of each period's debt and a dunning policy.",
+          "kept_in": [
+            "scene",
+            "in-practice"
+          ]
+        },
+        {
+          "promise": "Define the invoice, its five states, what finalization freezes and how a finalized invoice is corrected.",
+          "kept_in": [
+            "the-invoice"
+          ]
+        },
+        {
+          "promise": "Show why one invoice has many payment attempts, and define dunning and involuntary churn.",
+          "kept_in": [
+            "attempts-against-a-debt"
+          ]
+        },
+        {
+          "promise": "Work out whether another attempt can succeed, by decline type and by payment method.",
+          "kept_in": [
+            "can-another-attempt-succeed"
+          ]
+        },
+        {
+          "promise": "Cover money the customer sends on their own: bank transfers, partial payments and cash application.",
+          "kept_in": [
+            "cash-application"
+          ]
+        },
+        {
+          "promise": "Compare three designs for who runs the collection, then Stripe and Adyen.",
+          "kept_in": [
+            "designs",
+            "where-they-differ"
+          ]
+        },
+        {
+          "promise": "Show how collection fails and how each failure is caught.",
+          "kept_in": [
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "Mila's €49.00 renewal is declined on 1 April 2027 and paid on 4 April by a different payment, so what was 'retried' was not the payment but something that outlived it.",
+        "function": "context",
+        "organization": "narration",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's membership renewal: €49.00, declined on 1 April 2027 for insufficient funds, retried and approved on 4 April (ledger).",
+            "shows": "A failed payment stays failed; the second charge is a new payment, so the thing that persisted across the three days has to be something else.",
+            "source": "_research/scenario-ledger.md"
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "What outlives the failed payment is the invoice, a frozen record of a debt that is collected through as many attempts and methods as it takes, and the party that holds it decides what a provider can recover.",
+        "function": "claim",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The question of what was retried.",
+          "introduces": "The answer and the chapter's thesis: the debt on an invoice, and why it matters who holds that invoice.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "On the payment's journey this chapter covers the days between Mila's declined renewal on 1 April and its payment on 4 April; her one-off class pass needed no such process because its amount was owed and paid in the same minute.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's class pass of €120.00 on 9 March 2027 at 19:42, approved at once; her renewal declined on 1 April and paid on 4 April (ledger).",
+            "shows": "Places the chapter on the recurring payment and shows why the one-off purchase hides the invoice: owed and paid coincide.",
+            "source": "_research/scenario-ledger.md"
+          }
+        ],
+        "transition_in": {
+          "relationship": "place",
+          "carries_over": "The debt that outlives a failed payment.",
+          "introduces": "Where that debt sits on the book's recurring payment.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "controlling_idea": "The chapter goes from Larkfield's mistaken failure emails to the invoice and its states, the attempts made against it, whether another attempt can succeed, money that arrives by bank transfer, three designs for who runs collection, the comparison of Stripe and Adyen, Larkfield's renewal record and policy, and the failures.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The chapter's place on the payment's journey.",
+          "introduces": "The order of its sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: 7,900 Emails About Payments Nobody Attempted",
+      "controlling_idea": "Larkfield told 7,900 members their payment had failed when no payment had been attempted, because its collection process was started by the absence of a payment and had no record of the debt or of the attempts against it.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "C2"
+        ],
+        "how": "Shows, before any vocabulary, what goes wrong when collection is driven by 'no payment yet' instead of by a failed attempt on a recorded debt."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The night of 1 October 2026, then what Femke finds in the job in 2027, then the three questions she writes; the questions name the next sections, so they come last."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The introduction's claim that what is collected is a debt, not a payment.",
+        "introduces": "A company whose collection process knew only payments.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p05",
+          "controlling_idea": "On 1 October 2026 Larkfield's renewal job hit a provider rate limit, 7,900 renewals were put off to the next day, and that evening every one of those members received a 'your payment failed' email.",
+          "function": "context",
+          "organization": "narration",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "The Renewal Wave: 38% of monthly membership volume attempted in a 6-hour window; on 1 October 2026 the renewal job hit the provider's rate limit and 7,900 renewals were delayed to the next day; dunning emails went to members who had done nothing wrong (ledger).",
+              "shows": "The members were told about a failure that had not happened: the scheduler was late, not the customer.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ]
+        },
+        {
+          "id": "p06",
+          "controlling_idea": "The email job selected memberships that were due and had no successful payment, so it could not tell a declined card from a card that had not been charged yet.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield before Keel (local detail consistent with the ledger): the booking app held a membership with a next-renewal date, the payment record store held payments; no record stood for 'the amount owed for October' or listed the attempts made against it.",
+              "shows": "With no debt record and no attempt record, 'not paid' was the only fact the job could read, and it covers two different situations.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The mistaken emails.",
+            "introduces": "The query behind them and what it could not see.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p07",
+          "controlling_idea": "Femke de Graaf turns the incident into three questions that any collection process must answer: what exactly is owed and is that final, what has been tried and how did it end, and what happens next and where does it stop.",
+          "function": "transition",
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "A process that could read only 'not paid'.",
+            "introduces": "The three questions that the rest of the chapter answers in order.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "the-invoice",
+      "heading": "The Invoice: A Debt With a Number and a Freeze Point",
+      "controlling_idea": "An invoice is the record of what is owed; it moves through five states, is frozen at finalization for tax reasons, and is corrected afterwards only by new documents.",
+      "function": "definition",
+      "advances_thesis": {
+        "supports": [
+          "C1"
+        ],
+        "how": "Establishes the object the rest of the chapter collects, and why it cannot be edited once issued."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "What an invoice is, then its states, then the one transition that matters most (finalization), then how to correct what finalization froze, then the two ends without money, then the coming change to the document itself. Corrections cannot be explained before the freeze, and void and uncollectible are easier to tell apart once the credit note has shown what 'still owed' means."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Femke's first question: what exactly is owed, and is that final?",
+        "introduces": "The invoice, the record that answers it.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p08",
+          "controlling_idea": "An invoice is a numbered, dated statement of what one customer owes for which goods or period, and it is a different thing from a payment, which is one attempt to move money; Stripe holds such an object and Adyen's documented model does not.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe documents an invoice object ('Invoices are statements of amounts owed by a customer'); nothing in Adyen's documentation describes an invoice, a point owned by subscriptions-and-billing-engines (consistency ruling 6).",
+              "shows": "Separates the debt from the attempt, and states in one sentence the difference between the providers that the comparison section later uses.",
+              "source": "Stripe documentation, 'Issue credit notes', https://docs.stripe.com/invoicing/dashboard/credit-notes (n.d., accessed November 2026)"
+            }
+          ]
+        },
+        {
+          "id": "p09",
+          "controlling_idea": "Stripe documents five invoice states (draft, open, paid, void, uncollectible) and a small set of transitions between them, each with an endpoint and a webhook.",
+          "function": "description",
+          "organization": "classification",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "State table from Stripe's transitions page: draft → open (finalize, invoice.finalized); open → paid (pay, invoice.paid); open → open on a failed payment (invoice.payment_failed); open → void; open → uncollectible; uncollectible → paid or void; a draft can be deleted.",
+              "shows": "A failed payment is a transition from open to open: the invoice does not change state when an attempt fails.",
+              "source": "Stripe documentation, 'Status transitions and finalization', https://docs.stripe.com/invoicing/integration/workflow-transitions (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "figure",
+              "what": "Figure: the invoice state machine with five states, the finalize transition marked as the freeze point and a loop on 'open' for a failed attempt.",
+              "shows": "Makes visible that only a draft can be edited and that failure loops on open."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The invoice as a record.",
+            "introduces": "The states it moves through.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "controlling_idea": "Finalization is the freeze point: it assigns the number, makes the invoice payable and fixes the amounts and the customer's details, and Stripe gives the reason as tax rules that require invoices to be kept as issued.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"It allows the invoice to be paid. It ensures that an invoice number is present. It makes certain properties immutable on the invoice. It creates an incomplete payment intent for the invoice.\"",
+              "shows": "Finalization is one act with several effects: the number, the freeze and the first payment object appear together.",
+              "source": "Stripe documentation, 'Status transitions and finalization', https://docs.stripe.com/invoicing/integration/workflow-transitions (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "quotation",
+              "what": "\"This is to satisfy the common tax-compliance requirement that finalized invoices be retained—as they were finalized—for a legally required minimum time period.\"; customer name, address, tax IDs and tax-exempt status are copied onto the invoice and made immutable.",
+              "shows": "The immutability is a legal requirement the software inherits, not a product choice.",
+              "source": "Stripe documentation, 'Status transitions and finalization', https://docs.stripe.com/invoicing/integration/workflow-transitions (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "emphasis",
+            "carries_over": "The five states.",
+            "introduces": "The one transition after which nothing may be edited.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "controlling_idea": "A finalized invoice is corrected by a new document: a credit note reduces what is owed without touching the original, and a wrong customer detail is fixed by voiding the invoice and issuing a corrected copy.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"Credit notes are documents that decrease the amount of an `open` or `paid` invoice\"; \"a credit note doesn’t void and replace the original invoice\"; \"The sum of all credit notes issued for an invoice can’t exceed the total amount of the invoice.\"",
+              "shows": "The correction is additive and bounded by the invoice it corrects.",
+              "source": "Stripe documentation, 'Issue credit notes', https://docs.stripe.com/invoicing/dashboard/credit-notes (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "fact",
+              "what": "To change a customer-related property Stripe documents three steps: void the current invoice, duplicate the voided invoice, update the customer information on the new invoice.",
+              "shows": "The second path, for fields a credit note cannot change.",
+              "source": "Stripe documentation, 'Status transitions and finalization', https://docs.stripe.com/invoicing/integration/workflow-transitions (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "example",
+              "what": "Larkfield invoice from the ledger (chapter 28's addition): Studio Noord's March 2027 invoice on the €89 plan with €57.68 of billed SMS overage, €146.68 before tax; 180 messages were counted twice; a credit note for 180 × €0.07 = €12.60 leaves €134.08 due and the invoice unchanged.",
+              "shows": "Shows the mechanics with ledger prices: the invoice still says €146.68, and a second document explains the difference.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "An invoice that may no longer be edited.",
+            "introduces": "The two ways to correct it anyway.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p12",
+          "controlling_idea": "Two states end an invoice without money and mean opposite things: void says the amount was never owed, uncollectible says it is owed and written off, and an uncollectible invoice can still be paid.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: an uncollectible invoice is one where 'The customer is unlikely to pay the invoice. Normally, you treat it as bad debt in your accounting process'; documented transitions lead from uncollectible to paid or void; only open or uncollectible invoices can be voided.",
+              "shows": "The collection process needs both ends, because finance treats a cancelled debt and a bad debt differently.",
+              "source": "Stripe documentation, 'Invoicing overview', https://docs.stripe.com/invoicing/overview (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Corrections that leave the debt in place.",
+            "introduces": "The two states that close it without payment.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p13",
+          "controlling_idea": "The document itself is becoming regulated data: the EU's VAT in the Digital Age package, adopted on 11 March 2025, lets member states require electronic invoices and makes digital reporting based on them mandatory for cross-border business sales from 1 July 2030.",
+          "function": "context",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "European Commission: the package 'was adopted on 11 March 2025' and 'will be rolled out progressively until January 2035'; 'Upon entry into force (14 April 2025), Member States are able to introduce mandatory e-invoicing under specific conditions'; 'Digital Reporting Requirements will affect cross-border B2B transactions from 1 July 2030'. National mandates were not verified.",
+              "shows": "An invoice engine will have to produce a structured record in a format set by a tax authority, which strengthens the case for treating the finalized invoice as an immutable record and not a rendering.",
+              "source": "European Commission, 'VAT in the Digital Age (ViDA)', https://taxation-customs.ec.europa.eu/taxation/vat/vat-digital-age-vida_en (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "An invoice frozen for tax reasons.",
+            "introduces": "A second tax-driven change: the invoice as structured data reported to an authority.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "attempts-against-a-debt",
+      "heading": "Attempts Against a Debt: Why the Invoice Outlives Its Payments",
+      "controlling_idea": "One invoice has many payment attempts, a failed attempt leaves the invoice open, and the process that works through the attempts to a defined end is dunning.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "C2",
+          "C5"
+        ],
+        "how": "Gives the data model (one debt, many attempts), defines dunning and involuntary churn against it, and states that no independent figure sizes the problem."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The relation between invoice and attempts first, then the process that runs over it, then the name for its failure and the missing measurement of it, then the requirements the process must meet. Dunning cannot be defined before the reader knows what an attempt is to an invoice."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Femke's second question: what has been tried, and how did it end?",
+        "introduces": "The attempts as records of their own, attached to the invoice.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p14",
+          "controlling_idea": "Each payment attempt is its own record with its own outcome, attached to the invoice, and a failed attempt changes the attempt and a counter but leaves the invoice open.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe's transition table lists paying an open invoice with the result invoice.payment_failed and end status open; 'The attempt_count attribute on the invoice.payment_failed webhook indicates how many attempts have been made so far.'",
+              "shows": "The documented model is one invoice with a count of attempts; the failure belongs to the attempt.",
+              "source": "Stripe documentation, 'Automate payment retries', https://docs.stripe.com/billing/revenue-recovery/smart-retries (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "figure",
+              "what": "Figure: one invoice of €49.00 with three attempts hanging from it (a declined card, a second declined card attempt, a paid attempt with a new card), and the invoice turning from open to paid only at the last.",
+              "shows": "Shows that the attempts may use different methods and that the debt is the only constant."
+            }
+          ]
+        },
+        {
+          "id": "p15",
+          "controlling_idea": "Dunning is the process of collecting an invoice whose payment failed or is overdue (retries, messages to the customer and a defined end), and involuntary churn is the customer lost when that process fails.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Recurly's documentation: \"Involuntary churn refers to customer loss caused by factors outside their direct intent — expired credit cards, bank account changes, or failed payment attempts\".",
+              "shows": "A definition from a billing vendor that separates the customer who left from the customer who was lost.",
+              "source": "Recurly documentation, 'Involuntary churn', https://docs.recurly.com/recurly-subscriptions/docs/involuntary-churn (updated 7 July 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "One invoice with several attempts.",
+            "introduces": "The name of the process that makes those attempts, and of its failure.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p16",
+          "controlling_idea": "How much revenue involuntary churn costs is not established by any independent source I found; the figures in circulation are vendor claims without definitions, so this chapter quotes no churn share.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "statistic",
+              "what": "Stripe's Billing product page: \"Businesses using Stripe recover 55% of failed payments on average\" (after a sentence naming Smart Retries, card account updater and cancellation surveys together) and \"US$8.2bn in failed payments recovered in 2025\"; the page defines neither 'failed payment' nor 'recovered' nor the cohort. Stripe's documentation defines a dashboard recovery rate by volume and by any means. Adyen publishes no average; its knowledge-hub guide of 16 June 2026 gives one customer's result, \"Pinterest saw a 4% improvement in recovery rate on retried transactions, with expectation of reaching 10% over time\", first published as a customer quotation on 4 December 2020, without a baseline.",
+              "shows": "The best-known recovery figures are marketing statements that cannot be checked or compared.",
+              "source": "Stripe product page, 'Billing', https://stripe.com/billing (n.d., accessed November 2026; vendor marketing page)"
+            },
+            {
+              "kind": "reasoning",
+              "what": "The research for this book found no independent, primary, dated measurement of the share of churn that is involuntary.",
+              "shows": "The chapter's argument must not depend on a percentage, and it does not."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A clear definition of involuntary churn.",
+            "introduces": "The absence of a trustworthy measurement of it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p17",
+          "controlling_idea": "A collection process has to guarantee five things whatever its schedule: the debt is paid at most once, every attempt is tied to its invoice, the customer is told only about real failures, attempts stay inside network limits, and the process ends in a defined state.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Requirements table (author's): requirement, why, what breaks without it. Rows: paid at most once; every attempt tied to the invoice; a message only after a failed attempt; attempts bounded per card and per network; a defined end (canceled, paused, unpaid) with the invoice void or uncollectible.",
+              "shows": "Turns the model into testable properties, each of which names a failure seen later in the chapter."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "A debt with many attempts and a process that can fail.",
+            "introduces": "What that process must guarantee.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "can-another-attempt-succeed",
+      "heading": "Can Another Attempt Succeed? Decline Type and Payment Method",
+      "controlling_idea": "The next step after a failed attempt depends on why it failed and on the payment method: a hard decline needs a new credential, a soft decline needs time, a direct debit needs a slower and capped schedule, and a repaired credential or a message to the customer can do what no retry can.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "C3",
+          "C5"
+        ],
+        "how": "Supplies the branches of a dunning policy with the documented behavior of each provider on each branch, and marks where the published description of the retry logic ends."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "By the question a scheduler asks, in the order it asks them: can this credential ever work (hard decline), if so when (soft decline and timing) and how often (network limits); can the credential be repaired without the customer; does the method follow card rules at all (direct debit); and finally what only the customer can do. The customer message comes last because for a hard decline it is the only remaining instrument."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Femke's third question: what happens next?",
+        "introduces": "The facts that decide it: decline type and payment method.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p18",
+          "controlling_idea": "A hard decline means no retry of the same credential can succeed, and Stripe documents exactly that behavior: for a listed set of codes it keeps scheduling retries but executes none until a new payment method appears.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: \"A hard decline code means the issuing bank has rejected the transaction and you can't retry it\"; codes listed include `lost_card`, `stolen_card`, `pickup_card`, `incorrect_number`, `revocation_of_authorization`, `authentication_required`, `transaction_not_allowed`; \"Retries continue to be scheduled, and attempt_count continues to increment, but retries only execute after detecting a new payment method.\"",
+              "shows": "The debt stays open and scheduled while the credential is treated as dead, which is the invoice-level view of a hard decline.",
+              "source": "Stripe documentation, 'Automate payment retries', https://docs.stripe.com/billing/revenue-recovery/smart-retries (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "fact",
+              "what": "'Hard decline' and 'soft decline' are industry shorthand, not card-network terms; Visa's rules use four categories, of which category 1 may never be resubmitted (consistency ruling 15; authorization-optimization owns the categories).",
+              "shows": "Keeps the vocabulary honest and points to the chapter that owns it.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, 24 October 2026, Table 7-2 (consistency ruling 19; cited in authorization-optimization)"
+            }
+          ]
+        },
+        {
+          "id": "p19",
+          "controlling_idea": "A soft decline can succeed later, so the question becomes when to try: a fixed schedule picks the days in advance, and Stripe's Smart Retries picks the moments inside an envelope the merchant sets.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Fixed schedules: Stripe's custom schedule allows 'up to three retries, each with a specific number of days after the previous attempt'; Orb's essential dunning retries 'after 1, 4, and 9 days from the initial payment attempt'.",
+              "shows": "A fixed schedule is simple and blind to the reason for the decline and to the cardholder's pay cycle.",
+              "source": "Orb documentation, 'Essential dunning', https://docs.withorb.com/financial-operations/essential-dunning (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "quotation",
+              "what": "Smart Retries: \"For new Stripe accounts, Stripe enables Smart Retries by default and configures it for up to 8 retries within 2 weeks\"; the window can be 1 week, 2 weeks, 3 weeks, 1 month or 2 months; signals named: \"The number of different devices that have presented a given payment method in the last N hours\" and \"The best time to pay (payments made for debit cards in certain countries might be slightly more successful at 12:01 am in local time zones)\".",
+              "shows": "The merchant sets count and window; the model chooses the times; two example signals are all that the documentation publishes (the 2024 blog post adds 'more than 500 attributes').",
+              "source": "Stripe documentation, 'Automate payment retries', https://docs.stripe.com/billing/revenue-recovery/smart-retries (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Declines that no retry can fix.",
+            "introduces": "Declines that time can fix, and the two ways to choose the time.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "controlling_idea": "Any schedule runs inside limits the card networks set and count per card, whichever system sends the attempt.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Visa's rules (Product and Service Rules, edition of 24 October 2026), Table 7-2: no resubmission after a category 1 code; for categories 2, 3 and 4, 'Reattempt permitted (up to 20 attempts in 30 days)'; Stripe 'recommends a maximum of eight retries'.",
+              "shows": "A dunning window of a month with daily retries would exceed the rule; the network limit is an input to the schedule, not a detail.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, 24 October 2026, Table 7-2 (consistency ruling 19; cited in authorization-optimization)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "A schedule chosen by the merchant or the provider.",
+            "introduces": "The outer limit neither of them sets.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p21",
+          "controlling_idea": "A failing credential can sometimes be repaired without the customer: card networks pass on reissued card details, Stripe applies them to saved cards where the issuer takes part, and Adyen's Real Time Account Updater checks for them inside the refused payment and retries at once.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: \"Stripe works with card networks and automatically attempts to update saved card details whenever a customer receives a new card\"; \"International support varies from country to country. It isn’t possible to identify cards that support automatic updates\"; event `payment_method.automatically_updated`.",
+              "shows": "The repair is automatic but its coverage cannot be known per card, so it cannot replace asking the customer.",
+              "source": "Stripe documentation, 'How cards work', https://docs.stripe.com/payments/cards/overview (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen: \"When you submit a payment that is refused, our Real Time Account Updater instantly checks for updated card details. If there is an update, we immediately retry the payment with the updated card details. This all happens while the payment is being processed, and appears as a single transaction.\" Conditions: non-zero amount, shopperInteraction ContAuth, no security code.",
+              "shows": "On Adyen the repair happens inside the payment call, so a renewal can succeed on a replaced card without any dunning step.",
+              "source": "Adyen documentation, 'Real Time Account Updater', https://docs.adyen.com/online-payments/account-updater/real-time-account-updater (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "fact",
+              "what": "A network token stays valid when the card behind it is reissued (network-tokens owns the mechanism).",
+              "shows": "A second repair route that removes the expired-card failure before it occurs."
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "A credential that fails.",
+            "introduces": "Ways to repair it without involving the customer.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p22",
+          "controlling_idea": "A direct debit needs its own rules because its failure arrives days after an apparent success and the number of re-presentations is capped at two by both providers' documentation.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: SEPA Direct Debit payments 'can fail because of insufficient funds, closed or restricted accounts, invalid bank details, revoked or missing authorization, or bank processing errors. Most failures occur within 6 business days after initiation'; retries for SEPA Direct Debit and Bacs Direct Debit: retryable failure 'Insufficient funds', maximum 2 retries, maximum retry period 30 days; 'Direct debit retries use the payment method’s retry configuration, not the general card retry policy.'",
+              "shows": "Only one failure reason is retried at all, and the card policy does not apply.",
+              "source": "Stripe documentation, 'Automate payment retries', https://docs.stripe.com/billing/revenue-recovery/smart-retries (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen: \"Because SEPA transactions always have eventCode AUTHORISED in the response, these require a different rescue logic compared to card transactions\"; rescue applies to chargeback reasons AM04 (insufficient funds) and MS03; \"we have a maximum of two rescue attempts within the rescue window\" because the first decline message arrives later and \"chargebacks are typically fined by the issuing bank\"; account-level window 42 days.",
+              "shows": "Adyen states the two reasons a card schedule does not fit: less time left and a cost per failure.",
+              "source": "Adyen documentation, 'Auto Rescue for SEPA payments', https://docs.adyen.com/online-payments/auto-rescue/sepa (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Card declines, which answer in seconds.",
+            "introduces": "Direct debit, which answers in days and allows two more tries.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p23",
+          "controlling_idea": "The message to the customer is the one instrument that works on every branch and the only one that works after a hard decline, so it must say what the customer can do and must be sent only after an attempt has failed.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe documents emails for failed payments, expiring cards and renewals that 'include a link to a page where the customer can update their payment method', either 'a Stripe-hosted Customer Portal or your own custom subscription management page'. Adyen documents an optional payment link when Auto Rescue ends unsuccessfully: 'The URL where the shopper can complete the payment. Valid for 5 days.'",
+              "shows": "Both providers treat the customer's own action as part of recovery; Stripe attaches it to the invoice from the first failure, Adyen offers it at the end of the rescue.",
+              "source": "Stripe documentation, 'Automate customer emails', https://docs.stripe.com/billing/revenue-recovery/customer-emails (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "reasoning",
+              "what": "A message triggered by 'no payment yet' reaches customers whose card was never charged (the Larkfield scene); a message triggered by a failed attempt carries the decline type and can ask for the right action.",
+              "shows": "Ties the scene's failure to a rule about what starts a message."
+            }
+          ],
+          "transition_in": {
+            "relationship": "emphasis",
+            "carries_over": "Retries and automatic repairs.",
+            "introduces": "What only the customer can do, and when to ask.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "cash-application",
+      "heading": "Money That Arrives on Its Own: Bank Transfers, Partial Payments and Cash Application",
+      "controlling_idea": "When the customer pushes money by bank transfer, the amount and timing are the customer's choice, so collection becomes matching arrived money to open invoices, and unmatched money needs an explicit holding place.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "C2",
+          "C4"
+        ],
+        "how": "Shows the strongest case of 'one debt, many payments': an invoice settled by several transfers, or one transfer spread over several invoices, which only a system holding the invoices can do."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "The problem (the payer controls amount and reference), then the documented solution on Stripe (a balance and a matching order), then what the public record shows on Adyen. The Adyen paragraph comes last because it is a statement about absence that only makes sense once the reader has seen what is being looked for."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "Attempts the merchant starts against a card or a bank account.",
+        "introduces": "Payments the customer starts, in an amount and at a time of their choosing.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p24",
+          "controlling_idea": "A bank transfer inverts collection: the customer decides how much to send and when, so the system's job is cash application, matching money that has arrived to the invoices it was meant to pay.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: \"bank transfers don’t allow you to control the amount a customer sends to you, which means that customers might send too much or too little money by accident. To manage common overpayment and underpayment issues, Stripe holds your customer’s bank transfers in a customer balance\"; each customer gets 'a unique virtual bank account number' shown on the invoice.",
+              "shows": "The holding place (a balance per customer) exists because the amount cannot be controlled; the virtual account number identifies who paid.",
+              "source": "Stripe documentation, 'Bank transfers', https://docs.stripe.com/payments/bank-transfers (n.d., accessed November 2026)"
+            }
+          ]
+        },
+        {
+          "id": "p25",
+          "controlling_idea": "Stripe publishes the order in which it applies arrived money: by invoice number in the transfer reference, then by exact amount, then oldest invoice first, with partial payment of an invoice only when the reference names it, and an ageing rule for what cannot be matched.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Documented order for EUR, USD and other currencies: match the reference to one invoice number; else to one PaymentIntent reference; else find a group of one to five invoices and PaymentIntents 'awaiting the exact amount available'; else fund invoices that can be fully funded, oldest due first; else apply the rest to incomplete PaymentIntents. Partial payment of an invoice only with automatic partial reconciliation enabled and the invoice number in the memo.",
+              "shows": "A published, deterministic matching rule: the reader can predict where a transfer lands, and sees that one invoice can be paid by several transfers.",
+              "source": "Stripe documentation, 'Reconciliation' (customer balance), https://docs.stripe.com/payments/customer-balance/reconciliation (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "fact",
+              "what": "Unreconciled funds: after 75 days Stripe 'automatically attempts to return the funds to the customer’s bank account'; by the 90 day mark it sweeps them to the merchant's balance. A tolerance setting can mark an invoice paid if it is partially paid within a set amount (the documentation's example: within 20 USD).",
+              "shows": "Unmatched money has an explicit location and an age limit, never a silent guess.",
+              "source": "Stripe documentation, 'Bank transfers', https://docs.stripe.com/payments/bank-transfers (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "Money held in a customer balance.",
+            "introduces": "The documented rule that applies it to invoices.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p26",
+          "controlling_idea": "On Adyen I found no documented invoice, customer balance for receivables or cash-application feature, which is an absence in the public record and not a statement by Adyen; a merchant that takes bank transfers there applies them to its own invoices in its own system.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Searches of Adyen's documentation in November 2026 found bank transfer and direct debit as payment methods and Auto Rescue for SEPA retries, and no object that holds a receivable. Absence of evidence from public documentation, not confirmation.",
+              "shows": "Marks where the evidence stops on one side of the comparison and what the merchant must supply."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Stripe's documented matching against invoices it holds.",
+            "introduces": "What the public record shows on Adyen: nothing equivalent.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "designs",
+      "heading": "Who Runs the Collection: Three Designs",
+      "controlling_idea": "Collection can be run by a provider that holds the invoice, by a provider that retries a payment for a merchant who holds the invoice, or by the merchant's own billing system; the choice follows from where the invoice lives, and exactly one scheduler may act on a debt.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "C4",
+          "C5"
+        ],
+        "how": "Presents Stripe's Smart Retries and Adyen's Auto Rescue as two designs that differ in the unit they act on, with the documented detail of each, and states what neither publishes."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The three designs in order of how much the provider holds (invoice and schedule; schedule only; neither), then the table that compares them on the same criteria with the rule for choosing, then the limit of the public record that applies to the first two. The limit comes last so the reader knows what the two provider designs are before learning what cannot be known about them."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "The branches of a collection process and the instruments for each.",
+        "introduces": "Who runs that process: three realistic designs.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p27",
+          "controlling_idea": "In the first design the provider holds the invoice and runs the dunning: Stripe's Smart Retries act on the invoice, use whichever payment method is current, and end by moving the subscription to a state the merchant has chosen.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: Smart Retries choose times 'to increase the chance of successfully paying an invoice'; a documented payment-method order (subscription default payment method first, then customer defaults); 'If recovery fails, the subscription transitions according to your settings': canceled, unpaid, left past_due or paused.",
+              "shows": "Because the retry belongs to the invoice, a new card supplied mid-process is used by the next retry, and the end of the process is a subscription state.",
+              "source": "Stripe documentation, 'Automate payment retries', https://docs.stripe.com/billing/revenue-recovery/smart-retries (n.d., accessed November 2026)"
+            }
+          ]
+        },
+        {
+          "id": "p28",
+          "controlling_idea": "In the second design the merchant holds the invoice and the provider retries the payment: Adyen's Auto Rescue retries a refused merchant-initiated payment inside a rescue window and reports each attempt by webhook under a reference the merchant chose to stand for the billing cycle.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: Auto Rescue \"automatically retries refused or charged back shopper-not-present transactions such as subscription renewals. It uses smart logic to decide which payments can succeed when retried later, and performs these retries at optimal times\" (documentation n.d., accessed November 2026; ruling 30: last-modified stamps are not used as dates).",
+              "shows": "The unit is the transaction; the description of the logic is two phrases.",
+              "source": "Adyen documentation, 'Auto Rescue', https://docs.adyen.com/online-payments/auto-rescue (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "fact",
+              "what": "Card page: enabled by Adyen's support team; applies to shopperInteraction ContAuth; account-level 'rescue window of one calendar month', or maxDaysToRescue 'between 1 and 48 days' per transaction; the merchant provides 'a unique merchantOrderReference. This should represent a specific billing cycle or subscription'; refused response carries retry.rescueScheduled (false 'when a payment cannot be rescued. For example, because of account closure or fraud'); 'Each Auto Rescue retry attempt is a separate transaction, and thus generates a unique pspReference'; an AUTORESCUE webhook ends the process; the merchant should cancel the rescue when the shopper provides a new payment method.",
+              "shows": "Everything that ties the retries to a debt (the reference, the cancellation on a new method, the state at the end) is the merchant's work.",
+              "source": "Adyen documentation, 'Auto Rescue for card payments', https://docs.adyen.com/online-payments/auto-rescue/cards (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A provider that retries an invoice it holds.",
+            "introduces": "A provider that retries a payment for a merchant who holds the invoice.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p29",
+          "controlling_idea": "In the third design the merchant's own billing system holds the invoice and schedules every attempt, calling the provider only to charge; Orb, the billing company Adyen acquired on 1 July 2026, documents this design on top of several gateways, and no integrated Adyen product is documented yet.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Orb: 'Orb will automatically retry the charge after 1, 4, and 9 days from the initial payment attempt'; 'If payment method is updated prior to exhaustion of the dunning period, Orb will immediately try to collect on the invoice.' Adyen completed the acquisition of Orb on 1 July 2026 (owned by subscriptions-and-billing-engines); as of November 2026 no Adyen documentation describes an integrated billing product.",
+              "shows": "A billing system above the gateway behaves like the first design (retries belong to the invoice) while the payment provider sees only single charges; Orb's documentation is about Orb, not about Adyen's platform.",
+              "source": "Orb documentation, 'Essential dunning', https://docs.withorb.com/financial-operations/essential-dunning (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Designs in which the provider schedules the retries.",
+            "introduces": "The design in which the merchant's own system does.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p30",
+          "controlling_idea": "The rule I use is to let the system that holds the invoice own the schedule, and never to let two schedulers retry the same debt.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Trade-off table, three designs: who holds the invoice; who schedules retries; what the merchant builds; right when; main risk.",
+              "shows": "Sets the designs side by side on the same criteria so that the rule can be read off the first two columns."
+            },
+            {
+              "kind": "reasoning",
+              "what": "A scheduler that does not hold the invoice cannot know that the customer paid another way, changed card or canceled; Adyen's own instruction to cancel the rescue in those cases is evidence of the gap. Two schedulers spend one network retry allowance twice (authorization-optimization).",
+              "shows": "Gives the reason for the rule and the conditions under which the second design is still reasonable: a merchant with no billing system of its own that keeps a small invoice table and joins by reference."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "Three designs described one by one.",
+            "introduces": "Their comparison and the rule for choosing.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p31",
+          "controlling_idea": "The public record of the retry logic is thin and dated for both providers: each has described its model in one blog post (Stripe 2024, Adyen 2020), and neither documents the model now running or a recovery rate with a stated basis.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe's documentation names two example signals and says Smart Retries 'are more effective than scheduled retries' without a figure; Adyen's says 'smart logic' and 'optimal times'; Adyen's 2026 knowledge-hub guide gives one customer's 4% improvement in recovery rate on retried transactions, without a baseline; Stripe's 55% is a marketing-page average for its recovery tools together, without a definition. Stripe blog post 'How we built it: Smart Retries' (23 January 2024): a model that 'predicts the optimal time to retry a failed payment', 'more than 500 attributes'. Adyen post 'Rescuing failed subscription payments using contextual multi-armed bandits' (3 December 2020): a contextual bandit over 'all possible future times at which to retry the failed payment'; one experiment converted 'about 6% more orders than the baseline' (a retry every four days).",
+              "shows": "A merchant cannot choose between the two on published performance and has to measure on its own renewals.",
+              "source": "Stripe documentation, 'Automate payment retries', https://docs.stripe.com/billing/revenue-recovery/smart-retries (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What each design documents about its controls.",
+            "introduces": "What neither documents: how the times are chosen and how well it works.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "The two companies differ first in the unit they recover (an invoice or a payment), and the other documented differences in defaults, hard declines, direct debit, card repair and published detail follow from or sit beside that one.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "C4",
+          "C5"
+        ],
+        "how": "Sets the documented facts of the earlier sections side by side and reads them as inference."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The table carries the facts already cited, the reading follows as advice per provider. It stands after the designs because rows one and two are the first two designs seen as products, and before Larkfield's case, which uses both providers."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "Documented behavior described branch by branch and design by design.",
+        "introduces": "The same facts in one table, with the author's reading.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p32",
+          "controlling_idea": "Seven aspects separate the two in the public record, from the unit being recovered to what each publishes about its retry logic.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Where They Differ table, seven rows: unit being recovered; invoice object and corrections; default retry envelope; hard declines; direct debit; card repair; published logic and results. Every Stripe and Adyen cell is a fact cited earlier in the chapter or a statement that nothing was found; the last column is the author's inference.",
+              "shows": "The required comparison; no cell introduces a fact the chapter has not already sourced."
+            }
+          ]
+        },
+        {
+          "id": "p33",
+          "controlling_idea": "On Stripe an integrator should mirror invoice state from the provider's record and decide the end state on purpose; on Adyen it should build the invoice table first, derive the order reference from invoice and period, and treat rescue webhooks as attempts against that invoice.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Follows from the table: Stripe holds the invoice, so the merchant's risk is a stale copy and an unchosen default; Adyen holds only payments, so the merchant's risk is retries that nothing ties to a debt.",
+              "shows": "Turns the differences into what to do on each provider."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The documented differences.",
+            "introduces": "What an integrator does differently on each.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: One Period Record, Two Providers",
+      "controlling_idea": "Larkfield holds the invoice for member renewals itself on both providers, so under Keel it gives each renewal a frozen record with attempt rows, a policy that branches on decline type and method, and a recovery curve counted per renewal.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "C2",
+          "C3",
+          "C4"
+        ],
+        "how": "Applies the model, the branches and the third design to ledger numbers, and repairs the scene's failure."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "Where the invoice lives at Larkfield, then the record that Keel adds, then the policy that runs over it with Mila's renewal traced through, then the curve that measures the policy, then the fix to the October emails. The fix comes last because it needs both the record and the policy."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "Two providers that recover different units.",
+        "introduces": "A company that uses both and holds its own invoice.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p34",
+          "controlling_idea": "Larkfield has two billing problems with two answers: Stripe holds the invoices for its own studio subscriptions, while for member renewals the booking app holds the debt on both providers and Larkfield runs the only retry scheduler.",
+          "function": "context",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger: studio subscriptions billed with Stripe Billing since 2018; member payments through Stripe Connect and Adyen for Platforms with the payment service routing by studio; decision K5 (renewals paced and retried by Larkfield on a schedule tied to decline codes); Larkfield runs its own retry schedule for member card renewals on both providers (chapter 9's addition).",
+              "shows": "The same company sits in the first design for one product and the third for the other, and has provider retry features off for member renewals so that one scheduler acts.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ]
+        },
+        {
+          "id": "p35",
+          "controlling_idea": "Under Keel each member renewal has the period record chapter 27 introduced (membership, period, amount due, written before the first attempt), extended here with the invoice vocabulary's uncollectible state and one row per attempt, and the attempt's idempotency key and provider reference are derived from it.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Decision K1: the idempotency key is membership id plus billing period plus the number of the scheduled attempt. Keel's payment record keeps child rows for attempts (chapter 8's addition). Chapter 27's addition: a period record per membership and billing period with states open, paid or void; a member keeps access while it is open inside the retry window. New detail: the state uncollectible; on Adyen the merchantOrderReference of each attempt is the period record's identifier.",
+              "shows": "The debt becomes something the system can read: 'open with zero attempts' and 'open with one declined attempt' are now different facts.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "A debt held by the booking app without a record of its own.",
+            "introduces": "The record Keel introduces.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p36",
+          "controlling_idea": "Larkfield's policy branches on decline type and payment method and always ends in a named state, and Mila's renewal passes through its soft-decline branch in three days.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Larkfield dunning policy (illustrative): card soft decline: retry on days 3, 7 and 12, email on the first failure; card hard decline: no retry, email and in-app request for a new card, attempt as soon as one is saved; direct debit failed for insufficient funds: one new collection after 7 days, no more than two in all; direct debit failed for any other reason: ask for a new mandate or another method; day 14 unpaid: membership paused, period record stays open; day 30 unpaid: period record marked uncollectible, membership ended. Access is kept while the record is open inside the 14-day window (chapter 27's addition).",
+              "shows": "A policy the reader can copy the shape of: every branch has an action, a limit and an end.",
+              "source": "_research/scenario-ledger.md"
+            },
+            {
+              "kind": "scenario",
+              "what": "Mila: €49.00 at Studio Noord (on Adyen), declined on 1 April 2027 with Visa code 51 (category 2), email the same day, scheduled attempt 2 on 4 April approved; the renewal moves from open to paid; two attempt rows, one renewal (ledger and chapter 2's addition).",
+              "shows": "The worked case from the introduction, now read as one debt and two attempts.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "A record of the debt and its attempts.",
+            "introduces": "The policy that decides the next step from that record.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p37",
+          "controlling_idea": "Counted per renewal, December 2026's card renewals show the recovery curve: 90.5% paid at the first attempt, 95.3% within fourteen days, half of the failed first attempts recovered, and a curve that flattens after the first week.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Illustrative recovery curve from chapter 9's December 2026 assumptions (540,000 card renewals due on both providers): paid at first attempt 488,760 (90.5%); by day 3: 502,260 (93.0%); by day 7: 509,820 (94.4%); by day 14: 514,380 (95.3%); unpaid after 14 days: 25,620 (about €1.26 million at €49). Of 51,240 failed first attempts, 25,620 were recovered (50%). The day-3 and day-7 figures are new assumptions; the first-attempt and final figures are chapter 9's.",
+              "shows": "Recovery is front-loaded; after day 7 additional retries add little, and what remains is waiting on the customer, not on the schedule. The 50% is Larkfield's own illustrative ratio and is not comparable with a vendor's undefined 55%.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "A policy with a fourteen-day retry window.",
+            "introduces": "What that window recovers, counted on one basis.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p38",
+          "controlling_idea": "The October failure is repaired by one rule: a failure message is sent on a declined attempt row of an open renewal, never on the absence of a payment, so a renewal the scheduler has not reached yet is 'open, not attempted' and silent.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "On 1 October 2026 the 7,900 delayed renewals had no attempt; under K5 the renewal job paces itself over 18 hours, so on any first of the month many renewals are due and not yet attempted for hours.",
+              "shows": "With pacing as policy, 'due and unpaid' is the normal state of a healthy renewal for most of the day, which makes the old trigger wrong by design.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The record, the policy and the curve.",
+            "introduces": "The fix to the incident the chapter began with.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong",
+      "controlling_idea": "Collection fails in three characteristic ways (a debt paid twice, a result that arrives after the process has ended, and a refund that bypasses the invoice), and each is caught by a check against the invoice.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "C2",
+          "C4"
+        ],
+        "how": "Shows that each failure is a break in the link between payments and the debt, which is the thesis seen from the failure side."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "In the order they occur in a debt's life: during collection (paid twice), at its end (a late result), after payment (a correction that skips the invoice)."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "A collection process that works as designed.",
+        "introduces": "The ways it breaks, with detection and recovery.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p39",
+          "controlling_idea": "The first failure is a debt paid twice: a scheduled retry and the customer's own payment from the email link both succeed, because the two attempts were not checked against the same open invoice.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen instructs the merchant to cancel the Auto Rescue process when 'your shopper may provide you with a new payment method, or cancel their subscription'; the cancellation is asynchronous (a CANCEL_AUTORESCUE webhook reports whether it succeeded). Larkfield's Double Charge of 1 November 2026 (1,840 members) was the idempotency form of the same damage (ledger).",
+              "shows": "Where the scheduler does not hold the invoice, stopping it is a separate call that can lose a race; the guard is an invoice that accepts one successful attempt and refunds any second one automatically.",
+              "source": "Adyen documentation, 'Auto Rescue for card payments', https://docs.adyen.com/online-payments/auto-rescue/cards (n.d., accessed November 2026)"
+            }
+          ]
+        },
+        {
+          "id": "p40",
+          "controlling_idea": "The second failure is a result that arrives after the process has ended: the merchant pauses or cancels on its own timer while a provider retry or a direct debit is still in flight, and the late success or late failure lands on a closed record.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen, Auto Rescue for SEPA: 'You will receive the webhook 16 days after the rescue attempt'; Stripe: most SEPA Direct Debit failures 'occur within 6 business days after initiation'. Auto Rescue results arrive only by webhook.",
+              "shows": "The end of dunning must wait for, or be able to absorb, the slowest outstanding attempt; a direct debit is not 'paid' until collection is confirmed (local-payment-methods).",
+              "source": "Adyen documentation, 'Auto Rescue for SEPA payments', https://docs.adyen.com/online-payments/auto-rescue/sepa (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "A failure during collection.",
+            "introduces": "A failure at its end.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p41",
+          "controlling_idea": "The third failure comes after payment: a refund is issued on the payment without a credit note on the invoice, so the invoice still says paid in full while the money has gone back.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: \"Issuing a credit note doesn’t automatically refund the customer’s payment method\"; for a paid invoice \"the sum of the refund, credit, and out-of-band payment amounts must equal the credit note total.\"",
+              "shows": "The document and the money are two operations that must be made to agree; done in the wrong order, or one without the other, tax records and cash disagree.",
+              "source": "Stripe documentation, 'Issue credit notes', https://docs.stripe.com/invoicing/dashboard/credit-notes (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "A failure at the end of collection.",
+            "introduces": "A failure after the invoice was paid.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "The invoice's freeze, the attempts that hang from it, the branches by decline type and method, cash application and the three designs are one idea applied five times: the debt is the stable object and every payment is an event against it. That is also why the two providers differ where they do: a retry feature can only be as aware of new cards, other payments and cancellations as the system that holds the debt lets it be.",
+    "so_what": "A team that models renewals as charges to repeat will email customers who owe nothing, retry cards that can never work, charge twice when a customer pays another way, and lose track of what a refund corrected. A team that models the debt first can change schedule, payment method or provider without changing what is owed, and can say for every unpaid renewal what was tried and what happens next.",
+    "callback": {
+      "to": "The opening question: on 4 April, what was retried?",
+      "how": "The reader can now answer that nothing was retried: the invoice for April stayed open after a soft decline, a second attempt was made against it inside the network's limits, and the invoice, not the payment of 1 April, became paid."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Give every amount owed a record that is frozen when issued; attach every attempt to it; branch on decline type and payment method; let the system that holds the record own the only schedule; end in a named state. Eight questions for a design review or a provider evaluation follow."
+    },
+    "hand_off": {
+      "to": "billing-and-payment-tax",
+      "relationship": "elaboration",
+      "carries_over": "A finalized invoice is frozen for tax reasons and carries the customer's address and tax number.",
+      "introduces": "The tax line on that invoice: who owes it, what decides the rate, and how much of the work a payment provider's tax product does."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The failures and how each is caught.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p42",
+        "form": "list",
+        "controlling_idea": "Established: a finalized invoice is kept as issued and corrected by credit note; a failed attempt leaves the invoice open; hard declines are not retried on the same credential; direct debit retries are few and slow; both providers document these behaviors.",
+        "function": "synthesis"
+      },
+      {
+        "id": "p43",
+        "form": "list",
+        "controlling_idea": "Depends on context: who should schedule retries, how long the window should be, whether to use learned timing, and when to stop and what state to end in.",
+        "function": "synthesis",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What the field agrees on.",
+          "introduces": "What changes with where the invoice lives, the payment method mix and the product.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p44",
+        "form": "list",
+        "controlling_idea": "The author's synthesis: model the debt before the payment, let its holder own the one schedule, and treat every recovery percentage as a number to be measured on your own renewals.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is established and what depends on context.",
+          "introduces": "The author's own position, labeled as such.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p45",
+        "form": "list",
+        "controlling_idea": "Eight questions let the reader test a collection process in a design review or a provider evaluation.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The take-aways.",
+          "introduces": "Questions that apply them.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p46",
+        "controlling_idea": "The frozen invoice carries the customer's address and tax number because one of its lines is a tax amount that had to be right before the freeze, which is the subject of the next chapter.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "elaboration",
+          "carries_over": "A finalized invoice frozen for tax reasons.",
+          "introduces": "The tax line on it: who owes it, at what rate, and what a provider's tax product does.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "Subscriptions, billing cycles, proration, the scheduler that creates the invoice, and the full account of who holds the invoice on each provider and of the Orb acquisition.",
+      "covered_in": [
+        "subscriptions-and-billing-engines"
+      ]
+    },
+    {
+      "topic": "Usage events, meters, rating and the cut-off after which a usage invoice stops changing.",
+      "covered_in": [
+        "usage-metering-and-rating"
+      ]
+    },
+    {
+      "topic": "Why issuers decline, decline categories and advice codes, network retry limits in detail, approval-rate metrics and in-call optimization.",
+      "covered_in": [
+        "authorization-optimization"
+      ]
+    },
+    {
+      "topic": "How network tokens are provisioned and updated.",
+      "covered_in": [
+        "network-tokens"
+      ]
+    },
+    {
+      "topic": "Direct debit schemes, mandates and reversal horizons.",
+      "covered_in": [
+        "local-payment-methods"
+      ]
+    },
+    {
+      "topic": "Tax calculation on the invoice, registrations and filing.",
+      "covered_in": [
+        "billing-and-payment-tax"
+      ]
+    },
+    {
+      "topic": "Deferred revenue and how credit notes and uncollectible invoices are recognized.",
+      "covered_in": [
+        "billing-revenue-recognition"
+      ]
+    },
+    {
+      "topic": "Idempotency keys for scheduled attempts and webhook handling.",
+      "covered_in": [
+        "idempotency-and-retries",
+        "payment-webhooks-and-events"
+      ]
+    },
+    {
+      "topic": "The failed renewal told end to end across systems.",
+      "covered_in": [
+        "journey-failed-renewal"
+      ]
+    },
+    {
+      "topic": "National e-invoicing mandates and formats; debt collection agencies and late-payment law."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "No independent, primary measurement of involuntary churn was found; the chapter says so and quotes Stripe's marketing figures only as vendor claims. If the author knows a citable study, paragraph p16 can use it.",
+    "Adyen's Auto Rescue card page contains an internal inconsistency (a window of 1 to 48 days, and an example text that says 'a maximum of 40 days'); the chapter uses the stated range and does not mention the example.",
+    "Adyen's Auto Rescue overview and Account Updater overview carry last-modified stamps of 2020 and 2019 in their metadata, which ruling 30 does not accept as dates; the sub-pages fetched in November 2026 are consistent with them. Whether Auto Rescue is now sold only inside Adyen Uplift's Optimize module was not settled from the pages read.",
+    "The recovery-curve figures for days 3 and 7 (502,260 and 509,820 of 540,000) and Larkfield's dunning policy (retries on days 3, 7 and 12; pause at day 14; uncollectible at day 30) are new illustrative assumptions appended to the ledger; journey-failed-renewal may reuse them.",
+    "Whether and how Orb's dunning will be integrated with Auto Rescue is not public as of November 2026.",
+    "Flow rubric notes not acted on (the author decides): move the credential-repair paragraph (p21) directly after the hard-decline paragraph (p18); merge the 'public record stops' paragraph (p31) into the comparison table; move the churn-figures paragraph (p16) next to Larkfield's recovery curve (p37); cut or shrink the e-invoicing paragraph (p13). Kept as is because the contract asks for e-invoicing briefly, acceptance criterion AC-3 needs the churn statement where the term is defined, and the writer brief asks for a paragraph on where the evidence stops. Notes acted on in the prose: a forward pointer for network limits in p17, one-clause reminders for Keel and the rescue window."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "The scene is the Renewal Wave's mistaken dunning emails (1 October 2026), not a recovery-rate discussion, because it is the ledger incident in which the absence of an invoice record is the cause, and it matches the part's 'late' failure (acceptance criterion AC-3 of the part).",
+      "rejected": [
+        "Opening the scene on Mila's renewal (used as the hook and the worked case instead)",
+        "Opening on the Double Charge (owned by idempotency-and-retries)"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Who holds the invoice is stated in one sentence in the definition paragraph and then used, as consistency ruling 6 requires; the chapter spends its space on what follows from it for recovery.",
+      "rejected": [
+        "A section re-arguing that Adyen has no invoice object"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Network retry limits, decline categories and account updater mechanics are given one paragraph each with a link to authorization-optimization and network-tokens, which own them.",
+      "rejected": [
+        "Repeating the Visa category table"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "E-invoicing is one paragraph at the end of the invoice section, limited to the European Commission's ViDA dates; national mandates were not verified and are a non-goal.",
+      "rejected": [
+        "A separate e-invoicing section"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Orb's dunning is presented as an example of the third design (a billing system above the gateway) and as Orb's documentation about Orb, not as an Adyen feature.",
+      "rejected": [
+        "Listing Orb's dunning in the Adyen column of the comparison table"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Nine body sections: the style guide's fixed elements plus the three mechanism sections that follow Femke's three questions and a short section on bank transfers, which the contract lists and which does not fit under card retries.",
+      "rejected": [
+        "Folding cash application into the designs section"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "PLAN.md",
+      "contributed": "The chapter contract: question, scope, owned terms (invoice, credit note, dunning, involuntary churn, retry schedule), Larkfield thread."
+    },
+    {
+      "kind": "internal",
+      "ref": "journal-spec.json",
+      "contributed": "Intent, acceptance criteria, thesis and role, copied unchanged; the previous and next chapters' transitions."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-billing-and-revenue.md",
+      "contributed": "Part 3 (invoice states, finalization, credit notes, retries, card updates, churn claims, bank transfers, e-invoicing, comparison), sections 1.9, 1.10 and 7.1, open questions."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-optimization-routing-orchestration.md",
+      "contributed": "Sections 1.2, 2.1 to 2.5 and 3.3: decline types, network retry limits, Smart Retries and Auto Rescue, account updater services."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "Larkfield facts: the Renewal Wave, Mila's renewal, K1 and K5, prices, chapter 9's December 2026 renewal counts."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/consistency-issues.md",
+      "contributed": "Rulings 6 (who holds the invoice), 13 (idempotency keys and scheduled retries), 15 (soft and hard decline are not network terms), 19 (Visa's limit of 20 in 30 days)."
+    },
+    {
+      "kind": "external",
+      "ref": "Stripe documentation: invoice status transitions and finalization, invoicing overview, credit notes, Smart Retries, automatic collection, customer emails, revenue recovery, how cards work, SEPA Direct Debit, bank transfers, bank transfers on invoices, customer balance reconciliation (n.d., fetched 17 November 2026); Stripe Billing product page (fetched 17 November 2026)",
+      "contributed": "Every Stripe fact and quotation in the chapter; all pages re-fetched for this spec."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen documentation: Auto Rescue, Auto Rescue for card payments, Auto Rescue for SEPA payments, Account Updater, Real Time Account Updater, Mapping to Visa system integrity fee categories, Bank Transfer (n.d., fetched 17 November 2026); Adyen knowledge hub, 'Recurring payments: A guide for enterprise businesses' (16 June 2026) and 'Rescuing failed payments to make subscriptions unstoppable' (4 December 2020)",
+      "contributed": "Every Adyen fact and quotation in the chapter; all pages re-fetched for this spec."
+    },
+    {
+      "kind": "external",
+      "ref": "Orb documentation, 'Essential dunning'; Recurly documentation, 'Involuntary churn'; European Commission, 'VAT in the Digital Age'",
+      "contributed": "The fixed-schedule contrast, the definition of involuntary churn, the e-invoicing dates."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation pass (parts 6-8): fields copied from the journal spec and unit-level controlling ideas and evidence brought into line with the verified page and the consistency rulings; no unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 92 claims checked (76 confirmed, 5 corrected, 9 hedged, 0 unsupported and removed or relabeled, 0 unreachable; 2 not checked); the page said no recovery figure from Adyen was found, and now quotes Adyen's own claim of one customer's 4% improvement in recovery rate with Auto Rescue (knowledge-hub guide, 16 June 2026) beside Stripe's 55% average, which is for its recovery tools together and not for Smart Retries alone."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "First version, written from PLAN.md, the journal spec and the billing and optimization research briefs."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: 'neither documents its retry model' overturned. Stripe blog post of 23 January 2024 and Adyen technology post of 3 December 2020 describe the Smart Retries and Auto Rescue models; Adyen's post reports one experiment (about 6% more orders than a four-day fixed schedule). Key point, logic paragraph, inference block, comparison row, take-away and sources updated; connective sentences trimmed to stay within max_words. Adyen cash-application absence re-tested against the documentation full text and help center: holds."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('Published recovery and churn percentages are vendor claims w' -> 'Published recovery and churn percentages are vendor claims, ')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('The public record stops at the retry logic: Stripe names two' -> 'The public record on the retry logic is one engineering post')."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Sweep of rulings 46 to 48: thesis how_why no longer says the record stops at two example signals and 'smart logic'; it names the two engineering posts on the retry models (Stripe, 23 January 2024; Adyen, 3 December 2020) as the prose already does (46a). Prose and units unchanged."
+    }
+  ],
+  "length": {
+    "target_words": 5000,
+    "max_words": 6500
+  }
+}

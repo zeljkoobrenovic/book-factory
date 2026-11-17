@@ -1,0 +1,1365 @@
+{
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "journey-platform-payment",
+  "journal": "payments-platform-architecture",
+  "part": "part-9",
+  "title": "Journey 3: One Payment, Three Parties, and a Refund After Payout",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "The steps of a platform payment and its late refund: the studio's verification and capability state, the split instruction, the platform fee, the processing cost, the studio's balance, the payout, the refund request, the debit of a balance that has been paid out, the shortfall and its recovery, and the ledger entries; for each, the party, the record, the promise and the failure, with the chapter that owns it.",
+        "The canonical figures: €120.00 divided into €117.47 for Studio Noord and €2.53 for Larkfield (1.9% + €0.25), with an illustrative provider cost of €0.61 inside the fee; the studio paid on 11 March 2027; a refund of €84.00 for seven unused classes requested on 18 March.",
+        "The same journey in both vocabularies as documented in 2026: on Adyen a splits instruction of typed bookings to the studio's balance account and the platform's liable balance account, refunds debited only from balance accounts the payment credited, and the liable balance account standing behind a negative user balance; on Stripe an application fee or transfers, with the charge type deciding whether the studio's or the platform's balance is debited by a refund, and a refund held pending for up to 45 days when the balance is short.",
+        "Where the public record stops: Adyen documents an option in which it takes a seller's loss only as a pilot with limited availability (Managed Risk), and no Adyen price list for platforms was found; the pairing of Stripe and Adyen terms is the book's own mapping."
+      ],
+      "believe": [
+        "A platform that never holds the money still carries the risk that the money comes back.",
+        "The account model chosen at integration is the answer to 'who pays' for every later refund, whether or not anyone read it that way."
+      ],
+      "can_do": [
+        "Trace a refund made after payout to the balance it is debited from and the party that covers a shortfall, on either provider.",
+        "List what a platform must decide before its first late refund: the refund split, what happens to its own fee, who bears the processing cost, and how a seller's shortfall is recovered and recorded."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a refund after payout on a platform the chapter does not contain, the reader says which balance is debited, who covers a shortfall on each provider and what the platform should have decided and recorded beforehand.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A tutoring platform takes card payments from parents and pays each tutor daily. A parent is refunded €60 for a lesson that was paid out to the tutor four days earlier; the tutor has since stopped using the platform and has no further sales. Using only this chapter: where does the €60 come from on Adyen for Platforms and on Stripe Connect, and what should the platform have decided and recorded before this happened?",
+        "expected": "On Adyen, and on Stripe with a destination charge, the parent gets the €60 at once and the question is which balance is left short. On Adyen the refund can be debited only from the balance accounts the payment credited, so the tutor's balance account goes negative and the platform's liable balance account stands behind it (Adyen allows a negative balance for up to 30 days and then debits the platform's reserved compensation account; only under its Managed Risk pilot does Adyen bear the loss); the platform can recover by a top-up drawn by direct debit from the tutor's verified bank account, if the tutor consented to that at onboarding. On Stripe it depends on the charge type: with a direct charge the refund is debited from the tutor's connected account, and while that balance is short the refund waits as pending and fails after 45 days, so the parent is not repaid until the balance is funded; with a destination charge the platform's balance is debited and the platform must reverse the transfer to the tutor, which errors if the tutor's balance is short. Beforehand: a decision on the refund split and on the platform's own fee, consent to debit, the platform's own figure for money paid out that can still come back per seller, and a ledger entry for the amount the tutor now owes."
+      },
+      {
+        "id": "AC-2",
+        "statement": "The reader can say why the provider's processing cost is not a fixed line in the split and who bears it by default on each provider.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A platform wants every payment split into exactly three known amounts at the moment of payment: the seller's share, the platform's fee and the provider's cost. Using only this chapter: why can it not always know the third amount at that moment, and who pays it by default on Adyen and on Stripe?",
+        "expected": "On Adyen the transaction fees are calculated after the payment request is received and are not known at the time of payment, so the split names who bears each type of fee, not an amount; if the request names nobody, Adyen books all transaction fees to the platform's liable balance account. On Stripe who pays follows from the charge type and the account's fee configuration, and the fee is reported afterwards on the balance transaction. So the platform's ledger records its fee at the payment and the provider's cost when it is reported, and the two are reconciled later."
+      },
+      {
+        "id": "AC-3",
+        "statement": "Every step that names an Adyen resource names the Stripe counterpart, and the chapter says once that the pairing is the book's own mapping, since neither company publishes one.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "major"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "How is Mila's €120 divided among Studio Noord, Larkfield and the provider, and whose money pays the €84 refund on 18 March, a week after the studio was paid?",
+    "claim": "Mila's €120 is divided by an instruction attached to the payment into €117.47 for Studio Noord and €2.53 for Larkfield, and the provider's cost (an illustrative €0.61) comes out of Larkfield's share, leaving it €1.92. The €84 refund of 18 March is debited from a balance out of which that €117.47 was already paid on 11 March, and the platform's account model, chosen long before either date, decides whose balance goes short and who stands behind it. On Adyen a refund is debited from the balance accounts the payment credited, and Larkfield's liable balance account covers a studio balance that goes negative; on Stripe the charge type decides whether the studio's or the platform's balance is debited first.",
+    "disputed_by": "The view that a platform only passes money through: once the split is correct and the studio has been paid, the payment is the studio's business, a later refund is the studio's refund, and a platform that never holds funds carries no balance risk.",
+    "so_what": "A platform that accepts this decides the refund split, the fate of its own fee and the recovery of a seller's shortfall before the first late refund, keeps its own figure per seller for money paid out that can still come back, and books a refund after payout as its own ledger entry. Refunds after payout were one of the three causes of Larkfield's unexplained €412,000 at year-end 2025, and Keel's K3 makes every such movement an entry.",
+    "how_why": "Money moves forward on the provider's schedule and backward on the customer's, so the two meet in a balance at different times. On Adyen, as documented in 2026, a split is a list of typed bookings declared at authorization or capture (the user's balance account, the platform's commission, the fee types); the provider's own fees are calculated after the request and by default fall on the liable balance account; refunds 'can only be deducted from the balance accounts to which the payment was credited', and the result arrives later by webhook; funds can be deducted from the liable balance account when a user's balance account goes negative through refunds or chargebacks; and an instruction that names a missing or closed balance account is not rejected but booked in full to the liable account. On Stripe a platform fee is an application fee on the charge or a transfer after it; a refund on a direct charge debits the connected account, a refund on a destination charge debits the platform, which must reverse the transfer to recover it; a refund against a short balance waits as pending and fails after 45 days; and a connected account's negative balance is collected from its bank account first and, where the platform is responsible, from a platform reserve after 180 days. Adyen documents a negative balance for up to 30 days before the platform's reserved compensation account is debited, and an arrangement in which Adyen itself bears the loss only as a pilot (Managed Risk), so the walkthrough states the default and names the pilot.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "The split is an instruction attached to the payment request (typed bookings on Adyen, an application fee on a destination charge on Stripe), it depends on an account state set before the sale, and the approval of the payment does not confirm that the bookings landed where the instruction said."
+      },
+      {
+        "id": "S2",
+        "claim": "The provider's cost is not a line in the split: on Adyen it is calculated after the request and booked by fee type, by default to the liable balance account; on Stripe it follows from the charge type and fee configuration and is reported on the balance transaction; so Larkfield's €2.53 becomes €1.92 only when the cost is reported."
+      },
+      {
+        "id": "S3",
+        "claim": "Money moves forward on the provider's schedule and backward on the customer's: the payout of 11 March emptied the balance that the refund of 18 March is debited from, so the refund is funded by something other than the payment it refunds."
+      },
+      {
+        "id": "S4",
+        "claim": "The account model chosen at integration decides whose balance goes short and who stands behind it: on Adyen the balance accounts the payment credited, with the liable balance account behind them; on Stripe the charge type, with a published order of collection; and Adyen documents 30 days before the platform's liable account is debited, with a pilot in which Adyen takes the loss."
+      },
+      {
+        "id": "S5",
+        "claim": "The journey runs without loss only where each hand-off is followed by a later record and the platform has decided beforehand: the refund split, its own fee, the processing cost and the recovery of a shortfall, with an exposure figure per seller and a ledger entry per leg."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Opens the split and payout rows of Journey 1 into a full platform journey in both providers' vocabularies and then reverses it, showing the first backward flow of the part and the point at which the account model becomes the liability model.",
+    "supports": [
+      "P9-3",
+      "P9-5"
+    ]
+  },
+  "flow": {
+    "pattern": "chronological",
+    "additional_patterns": [
+      {
+        "pattern": "problem_solution",
+        "applies_to": "scene poses the question; the steps answer it; decisions turn the answer into what to set beforehand"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "inside each step: Adyen as it happened, Stripe as it would have"
+      }
+    ],
+    "rationale": "A journey is read in the order the payment meets its steps, because each hand-off is only visible when the step before it has just been told: the capability state before the instruction that relies on it, the instruction before the bookings, the payout before the refund that finds the balance empty, the actual refund before the shortfall that did not happen. The ledger and the step table come after the steps because they summarize them, and the decisions come last because each is the answer to a failure the reader has by then seen. Telling the refund first, as the hook does, and then the forward steps works only for one paragraph; a reader who met the shortfall before the payout would not know why the balance was empty. Moving the ledger before the refund would list an entry for a movement the reader has not seen; moving the step table before the steps would fill its rows with terms not yet glossed; moving the decisions before the table would ask for four choices before the failures they prevent have been set side by side."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "On Thursday 18 March 2027 Ines Bakker approves an €84.00 refund for Mila Janssen. The €117.47 Studio Noord received for Mila's pass went to its bank a week earlier, and Larkfield, the platform between them, never held any of it. Whose money goes back to Mila?"
+    },
+    "bridge": {
+      "from_reader_world": "An engineer who has built a split sees a platform as a pipe: compute the shares, pass the money through, and the seller's later refund is the seller's business.",
+      "to_topic": "The refund is debited from a balance at the provider that the payout already emptied, and which balance that is, and who stands behind it, was fixed by the account model at integration."
+    },
+    "thesis_statement": {
+      "text": "Mila's €120 is divided by an instruction attached to the payment into €117.47 for Studio Noord and €2.53 for Larkfield; the €84 refund of 18 March is debited from a balance out of which that €117.47 was already paid, and the platform's account model, chosen long before either date, decides whose balance goes short and who stands behind it.",
+      "placement": "KEY POINTS bullets 1 and 2, and paragraph p03"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p06",
+      "promises": [
+        {
+          "promise": "Start from the question Larkfield's support lead asked on 18 March and the three answers it got.",
+          "kept_in": [
+            "scene"
+          ]
+        },
+        {
+          "promise": "Begin the journey before the sale, with the state that lets the studio take payments and be paid.",
+          "kept_in": [
+            "before-sale"
+          ]
+        },
+        {
+          "promise": "Follow the €120 through the split, the platform's fee and the provider's cost on 9 March.",
+          "kept_in": [
+            "split"
+          ]
+        },
+        {
+          "promise": "Follow the studio's share into its balance and out to its bank on 11 March.",
+          "kept_in": [
+            "claim-and-payout"
+          ]
+        },
+        {
+          "promise": "Follow the €84 refund of 18 March to the balance it is debited from, and then to the shortfall that would have followed had that balance been empty.",
+          "kept_in": [
+            "refund",
+            "shortfall"
+          ]
+        },
+        {
+          "promise": "Show the ledger entries for every leg and the eleven steps in one table.",
+          "kept_in": [
+            "ledger",
+            "step-table"
+          ]
+        },
+        {
+          "promise": "List the decisions a platform takes before its first late refund.",
+          "kept_in": [
+            "decisions"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "On 18 March 2027 Studio Noord approves an €84.00 refund on a pass whose €117.47 left for its bank a week earlier, and it is not obvious whose money goes back to Mila.",
+        "function": "context",
+        "organization": "narration",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's €120.00 pass of 9 March 2027; €117.47 paid out to Studio Noord on 11 March; €84.00 refund for seven unused classes requested on 18 March; Larkfield never holds member funds.",
+            "shows": "The money the refund would come from has already left the provider, and the platform never had it: the puzzle the journey answers.",
+            "source": "Larkfield scenario ledger"
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "Journey 1 gave the split and the payout one row each and Journey 2 showed a payment whose state stayed open after the first answer; this journey opens those two rows from the platform's side and then follows the first money in the part that goes backward.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "elaboration",
+          "carries_over": "From Journey 1, the pass of 9 March with its split and payout rows; from Journey 2, the lesson that a payment's state can stay open after the first answer.",
+          "introduces": "The third party in every Larkfield payment, seen from the platform's side, and the first backward flow of the part: an €84 refund a week after the payout.",
+          "form": "paragraph",
+          "placement": "both"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "Mila's €120 is divided by an instruction attached to the payment, the €84 refund is debited from a balance the payout already emptied, and the account model chosen long before either date decides whose balance goes short, so a platform that never holds the money still carries the risk that it comes back.",
+        "function": "claim",
+        "evidence": [
+          {
+            "kind": "fact",
+            "what": "€120.00 = €117.47 for Studio Noord + €2.53 for Larkfield (1.9% + €0.25); illustrative provider cost €0.61 inside the fee, leaving Larkfield €1.92.",
+            "shows": "The canonical figures the claim is stated in.",
+            "source": "Larkfield scenario ledger"
+          }
+        ],
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "The question of whose money pays the €84.",
+          "introduces": "The answer in one paragraph: instruction, emptied balance, account model.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "controlling_idea": "On the journey of Mila's class pass this chapter covers the split at 19:42 on 9 March, the payout of 11 March and the refund of 18 March, inside a dispute window that stays open until about 7 July 2027.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Pass bought Tuesday 9 March 2027 at 19:42; payout Thursday 11 March; refund Thursday 18 March; basic dispute window to about 7 July 2027.",
+            "shows": "Places the chapter on the recurring payment.",
+            "source": "Larkfield scenario ledger"
+          }
+        ],
+        "transition_in": {
+          "relationship": "place",
+          "carries_over": "The claim.",
+          "introduces": "Its dates on the recurring payment.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p05",
+        "controlling_idea": "A journey teaches no new mechanism: each step is told as a hand-off, with the chapter that owns the mechanism named, in Adyen's vocabulary as it happened and in Stripe's as it would have, and the pairing of the two vocabularies is the book's own mapping because neither company publishes one.",
+        "function": "explanation",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "Rulings 7 and 10 of the book's consistency rulings: journeys lead with the hand-off; the liability rule is owned by platform-payment-models and the mechanics by splits-balances-and-platform-payouts. Neither Stripe nor Adyen publishes a translation of its platform terms into the other's.",
+            "shows": "Tells the reader how to read the steps and that the term pairs are an inference, said once.",
+            "source": "consistency rulings; brief section 1.8 (researcher's mapping)"
+          }
+        ],
+        "transition_in": {
+          "relationship": "elaboration",
+          "carries_over": "The dates of the journey.",
+          "introduces": "How each step is told and the status of the Stripe–Adyen term pairs.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p06",
+        "controlling_idea": "The chapter goes from the question at Larkfield through the state before the sale, the split of 9 March, the claim and the payout, the refund of 18 March, the shortfall that did not happen, the ledger entries, the eleven steps in one table and the decisions a platform takes beforehand.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "How to read a step.",
+          "introduces": "The order of the steps and sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: Three Answers, Each True of One Step",
+      "controlling_idea": "Three people at Larkfield answered 'whose money pays this?' differently because each described one step of the payment correctly and none described the hand-offs between the steps.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S4",
+          "S5"
+        ],
+        "how": "Poses the question the journey answers and shows that knowing single steps did not answer it."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The question of whose money pays the €84.",
+        "introduces": "The people who asked and answered it at Larkfield on 18 March 2027.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p07",
+          "controlling_idea": "Product said the studio pays, finance said Larkfield and the CTO said the provider, and each answer was true of one step: the refund policy, the ledger account for money to recover, and the balance that holds the money.",
+          "function": "context",
+          "organization": "narration",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "18 March 2027: Ines Bakker approves the €84.00 refund; Aylin Demir asks 'whose money pays this?'; product cites Larkfield's terms, finance the ledger account 'to recover from studio', Daniel Osei the provider that holds the money; none had read the provider configuration.",
+              "shows": "Each answer is a correct description of one mechanism, which is the part thesis in miniature.",
+              "source": "Larkfield scenario ledger (33-platform-payment-models addition)"
+            }
+          ]
+        },
+        {
+          "id": "p08",
+          "controlling_idea": "Femke de Graaf answers by walking the one payment through eleven steps on five dates, starting before the sale, and the figure shows that walk as a sequence.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "figure",
+              "what": "Sequence figure: member, platform, provider's books and the studio's bank as lanes; forward arrows on 9 and 11 March, backward arrows on 18 March; amounts €120.00, €117.47, €2.53 and €84.00.",
+              "shows": "Gives the reader the whole journey as a map before the steps are told one by one.",
+              "source": "Larkfield scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "Three answers that do not add up to one.",
+            "introduces": "The method: follow one payment in order, with every hand-off.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "before-sale",
+      "heading": "Before the Sale: Studio Noord May Take Payments and Be Paid",
+      "controlling_idea": "The payment of 9 March depends on a state set long before it, the studio's verified capabilities, and that state can lapse without the next payment failing in an obvious way.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "Step 1: the account the split instruction will name has to exist and be allowed, and the instruction does not check that."
+      },
+      "transition_in": {
+        "relationship": "sequence",
+        "carries_over": "The decision to start before the sale.",
+        "introduces": "Step 1: the studio's verification and capability state.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p09",
+          "controlling_idea": "Step 1 is a state, not an event: Studio Noord could take Mila's payment and be paid for it because its capabilities to receive payments and to pay out to its bank account were allowed by Adyen and enabled by Larkfield, which on Stripe is a capability whose status is active.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen capabilities page: 'The capability can only be used when it is both allowed and enabled'; capabilities receivePayments ('Allows users to receive payments using a payment method') and sendToTransferInstrument ('Allows users to transfer funds to verified bank accounts'). Stripe: 'A capability must be active for a connected account to perform actions associated with that capability.'",
+              "shows": "The precondition of the payment is a provider-held state with two switches on Adyen and one status on Stripe.",
+              "source": "docs.adyen.com/platforms/verification-overview/capabilities; docs.stripe.com/connect/account-capabilities (n.d., accessed 2026-11)"
+            }
+          ]
+        },
+        {
+          "id": "p10",
+          "controlling_idea": "The hand-off from that state to a payment fails quietly: payouts are switched off a month before payments, and on Adyen a split that names the balance account of a closed account holder is booked to the platform without an error.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen's standard verification deadlines: a 30-day period for sendToTransferInstrument and a 60-day period for receivePayments; 'If the user does not resolve the verification issues in a timely manner, their capabilities will be disallowed.' Split pages: if the balance account 'is linked to an account holder with a closed status, the full transaction and its fees are booked to your platform's liable balance account.'",
+              "shows": "Both failures leave the payment itself approved; only a later record shows them.",
+              "source": "docs.adyen.com/platforms/verification-overview; docs.adyen.com/platforms/online-payments/split-transactions/split-refunds (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "scenario",
+              "what": "The Frozen Studios, May 2026: 230 studios on Stripe Connect missed a verification deadline and went up to 12 days without payouts.",
+              "shows": "Larkfield has met this hand-off failing.",
+              "source": "Larkfield scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The state that made the payment possible.",
+            "introduces": "What happens to the next payment when that state lapses.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "split",
+      "heading": "9 March, 19:42: One Instruction, Two Bookings and a Cost That Arrives Later",
+      "controlling_idea": "The division of the €120.00 is an instruction that travels with the payment request and books two amounts; the approval does not confirm the bookings, and the provider's cost is not one of them.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "S1",
+          "S2"
+        ],
+        "how": "Steps 2 to 4: the split instruction, the platform's fee and the processing cost, each with its hand-off, on both providers."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The instruction is sent, then answered, then the cost is booked; the paragraph on what the approval does not confirm has to follow the instruction it is about, and the cost has to come last because it is the only amount that arrives after the payment."
+      },
+      "transition_in": {
+        "relationship": "sequence",
+        "carries_over": "A studio that is allowed to take the payment.",
+        "introduces": "Steps 2 to 4: the payment and the instruction that divides it.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p11",
+          "controlling_idea": "Steps 2 and 3: the division is written before the payment, as an instruction inside the payment request, which on Adyen is two typed split items and on Stripe a destination charge that names the studio and an application fee.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "The instruction in two vocabularies. Adyen: splits item BalanceAccount, 11747, Studio Noord's balance account; item Commission, 253, booked to the liable balance account; platformChargebackLogic for a later chargeback. Stripe: destination charge of €120.00 with on_behalf_of the studio, transfer_data[destination] the studio's connected account, application_fee_amount 253.",
+              "shows": "The same division is one request on each provider, with the amounts fixed by the platform before the issuer answers.",
+              "source": "Larkfield scenario ledger (35 addition); docs.adyen.com/platforms/online-payments/split-transactions; docs.stripe.com/connect/destination-charges (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen: BalanceAccount 'Books a part of the transaction to your user's balance account'; Commission 'Books your platform's commission to your liable balance account'. Stripe: 'the full charge amount is immediately transferred from the platform to the transfer_data[destination] account after the charge is captured. The application_fee_amount (capped at the full amount of the charge) is then transferred back to the platform.'",
+              "shows": "Each provider's own words for where the two amounts land.",
+              "source": "same pages"
+            }
+          ]
+        },
+        {
+          "id": "p12",
+          "controlling_idea": "The answer 'Authorised' at 19:42 reports the issuer's approval and that the instruction was well formed; it does not report that €117.47 reached Studio Noord's balance account, which only the transfer webhooks and the accounting report show.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'The API request validates only the format of the split instructions, not the balance accounts specified in the request. This means that even if the transaction is successful, it is possible that the funds are not credited to/deducted from the specified balance account.' The Balance Platform Accounting Report 'tracks all balance changes on all balance accounts in your balance platform, including liable accounts and the accounts of your users.'",
+              "shows": "The promise of step 2 is confirmed by a different record on a different channel.",
+              "source": "docs.adyen.com/platforms/online-payments/split-transactions/split-refunds (troubleshooting note); docs.adyen.com/platforms/reports-and-fees/balance-platform-accounting-report (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The instruction as sent.",
+            "introduces": "What the approval of the payment does and does not confirm about it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p13",
+          "controlling_idea": "Step 4: the provider's cost cannot be a line with an amount in the split, because on Adyen it is calculated after the request; the split names who bears each type of fee, and when it names nobody the cost falls on the platform's liable balance account.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'Transaction fees refer to the costs you incur on a transaction in your platform that are not known at the time of payment. They are calculated by Adyen after we receive the payment request. By default, these costs are deducted from your liable balance account'; 'If you don't include booking instructions for any of the transaction fee types in your payment request, Adyen automatically updates the request to include the PaymentFee split type, deducting all transaction fees from your platform's liable balance account.'",
+              "shows": "Why the third amount is unknown at the payment and who pays it by default on Adyen.",
+              "source": "docs.adyen.com/platforms/online-payments/transaction-fees (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "Illustrative provider cost on the pass: €0.61 (assumption), leaving Larkfield €1.92 of its €2.53.",
+              "shows": "The amount that arrives later in this journey.",
+              "source": "Larkfield scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Two amounts the platform fixed in advance.",
+            "introduces": "The third amount, which the platform cannot fix.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p14",
+          "controlling_idea": "On Stripe who pays the provider follows from the charge type and the account's fee configuration, and the amount is read afterwards from the balance transaction: on Larkfield's destination charges the platform pays, an assumed €0.87.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe charges page, destination charges: 'Stripe debits fees from your platform's balance'; direct charges: 'You can choose whether to have Stripe debit fees directly from connected accounts or from your platform account.' The balance transaction carries amount, fee and net.",
+              "shows": "The Stripe counterpart of step 4: fixed by configuration, reported after the payment.",
+              "source": "docs.stripe.com/connect/charges; docs.stripe.com/api/balance_transactions/object (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "table",
+              "what": "Mila's €120.00 on both providers: studio €117.47 on both; Larkfield's fee €2.53 on both; provider's cost €0.61 on Adyen and €0.87 on Stripe (both assumptions); Larkfield keeps €1.92 or €1.66.",
+              "shows": "The split is identical; only the amount that arrives later differs.",
+              "source": "Larkfield scenario ledger (05 and 35 additions)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "Adyen's fee booked by type after the payment.",
+            "introduces": "Stripe's fee, fixed by charge type and reported on the balance transaction.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p15",
+          "controlling_idea": "The hand-off from payment to cost is therefore a matter of time: Larkfield's ledger records its fee at the payment and the provider's cost when the provider reports it, and until the two are reconciled the margin on the payment is an estimate.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger legs under K3: Larkfield's fee €2.53 at the payment; provider's cost €0.61 'when reported'; processing costs that 'cannot be allocated to individual payments' on Adyen.",
+              "shows": "Shows the consequence for the platform's own record.",
+              "source": "Larkfield scenario ledger (35 addition); docs.adyen.com/platforms/online-payments/transaction-fees"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "A cost that is known only after the payment on both providers.",
+            "introduces": "What that does to the platform's record of its own fee.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "claim-and-payout",
+      "heading": "10 and 11 March: A Claim Becomes a Payout, and the Balance Is Empty",
+      "controlling_idea": "The studio's €117.47 becomes payable on the provider's schedule and leaves for the bank two days after the sale, which empties the balance while the payment stays reversible for months.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "S3"
+        ],
+        "how": "Steps 5 and 6: shows the forward movement finishing on the provider's schedule and leaving nothing behind for a later reversal."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "Wednesday's claim, Thursday's payout, then what Thursday leaves open; the third paragraph depends on the balance having been emptied in the second."
+      },
+      "transition_in": {
+        "relationship": "sequence",
+        "carries_over": "Two bookings made on 9 March.",
+        "introduces": "Steps 5 and 6: what happens to the studio's booking over the next two days.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p16",
+          "controlling_idea": "Step 5: on 10 March the €117.47 is a claim on Adyen with a date set by Adyen's schedule, not by the card network, and the hand-off from booking to payable is that date.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen settle-funds page: 'Adyen settles a settlement batch after its sales day ends and the configured settlement delay has passed. The date when the schemes or payment methods transfer the funds to Adyen does not affect this timing.' The accounting report distinguishes a booking date from a value date. Stripe's Dutch default is 3 business days.",
+              "shows": "The step's promise is 'payable on Thursday', made by the provider on its own schedule.",
+              "source": "docs.adyen.com/platforms/settle-funds; docs.adyen.com/platforms/reports-and-fees/balance-platform-accounting-report; docs.stripe.com/payments/balances (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "scenario",
+              "what": "Studio Noord's sales day closes at midnight with a two-business-day delay; on 10 March Ines's ticket reads 'It says paid. Paid to whom?'; on Stripe's Dutch default the funds would have become available on Friday 12 March.",
+              "shows": "The gap between 'paid' in the back office and money in the bank, on the journey's own dates.",
+              "source": "Larkfield scenario ledger (01 and 03 additions)"
+            }
+          ]
+        },
+        {
+          "id": "p17",
+          "controlling_idea": "Step 6: on 11 March the payout leaves, and what the provider reports is that it sent the money; in the best case the money lands that day; Larkfield marks the payout sent and sets the record state arrived only on 25 March, when ten business days have passed without a return, which is not the date of the credit.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen payout webhooks page, on booked: 'This status is not final.' Stripe Payout object: 'Some payouts that fail might initially show as paid, then change to failed.'",
+              "shows": "On both providers the success message of the payout reports sending, not arrival.",
+              "source": "docs.adyen.com/platforms/payout-webhooks; docs.stripe.com/api/payouts/object (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "scenario",
+              "what": "The payout carrying Mila's €117.47 is marked sent on Thursday 11 March 2027 and arrived on Thursday 25 March; a sent payout stays open for 10 business days (Larkfield's policy, an assumption).",
+              "shows": "The later record that confirms this hand-off is the closing of a window.",
+              "source": "Larkfield scenario ledger (14 addition)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "A claim that became payable.",
+            "introduces": "The payout, and what its status reports.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p18",
+          "controlling_idea": "The payout closes nothing about the payment: money moves forward on the provider's schedule and backward on the customer's, so from 11 March the studio's balance no longer contains Mila's money while the €117.47 can still come back until about 7 July.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Payout two days after the sale; refunds whenever the studio agrees; basic card dispute window of about 120 days, to about 7 July 2027.",
+              "shows": "The two clocks meet in the same balance at different times, which is why the next step needs money from somewhere else.",
+              "source": "Larkfield scenario ledger (01 addition)"
+            },
+            {
+              "kind": "figure",
+              "what": "Conceptual figure: a tray filled on 9 March and emptied on 11 March; a refund arrow arriving on 18 March at the empty tray.",
+              "shows": "Makes the timing argument memorable before the refund is told.",
+              "source": "Larkfield scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "A balance emptied on Thursday 11 March.",
+            "introduces": "What stays open after it: the amount that can still come back.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "refund",
+      "heading": "18 March: €84 Goes Back Through a Balance the Payout Emptied",
+      "controlling_idea": "The refund is a new instruction, written from a policy decided beforehand, and it is debited from the balance the payment was booked to, which by 18 March holds other members' payments.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S4"
+        ],
+        "how": "Steps 7 and 8: the refund request and the debit, with the rule on each provider for which balance pays."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "additional_patterns": [
+          {
+            "pattern": "prerequisite_order",
+            "applies_to": "the request and its missing-instruction default come before the debit; the debit before what funded it; the fee and the confirmation last"
+          }
+        ],
+        "rationale": "The reader has to see the instruction before the rule that bounds it, and the rule before the actual outcome at Studio Noord; the platform's fee and the refund's confirmation are consequences of the outcome and cannot come earlier."
+      },
+      "transition_in": {
+        "relationship": "time",
+        "carries_over": "A balance emptied on 11 March with exposure left behind.",
+        "introduces": "A week later, steps 7 and 8: the first money in the part that goes backward.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p19",
+          "controlling_idea": "Step 7: Mila asks, Ines approves, and the payment service sends a refund that carries its own instruction, written from a policy Larkfield set beforehand: the studio funds the refund and Larkfield keeps its fee.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "The refund instruction in two vocabularies. Adyen: refund of 8400 on the original payment's PSP reference with one split item, BalanceAccount, 8400, Studio Noord's balance account. Stripe: refund of 8400 on the charge with reverse_transfer=true and without refund_application_fee.",
+              "shows": "The refund is a second request with a second division, not an undo of the first.",
+              "source": "Larkfield scenario ledger (35 addition); docs.adyen.com/platforms/online-payments/split-transactions/split-refunds; docs.stripe.com/connect/destination-charges (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen: splitting a refund 'allows you to choose who is liable for the refund.'",
+              "shows": "The provider states that the refund's split is a liability choice.",
+              "source": "docs.adyen.com/platforms/online-payments/split-transactions/split-refunds"
+            }
+          ]
+        },
+        {
+          "id": "p20",
+          "controlling_idea": "The hand-off that fails here is a refund sent without its instruction, and on both providers the default then puts the whole amount on the platform.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen, how split instructions are applied (pilot, not available for all platforms): a refund without instructions is checked against a split configuration profile and a default refund logic first, then uses the capture's split ratio only for a full refund of one capture; 'In all other cases, such as for refunds of partial captures, we book the full refund amount to your platform's liable balance account.' Stripe: 'by default the destination account keeps the funds that were transferred to it, leaving the platform account to cover the negative balance from the refund.'",
+              "shows": "A partial refund like Mila's, sent bare, is paid by Larkfield on Stripe, and on Adyen under the pilot logic where no profile or default applies.",
+              "source": "docs.adyen.com/platforms/how-adyen-applies-split-instructions; docs.stripe.com/connect/destination-charges (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The refund with its instruction.",
+            "introduces": "The same refund without one.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p21",
+          "controlling_idea": "Step 8: the debit lands on the balance the payment was booked to, not on the payment: on Adyen a refund can be deducted only from the balance accounts the payment credited, and on Stripe a refund of a destination charge debits the platform's balance, which recovers by reversing a proportional part of the transfer.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'Refunds can only be deducted from the balance accounts to which the payment was credited.' Stripe: 'Stripe debits your platform balance for the refund amount. You can reverse the transfers made to your connected accounts to recover your refund cost'; with reverse_transfer, 'If the refund results in the entire charge being refunded, the entire transfer is reversed. Otherwise, a proportional amount of the transfer is reversed.' Direct charges: 'Stripe debits the refund amount from the connected account's balance directly when you create a refund.'",
+              "shows": "The rule on each provider for which balance a refund after payout is debited from.",
+              "source": "docs.adyen.com/platforms/online-payments/split-transactions/split-refunds; docs.stripe.com/connect/charges; docs.stripe.com/connect/destination-charges (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "reasoning",
+              "what": "€84.00 is 70% of the €120.00 transferred; a proportional reversal is €84.00 (the author's arithmetic).",
+              "shows": "The Stripe reversal equals the refund in this case.",
+              "source": "author's arithmetic on ledger figures"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "A refund request and its instruction.",
+            "introduces": "Where the provider debits it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p22",
+          "controlling_idea": "What paid Mila on 18 March was €84.00 of the €212.40 that other members had paid Studio Noord since the payout, so the refund showed up only as a next payout that was €84.00 smaller.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "On 18 March Studio Noord's balance account held €212.40 of later sales (assumption); the refund was netted and the next payout was €84.00 smaller. Adyen settles net of the day's refunds and chargebacks.",
+              "shows": "The ordinary case: the refund is funded by later sales and is visible nowhere unless it has an entry of its own.",
+              "source": "Larkfield scenario ledger (35 addition); docs.adyen.com/platforms/settle-funds"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The rule for which balance is debited.",
+            "introduces": "What that balance held on the day.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p23",
+          "controlling_idea": "The fate of the platform's fee is a separate decision inside the refund: under Larkfield's policy the studio keeps €33.47 for three classes sold at €36.00 and Larkfield keeps the full €2.53, and each provider has a parameter that would have changed that.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "€120.00 for ten classes is €12.00 a class; three classes taken = €36.00; the studio received €117.47 and gives back €84.00, keeping €33.47; Larkfield's fee stays €2.53 (the author's arithmetic on ledger figures).",
+              "shows": "Shows in euros who bears the fee on the refunded part when nothing is decided otherwise.",
+              "source": "author's arithmetic on ledger figures"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'When refunding a charge with an application fee, by default the platform account keeps the funds from the application fee'; with refund_application_fee=true on a partial refund 'you refund a proportional amount of the application fee'. Adyen refund split type Commission: 'deducts the amount of your platform's commission for the original payment from your liable balance account.' Stripe: 'Stripe's processing fees from the original transaction aren't returned.' Adyen's split-refund page does not say the original fees are returned; it lists fee items for the refund itself. The 70% and the €1.77 are the author's arithmetic.",
+              "shows": "The parameter on each provider that decides the fee's fate, and that the provider's cost is not returned.",
+              "source": "docs.stripe.com/connect/destination-charges; docs.stripe.com/refunds; docs.adyen.com/platforms/online-payments/split-transactions/split-refunds (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "A refund funded by the studio's later sales.",
+            "introduces": "What happened to Larkfield's own €2.53.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p24",
+          "controlling_idea": "An accepted refund is again a promise: Adyen's REFUND webhook says the request was sent to the card network, Stripe's Refund object can stay pending or fail, and the refund's row in Larkfield's record stays open until the provider's later record confirms it.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'You get the outcome of the refund request asynchronously, in a REFUND webhook'; success true means 'we sent the refund request to the card scheme. However, the card scheme can still reject the refund. This can happen even a few days after you submit the refund request.' Stripe: a refund against a short balance is pending and 'fails with a failure_reason of insufficient_funds' after 45 days.",
+              "shows": "The hand-off from refund accepted to cardholder credited has its own late failure on both providers.",
+              "source": "docs.adyen.com/platforms/online-payments/split-transactions/split-refunds; docs.adyen.com/online-payments/refund; docs.stripe.com/connect/charges (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A refund that was debited.",
+            "introduces": "Whether it has reached Mila, and how Larkfield learns that.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "shortfall",
+      "heading": "Had the Balance Been Empty: Who Goes Short, and How the Money Is Recovered",
+      "controlling_idea": "When the debited balance cannot pay, the account model decides who is short and who stands behind them: on Adyen the studio's balance account with Larkfield's liable balance account behind it, on Stripe by charge type, and Adyen documents 30 days before the liable account is debited and one pilot in which it takes the loss.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "S4"
+        ],
+        "how": "Steps 9 and 10: the shortfall and its recovery on both providers, and where the evidence stops."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "Who is short on Adyen, then on Stripe, has to be known first. What Adyen documents about the period and the pilot follows at once, because it qualifies the Adyen answer and is read against the Stripe timeline just given; moved later, the reader would take the Adyen default for the whole story. Recovery comes after it and runs into the exposure figure, which is the platform's response to recovery routes that can all fail."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "A refund that later sales covered.",
+        "introduces": "The same refund against a studio with no later sales: steps 9 and 10.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p25",
+          "controlling_idea": "Step 9 on Adyen: had Studio Noord stopped selling after 11 March, Mila would still have been refunded, the studio's balance account would stand at minus €84.00, and Larkfield's liable balance account is the account Adyen documents as standing behind it.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen account structure: 'Liable balance account: the account where your business' funds are held. Funds can be deducted from this account if your users' balance accounts incur negative balances due to refunds and chargebacks.'",
+              "shows": "The party behind a negative seller balance on Adyen is part of the account structure.",
+              "source": "docs.adyen.com/platforms/account-structure-resources (n.d., accessed 2026-11)"
+            }
+          ]
+        },
+        {
+          "id": "p26",
+          "controlling_idea": "On Stripe the charge type decides who is short: with Larkfield's destination charges the platform's balance has already paid and the reversal of the transfer errors when the studio's balance is short, while with a direct charge the studio's connected account is debited and a short balance holds the refund as pending for up to 45 days; a connected account that does go negative is collected from its bank account first, and the loss then falls on whoever is responsible for that account's negative balances.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'If the refund request also attempts a transfer reversal, but the connected account has an insufficient balance, the refund request returns an error instead of creating a refund with pending status'; 'Stripe first attempts to offset the negative amount by collecting funds from the account's external account'; 'if a connected account's balance remains negative for 180 days, we transfer funds from the platform reserve to cover the negative amount.'",
+              "shows": "Stripe's documented sequence for each charge type.",
+              "source": "docs.stripe.com/connect/charges; docs.stripe.com/connect/risk-management (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "table",
+              "what": "Who is short and who stands behind: Adyen (studio's balance account; liable balance account); Stripe destination charge (platform's balance; nobody behind it, the platform must reverse the transfer); Stripe direct charge (connected account's balance; the refund waits as pending for up to 45 days; for a negative balance Stripe or the platform by the account's loss responsibility).",
+              "shows": "One table answers 'whose balance goes short and who stands behind it' for the three configurations.",
+              "source": "pages above"
+            },
+            {
+              "kind": "figure",
+              "what": "Two-panel figure, Provider A (Adyen) and Provider B (Stripe, destination charge): the refund debits the seller's tray with the platform's tray behind it, or the platform's tray first with a reversal arrow to the seller's tray.",
+              "shows": "Shows the two routes to the same payer.",
+              "source": "pages above"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Adyen's answer: the studio's balance account, with the liable balance account behind.",
+            "introduces": "Stripe's answer, which depends on the charge type.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p27",
+          "controlling_idea": "Adyen publishes a shorter period than Stripe's 180 days and names the account: a balance account may be negative for up to 30 days and is then compensated from the platform's reserved compensation account on the first day of the following month; one arrangement in which Adyen takes the loss, Managed Risk, is documented as a pilot with limited availability; no price list for platforms is published.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "Adyen, Manage liable balance accounts: 'Adyen allows negative balances for up to 30 days. If a balance account has a negative balance for more than 30 days, Adyen compensates this by debiting your reserved compensation account on the first day of the following month.' Adyen Managed Risk (pilot, limited availability): Adyen will 'assume the responsibility for negative balances'. Adyen pricing page: 'Other Adyen products, besides payment methods, are priced separately.' Stripe risk-management page: Stripe or the platform responsible per account; 180-day transfer from the platform reserve.",
+              "shows": "States what Adyen documents about the shortfall and where the evidence ends (prices and access to the pilot).",
+              "source": "docs.adyen.com/platforms/manage-liable-accounts; docs.adyen.com/platforms/managed-risk; adyen.com/pricing; docs.stripe.com/connect/risk-management (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Stripe's published order of collection and its 180 days.",
+            "introduces": "What Adyen documents about the same shortfall: a period, an account and a pilot.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p28",
+          "controlling_idea": "Step 10: the money comes back from the studio by netting against later sales, by a debit of its bank account or by a movement between balances, and the second route needs a consent that was given before the shortfall and can itself be reversed.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen top-ups: 'To cover negative balances resulting from refunds or chargebacks'; for SEPA accounts 'your users must first accept a mandate that authorizes you to debit their accounts', which they 'only need to accept ... once', and whose recommended text says 'You must claim a refund within 8 weeks from the date your account was debited.' Stripe: debit_negative_balances; account debits require 'legally binding consent'; 'If at all possible, Stripe automatically offsets negative transactions against future payments.'",
+              "shows": "The recovery routes on each provider and the precondition of the bank debit.",
+              "source": "docs.adyen.com/platforms/top-up-balance-account; docs.adyen.com/platforms/top-up-balance-account/on-demand-top-ups; docs.stripe.com/connect/account-balances; docs.stripe.com/connect/account-debits (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "A balance that went short, and a record that does not say when the platform pays for it.",
+            "introduces": "Step 10: how the money is got back from the studio.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p29",
+          "controlling_idea": "Because the shortfall is decided by sales that have not happened yet, Larkfield keeps its own figure per studio for money paid out that can still come back: about €64,000 for Studio Noord and about €156 million across the platform.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "statistic",
+              "what": "Exposure = online card volume paid out in the last 120 days less refunds and disputes already booked; Studio Noord at €16,000 a month (assumption) ≈ €64,000; Larkfield ≈ €156 million (52% of €910M × 120/365).",
+              "shows": "The number that says how large step 9 can get for one studio; what can come back, not what will.",
+              "source": "Larkfield scenario ledger (04 and 35 additions)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "Recovery routes that all need a studio that still sells or still has a bank account to debit.",
+            "introduces": "The figure the platform keeps itself, so the shortfall is sized before it happens.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ledger",
+      "heading": "What Larkfield's Ledger Records, Leg by Leg",
+      "controlling_idea": "Every step that moved money is an entry in Larkfield's ledger under the provider's reference, written from the provider's report, and the reconciliation of those entries, run on each provider's report-ready signal, is the later record that catches each failed hand-off in this journey.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "Step 11: the platform's own record of every leg and the check that confirms the earlier promises."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The entries are listed first, then the source they are written from and the job that checks them, then the same entries replayed against 2025; the replay needs both."
+      },
+      "transition_in": {
+        "relationship": "sequence",
+        "carries_over": "Ten steps at the provider.",
+        "introduces": "Step 11: the same steps in Larkfield's own books.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p30",
+          "controlling_idea": "Step 11: under K3 each leg of the journey is its own entry, keyed by the provider's payment reference and Larkfield's event id, and the refund after payout is an entry and not a changed status.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Entries: 9 March studio's share (funds at provider / owed to Studio Noord, €117.47); Larkfield's fee (funds at provider / fees owed to Larkfield, €2.53); provider's cost when reported (fees owed to Larkfield / funds at provider, €0.61, assumption); 11 March payout sent (payouts in transit / funds at provider, €117.47); 25 March payout marked arrived (owed to Studio Noord / payouts in transit, €117.47); 18 March refund, balance covers it (owed to Studio Noord / funds at provider, €84.00); refund, balance empty (to recover from Studio Noord / funds at provider, €84.00).",
+              "shows": "The whole journey as seven entries, with the counterfactual row beside the actual one.",
+              "source": "Larkfield scenario ledger (12, 14 and 35 additions)"
+            }
+          ]
+        },
+        {
+          "id": "p31",
+          "controlling_idea": "The entries are written from the provider's report lines, not from webhooks, and the reconciliation job, run on each provider's report-ready signal, matches each leg against the provider's own bookings (on Adyen the Balance Platform Accounting Report, marked as required for full financial reconciliation), so a split booked to the wrong account, a refund sent without its instruction or a recovery that came back surfaces as an open item with an owner.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "K3: the reconciliation job runs per provider on its report-ready signal and writes ledger entries only from report lines; matching keys are the payout ID on Stripe and, on Adyen, the balance platform's daily report per studio; an item open more than five business days goes to Priya Raman's weekly review.",
+              "shows": "The later record for every promise in the journey is a report line matched to an entry.",
+              "source": "Larkfield scenario ledger (15 addition)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The entries.",
+            "introduces": "What they are written from and what checks them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p32",
+          "controlling_idea": "The refund row is the entry Larkfield lacked in 2025: refunds after payout were €317,200 of the €412,000 its books could not explain, each of them a debit at a provider with no entry at Larkfield.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "statistic",
+              "what": "The Unexplained €0.4 Million at year-end 2025: €412,000, of which refunds after payout €317,200, chargeback fees €73,500, conversion rounding €21,300.",
+              "shows": "The cost of running this journey without step 11.",
+              "source": "Larkfield scenario ledger (12 addition)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "A ledger with an entry per leg.",
+            "introduces": "The year Larkfield ran without one.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "step-table",
+      "heading": "The Journey in One Table: Eleven Steps and What Each Promises",
+      "controlling_idea": "Set side by side, the eleven steps show that every failure in this journey sits at a hand-off and is reported later by a different record, which Adyen delivers as events and report lines and Stripe as objects with a status.",
+      "function": "synthesis",
+      "advances_thesis": {
+        "supports": [
+          "S5",
+          "S1",
+          "S3",
+          "S4"
+        ],
+        "how": "Collects the steps into the part's reading device and states what the column of failures has in common."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "Eleven steps told one by one.",
+        "introduces": "The same steps in one table, with party, record, promise and failure.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p33",
+          "controlling_idea": "The table lists the eleven steps with the party or system that acts, the record it produces on Adyen and on Stripe, the promise that record makes and the failure that can occur there with the chapter that owns the mechanism.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Step table, columns Step | Party or system | Message or record | Promise made | What can fail here → chapter; rows: 1 capability state, 2 split instruction, 3 platform's fee, 4 provider's cost, 5 studio's balance, 6 payout, 7 refund request, 8 debit of the paid-out balance, 9 shortfall, 10 recovery, 11 ledger entries and reconciliation.",
+              "shows": "The journey in the format Journey 1 established, so the four journeys can be compared.",
+              "source": "the sections above"
+            }
+          ]
+        },
+        {
+          "id": "p34",
+          "controlling_idea": "Read down the last column, none of the failures is a mechanism breaking: each is one step's answer taken as final by the next, and each is caught by a later record on another channel, an event or report line on Adyen and a fetchable object on Stripe.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "The confirming records named in the sections: transfer webhooks and the accounting report for the split; the fee booking for the cost; the closed return window for the payout; the REFUND webhook or Refund status for the refund; the sign of the balance for the shortfall; the reconciliation for all of them.",
+              "shows": "Ties the eleven rows to the part's claim about hand-offs and to where each provider puts the later record.",
+              "source": "the sections above; journal thesis P9-5"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The table.",
+            "introduces": "What its last column has in common.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "decisions",
+      "heading": "Four Decisions to Take Before the First Late Refund",
+      "controlling_idea": "Before its first refund after payout a platform has to decide the refund split, the fate of its own fee, who bears the processing cost and how a seller's shortfall is recovered and recorded, because each has a provider default that otherwise decides for it.",
+      "function": "recommendation",
+      "advances_thesis": {
+        "supports": [
+          "S5",
+          "S4"
+        ],
+        "how": "Turns the journey into the list of decisions the thesis says the account model makes for a platform that does not make them."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "Failures that sit at hand-offs.",
+        "introduces": "The decisions that close the ones a platform controls.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p35",
+          "controlling_idea": "Four decisions cover the backward half of the journey, and each is a parameter or an agreement on both providers: the refund split, the platform's fee, the processing cost, and the recovery of a shortfall with its consent, its exposure figure and its ledger account.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Decision | Larkfield's answer | Where it is set on Adyen | Where it is set on Stripe: refund split (studio funds; refund's splits item; reverse_transfer); platform's fee (kept; Commission item in the refund split; refund_application_fee); processing cost (Larkfield bears; fee split types, default liable account; charge type and fee configuration); shortfall (netting, then bank debit, booked to 'to recover from studio'; top-up under a mandate, internal transfer; debit of the bank account, account debit, transfer reversal).",
+              "shows": "Each decision has a named place on each provider, so none of them is abstract.",
+              "source": "the sections above"
+            }
+          ]
+        },
+        {
+          "id": "p36",
+          "controlling_idea": "Left undecided, each of the four still has an answer, and on both providers the default answer is the platform, which is why I treat the account model as the decision about who pays and write the four answers down before the first seller is onboarded.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Defaults cited above: Adyen books unspecified amounts, fees and bare partial refunds to the liable balance account; Stripe leaves the transferred funds with the destination account and the application fee with the platform.",
+              "shows": "The defaults are documented, so 'we did not decide' has a known outcome.",
+              "source": "the sections above"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Four decisions with a named parameter each.",
+            "introduces": "What happens when a platform does not take them: the defaults decide.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "The forward half of a platform payment is finished in two days by instructions the platform wrote, and the backward half is decided by a balance on some later day; the only things that connect the two halves are the account model, which says whose balance is asked, and the platform's own ledger entry, which says that it happened.",
+    "so_what": "A platform that reads its account model as a liability decision sets the refund split, the fee, the cost and the recovery before its first late refund and keeps an exposure figure per seller; one that reads it as plumbing meets the same decisions as a difference in its books, as Larkfield did with €317,200.",
+    "callback": {
+      "to": "Aylin Demir's question of 18 March, 'whose money pays this?', and the three answers it got.",
+      "how": "The reader can now give the one answer: other members' payments in Studio Noord's balance account paid it, Larkfield's liable balance account stood behind them, and each of the three earlier answers was one step of that."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Walk one refund after payout through your own configuration before it happens: name the balance it debits, the party behind that balance, the parameter that sets each of the four decisions, and the ledger entry it writes."
+    },
+    "hand_off": {
+      "to": "journey-dispute",
+      "relationship": "contrast",
+      "carries_over": "Journey 3's refund: money going back because the member asked and the studio agreed, debited from a balance that had been paid out, with the account model deciding who covers the gap.",
+      "introduces": "Money going back because the cardholder's bank says so: the same balances and the same question of who covers the gap, with nobody on the merchant side having agreed, a fee, a deadline and a count that the refund did not have."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The four decisions.",
+      "introduces": "What holds across the journey, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p37",
+        "form": "list",
+        "controlling_idea": "Established: a split is an instruction on the payment whose approval does not confirm the bookings; the provider's cost arrives after the payment; a refund after payout debits the balance the payment was booked to; an accepted refund and a sent payout are promises.",
+        "function": "synthesis"
+      },
+      {
+        "id": "p38",
+        "form": "list",
+        "controlling_idea": "Depends on context: who funds a refund and whether the platform returns its fee, how hard to pursue a seller's shortfall, and, on Adyen, whether the provider can bear a seller's loss, which depends on access to the Managed Risk pilot and on unpublished terms and prices.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is documented.",
+          "introduces": "What depends on the platform's terms, sellers and contract.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p39",
+        "form": "list",
+        "controlling_idea": "The author's synthesis: the account model is the answer to 'who pays' for every later refund, and 'whose money pays this?' has one answer only when the payment is walked through every hand-off.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "emphasis",
+          "carries_over": "Conditional recommendations.",
+          "introduces": "The author's own position, with the callback to the question of 18 March.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p40",
+        "form": "list",
+        "controlling_idea": "Seven questions let the reader walk a refund after payout through their own platform.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The take-aways.",
+          "introduces": "Questions to carry into a design review.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p41",
+        "controlling_idea": "Mila's refund went back because she asked and the studio agreed; the next journey follows a payment that goes back because the cardholder's bank says so, through the same balances, with a fee, a deadline and a count the refund did not have.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "A refund the merchant side agreed to, and the account model that decided who covered it.",
+          "introduces": "A chargeback nobody on the merchant side agreed to: Bram de Wit's €120.",
+          "form": "paragraph",
+          "placement": "both"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "Who the merchant is, the network definitions of payment facilitator and marketplace, and the liability rule itself.",
+      "covered_in": [
+        "platform-payment-models"
+      ]
+    },
+    {
+      "topic": "The mechanics of charge types, split types, payout schedules and top-ups beyond what each step needs.",
+      "covered_in": [
+        "splits-balances-and-platform-payouts"
+      ]
+    },
+    {
+      "topic": "Onboarding, requirements and deadlines beyond the one state the payment depends on.",
+      "covered_in": [
+        "platform-onboarding-and-verification",
+        "payment-compliance-and-regulation"
+      ]
+    },
+    {
+      "topic": "Pending, available and reserved balances, pre-financing and holds.",
+      "covered_in": [
+        "balances-and-funds-flows"
+      ]
+    },
+    {
+      "topic": "Payout rails, returns and the payee-name check.",
+      "covered_in": [
+        "payouts-and-money-movement"
+      ]
+    },
+    {
+      "topic": "The forward card steps before the split (tokenization, risk, authentication, authorization, capture, clearing, settlement).",
+      "covered_in": [
+        "journey-card-payment"
+      ]
+    },
+    {
+      "topic": "Chargebacks, the chargeback logic in use, dispute fees, deadlines and monitoring ratios.",
+      "covered_in": [
+        "journey-dispute",
+        "refunds-reversals-and-disputes"
+      ]
+    },
+    {
+      "topic": "Ledger design and reconciliation design.",
+      "covered_in": [
+        "payment-ledgers",
+        "payment-reconciliation-and-reporting"
+      ]
+    },
+    {
+      "topic": "A 'Stripe and Adyen: Where They Differ' section: journeys show both providers inline."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "How long an Adyen user's balance account may stay negative before the liable balance account is debited, and whether Adyen offers any arrangement in which it bears a seller's loss: nothing published; the chapter says so and stops at the default.",
+    "Whether Stripe rounds a proportional application-fee refund up or down (70% of €2.53 is €1.771): not documented on the pages read; the chapter says 'about €1.77'.",
+    "Chapter 12's worked ledger books Mila's refund to 'to recover from Studio Noord' on 18 March and moves it out when later sales cover it; chapter 35 and its ledger addition book a covered refund directly against 'owed to Studio Noord'. This chapter follows chapter 35 (the mechanics owner) and shows the other account only for the empty-balance case. The author may want the two reconciled.",
+    "Adyen's fallback for a refund sent without split instructions is documented as in pilot and not available for all platforms; what applies to a platform outside the pilot is not stated on the page."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "The step table closes the narrative instead of opening it: its rows use terms (liable balance account, split item, transfer reversal) that the steps gloss as they are told.",
+      "rejected": [
+        "The table first as a map, as a pure reference page would have it",
+        "A table per section"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Eleven steps, following the list in the journal-spec entry (capability state, split instruction, platform fee, processing cost, studio balance, payout, refund request, debit of the paid-out balance, shortfall, recovery, ledger entries).",
+      "rejected": [
+        "Reusing Journey 1's twelve steps and marking the ones this journey opens",
+        "Collapsing fee and cost into one step, which would hide the point of AC-2"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The shortfall is told as a counterfactual ('had the balance been empty'), because the ledger fixes that Studio Noord's balance held €212.40 on 18 March.",
+      "rejected": [
+        "Changing the scenario so the balance was empty",
+        "Using a different studio for the shortfall"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The statement that the Stripe–Adyen term pairs are the book's own mapping is made once, in the introduction's reading paragraph, as AC-3 asks.",
+      "rejected": [
+        "Repeating the caveat at every pair",
+        "A separate crosswalk table, which platform-payment-models already has"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The chargeback instruction that travels with the same payment is named in one sentence and left to Journey 4.",
+      "rejected": [
+        "Explaining platformChargebackLogic here"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "No 'Stripe and Adyen: Where They Differ' section and no separate 'When It Goes Wrong' section: the style guide exempts journeys from the first, and the failures are the last column of the step table and are told inside each step.",
+      "rejected": [
+        "A closing failure section that would repeat the steps"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/PLAN.md, contract 44",
+      "contributed": "Scope: onboarding state, split, fee, seller balance, payout, refund after payout, negative balance and recovery, both vocabularies."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/journal-spec.json, entry journey-platform-payment and part-9",
+      "contributed": "Intent, acceptance criteria, thesis, role, transitions in and out."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/_research/scenario-ledger.md",
+      "contributed": "Mila's pass, the refund after payout, and the additions of chapters 01, 03, 04, 05, 12, 13, 14, 15, 33 and 35."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/_research/consistency-issues.md, rulings 7, 10, 12, 18 and 22",
+      "contributed": "Hand-off first; ownership of the liability rule and the mechanics; no payment GET on Adyen; no external URLs in running text."
+    },
+    {
+      "kind": "internal",
+      "ref": "Chapters 13, 14, 33, 34 and 35 of this book as written (and 04, 12 skimmed)",
+      "contributed": "The provider facts the journey walks through, each re-fetched for this page."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen documentation (n.d., accessed 2026-11): platforms/online-payments/split-transactions, transaction-fees, split-transactions/split-refunds, split-transactions/split-chargebacks, how-adyen-applies-split-instructions, account-structure-resources, verification-overview, verification-overview/capabilities, settle-funds, managed-payouts, payout-webhooks, top-up-balance-account, top-up-balance-account/on-demand-top-ups, internal-fund-transfers, reports-and-fees/balance-platform-accounting-report, reports-and-fees, prepare-reports/generate-download-reports, manage-liable-accounts, managed-risk, split-transactions/split-payments-at-authorization; online-payments/refund; adyen.com/pricing",
+      "contributed": "Split types and defaults, fees calculated after the payment, the credited-accounts rule for refunds, the liable balance account, capabilities and deadlines, settlement timing, payout status, top-ups and the SEPA mandate, the accounting report."
+    },
+    {
+      "kind": "external",
+      "ref": "Stripe documentation (n.d., accessed 2026-11): connect/charges, connect/destination-charges, connect/account-balances, connect/risk-management, connect/account-debits, connect/account-capabilities, connect/disputes, refunds, payments/balances, api/payouts/object, api/balance_transactions/object",
+      "contributed": "Charge types, the application fee flow, refunds by charge type, the 45-day pending refund, transfer reversal, the order of collection and the 180-day transfer, capabilities, payout status."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 66 claims checked (51 confirmed, 6 corrected, 8 hedged, 0 unsupported and removed or relabeled, 0 unreachable, 1 not checked against a primary source); the paragraph saying Adyen's public record stops at its default was wrong and now gives the documented 30-day rule for negative balances and the Managed Risk pilot, and a Stripe direct-charge refund against a short balance is held pending, not booked negative. intent.outcome.know[3] and the AC-1 probe still carry the earlier wording because they must equal the journal spec."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "After the flow rubric: in the shortfall section the limit of Adyen's public record now follows the Stripe answer directly and precedes recovery; the ledger paragraph on reconciliation keeps the specific failures and leaves the generalisation to the step table; the declared reason now says what breaks if the ledger, table or decisions move. Notes carried into the draft as glosses, not as order changes: 'split' glossed at its first use before the sale, 'liable balance account' at the split, K3 and the 2025 figures introduced where used, the Adyen €0.61 stated with the cost."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "First draft of the outcome spec, from PLAN contract 44, the journal-spec entry, the platforms brief and chapters 13, 14, 33, 34 and 35 as written."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation after verification (parts-9-10): intent, thesis and role re-synced with the corrected journal-spec entry. No unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: statements of absence re-tested with a wide search (docs.adyen.com and help.adyen.com sitemaps, adyen.com pricing and legal pages, web search). All hold: Adyen's split-refund page lists fee items for the refund itself and does not say the original fees are returned; no terms or prices for the Managed Risk pilot are published. No change to the text."
+    }
+  ],
+  "length": {
+    "target_words": 5000,
+    "max_words": 6500
+  }
+}

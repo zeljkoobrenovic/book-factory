@@ -1,0 +1,1578 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "payment-economics",
+  "journal": "payments-platform-architecture",
+  "part": "part-1",
+  "title": "Who Earns What: Interchange, Scheme Fees and Provider Pricing",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "What interchange, scheme fees and the acquirer's markup are, who sets each and who receives it.",
+        "The legal caps: the EU Interchange Fee Regulation's 0.2% and 0.3% for consumer cards, and the US debit cap and routing rule with their status in court as of November 2026.",
+        "Blended pricing and interchange-plus-plus, and which is each company's published default.",
+        "What Adyen reports (net revenue, processed volume, take rate) and what Stripe does not publish."
+      ],
+      "believe": [
+        "A provider's pricing model is an architectural fact: it decides which network costs the merchant sees and what the provider has to calculate for every transaction.",
+        "Declines, late captures, refunds and disputes each have a price, paid by whoever is left holding the promise."
+      ],
+      "can_do": [
+        "Split a quoted card fee into interchange, scheme fees and markup, and say which parts are known, capped or not public.",
+        "Compare a blended quote with a pass-through quote for a stated card mix without treating the two percentages as like for like.",
+        "Say why a provider's reported volume, another's net revenue and a take rate cannot be ranked against each other."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a fee quote the chapter does not contain, the reader splits it into its parts and says which part the provider keeps.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "An Austrian online bookshop is offered two prices for a €50 payment with a consumer debit card: provider A charges a flat 1.4% + €0.25; provider B charges the card's interchange and the network's fees at cost, plus 0.6% + €0.10. What is the most the customer's bank can receive, what does each provider keep, and what can you not work out from the quote?",
+        "expected": "The bank's share (interchange) is capped by EU law at 0.2%, so at most €0.10. Provider B keeps 0.6% + €0.10 = €0.40 and passes the rest on; provider A charges €0.95 in total and keeps whatever is left after interchange and network fees. The network's fees are not public, so A's exact margin and B's exact total cannot be worked out from the quote."
+      },
+      {
+        "id": "AC-2",
+        "statement": "The reader can say who gains when a network cost falls under each pricing model.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A card network lowers a fee it charges on every transaction. Under a flat all-in price, who gains? Under a price that passes network fees through at cost, who gains? What does that suggest about which provider has a reason to build cost-reducing features into its own systems?",
+        "expected": "Under the flat price the provider keeps the saving, because the merchant's price does not change; under pass-through the merchant gets it. A provider on flat pricing gains directly from features that lower network costs; under pass-through such features are something the provider offers the merchant. The answer should mark the last step as reasoning, not as a documented fact about a company."
+      },
+      {
+        "id": "AC-3",
+        "statement": "Every price, cap, court ruling and reported figure carries its source and date; Stripe's take rate is stated as not computable from public figures and no estimate is presented as fact; the Larkfield fee stack is labeled illustrative; Stripe's and Adyen's volumes are not ranked against each other.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      },
+      {
+        "id": "AC-4",
+        "statement": "The closing of this chapter performs the part's closing: it lays the four promises and the three fees on one line, returns to the €120 dispute of the part opening, and hands off to Part II with the question of what decides the issuer's yes.",
+        "check": "conclusion_calls_back_to_introduction",
+        "method": "rubric",
+        "severity": "major"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "Where does the fee on a payment go, and how does the way a provider earns its share shape what it builds?",
+    "claim": "The fee on a card payment is three payments to three parties: interchange to the issuer, scheme fees to the network, and a markup to the acquirer or provider. A provider's default price either blends the three into one rate, as Stripe's published standard pricing does, or passes the first two through at cost, as Adyen's published Interchange++ pricing does, and that choice decides which network costs the merchant can see, who keeps the saving when one of them falls, and what the provider must calculate and report for every transaction. In the one case the public record documents, features follow the pricing model: Stripe offers five authorization and capture features on interchange-plus pricing.",
+    "disputed_by": "The view that pricing is a commercial term settled by procurement: the fee is what the provider charges for its service, the cheapest percentage wins, and none of it has anything to do with how the provider's systems are built.",
+    "so_what": "A reader can cost a payment, including its declines, late captures, refunds and disputes, before choosing a provider, will not compare a blended rate with a pass-through markup as if they measured the same thing, and knows to ask which features and reports depend on the pricing plan before signing.",
+    "how_why": "The annual reports Visa and Mastercard published in 2026 say the networks set default interchange but do not earn it, and that the acquirer sets the merchant's price; EU Regulation 2015/751 caps consumer interchange at 0.2% for debit and 0.3% for credit and obliges acquirers to offer unblended prices. Stripe's Netherlands price list (n.d., accessed November 2026) prices a standard European Economic Area card at 1.5% + €0.25; Adyen's (same date, marked indicative) charges a fixed processing fee plus interchange and scheme fees at cost plus 0.60%, and says its pricing model tracks those costs for each transaction. Stripe's documentation labels five authorization and capture features as available on interchange-plus pricing, which ties features to the model where their network cost is passed on. Adyen reports net revenue and a take rate (16.2 basis points for the first half of 2026); Stripe publishes total volume and no revenue for the company, so its take rate cannot be computed. Scheme fee schedules, Stripe's interchange-plus markup and Adyen's negotiated markup are not public, and any reading of the pricing difference beyond these documented points is the author's inference.",
+    "supporting_claims": [
+      {
+        "id": "PE-1",
+        "claim": "The fee on a card payment is three payments to three parties (interchange to the issuer, scheme fees to the network, a markup to the acquirer or provider), each set by a different party and all collected through settlement."
+      },
+      {
+        "id": "PE-2",
+        "claim": "The law caps only one of the three, interchange, and only for some cards: 0.2% and 0.3% for consumer cards in the EU, and a US debit cap and routing rule that a court ruling has put in doubt as of November 2026."
+      },
+      {
+        "id": "PE-3",
+        "claim": "A provider's default price either blends the three parts into one rate (Stripe's published standard pricing) or passes interchange and scheme fees through at cost (Adyen's published Interchange++ pricing), and that choice decides which network costs the merchant sees and who keeps the saving when one falls."
+      },
+      {
+        "id": "PE-4",
+        "claim": "Declines, late captures, refunds and disputes each have a price of their own, paid by whoever is left holding the promise, which is usually the merchant."
+      },
+      {
+        "id": "PE-5",
+        "claim": "What the two companies report cannot be ranked: Adyen publishes net revenue, processed volume and a take rate, while Stripe publishes total volume and no revenue for the company, so its take rate cannot be computed."
+      },
+      {
+        "id": "PE-6",
+        "claim": "The pricing model decides what the provider must calculate and report for every transaction, and in the one documented case features follow it: Stripe offers five authorization and capture features on interchange-plus pricing."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Assigns a payment to each party and step the earlier chapters named, shows the cost of every backward and failed flow, and carries the part's closing.",
+    "supports": [
+      "P1-5"
+    ]
+  },
+  "flow": {
+    "pattern": "prerequisite_order",
+    "additional_patterns": [
+      {
+        "pattern": "problem_solution",
+        "applies_to": "scene to larkfield-fee-stack: the question Larkfield cannot answer about its provider cost is posed first and answered last"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "two-pricing-models and where-they-differ"
+      },
+      {
+        "pattern": "chronological",
+        "applies_to": "failure-costs: the events in the order they can happen to one payment"
+      }
+    ],
+    "rationale": "Each section supplies what the next one needs. The three parts of the fee come before the caps, because a cap is a ceiling on one part; the caps come before the pricing models, because a blended price can only be judged once the reader knows which part inside it is bounded; the models come before the failure costs, because whether the merchant sees a penalty depends on the model; the section on what a provider must build comes straight after both, because it uses the question of who keeps a saving and the retry and capture costs; what each company reports follows, since a take rate is the provider's share added up and the reader now knows what the share is made of and which prices are not public; and the comparison table and the Larkfield split come last because every row and every amount in them was established earlier. Put the pricing models first and 'pass-through' passes on things the reader cannot name; put the Larkfield split before the caps and €0.24 is a number without a reason; put the features section before the failure costs and 'a feature that changes the network cost' has no cost to change; put the company comparison before the reporting section and its last row cites figures the reader has not met."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "When Bram de Wit's €120.00 class pass was approved on 2 February 2027, Studio Noord was credited €117.47. The other €2.53 was shared by four companies, two of which the studio has no contract with. On 24 February the €120 was taken back, and a fifth charge, €15.00, was added to the bill. Who was paid what, and for which promise?"
+    },
+    "bridge": {
+      "from_reader_world": "An engineer sees the fee as one number on a price list or one field on a transaction record, and compares providers by that number.",
+      "to_topic": "The number is the sum of three payments to three parties the previous chapters introduced, and whether a provider shows the three or only the sum is a design decision with consequences for its systems and the merchant's."
+    },
+    "thesis_statement": {
+      "text": "The fee on a card payment is three payments to three parties: interchange to the customer's bank, scheme fees to the card network and a markup to the provider. A provider either blends the three into one rate, as Stripe's published standard pricing does, or passes the first two through at cost, as Adyen's published Interchange++ pricing does, and that choice decides what the merchant can see, who keeps a saving and what the provider has to calculate for every transaction.",
+      "placement": "KEY POINTS bullets 1 and 2, and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p04",
+      "promises": [
+        {
+          "promise": "Start from the question Larkfield's finance controller asks about its two providers' invoices, and return to it with the fee on Mila's €120 split to the cent.",
+          "kept_in": [
+            "scene",
+            "larkfield-fee-stack"
+          ]
+        },
+        {
+          "promise": "Take the fee apart into interchange, scheme fees and markup: who sets each and who receives it.",
+          "kept_in": [
+            "three-payments"
+          ]
+        },
+        {
+          "promise": "Say what the law caps, in the EU and the US, and what it leaves alone.",
+          "kept_in": [
+            "caps"
+          ]
+        },
+        {
+          "promise": "Compare the two ways a provider prices the three parts, blended and interchange-plus-plus.",
+          "kept_in": [
+            "two-pricing-models"
+          ]
+        },
+        {
+          "promise": "Price the declines, late captures, refunds and disputes of the earlier chapters.",
+          "kept_in": [
+            "failure-costs"
+          ]
+        },
+        {
+          "promise": "Show what a pricing model obliges a provider to build, and where the public record stops.",
+          "kept_in": [
+            "pricing-shapes-systems"
+          ]
+        },
+        {
+          "promise": "Read what Adyen and Stripe report about their own earnings, and what cannot be compared.",
+          "kept_in": [
+            "reported-numbers"
+          ]
+        },
+        {
+          "promise": "Set the two companies side by side.",
+          "kept_in": [
+            "where-they-differ"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "Bram de Wit's approved €120 left Studio Noord with €117.47; the other €2.53 was Larkfield's platform fee, out of which three more companies were paid, and the chargeback three weeks later added a €15 charge instead of undoing any of it.",
+        "function": "context",
+        "organization": "narration",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "The €120 dispute: pass bought 2 February 2027 with a Dutch Mastercard credit card at Studio Noord (on Adyen); Larkfield's fee 1.9% + €0.25 = €2.53; chargeback 24 February with a €15.00 dispute fee (illustrative).",
+            "shows": "A payment the reader already knows from the part opening, now seen as a set of payments to parties.",
+            "source": "Larkfield scenario ledger (fictional)"
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "Beneath the platform's own fee, the fee on a card payment is three payments to three parties (interchange to the issuer, scheme fees to the network, a markup to the provider), and whether a provider blends them or passes two of them through is a design decision, not only a commercial term.",
+        "function": "claim",
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "The question of who was paid what out of Bram's €120.",
+          "introduces": "The three parts of the fee and the two ways a provider prices them.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "On the journey of Mila's class pass every step has now been followed, and this chapter puts a price on each of them and on the party that carried it.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's €120.00 pass of 9 March 2027: Larkfield's fee €2.53, the studio receives €117.47, illustrative provider cost €0.61.",
+            "shows": "Fixes the amounts the worked example later splits.",
+            "source": "Larkfield scenario ledger (fictional)"
+          }
+        ],
+        "transition_in": {
+          "relationship": "place",
+          "carries_over": "The fee as three payments.",
+          "introduces": "Where the chapter sits on the recurring payment's journey.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "controlling_idea": "The chapter goes from Larkfield's two invoices, through the three parts of the fee, the legal caps, the two pricing models, the price of failed and backward flows, what a pricing model makes a provider build and what each company reports, to the comparison of Stripe and Adyen and the fee on Mila's €120 split to the cent.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The chapter's position on the journey.",
+          "introduces": "The order of its sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: Two Invoices for One Kind of Payment",
+      "controlling_idea": "Larkfield pays €12.6 million a year to two providers whose statements cannot be laid side by side, because one itemizes the cost of each payment and the other shows a single fee.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "PE-1",
+          "PE-3"
+        ],
+        "how": "Poses the chapter's question with the ledger's figures: what is inside the provider cost, and why one provider shows it and the other does not."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The claim that a fee is three payments and that providers price them in two ways.",
+        "introduces": "One company that pays both kinds of price and cannot compare them.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p05",
+          "controlling_idea": "In February 2027 Larkfield's finance controller asks why €12.6 million of the €19.8 million it earned in payment fees went to its two providers, and why she cannot forecast the figure.",
+          "function": "context",
+          "organization": "narration",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "2026: payments revenue €19.8M and providers' processing costs €12.6M, on €1.12 billion of volume; Priya Raman is Finance Controller, Femke de Graaf Head of Payments Engineering since January 2027.",
+              "shows": "The provider cost is the largest cost in Larkfield's payments business, so its composition is worth an engineer's time.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ]
+        },
+        {
+          "id": "p06",
+          "controlling_idea": "The two providers' statements have different shapes: on Adyen a payment such as Mila's pass carries three cost lines that sum to €0.61, while on Stripe each payment carries one fee, so the question becomes what the three lines are and whether they are also inside the single fee.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen's pricing page: with Interchange++ you 'can see exactly what you’re being charged for each transaction'. Stripe's documentation defines blended pricing by contrast with IC+ as 'a flat rate for all transactions'.",
+              "shows": "The difference in the statements is a documented property of the two pricing models, not an invention of the scene.",
+              "source": "Adyen, Pricing, n.d., accessed 2026-11, https://www.adyen.com/pricing; Stripe docs, extended authorization, n.d., accessed 2026-11, https://docs.stripe.com/payments/extended-authorization"
+            },
+            {
+              "kind": "scenario",
+              "what": "The illustrative provider cost of €0.61 inside Larkfield's €2.53 fee on Mila's €120.",
+              "shows": "Names the number the chapter will take apart.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The controller's question about a cost she cannot forecast.",
+            "introduces": "Why the two statements cannot answer it in the same way.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "three-payments",
+      "heading": "Three Payments Inside One Fee: Interchange, Scheme Fees and Markup",
+      "controlling_idea": "What a merchant pays for a card payment is three payments to three parties, each set by a different party, and all three are collected through settlement.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "PE-1"
+        ],
+        "how": "Establishes the three parts, who sets each and who receives it, from the networks' own annual reports."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The whole fee and its table first, then each part in the order the money leaves the merchant's side (to the issuer, to the network, to the provider), then how all three are collected; the last paragraph needs all three definitions."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The €0.61 whose contents Larkfield cannot see on one of its two statements.",
+        "introduces": "The three parts any card fee is made of.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p07",
+          "controlling_idea": "The total a merchant pays, which the networks call the merchant discount rate, is the sum of three payments: interchange to the issuer, scheme fees to the network, and the acquirer's or provider's markup.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Table: part of the fee | paid to | set by | scales with | public? (interchange: issuer, network default or law, value and card type, default rates and caps public; scheme fees: network, network, value, message count and cross-border, schedules not public; markup: acquirer or provider, the acquirer, by contract, list prices public, negotiated ones not).",
+              "shows": "Puts the three parts and their owners in one view before each is defined."
+            }
+          ]
+        },
+        {
+          "id": "p08",
+          "controlling_idea": "Interchange is a fee the acquirer pays the issuer on each transaction; the network sets its default level and does not earn it.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa: 'Generally, IRFs are paid by acquirers to issuers. We establish default IRFs that apply absent other established settlement terms.' Mastercard: 'Although we do not earn revenues from interchange, interchange rates can impact the volume of transactions we see on our payment products.'",
+              "shows": "Both networks say in their own filings that interchange goes to the issuer and is not their revenue.",
+              "source": "Visa Inc., Form 10-K for the fiscal year ended 30 September 2026, filed 2026-11-05, https://www.sec.gov/Archives/edgar/data/1403161/000140316126000134/v-20260930.htm; Mastercard Incorporated, Form 10-K for 2025, filed 2026-02-11, https://www.sec.gov/Archives/edgar/data/1141391/000114139126000013/ma-20251231.htm"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The three parts named in the table.",
+            "introduces": "The first and usually largest part, and who sets it.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p09",
+          "controlling_idea": "Scheme fees are what the network charges issuers and acquirers for its own services; their kinds are public and their schedules are not.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa: 'Payments volume is the primary driver for our service revenue, and the number of processed transactions is the primary driver for our data processing revenue'; international transaction revenue is 'Earned for cross-border transaction processing and currency conversion activities'.",
+              "shows": "Shows the three bases scheme fees scale with (value, message count, cross-border) without a public price list.",
+              "source": "Visa Inc., Form 10-K for the fiscal year ended 30 September 2026, filed 2026-11-05, https://www.sec.gov/Archives/edgar/data/1403161/000140316126000134/v-20260930.htm"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Interchange, which the network sets but does not keep.",
+            "introduces": "The fees the network does keep.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "controlling_idea": "The markup is the acquirer's or provider's own price for its service, and it alone sets the total the merchant pays.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Mastercard: 'The merchant discount rate is established by the acquirer to cover its costs of both participating in the four-party system and providing services to merchants.'",
+              "shows": "The network disclaims the merchant's price: it is the acquirer's decision, which is what makes blended pricing possible.",
+              "source": "Mastercard Incorporated, Form 10-K for 2025, filed 2026-02-11, https://www.sec.gov/Archives/edgar/data/1141391/000114139126000013/ma-20251231.htm"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The two parts that leave the acquirer for the issuer and the network.",
+            "introduces": "The part the acquirer or provider keeps.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "controlling_idea": "None of the three is invoiced by the party that earns it: interchange and scheme fees are taken in the network's settlement, the provider deducts or bills the total, and the exact interchange is known only once the clearing record exists.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Mastercard: 'We administer the collection and remittance of interchange fees through the settlement process.'",
+              "shows": "The fee travels on the same path as the money the earlier chapter followed.",
+              "source": "Mastercard Incorporated, Form 10-K for 2025, filed 2026-02-11, https://www.sec.gov/Archives/edgar/data/1141391/000114139126000013/ma-20251231.htm"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen's documentation lists 'Increased interchange fees' among the risks of capturing after an authorization has expired.",
+              "shows": "A documented case of interchange depending on how and when the payment is cleared, not only on the card.",
+              "source": "Adyen docs, Adjust authorisation, n.d., accessed 2026-11, https://docs.adyen.com/online-payments/adjust-authorisation"
+            },
+            {
+              "kind": "figure",
+              "what": "Figure: one payment leaving the cardholder's bank, with three small arrows splitting off to the issuer, the network and the provider before the remainder reaches the merchant.",
+              "shows": "Makes the three payments and their directions visible at once."
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "The three parts and their owners.",
+            "introduces": "When and by whom each is actually collected.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "caps",
+      "heading": "What the Law Caps, and What It Leaves Alone",
+      "controlling_idea": "Regulators have capped one of the three parts, interchange, and only for some cards; scheme fees, the markup and every card outside the caps are priced freely.",
+      "function": "evidence",
+      "advances_thesis": {
+        "supports": [
+          "PE-2"
+        ],
+        "how": "Gives the caps, their scope and their legal status with dates, so the reader knows which part of a quote is bounded by law."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "additional_patterns": [
+          {
+            "pattern": "large_to_small",
+            "applies_to": "p12 to p17: the general rule, then the EU, then the US, then the cards outside both"
+          }
+        ],
+        "rationale": "The claim first, then the two jurisdictions Larkfield sells in, each with its cap before its other rule, then what neither cap reaches; the cross-border paragraph comes last because it is defined by exclusion from the caps before it."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "Three parts, each set by a private party.",
+        "introduces": "The one part that law has put a ceiling on.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p12",
+          "controlling_idea": "Only interchange is capped by law, and only for some cards, so a quote's interchange is the one part a merchant can bound without asking anyone.",
+          "function": "claim"
+        },
+        {
+          "id": "p13",
+          "controlling_idea": "In the EU, Regulation 2015/751 caps interchange at 0.2% of the value for consumer debit cards and 0.3% for consumer credit cards, and exempts commercial cards and three-party schemes.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Art. 3: 'Payment service providers shall not offer or request a per transaction interchange fee of more than 0,2 % of the value of the transaction for any debit card transaction'; Art. 4: 'more than 0,3 % ... for any credit card transaction'; Art. 1(3): Chapter II does not apply to 'transactions with commercial cards' and 'transactions with payment cards issued by three party payment card schemes'. Member states may set lower domestic caps.",
+              "shows": "Gives the ceiling for the consumer cards Larkfield's members use, and the two categories it does not cover.",
+              "source": "Regulation (EU) 2015/751, OJ L 123, 2015-05-19, http://publications.europa.eu/resource/celex/32015R0751 (evidence age: 11 years; in force)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The claim that only interchange is capped.",
+            "introduces": "The European cap and its scope.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p14",
+          "controlling_idea": "The same regulation makes an itemized price, one that is not blended into a single rate, the default an acquirer must offer, and gives the merchant a right to see the interchange on each transaction.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Art. 9: 'Each acquirer shall offer and charge its payee merchant service charges individually specified for different categories and different brands of payment cards with different interchange fee levels unless payees request the acquirer, in writing, to charge blended merchant service charges.' Art. 12: the payee is given 'the amount of any charges for the card-based payment transaction, indicating separately the merchant service charge and the amount of the interchange fee'.",
+              "shows": "European law treats blending as something the merchant asks for, which bears directly on the two pricing models.",
+              "source": "Regulation (EU) 2015/751, OJ L 123, 2015-05-19, http://publications.europa.eu/resource/celex/32015R0751 (evidence age: 11 years; in force)"
+            },
+            {
+              "kind": "reasoning",
+              "what": "INFERENCE block: Stripe's blended standard pricing in the EU presumably rests on the merchant's agreement to a blended charge; Stripe does not say so on the pages read.",
+              "shows": "Marks the step from the legal text to one company as the author's inference."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The cap on the amount.",
+            "introduces": "The rule on how the price must be presented.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p15",
+          "controlling_idea": "In the United States the cap covers debit cards of large issuers only ($0.21 plus 0.05% plus a one-cent fraud adjustment) and leaves credit cards uncapped, and a second rule lets the merchant choose between at least two unaffiliated networks for a debit transaction.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Federal Reserve: a covered issuer 'may not receive, for any electronic debit transaction, an interchange fee that exceeds $0.21 plus 0.05 percent multiplied by the value of the transaction, plus a $0.01 fraud-prevention adjustment, if eligible'; the rule 'prohibits all issuers and networks from restricting the number of networks over which debit transactions may be processed to less than two unaffiliated networks'.",
+              "shows": "States the US cap and the routing rule in the regulator's words.",
+              "source": "Federal Reserve Board, Average Debit Card Interchange Fee by Payment Card Network, updated 2025-12-19, https://www.federalreserve.gov/paymentsystems/regii-average-interchange-fee.htm; Regulation II, updated 2024-05-17, https://www.federalreserve.gov/paymentsystems/regii-about.htm"
+            },
+            {
+              "kind": "statistic",
+              "what": "2024, all networks: covered transactions averaged $0.23 (0.47% of an average $48.95 ticket); exempt transactions averaged $0.51 (1.21% of $42.27). The cap applies to issuers with $10 billion or more in assets (Federal Reserve press release, 2023-10-25; evidence age 3 years).",
+              "shows": "Shows what the cap is worth: the same kind of payment costs more than twice as much in interchange when the issuer is exempt.",
+              "source": "Federal Reserve Board, same page, 2025-12-19; https://www.federalreserve.gov/newsevents/pressreleases/bcreg20231025a.htm"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The European caps, which cover debit and credit.",
+            "introduces": "The American cap, which covers debit of large issuers only, and its routing rule.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p16",
+          "controlling_idea": "As of 17 November 2026 both the debit cap and the level of credit interchange are unsettled in the United States: an appeals court has upheld the vacating of the debit cap in a ruling that has not taken effect, and a settlement between the networks and merchants over credit interchange is approved only preliminarily.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "Eighth Circuit, Corner Post, Inc. v. Board of Governors, decided late October 2026 (26 October per the law-firm briefing): unanimously affirmed the vacatur of the 21-cent standard; 'its decision would not become effective until issuance of the mandate' (Consumer Finance Monitor, Ballard Spahr, 2026-10-28, secondary source; ABA Banking Journal, 2026-11-03, secondary source).",
+              "shows": "The cap is still applied but its legal basis has been rejected by an appeals court.",
+              "source": "https://www.consumerfinancemonitor.com/2026/10/28/eighth-circuit-invalidates-federal-reserves-21-cent-debit-card-interchange-fee-cap-holding-that-the-durbin-amendment-requires-a-transaction-specific-cost-analysis/; https://bankingjournal.aba.com/2026/11/eighth-circuit-affirms-vacatur-of-regulation-ii/"
+            },
+            {
+              "kind": "quotation",
+              "what": "Visa: 'Recent conflicting federal court decisions on the validity of Regulation II's interchange fee standard have created additional uncertainty and could result in a significantly lower interchange cap for debit transactions.' On credit: an amended settlement of 10 November 2025 received preliminary approval 'on June 9, 2026', and 'On July 15, 2026, the Injunctive Relief Class plaintiffs filed a motion for final approval'.",
+              "shows": "A primary source confirms the uncertainty on debit and the unfinished state of the credit settlement.",
+              "source": "Visa Inc., Form 10-K for the fiscal year ended 30 September 2026, filed 2026-11-05, https://www.sec.gov/Archives/edgar/data/1403161/000140316126000134/v-20260930.htm"
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "The US cap and routing rule as written.",
+            "introduces": "Their status in court on the day this chapter was checked.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p17",
+          "controlling_idea": "Cards outside the caps cost more and the public price lists show it: a card issued outside the European Economic Area, a commercial card or a payment that needs currency conversion each carries a higher price or a surcharge.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe's Netherlands list: '1.5% + €0.25 for standard European Economic Area cards', '2.8% + €0.25 for premium European Economic Area cards', '2.5% + €0.25 for UK cards', '3.15% + €0.25 for international cards', '+ 2% if currency conversion is required'.",
+              "shows": "The tiers of a blended price list are the visible trace of costs that differ by where and how the card was issued.",
+              "source": "Stripe, Pricing (Netherlands, English), n.d., accessed 2026-11, https://stripe.com/en-nl/pricing"
+            },
+            {
+              "kind": "quotation",
+              "what": "Visa earns international transaction revenue 'for cross-border transaction processing and currency conversion activities' (quoted in the scheme-fee paragraph).",
+              "shows": "The network charges separately for cross-border work.",
+              "source": "Visa Inc., Form 10-K for the fiscal year ended 30 September 2026, filed 2026-11-05, https://www.sec.gov/Archives/edgar/data/1403161/000140316126000134/v-20260930.htm"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The cards the caps cover.",
+            "introduces": "The cards and payments they do not.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "two-pricing-models",
+      "heading": "Two Ways to Price It: Blended and Interchange-Plus-Plus",
+      "controlling_idea": "A provider either charges one blended rate and keeps what is left after the network costs, or passes interchange and scheme fees through at cost and charges a stated markup; the choice decides what the merchant sees and who gains when a network cost falls.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "PE-3"
+        ],
+        "how": "Defines the two models, documents which is each company's published default, and reasons through who carries the variance and who keeps a saving under each."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "additional_patterns": [
+          {
+            "pattern": "assertion_evidence_reasoning",
+            "applies_to": "p18 to p24: the two definitions, each company's published default, then the comparison, the reasoning about savings and the recommendation"
+          }
+        ],
+        "rationale": "Both definitions come before either company so that the reader judges the price lists against the models and not the other way round; the comparison table and the question of who keeps a saving need both price lists; the recommendation comes last because it depends on the trade-offs."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "Three parts, one of them capped for some cards and the other two priced freely.",
+        "introduces": "The two ways a provider turns the three parts into the price it quotes.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p18",
+          "controlling_idea": "Blended pricing is one percentage plus a fixed amount for every payment of a kind, whatever the card behind it costs the provider, so the provider's own share is the remainder and varies from payment to payment.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "A 1.5% + €0.25 price on €120 is €2.05; with interchange of €0.24 or €0.36 inside it the remainder differs by €0.12, and the merchant sees neither figure.",
+              "shows": "Shows with the chapter's own numbers that a blended price fixes the total and leaves the split invisible."
+            }
+          ]
+        },
+        {
+          "id": "p19",
+          "controlling_idea": "Interchange-plus-plus pricing charges the interchange and the scheme fees of each payment at cost and adds a stated markup, so the provider's share is fixed and the total varies from payment to payment.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe's definition of IC+: 'A pricing plan where businesses pay the variable network cost for each transaction plus the Stripe fee rather than a flat rate for all transactions.'",
+              "shows": "A provider's own one-sentence definition of the pass-through model; the two pluses are the scheme fees and the markup.",
+              "source": "Stripe docs, extended authorization, n.d., accessed 2026-11, https://docs.stripe.com/payments/extended-authorization"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A fixed total with a variable provider share.",
+            "introduces": "A fixed provider share with a variable total.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "controlling_idea": "Stripe's published default is blended: its Netherlands list charges 1.5% + €0.25 on a standard European card, and offers the pass-through model, which it calls IC+, only as custom pricing.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe NL pricing: 'No setup fees, monthly fees, or hidden fees'; '1.5% + €0.25 for standard European Economic Area cards'; the Custom column lists 'IC+ pricing', 'Volume discounts', 'Multi-product discounts', 'Country-specific rates'.",
+              "shows": "The public price is one number per card category and the pass-through model is by negotiation; the IC+ markup is not published.",
+              "source": "Stripe, Pricing (Netherlands, English), n.d., accessed 2026-11, https://stripe.com/en-nl/pricing"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The two models in the abstract.",
+            "introduces": "The model Stripe publishes as its default.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p21",
+          "controlling_idea": "Adyen's published default is interchange-plus-plus: a fixed processing fee on each transaction plus, for Visa and Mastercard, interchange and scheme fees at cost plus 0.60%, on a page that calls its prices indicative and mentions a minimum invoice.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen pricing: 'For each transaction, we charge a fixed processing fee + a fee determined by the payment method'; Visa and Mastercard '$0.13 + Interchange+ + 0.60%' (the page shows the fixed fee in US dollars); 'Interchange fees are variable, our Interchange++ pricing passes these fees directly to you'; 'The fees outlined above are indicative'; 'We do have a minimum invoice depending on industry or business model'; some methods carry a fixed percentage where a card shows Interchange++.",
+              "shows": "The public price states the markup and passes the network costs on; it also shows fixed-percentage rows for some methods and a minimum invoice, so neither company is purely one model.",
+              "source": "Adyen, Pricing, n.d., accessed 2026-11, https://www.adyen.com/pricing; https://www.adyen.com/payment-methods/visa"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Stripe's blended default.",
+            "introduces": "Adyen's pass-through default.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p22",
+          "controlling_idea": "Set side by side, the two models differ in what the merchant can see, who carries the variance in card mix, who keeps a saving, and what each party has to compute.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Table: question | blended | interchange-plus-plus (what the merchant sees; who carries a change in card mix; who gains when a network cost falls; who is charged a network penalty; how easy the cost is to forecast; what the provider must compute per transaction).",
+              "shows": "The trade-off table the chapter's judgement rests on; it describes the models, not the companies."
+            },
+            {
+              "kind": "figure",
+              "what": "Figure: the same payment shown as a closed box with one price tag and as an open box with three labeled parts; caption says Provider A is priced like Stripe's published default and Provider B like Adyen's.",
+              "shows": "A before-and-after image of what blending hides."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The two definitions and the two published defaults.",
+            "introduces": "The differences that follow from the models themselves.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p23",
+          "controlling_idea": "When a network cost falls, a blended price leaves the saving with the provider and a pass-through price hands it to the merchant, so the two models give the provider different reasons to reduce network costs.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Under a flat price the merchant's bill does not change when interchange or a scheme fee falls, so the provider's remainder grows; under pass-through the merchant's bill falls and the provider's markup is unchanged. Labeled as reasoning from the definitions, not a documented fact about either company.",
+              "shows": "Answers who gains under each model and why the answer matters for what a provider builds, which a later section takes up."
+            }
+          ],
+          "transition_in": {
+            "relationship": "emphasis",
+            "carries_over": "The row of the table about savings.",
+            "introduces": "Why that row matters more than the others.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p24",
+          "controlling_idea": "Blended pricing suits a business that wants one predictable number and has no one to audit a fee statement; pass-through suits one with enough volume and a cheap enough card mix to gain from seeing the parts, and the two quotes can be compared only after interchange and scheme fees are added to the markup.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Author's judgement, with the condition under which it fails: a merchant whose cards are mostly commercial or from outside the EEA can pay more under pass-through than under a blended rate without tiers.",
+              "shows": "Gives the reader a rule and its limit."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Who carries the variance and who keeps the saving.",
+            "introduces": "Which business each model fits.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "failure-costs",
+      "heading": "What Failure Costs: Declines, Late Captures, Refunds and Disputes",
+      "controlling_idea": "Each failed or backward flow of the earlier chapters has its own price, charged by the network or the provider, and it lands on whoever is left holding the promise, which is usually the merchant.",
+      "function": "evidence",
+      "advances_thesis": {
+        "supports": [
+          "PE-4"
+        ],
+        "how": "Attaches a documented cost to each event the previous three chapters defined, on each provider."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The events come in the order they can happen to one payment and in the order the part taught them: a declined or retried authorization, a capture after the promise expired, a refund, a dispute."
+      },
+      "transition_in": {
+        "relationship": "additional_support",
+        "carries_over": "The price of a payment that succeeds, under either model.",
+        "introduces": "The price of the payments and steps that do not.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p25",
+          "controlling_idea": "A payment that is declined, captured late, refunded or disputed is not free, and the pricing model decides whether the merchant sees each of those four costs as a line on a statement or never sees it.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Table: event | Stripe (documented) | Adyen (documented) (declined or retried authorization; capture after the validity window; refund; dispute).",
+              "shows": "One view of the four costs and where each provider's public record states them or is silent."
+            }
+          ]
+        },
+        {
+          "id": "p26",
+          "controlling_idea": "A declined attempt still costs the provider a network fee, and too many retries of a declined card bring a penalty, which both companies document by offering to block the retry.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe's optimization page: 'We block payments that are unlikely to succeed before they reach the card networks, saving you unnecessary scheme fees', and 'Excessive retry prevention: Stripe blocks a payment that would have incurred network retry penalties and likely failed'. Adyen: 'Visa charges system integrity fees. These fees are related to excessive retries of failed transactions, and excessive numbers of transactions that failed due to incorrect payment details'; refusal reason 46 is 'Transaction blocked by Adyen to prevent excessive retry fees'.",
+              "shows": "Both providers confirm that attempts and retries have a network cost; under a blended price the merchant does not see it, and under pass-through it is a line on the statement.",
+              "source": "Stripe docs, Optimization, n.d., accessed 2026-11, https://docs.stripe.com/payments/analytics/optimization; Adyen docs, Visa system integrity fees and Refusal reasons, n.d., accessed 2026-11, https://docs.adyen.com/development-resources/raw-acquirer-responses/visa-integrity-fees, https://docs.adyen.com/development-resources/refusal-reasons"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The four events in the table.",
+            "introduces": "The first: an authorization that is declined or retried.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p27",
+          "controlling_idea": "A capture sent after the issuer's promise has expired can cost more in interchange and scheme fees, and holding the promise open longer has a price too.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: capturing after an authorization has expired 'increases the risk of' 'Increased interchange fees', 'Card scheme transaction fees' and a chargeback for 'No Authorization' or 'Late Presentment'. Stripe: for extended authorizations in other merchant categories 'Stripe charges an additional 0.08% fee per transaction'.",
+              "shows": "The validity window of chapter 2 has a price on both sides of it: keeping it open and missing it.",
+              "source": "Adyen docs, Adjust authorisation, n.d., accessed 2026-11, https://docs.adyen.com/online-payments/adjust-authorisation; Stripe docs, extended authorization (advanced integration variant), n.d., accessed 2026-11, https://docs.stripe.com/payments/extended-authorization"
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "A promise that was refused.",
+            "introduces": "A promise that was given and then allowed to run out.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p28",
+          "controlling_idea": "A refund does not return the fee of the original payment and can carry a fee of its own.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'Stripe’s processing fees from the original transaction aren’t returned'; 'IC+ users might see a difference in cost between reversals and refunds because reversals usually incur lower network fees.' Adyen's price list has a 'Payment method refund fee' column next to the payment fee.",
+              "shows": "The merchant pays for the sale it gave back, and under pass-through even the form the refund takes changes its cost.",
+              "source": "Stripe docs, Refunds, n.d., accessed 2026-11, https://docs.stripe.com/refunds; Adyen, Pricing, n.d., accessed 2026-11, https://www.adyen.com/pricing"
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "Costs before and at capture.",
+            "introduces": "The cost of sending the money back.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p29",
+          "controlling_idea": "A dispute adds a fee to the amount taken back: Stripe publishes €20.00 per dispute received in the Netherlands, and Adyen charges a non-refundable chargeback fee whose amount is set in the contract (CAD 24.00 in its standard disclosure for Canada is the one published amount).",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe NL pricing: 'Dispute received fee €20.00 for each dispute you receive. In rare cases, network fees also apply. Dispute countered fee €20.00 for each dispute you respond to manually. You get this fee back for won disputes.' Adyen docs: Adyen 'debits the payment amount and the chargeback processing fee from your account'; no amount on its public price list.",
+              "shows": "The dispute of chapter 4 has a published price on one provider and an unpublished one on the other; Larkfield's €15.00 is illustrative.",
+              "source": "Stripe, Pricing (Netherlands, English), n.d., accessed 2026-11, https://stripe.com/en-nl/pricing; Adyen docs, Dispute process and flow, n.d., accessed 2026-11, https://docs.adyen.com/risk-management/understanding-disputes/dispute-process-and-flow"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Money the merchant chose to send back.",
+            "introduces": "Money the cardholder's bank takes back.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "pricing-shapes-systems",
+      "heading": "What a Pricing Model Makes a Provider Build",
+      "controlling_idea": "Pass-through pricing obliges a provider to calculate and report network costs per transaction, and the one documented link between pricing and features is Stripe's: five authorization and capture features and its network-cost reporting are tied to IC+ pricing; beyond that the record stops.",
+      "function": "cause_effect",
+      "advances_thesis": {
+        "supports": [
+          "PE-6"
+        ],
+        "how": "Moves from the pricing model to what the provider's systems must do, with the documented cases first and the inference labeled."
+      },
+      "flow": {
+        "pattern": "assertion_evidence_reasoning",
+        "rationale": "What pass-through requires, then the two documented Stripe cases, then the author's labeled reading of them, then the limits of the record; the inference must come after the evidence it interprets and before the statement of what is not public."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "Network costs that the merchant sees under one pricing model and never sees under the other, and the saving that stays with a different party under each.",
+        "introduces": "What each model therefore obliges the provider's systems to compute, expose and sell.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p34",
+          "controlling_idea": "A provider that passes network costs through has to work out the interchange and scheme fees of each transaction and show them to the merchant, which a provider on a blended rate does not owe anyone.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'Interchange++ is a pricing model which accurately tracks Interchange rates and scheme fees right down to a transaction level. This means we can calculate the cost of each payment even before it is completed.'",
+              "shows": "A provider's own statement that its pricing model requires a per-transaction cost calculation.",
+              "source": "Adyen, Pricing, n.d., accessed 2026-11, https://www.adyen.com/pricing"
+            },
+            {
+              "kind": "fact",
+              "what": "Regulation (EU) 2015/751 Art. 12: per-transaction information 'indicating separately the merchant service charge and the amount of the interchange fee', which may be aggregated with the payee's consent.",
+              "shows": "In the EU the per-transaction breakdown is also a legal duty unless the merchant agrees to aggregation.",
+              "source": "Regulation (EU) 2015/751, OJ L 123, 2015-05-19, http://publications.europa.eu/resource/celex/32015R0751 (evidence age: 11 years; in force)"
+            }
+          ]
+        },
+        {
+          "id": "p35",
+          "controlling_idea": "Stripe's documentation labels five authorization and capture features as IC+ features, offered to users on IC+ pricing, with users on blended or standard pricing told to contact support.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Extended authorization: 'We offer extended authorizations to users on IC+ pricing. If you’re on blended Stripe pricing and want access to this feature, contact us'. The same 'IC+ feature' label appears on incremental authorization, multicapture, overcapture and partial authorization.",
+              "shows": "The documented case in which features follow the pricing model: each of the five changes what the networks charge for a payment.",
+              "source": "Stripe docs, n.d., accessed 2026-11: https://docs.stripe.com/payments/extended-authorization, /incremental-authorization, /multicapture, /overcapture, /partial-authorization"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "What pass-through requires in general.",
+            "introduces": "The documented case of features tied to it.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p36",
+          "controlling_idea": "Stripe also prices and reports its cost-reducing features by pricing plan: the estimated network-cost savings are computed for businesses on IC+ pricing, and its optimization bundle is included in standard pricing and charged separately on custom pricing.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Optimization page: 'Optimization features can help reduce network costs for businesses on IC+ pricing'; 'Stripe uses interchange and scheme fee rules or specifications from card networks to compute costs you would have incurred without the use of optimizations.' Pricing page (Netherlands): Authorisation Boost 'Included at no additional charge for businesses on standard payments pricing'; '0.2% per successful online card transaction for accounts with custom payments pricing'.",
+              "shows": "Under the blended plan cost-reducing features are bundled and their savings are not shown; under pass-through they are a priced product whose savings are calculated for the merchant.",
+              "source": "Stripe docs, Optimization, n.d., accessed 2026-11, https://docs.stripe.com/payments/analytics/optimization; Stripe, Pricing (Netherlands, English), n.d., accessed 2026-11, https://stripe.com/en-nl/pricing"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Features that add network cost, tied to IC+.",
+            "introduces": "Features that remove network cost, priced and reported by plan.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p37",
+          "controlling_idea": "Read together, these cases suggest that features whose network cost varies per transaction are offered where that cost is passed on, and that under a blended rate cost reduction is the provider's own margin; this is the author's inference.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "INFERENCE, NOT DOCUMENTED block: neither company states why features are tied to pricing; the reading follows from who keeps a saving under each model. Adyen's equivalents are enabled by Support and merchant category with no pricing-plan condition on the pages read.",
+              "shows": "Separates the documented pattern from its explanation."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The two documented Stripe cases.",
+            "introduces": "The author's labeled reading of what they have in common.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p38",
+          "controlling_idea": "The record stops well short of the prices themselves: scheme fee schedules, Stripe's IC+ markup, Adyen's negotiated markup, its chargeback fee outside one Canadian disclosure, and how either company computes network costs internally are not public.",
+          "function": "context",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Not found in any fetched source: Visa or Mastercard scheme fee schedules; a Stripe IC+ rate; Adyen's non-indicative markup or its chargeback fee; UK interchange after Brexit was not researched.",
+              "shows": "Tells the reader which parts of a real quote can only come from the provider's sales team."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What the documentation shows and what can be inferred from it.",
+            "introduces": "What it does not show at all.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "reported-numbers",
+      "heading": "What Each Company Reports: Volume, Net Revenue and Take Rate",
+      "controlling_idea": "Adyen publishes what it keeps (net revenue) and a take rate; Stripe publishes the value its customers moved and no revenue for the company, so the two companies' figures measure different things and cannot be ranked.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "PE-5"
+        ],
+        "how": "Defines net revenue and take rate, gives each company's published figures with dates, and says what cannot be computed or compared."
+      },
+      "flow": {
+        "pattern": "assertion_evidence_reasoning",
+        "rationale": "The two terms first, then the company that publishes both, then the company that publishes neither, then what follows for comparing them; the reasoning needs both sets of figures."
+      },
+      "transition_in": {
+        "relationship": "place",
+        "carries_over": "The price of one payment and what the provider must build to charge it, including the prices the record does not show.",
+        "introduces": "The sum of a provider's share over all its payments, which is the part of its earnings a company does or does not publish.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p30",
+          "controlling_idea": "Net revenue is what a provider keeps after passing interchange and scheme fees on, and take rate is net revenue divided by the volume processed, in basis points.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen defines net revenue as 'Net non-interest revenue (\"Non-interest revenue\" less \"Costs incurred from financial institutions\" and \"Costs of goods sold\") and Net interest income'; the costs deducted are those 'that do not form part of the passthrough settlement fees'.",
+              "shows": "The pass-through costs never appear in the revenue line, so net revenue is the provider's own share.",
+              "source": "Adyen, H1 2026 Shareholder Letter and interim statements, 2026-08-13, https://investors.adyen.com/financials/h1-2026-c2a1a"
+            }
+          ]
+        },
+        {
+          "id": "p31",
+          "controlling_idea": "Adyen reported net revenue of €1,302.9 million on €803.8 billion of processed volume for the first half of 2026 and a take rate of 16.2 basis points.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "statistic",
+              "what": "'Net revenue was €1,302.9 million, up 19% year-on-year'; 'Processed volume was €803.8 billion, up 24% YoY' (press release, 2026-08-13). 'Take rate landed at 16.2 bps, reflecting expected volume tiering as enterprise merchants process at larger scale on our infrastructure' (H1 2026 Shareholder Letter, unaudited).",
+              "shows": "A dated, defined take rate exists for one of the two companies; it is far below the indicative 0.60% markup, so most volume pays less than list.",
+              "source": "https://www.adyen.com/press-and-media/adyen-publishes-h1-2026-financial-results-3wjne; https://investors.adyen.com/financials/h1-2026-c2a1a; https://www.adyen.com/press-and-media/adyen-publishes-h2-2025-financial-results-3pgu2"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The two definitions.",
+            "introduces": "The company that publishes both figures.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p32",
+          "controlling_idea": "Stripe is private and publishes total volume ($1.9 trillion for 2025) but no revenue for the company, so its take rate cannot be computed from public figures.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe 2025 annual letter: 'Last year, businesses running on Stripe generated $1.9 trillion in total volume, up 34% from 2024, and equivalent to roughly 1.6% of global GDP'; 'Stripe remained robustly profitable'. The letter gives no revenue or net revenue figure for the company (its one revenue number is a run rate for the Revenue suite) and does not define total volume.",
+              "shows": "The numerator of a take rate is missing, and the denominator is undefined.",
+              "source": "Stripe, 2025 annual letter, 2026-02-24, https://stripe.com/en-nl/annual-updates/2025"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The listed company that reports revenue and take rate.",
+            "introduces": "The private company that reports volume only.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p33",
+          "controlling_idea": "The two volumes are in different currencies, defined differently and drawn from different customers, and a take rate falls as customers get larger, so none of these figures ranks one company against the other.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "statistic",
+              "what": "Adyen 2025: processed volume 'up 21% excluding a single large-volume customer, or 8% YoY including this customer', while net revenue rose 18%.",
+              "shows": "Volume and revenue can move apart by ten points in a year because the largest customers pay the lowest rates; a lower take rate is not a lower price for a given merchant.",
+              "source": "Adyen, H2 2025 results press release, 2026-02-12, https://www.adyen.com/press-and-media/adyen-publishes-h2-2025-financial-results-3pgu2"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "One company's net revenue and take rate, the other's volume.",
+            "introduces": "Why they cannot be set against each other.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "On the public record the two companies differ in their default price, in what they publish about failed and disputed payments, in whether features depend on the pricing plan, and in what they report about their own earnings.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "PE-3",
+          "PE-5",
+          "PE-6"
+        ],
+        "how": "Collects the documented differences of the preceding sections into one table and says what an integrator should do differently on each provider."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "The documented facts about each company's pricing, fees, features and reporting, and the limits of the record.",
+        "introduces": "The same facts side by side, with the author's reading in a separate column.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p39",
+          "controlling_idea": "Six documented differences separate the two companies, and the last column of the table is the author's inference from them.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Table: aspect | Stripe | Adyen | what the difference suggests. Rows: published default card price; the other model; refunds on the price list; dispute fee; features tied to the pricing plan; reported financials.",
+              "shows": "Every Stripe and Adyen cell repeats a fact cited earlier in the chapter or says 'Not public'."
+            }
+          ]
+        },
+        {
+          "id": "p40",
+          "controlling_idea": "On Stripe, ask which features and reports change if you move to IC+ and what the optimization bundle then costs; on Adyen, ask for the markup, the minimum invoice and the chargeback fee in writing, and build the fee reconciliation the pass-through statement makes possible.",
+          "function": "recommendation",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The six differences.",
+            "introduces": "What an integrator does differently on each provider because of them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "larkfield-fee-stack",
+      "heading": "In Practice at Larkfield: The Fee Stack on Mila's €120",
+      "controlling_idea": "Split to the cent, Mila's €120 shows that Larkfield's two providers' prices can be compared only after the network costs are added to one and subtracted from the other, and that the answer changes with the card.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "PE-1",
+          "PE-3",
+          "PE-4"
+        ],
+        "how": "Applies the three parts and the two models to the ledger's recurring payment with labeled illustrative figures, then to Bram's disputed payment."
+      },
+      "flow": {
+        "pattern": "small_to_large",
+        "additional_patterns": [
+          {
+            "pattern": "chronological",
+            "applies_to": "p45: after the forward payments, the payment that was taken back"
+          }
+        ],
+        "rationale": "One payment on one provider, the same payment on the other, then the card mix across all payments; the disputed payment comes last because it reuses the split and adds the backward cost, and because the conclusion returns to it."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The comparison of the two companies and the advice that follows from it.",
+        "introduces": "The same comparison done with Larkfield's figures on one payment.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p41",
+          "controlling_idea": "Every figure in this section is illustrative: Larkfield is fictional, its negotiated rates are assumptions, and scheme fees are not public.",
+          "function": "context",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Mila's pass, 9 March 2027: €120.00 with a Dutch Visa debit card (a consumer debit card, so the 0.2% cap applies) at Studio Noord, on Adyen; Larkfield's fee €2.53; the studio receives €117.47.",
+              "shows": "Recalls the ledger amounts the split starts from.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ]
+        },
+        {
+          "id": "p42",
+          "controlling_idea": "On Adyen the €0.61 provider cost on Mila's pass is €0.24 of interchange, €0.06 of scheme fees and €0.31 for Adyen, which leaves Larkfield €1.92.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Table: who is paid | for what | amount | basis. Mila's bank €0.24 (0.2% cap, assumed charged in full); Visa €0.06 (assumption); Adyen €0.31 (assumed negotiated processing fee €0.11 plus markup €0.20, about 0.17%); Larkfield €1.92; Studio Noord €117.47. At Adyen's indicative public price the provider cost would be about €1.13.",
+              "shows": "Splits the ledger's €0.61 into the three parts and shows which numbers are law, which are assumptions and which are list prices.",
+              "source": "Larkfield scenario ledger (fictional); Regulation (EU) 2015/751, OJ L 123, 2015-05-19, http://publications.europa.eu/resource/celex/32015R0751 (evidence age: 11 years; in force); Adyen, Pricing, n.d., accessed 2026-11, https://www.adyen.com/pricing"
+            },
+            {
+              "kind": "figure",
+              "what": "Figure: a €120 bar divided into €117.47 for the studio, €1.92 for the platform, €0.31 for the provider, €0.24 for the customer's bank and €0.06 for the card network.",
+              "shows": "Shows how small the three network and provider parts are next to the platform's own fee."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The warning that the figures are illustrative.",
+            "introduces": "The split on the provider Studio Noord uses.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p43",
+          "controlling_idea": "Had Studio Noord been on Stripe, Larkfield's statement would show one fee, €0.87 at its assumed negotiated blended rate or €2.05 at the public list price, with the same €0.24 and €0.06 inside it and unseen.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Assumed negotiated Stripe rate for standard EEA cards: 0.6% + €0.15 = €0.87 on €120, leaving Larkfield €1.66; public list 1.5% + €0.25 = €2.05, leaving €0.48.",
+              "shows": "The blended fee is larger than Adyen's markup and smaller than it looks, because it contains the network costs.",
+              "source": "Larkfield scenario ledger (fictional); Stripe, Pricing (Netherlands, English), n.d., accessed 2026-11, https://stripe.com/en-nl/pricing"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The itemized cost on Adyen.",
+            "introduces": "The single fee the same payment would carry on Stripe.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p44",
+          "controlling_idea": "Across Larkfield's card mix the like-for-like comparison is Adyen's €0.31 against what Stripe keeps after network costs, about €0.53, and it reverses for a card outside the caps.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Card mix 70% debit (ledger), the rest assumed consumer credit: average interchange at the caps 0.7 × €0.24 + 0.3 × €0.36 = €0.28; Adyen cost €0.28 + €0.06 + €0.31 = €0.65; Stripe €0.87 flat, of which about €0.53 is Stripe's. For a commercial card with an assumed 1.5% interchange (€1.80), Adyen's cost becomes €2.17 while the assumed blended rate stays €0.87 unless the contract has a premium tier.",
+              "shows": "Demonstrates the method for comparing a blended quote with a pass-through quote for a stated card mix, and the condition under which the cheaper one changes.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "One payment priced on each provider.",
+            "introduces": "The comparison across the card mix, and where it flips.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p45",
+          "controlling_idea": "Applied to the one payment in the ledger that came back, the same split shows that Bram's disputed €120 cost slightly more on the way in, because a credit card's interchange cap is higher, and that the chargeback then added €120 and €15 on the way back.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Bram's pass, 2 February 2027, Dutch Mastercard credit card, Studio Noord on Adyen: interchange up to €0.36 (0.3% cap), scheme fees €0.06 (assumption), Adyen €0.31, provider cost €0.73, Larkfield €1.80, studio €117.47; on 24 February the chargeback takes €120.00 and a €15.00 dispute fee (illustrative), carried by the studio under Larkfield's terms.",
+              "shows": "Prices the payment the part opened with, so the conclusion can return to it.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Payments that stayed paid.",
+            "introduces": "The one payment in the ledger that came back.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "Set side by side, the payment's timeline and its fee stack are one picture: each party that makes a promise on the way forward (the issuer, the network, the acquirer or provider) takes a share of the fee for it, and each backward flow sends a new cost to whoever was left holding the promise, usually the merchant. A provider's pricing model decides how much of that picture the merchant is shown.",
+    "so_what": "A reader can cost a payment before choosing a provider, including its declines, late captures, refunds and disputes, will not compare a blended rate with a pass-through markup as if they measured the same thing, and knows to ask which features and reports depend on the pricing plan.",
+    "callback": {
+      "to": "The introduction's question about Bram de Wit's €120: who was paid what on 2 February, and what the €15 of 24 February was.",
+      "how": "The reader can now name each party that said yes, what each was paid for saying it (the issuer its interchange, the network its scheme fee, Adyen its markup, Larkfield its platform fee), and why none of those yeses stopped the €120 and a €15 fee being taken back: the dispute right belongs to the cardholder and outlasts them all."
+    },
+    "takeaway": {
+      "type": "provocative_insight",
+      "content": "Part I treated the issuer's yes as given. It is not: the same payment can be approved or declined depending on how the provider reaches the networks and how it models the payment, which is the subject of Part II."
+    },
+    "hand_off": {
+      "to": "part-2",
+      "relationship": "elaboration",
+      "carries_over": "The whole chain of promises and what each party is paid for carrying its promise, with the issuer's approval taken as given.",
+      "introduces": "What decides whether the issuer says yes at all: how the provider reaches the networks and how it models the payment."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The fee on Mila's and Bram's payments split among the parties.",
+      "introduces": "What the split shows when it is laid on the timeline of the previous four chapters.",
+      "form": "sentence",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p46",
+        "controlling_idea": "Laid on one line, the four promises of a card payment and the three parts of its fee are the same picture: each party that says yes is paid for it, and each backward flow adds a cost for whoever is left holding the promise, as Bram's €120 shows.",
+        "function": "synthesis",
+        "evidence": [
+          {
+            "kind": "figure",
+            "what": "Figure: a timeline with four markers (authorization, clearing and settlement, payout, dispute window) and, under each, the party that is paid there.",
+            "shows": "The part's closing image: promises above the line, payments below it."
+          }
+        ]
+      },
+      {
+        "id": "p47",
+        "form": "list",
+        "controlling_idea": "Established: a card fee is interchange, scheme fees and markup; the networks set default interchange and do not earn it; EU law caps consumer interchange at 0.2% and 0.3% and makes unblended pricing the default offer; failed and backward flows carry their own charges.",
+        "function": "synthesis",
+        "transition_in": {
+          "relationship": "elaboration",
+          "carries_over": "The one-line picture.",
+          "introduces": "The parts of it the field agrees on, with their sources.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p48",
+        "form": "list",
+        "controlling_idea": "Depends on context: which pricing model is cheaper turns on card mix, volume and who can audit a statement; the US debit cap depends on litigation not finished in November 2026; a take rate describes a customer base, not a quote.",
+        "function": "synthesis",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is established.",
+          "introduces": "What changes with the situation.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p49",
+        "form": "list",
+        "controlling_idea": "The author's synthesis: treat the pricing model as part of the architecture, and never compare a blended rate with a markup before adding the network costs back.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is established and what depends on context.",
+          "introduces": "The author's own judgement, labeled as such.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p50",
+        "form": "list",
+        "controlling_idea": "Eight questions let the reader take the chapter into a provider evaluation or a design review.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The take-aways.",
+          "introduces": "Questions that apply them.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p51",
+        "controlling_idea": "Part I took the issuer's yes as given; Part II asks what decides it.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "elaboration",
+          "carries_over": "The chain of promises and what each party earns, with the approval assumed.",
+          "introduces": "The approval itself, unpacked as something a provider's connections and models can change.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "How interchange qualification, clearing records and net settlement work",
+      "covered_in": [
+        "clearing-and-settlement"
+      ]
+    },
+    {
+      "topic": "The dispute process, deadlines and monitoring programs behind the dispute fee",
+      "covered_in": [
+        "refunds-reversals-and-disputes"
+      ]
+    },
+    {
+      "topic": "Why issuers decline and how providers raise approval rates; least-cost debit routing as a routing technique",
+      "covered_in": [
+        "authorization-optimization",
+        "payment-routing-and-orchestration"
+      ]
+    },
+    {
+      "topic": "How fees are netted or invoiced against a balance and reconciled",
+      "covered_in": [
+        "balances-and-funds-flows",
+        "payment-reconciliation-and-reporting"
+      ]
+    },
+    {
+      "topic": "Platform fees, splits and who funds a loss on a platform",
+      "covered_in": [
+        "platform-payment-models",
+        "splits-balances-and-platform-payouts"
+      ]
+    },
+    {
+      "topic": "Pricing of payment methods other than cards (iDEAL, direct debit, wallets, buy-now-pay-later)",
+      "covered_in": [
+        "local-payment-methods"
+      ]
+    },
+    {
+      "topic": "The two companies' strategies and valuations",
+      "covered_in": [
+        "case-stripe",
+        "case-adyen",
+        "stripe-and-adyen-bets-compared"
+      ]
+    },
+    {
+      "topic": "An estimate of Stripe's revenue or take rate"
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "Has the Eighth Circuit's mandate in Corner Post issued, and was rehearing or certiorari sought? The chapter states the position as of 17 November 2026.",
+    "What was the outcome of the final-approval hearing on the US credit interchange settlement? Not found; the chapter says 'preliminarily approved'.",
+    "UK interchange after Brexit and UK–EEA cross-border rates were not researched; the chapter says so.",
+    "Does Adyen charge its fixed processing fee on refused transactions? The pricing page says 'for each transaction' and no more.",
+    "Stripe's Netherlands price list does not use the words 'per successful' for online card payments (it does for Klarna, Terminal and Authorisation Boost); the US list could not be re-fetched from this location. The article therefore does not claim that a declined attempt is free on Stripe; the journal-spec thesis wording was corrected to match on 17 November 2026.",
+    "Do either provider's fees on the original sale come back when a dispute is lost or won? Not stated on the pages read for disputes."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "Open with Bram de Wit's €120 from the part opening, so that this chapter's callback is also the part's closing callback.",
+      "rejected": [
+        "Open with Mila's pass and bring Bram in only at the end, which would make the part's callback a new element in the conclusion."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Put the cost of failed and backward flows before the company comparison instead of after the Larkfield example, because the comparison table has rows on refunds and dispute fees.",
+      "rejected": [
+        "The style guide's default position for 'When it goes wrong', after 'In practice'."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Give Larkfield assumed negotiated rates on both providers (Adyen: €0.11 + about 0.17% over cost; Stripe: 0.6% + €0.15 blended) so that the ledger's €0.61 can be split, and show the public list prices beside them.",
+      "rejected": [
+        "Use list prices only, which contradicts the ledger's €0.61 and overstates what a platform of Larkfield's volume would pay."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Keep the US credit interchange settlement to one sentence from Visa's annual report, since its terms are known only from trade press and it is not final.",
+      "rejected": [
+        "A paragraph on the settlement's reported terms."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Add the Authorisation Boost pricing line from Stripe's pricing page (fetched 17 November 2026) as a second documented link between pricing plan and features.",
+      "rejected": [
+        "Rest the section on the five IC+ features alone."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "PLAN.md, contract for 05-payment-economics",
+      "contributed": "Scope, owned terms, the Larkfield thread."
+    },
+    {
+      "kind": "internal",
+      "ref": "journal-spec.json, entry payment-economics and part-1 closing",
+      "contributed": "Intent, acceptance criteria, thesis, role, the part's closing this chapter carries."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-card-lifecycle-and-networks.md, Part 5 and sections 2.2, 2.3, 2.4, 4.1, 4.8",
+      "contributed": "Tagged claims on interchange, caps, scheme fees, pricing, reporting, behavioral fees and dispute fees."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-companies-and-bets.md, sections 1.3, 2.3, 3.5",
+      "contributed": "Adyen's metric definitions and figures, Stripe's disclosure."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "Mila's pass, the €120 dispute, Larkfield's 2026 figures and cast."
+    },
+    {
+      "kind": "external",
+      "ref": "https://stripe.com/en-nl/pricing (n.d., fetched 2026-11-17)",
+      "contributed": "Card prices, dispute fees, IC+ as custom pricing, Authorisation Boost pricing."
+    },
+    {
+      "kind": "external",
+      "ref": "https://www.adyen.com/pricing (n.d., fetched 2026-11-17)",
+      "contributed": "Interchange++ pricing, processing fee, indicative prices, minimum invoice."
+    },
+    {
+      "kind": "external",
+      "ref": "http://publications.europa.eu/resource/celex/32015R0751 (2015-05-19, fetched 2026-11-17)",
+      "contributed": "Caps, scope, unblending, per-transaction information."
+    },
+    {
+      "kind": "external",
+      "ref": "Visa Form 10-K filed 2026-11-05; Mastercard Form 10-K filed 2026-02-11 (both fetched 2026-11-17)",
+      "contributed": "Who sets interchange and the merchant's price; kinds of network revenue; status of US regulation and litigation."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen H1 2026 press release and Shareholder Letter (2026-08-13); H2 2025 press release (2026-02-12); Stripe 2025 annual letter (2026-02-24), all fetched 2026-11-17",
+      "contributed": "Net revenue, processed volume, take rate; total volume."
+    },
+    {
+      "kind": "external",
+      "ref": "docs.stripe.com: extended-authorization, incremental-authorization, multicapture, overcapture, partial-authorization, analytics/optimization, refunds; docs.adyen.com: adjust-authorisation, visa-integrity-fees, refusal-reasons (n.d., fetched 2026-11-17)",
+      "contributed": "IC+ features, cost-saving reporting, refund fees, late-capture and retry costs."
+    },
+    {
+      "kind": "external",
+      "ref": "Federal Reserve Regulation II pages (2024-05-17, 2025-12-19); Consumer Finance Monitor 2026-10-28 and ABA Banking Journal 2026-11-03 (secondary), fetched 2026-11-17",
+      "contributed": "US debit cap, routing rule, 2024 averages, the Corner Post ruling."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "First version, written from the PLAN contract, the journal spec entry and the cards and companies research briefs."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 72 claims checked (61 confirmed, 4 corrected, 2 hedged, 0 unsupported and removed or relabeled, 0 unreachable; 3 not checked and 2 negatives confirmed only by search, listed in _research/verification/05-payment-economics.md); the most significant fix: the article said Stripe's 2025 letter gives no revenue figure, and it now says the letter gives none for the company and quotes its one product-family run rate. thesis.how_why still says 'per successful payment', which Stripe's Dutch price list does not say for online cards; it must change together with the journal spec."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('charges 1.5% + €0.25 per successful payment on a standard Eu' -> 'prices a standard European Economic Area card at 1.5% + €0.2')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation after verification: journal-spec entry and spec body brought into line with the verified page and consistency rulings (journal entry thesis.how_why (ch5 verification row 64: one product-family run rate is published) re-synced; ch5 verification row 64; stale open question closed). No unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: 11 statements of absence re-tested with a wide search (0 overturned, 5 narrowed, 6 hold; table in _research/absence-audit/05-payment-economics.md). Narrowed: Stripe's pricing policy defines the blended and IC+ models and the markup without its size; Adyen's terms call the chargeback fee non-refundable; Adyen publishes a minimum invoice for Australia only."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Ruling 46(f) applied: the one published Adyen chargeback fee (CAD 24.00, Adyen Canada's fee disclosure) is named in both tables and the limits paragraph."
+    }
+  ],
+  "length": {
+    "target_words": 5200,
+    "max_words": 6500
+  }
+}

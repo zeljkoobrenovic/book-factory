@@ -1,0 +1,564 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "part-9",
+  "journal": "payments-platform-architecture",
+  "part": "part-9",
+  "title": "Part IX — JOURNEYS: One Payment, End to End",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "basis": "Written on 2026-11-17 from the part-9 entry and the part thesis, opening and flow in journal-spec.json, the scenario ledger, consistency rulings 10, 12, 14, 17, 22 and 24 to 29, and a full reading of the four written journeys of Part IX. The page makes no external factual claim of its own: every statement about Stripe, Adyen, a network or a regulation repeats one a journey makes and cites.",
+  "intent": {
+    "outcome": {
+      "know": [
+        "Part IX follows four payments in order: Mila's €120 class pass with nothing going wrong; her €49 renewal that is declined and collected three days later; the same pass as a platform payment with an €84 refund after the studio was paid; and a €120 chargeback raised by another member, Bram de Wit.",
+        "Each journey is a narrative with a step table and one sequence figure, told on Adyen (Studio Noord's provider) with the Stripe record for the same step beside it, and each step links to the chapter of Parts I to VIII that owns its mechanism.",
+        "The part's claim: every mechanism can work and the payment can still go wrong, because the failures occur at the hand-offs, where a promise is taken for a finished fact."
+      ],
+      "can_do": [
+        "Pick the journey that matches the payment, renewal, refund or dispute they need to trace, and read a step table row as party, record, promise and failure."
+      ]
+    },
+    "audience": {
+      "who": "Engineers and architects new to payments who have read Parts I to VIII and are about to start the journeys, or who arrive with one payment, renewal, refund or dispute of their own to trace and want the journey that matches it.",
+      "already_knows": [
+        "What an API, a webhook, a retry, a ledger entry and a reconciliation are.",
+        "Parts I to VIII: each mechanism of a payment in its own chapter, from authorization to payout, billing, the platform account model and operating at scale.",
+        "Larkfield in outline: a fictional studio-software platform that uses Stripe and Adyen, its incidents and its 2027 repair program Keel."
+      ],
+      "does_not_know": [
+        "What passes from one mechanism to the next on a single payment, and which later record confirms each step.",
+        "The four payments the journeys follow, their dates and amounts, and why they are read in an order that is not the calendar's."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "A reader of this page alone can name the four journeys' subjects in reading order and say what form each takes.",
+        "check": "intro_predicts_content",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "After reading only this page: what will each of the next four chapters follow, in order, and in what form?",
+        "expected": "Mila's €120 class pass from her tap at 19:42 on 9 March 2027 to the studio's payout on 11 March and its reconciliation, with nothing failing; her €49 monthly renewal, declined on 1 April 2027 and collected on 4 April, plus the branch where it is never collected; the pass as a payment divided among studio, platform and provider, then an €84 refund on 18 March after the studio was paid; Bram de Wit's €120 payment of 2 February charged back on 24 February, through evidence, deadline, outcome and ledger. Each as a narrative with a step table and a sequence figure, on Adyen with the Stripe equivalent alongside."
+      },
+      {
+        "id": "AC-2",
+        "statement": "A reader of this page alone can say what to look for while following a journey.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "minor",
+        "probe": "Using only this page: what should a reader watch for in each row of a journey's step table, and why does the part show two providers?",
+        "expected": "At each row: which party acts, what record it leaves, what that record promises, and which later record confirms or corrects it; the failures to look for are at the hand-offs between rows, not inside a row. Two providers are shown because Adyen and Stripe report the same step through different records at different moments, so an integration that waits for the right record on one waits for the wrong one on the other."
+      }
+    ]
+  },
+  "thesis": {
+    "question": "What do four payments followed from start to finish show about where a payment system fails that the chapters on single mechanisms could not?",
+    "claim": "Four payments at Larkfield (Mila's €120 class pass, her declined €49 renewal, the €84 refund after payout and Bram de Wit's €120 chargeback) each cross mechanisms owned by several parties, and every failure the four journeys show appears at a hand-off: the point where one mechanism's answer (an approval, a decline, a payout, a payment marked complete) is taken by the next system as final. The journeys run without loss where each hand-off carries a shared reference and is followed by a later record that confirms or corrects the earlier answer; Adyen and Stripe put those later records in different places, so an integration written for one misreads the other.",
+    "disputed_by": "The view that a payment system is the sum of its mechanisms: if tokenization, authorization, the ledger, the webhook receiver, the billing job and the payout each work and each is tested, the payment works, and an end-to-end failure must be a defect inside one of them or at the provider.",
+    "so_what": "A team that accepts the claim reviews its payments by walking one payment through every system in order, not by testing components, and spends first on references, pending-state sweeps and reconciliations. Five of Larkfield's Keel decisions are of this kind: one key per business event (K1), the provider's record over the webhook (K2), a ledger entry for every movement with a reconciliation of both providers run when each one's reports are ready (K3), renewals paced and retried by decline code (K5) and verification kept as state (K6). Keel adds no orchestration product (K8).",
+    "how_why": "The mechanisms run on different clocks and belong to different parties: the wallet, the provider's risk and authentication checks and the issuer answer in seconds; clearing and network settlement take days; a payout is a bank transfer; a refund can fail days after it was accepted; a chargeback can arrive about four months later. Each step can tell the next only what it knows when it finishes, which is a promise. Whether the promise was kept is reported later by another record: a webhook, a settlement report, a balance movement, a dispute event. A system that stops listening after the first success message is wrong without any component having failed. The two providers expose the later records differently, as documented in 2026: Stripe as objects with a status that can be fetched (PaymentIntent, Invoice, Dispute), Adyen as events and report lines keyed by a PSP reference, with provisional bookings such as a chargeback reversal shown as separate events.",
+    "supporting_claims": [
+      {
+        "id": "P9-1",
+        "claim": "On the path with no failure, a card payment is twelve steps (checkout, tokenization, risk scoring, authentication, authorization, capture, clearing, settlement, ledger entries, split, payout, reconciliation); the first eleven each end in a promise by the party that ran them, the customer's 'Payment successful' reports the fifth, and the merchant's money is established only by the twelfth."
+      },
+      {
+        "id": "P9-2",
+        "claim": "A declined renewal is an open debt with a clock, not a failed payment: the decline code and the network's retry limits decide whether and when to try again, and the state of the membership in between has to be held by the billing side, which on Stripe Billing is an invoice the provider owns and on Adyen is the merchant's own scheduler."
+      },
+      {
+        "id": "P9-3",
+        "claim": "On a platform the split is an instruction attached to the payment, but a refund after payout is debited from a balance the payout already emptied, and the account model chosen at integration decides whose balance goes short and who stands behind it."
+      },
+      {
+        "id": "P9-4",
+        "claim": "A chargeback reopens a payment that every system had closed: the money and a fee are debited before the issuer rules, the merchant gets one submission against a deadline, the dispute counts toward the network's monitoring ratio whatever the outcome, and who carries the loss was decided when the payment was made."
+      },
+      {
+        "id": "P9-5",
+        "claim": "In all four journeys Adyen and Stripe place the confirming record at a different point and in a different form (events and report lines keyed by a reference against objects with a fetchable status; a payment retried against an invoice retried; chargeback logic on the payment against a charge type), so each journey has to be read once per provider."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Performs the part's opening: the €412,000 difference of year-end 2025 as the hook, the part thesis in three points, the form every journey shares, the reason each is shown on both providers, and the reading order with the reason the order is not the calendar's.",
+    "supports": []
+  },
+  "flow": {
+    "pattern": "large_to_small",
+    "additional_patterns": [
+      {
+        "pattern": "prerequisite_order",
+        "applies_to": "chapters: the four journey paragraphs, in the part's reading order"
+      }
+    ],
+    "rationale": "The page opens on one unexplained number, widens it into the part's claim, and then narrows. The hook comes first because it is the part's evidence that a system can be wrong with no failed payment. The bridge follows because the reader must know that Parts I to VIII taught mechanisms one at a time before being told the part teaches none and reassembles them. The claim (failures sit at hand-offs; a success message is a promise) has to precede the description of the step table, because the table's columns are the claim turned into a reading device: a reader told about 'promise made' and 'what can fail here' before the claim would see four arbitrary columns. The two-provider point belongs with the table because it answers the next question the table raises, why each row is shown twice. The evidence paragraph precedes the roadmap and the chapter list because those state documented provider behavior and illustrative Larkfield figures, and the reader should know first which is which. The roadmap gives the order and the reason it is not the calendar's; the four chapter paragraphs keep that order, which the journal spec justifies as each journey reusing what the one before set up."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "At year-end 2025 every payment in Larkfield's records had the right status, yet its books said it owed its studios €412,000 more than the two providers' balances showed. The difference was found in January 2026 and took three weeks to trace to refunds made after payout, chargeback fees and a currency-conversion rounding rule. None of the three was a payment that had failed."
+    },
+    "bridge": {
+      "from_reader_world": "Parts I to VIII, which explained one mechanism per chapter and showed where on one payment each sits, ending with Part VIII's rule that a money path must be correct before it is available.",
+      "to_topic": "The same mechanisms in the order a payment meets them: four payments at Larkfield followed through every party and system, to show what passes from each step to the next and what does not."
+    },
+    "thesis_statement": {
+      "text": "Every failure the four journeys show appears at a hand-off, where one mechanism's answer is taken by the next system as final; a success message reports a promise, the news of whether it was kept comes later in another record, and Adyen and Stripe put that later record in different places.",
+      "placement": "KEY POINTS bullets 1 to 3; paragraph p03 states the claim and p04 the two-provider half of it."
+    },
+    "roadmap": {
+      "placement": "paragraph p06",
+      "promises": [
+        {
+          "promise": "Four journeys, read in the order of what each adds and not by the calendar, with the dispute last although its payment was made first; the chapter list names each journey and its payment.",
+          "kept_in": [
+            "chapters"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "At year-end 2025 Larkfield's books said it owed its studios €412,000 more than its two providers' balances showed, although every payment had the right status; the three causes found in January 2026 were refunds after payout, chargeback fees and a rounding rule, and none was a failed payment.",
+        "function": "example",
+        "organization": "illustration",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Larkfield (fictional), the Unexplained €0.4 Million: at year-end 2025 the ledger's 'owed to studios' balance was €412,000 higher than the two providers' balances; found and traced in January 2026 over three weeks to refunds after payout, chargeback fees and a currency-conversion rounding rule. Chapter 12 owns the breakdown.",
+            "source": "_research/scenario-ledger.md (Incidents; Additions: 12-payment-ledgers); consistency-issues ruling 24; payment-ledgers",
+            "shows": "A payment system can be wrong by a large amount without one failed payment, which single-mechanism chapters cannot explain."
+          },
+          {
+            "kind": "figure",
+            "what": "Figure 1: a row of payment records all marked with a check, and beside it two stacks, 'Books' and 'Providers', whose tops differ by a gap tagged '€412,000', with three small items in the gap: a refund slip, a fee tag and a rounding symbol.",
+            "shows": "The hook as a picture: every payment correct, the two totals apart, three later movements in between."
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "Parts I to VIII explained one mechanism per chapter; Part IX teaches no new mechanism and instead follows four payments at Larkfield through every party and system in the order the payment meets them, to show what passes from each step to the next.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "The part's bridge and transition_in: the mechanisms of Parts I to VIII each taught in its own chapter, ending with Part VIII's rule that a money path must be correct before it is available; Part IX as four single payments followed through all of them at once. Each journey says of itself that it teaches no new mechanism.",
+            "source": "journal-spec.json, part-9 opening.bridge and transition_in; journey-card-payment; consistency-issues ruling 10",
+            "shows": "What the reader already holds and what kind of reading the part asks for."
+          }
+        ],
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "The €412,000 that no failed payment explains.",
+          "introduces": "Why the earlier chapters could not show it, one mechanism at a time, and what Part IX does instead.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "The part's claim is that every failure the four journeys show appears at a hand-off, where one mechanism's answer is taken by the next system as final: the mechanisms belong to different parties on different clocks, so each step passes on a promise, and whether it was kept is reported later by another record.",
+        "function": "claim",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "The part thesis and its how_why: approvals in seconds, clearing and settlement in days, a chargeback up to about four months later (120 days in journey-card-payment and journey-dispute); each step can tell the next only what it knows when it finishes; a system that stops listening after the first success message is wrong without any component having failed.",
+            "source": "journal-spec.json, part-9 thesis (claim, how_why); journey-card-payment; journey-dispute",
+            "shows": "Why the failures sit between mechanisms and not inside them."
+          },
+          {
+            "kind": "figure",
+            "what": "Figure 2: four horizontal chains of boxes, labeled 'Pass', 'Renewal', 'Refund' and 'Dispute'; the boxes carry check marks and the joints between boxes are marked in orange, with one label 'Hand-off'.",
+            "shows": "The part's shape: four payments, each a chain of working mechanisms, with attention on the joints."
+          }
+        ],
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "Four payments followed through every system in order.",
+          "introduces": "What following them shows: the failures are at the hand-offs, and why.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "controlling_idea": "Every journey has the same form (a narrative, a sequence figure and a step table, set up in the first journey, whose rows name the party, the record, the promise and the failure, with the owning chapter), is read by asking which later record confirms each row, and is told on Adyen with the Stripe record beside it because the two providers report the same step through different records at different moments.",
+        "function": "description",
+        "evidence": [
+          {
+            "kind": "fact",
+            "what": "The step table of the four journeys: Step | Party or system | Message or record | Promise made | What can fail here → chapter; each journey told on Adyen, Studio Noord's provider, with the Stripe record alongside.",
+            "source": "journey-card-payment ('The Twelve Steps in One Table'); journey-failed-renewal; journey-platform-payment; journey-dispute",
+            "shows": "The reading device the reader will meet four times."
+          },
+          {
+            "kind": "fact",
+            "what": "As the journeys document: Stripe exposes the later records as objects whose status can be read again (PaymentIntent, Invoice, Refund, Dispute); Adyen as events and report lines keyed by the PSP reference, with no call in the Checkout API that returns a payment.",
+            "source": "journey-card-payment ('Had Studio Noord Been on Stripe'); journey-platform-payment; journey-dispute; consistency-issues rulings 12 and 29",
+            "shows": "Why an integration that waits for the right record on one provider waits for the wrong one on the other."
+          }
+        ],
+        "transition_in": {
+          "relationship": "elaboration",
+          "carries_over": "The claim that a promise is confirmed or corrected by a later record.",
+          "introduces": "The form that makes it checkable row by row, and the reason every row is shown for two providers.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p05",
+        "controlling_idea": "The journeys quote the two providers' documentation as read in November 2026 and say where it stops: the pairing of the two vocabularies is the book's own, interbank timing is industry practice, Mastercard's rules could not be read, and Adyen's chargeback fee is set by contract.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "fact",
+            "what": "As the journeys state: the pairing of Adyen's and Stripe's terms is the book's mapping and neither company publishes one (journey-platform-payment, journey-dispute); no cut-off times or settlement cycles were found in Visa's rule text, so clearing and settlement timing is industry practice (journey-card-payment); Mastercard's rule documents were not readable (journey-failed-renewal, journey-dispute); Adyen's terms (clause 8.2) leave the chargeback fee amount to the merchant agreement and the only published amount is CAD 24.00 in Adyen Canada's fee disclosure, so €15.00 is illustrative (journey-dispute; ruling 46f).",
+            "source": "journey-card-payment; journey-failed-renewal; journey-platform-payment; journey-dispute; consistency-issues ruling 17",
+            "shows": "The reader knows before the chapter list which statements are documented and which are the book's mapping or illustration."
+          }
+        ],
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "The two providers' records, shown side by side.",
+          "introduces": "How far the public record behind those records goes.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p06",
+        "controlling_idea": "The four journeys are read in the order of what each adds, not by the calendar: the disputed payment was made first, on 2 February 2027, and comes last because a chargeback debits a balance the reader should first see filled, paid out and refunded.",
+        "function": "transition",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "The part's flow rationale: each journey reuses what the one before set up; the disputed payment (2 February 2027) and its chargeback (24 February) precede the pass (9 March), the refund (18 March) and the renewal (1 April), but a chargeback debits a balance the reader should first see filled, paid out and refunded.",
+            "source": "journal-spec.json, part-9 flow.rationale and opening.roadmap; _research/scenario-ledger.md",
+            "shows": "The order is a dependency order, so the reader has a reason to read the journeys in sequence."
+          }
+        ],
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The claim, the form and the limits of the evidence.",
+          "introduces": "The four journeys in reading order and why that order is not chronological.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "chapters",
+      "heading": "Chapters in this part",
+      "controlling_idea": "Each of the four journeys answers one question about one payment at Larkfield, shows one kind of hand-off, and relies on the journeys before it.",
+      "function": "description",
+      "advances_thesis": {
+        "supports": [
+          "P9-1",
+          "P9-2",
+          "P9-3",
+          "P9-4",
+          "P9-5"
+        ],
+        "how": "Each paragraph introduces the journey that argues one of the part's supporting claims and names the provider difference it shows, so the list is the part's argument in outline."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "additional_patterns": [
+          {
+            "pattern": "small_to_large",
+            "applies_to": "p07 to p10: one payer and one payment that succeeds; the same payer over time; three parties and money going back by choice; money going back by force months later"
+          }
+        ],
+        "rationale": "The part's own reading order, as the journal spec declares it. Journey 1 sets up the step table and the twelve forward steps on a payment where nothing fails. Journey 2 keeps the payer and removes her presence and the approval, so its steps read as departures from a path already walked. Journey 3 opens the split and payout rows that Journey 1 only named and runs money backward by choice. Journey 4 runs money backward by the issuer's choice and needs Journey 3's balances to say whose account is debited; it also carries the part's closing. Putting the dispute first, as the calendar would, would show a chargeback debiting a balance the reader has not yet seen filled."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The four journeys in reading order (p06).",
+        "introduces": "One paragraph per journey: the question in bold, the Larkfield payment it follows and the difference between Adyen and Stripe it shows.",
+        "form": "sentence",
+        "placement": "end_of_previous"
+      },
+      "paragraphs": [
+        {
+          "id": "p07",
+          "controlling_idea": "Journey 1 answers what happens to one €120 card payment between the tap and the studio's reconciled payout: twelve steps, of which eleven end in a promise, the success message reports the fifth and only the twelfth establishes that the studio's €117.47 arrived.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P9-1",
+              "P9-5"
+            ],
+            "how": "Introduces the journey that sets up the step table on a payment where every hand-off works."
+          },
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield (fictional): Mila Janssen buys a ten-class pass for €120.00 at Studio Noord at 19:42 on Tuesday 9 March 2027; the studio's €117.47 is paid out on Thursday 11 March and the payout is matched by reconciliation.",
+              "source": "journey-card-payment; _research/scenario-ledger.md",
+              "shows": "The payment on which nothing fails."
+            },
+            {
+              "kind": "fact",
+              "what": "As Journey 1 documents: a Stripe PaymentIntent can be retrieved by its ID; Adyen's Checkout API has no call that returns a payment, and a CAPTURE webhook marked successful can be followed days later by CAPTURE_FAILED.",
+              "source": "journey-card-payment; consistency-issues rulings 12 and 29",
+              "shows": "The record to wait for differs by provider."
+            }
+          ]
+        },
+        {
+          "id": "p08",
+          "controlling_idea": "Journey 2 answers who decides whether and when to retry a declined renewal and which system holds the membership meanwhile: Mila's €49 renewal, declined on 1 April 2027 and collected on 4 April, is an open debt with a clock, held by Stripe's invoice on Stripe Billing and by Larkfield's own record on Adyen.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P9-2",
+              "P9-5"
+            ],
+            "how": "Introduces the journey that shows the hand-off between the billing clock and the payment attempt."
+          },
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield (fictional): Mila's €49.00 renewal is declined for insufficient funds on Thursday 1 April 2027 and collected on Sunday 4 April; a second branch follows the renewal that is never collected.",
+              "source": "journey-failed-renewal; _research/scenario-ledger.md",
+              "shows": "Between the two dates no payment record says what the member is."
+            },
+            {
+              "kind": "fact",
+              "what": "As Journey 2 documents: Visa's rules of 24 October 2026 separate codes never to be resubmitted from codes that may be reattempted up to 20 times in 30 days; Stripe Billing retries an invoice it holds; on Adyen the provider can retry a payment and the schedule, membership state and notice are the integrator's.",
+              "source": "journey-failed-renewal; consistency-issues rulings 6 and 19",
+              "shows": "Where the debt lives depends on the provider."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Journey 1's payment, started by Mila and approved the first time.",
+            "introduces": "The same member and stored card with her presence and the approval removed.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p09",
+          "controlling_idea": "Journey 3 answers how the €120 is divided and whose money pays a refund after payout: an instruction on the payment splits it into €117.47 and €2.53, the €84 refund of 18 March comes from a balance the payout emptied, and the account model decides who goes short.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P9-3",
+              "P9-5"
+            ],
+            "how": "Introduces the journey that opens the split and payout rows and runs money backward for the first time."
+          },
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield (fictional): the €120.00 is split into €117.47 for Studio Noord and €2.53 for Larkfield, with an illustrative €0.61 provider cost out of Larkfield's share; on 18 March 2027, a week after the payout of 11 March, €84.00 is refunded out of later sales in the studio's balance; Aylin Demir's question 'whose money pays this?' gets three answers.",
+              "source": "journey-platform-payment; _research/scenario-ledger.md; consistency-issues ruling 26",
+              "shows": "A refund after payout is paid from a balance that no longer holds the payment."
+            },
+            {
+              "kind": "fact",
+              "what": "As Journey 3 documents: on Adyen a refund can be deducted only from the balance accounts the payment credited, with the platform's liable balance account behind a user's negative balance; on Stripe the charge type decides whether the seller's or the platform's balance is debited first.",
+              "source": "journey-platform-payment; consistency-issues ruling 7",
+              "shows": "The account model is the liability model."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "Journey 1's pass, whose split and payout had one row each.",
+            "introduces": "Those two rows opened from the platform's side, and the first money that goes backward.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "controlling_idea": "Journey 4 answers what a chargeback costs in money, deadlines and records and who carries the loss: Bram de Wit's €120 of 2 February 2027 is charged back on 24 February, the money and a fee leave before anyone judges, Larkfield answers once, and who pays was decided at the sale; the journey also closes the part.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P9-4",
+              "P9-5"
+            ],
+            "how": "Introduces the journey that reopens a payment every system had closed, and that carries the part's closing."
+          },
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield (fictional): Bram de Wit's €120.00 pass of 2 February 2027, paid by Mastercard, is charged back on 24 February; €120.00 and an illustrative €15.00 fee leave Studio Noord's balance; the defense is sent on 3 March, the €120.00 is credited provisionally on 5 March and the dispute is won on 12 May.",
+              "source": "journey-dispute; _research/scenario-ledger.md",
+              "shows": "A favorable event is not the outcome, and the fee and the count stay."
+            },
+            {
+              "kind": "fact",
+              "what": "As Journey 4 documents: Adyen gives 40 days to defend a Mastercard chargeback and the submission is irreversible; the networks' monitoring programs count a dispute whatever its outcome; on Adyen the chargeback logic set on the payment decides the balance debited and on Stripe the charge type does.",
+              "source": "journey-dispute; consistency-issues ruling 17",
+              "shows": "Who carries the loss was decided when the payment was made."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Journey 3's refund: money going back because the member asked and the studio agreed.",
+            "introduces": "Money taken back by the cardholder's bank, with a fee, a deadline and a count.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "Where to Begin",
+    "synthesis": "The four journeys can be read as a set or one at a time: a reader tracing a payment, a renewal, a refund or a dispute of their own starts at the matching journey and fills in the same step table.",
+    "so_what": "When a payment goes wrong, the reader looks first for the hand-off at which a promise was taken for a fact and for the later record that would have shown the difference.",
+    "callback": {
+      "to": "The opening's €412,000 difference of year-end 2025 (p01).",
+      "how": "The reader is told that by the end of the part it will read as three kinds of later record that reached a provider's balance and not Larkfield's books, two of which the third and fourth journeys write as ledger entries."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Begin with the first journey, Mila's class pass, on which nothing fails."
+    },
+    "hand_off": {
+      "to": "journey-card-payment",
+      "relationship": "example",
+      "carries_over": "The part introduction's claim that payments go wrong at hand-offs, and the step table it describes.",
+      "introduces": "The first payment walked through that table: Mila's class pass, on which nothing fails, so every hand-off can be seen working."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The four journeys and the payment each follows.",
+      "introduces": "How to use them, alone or as a set, and where to begin.",
+      "form": "sentence",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p11",
+        "controlling_idea": "The journeys can be entered at the one that matches the reader's own case; read through, they turn the opening's €412,000 into three kinds of later record that never reached the books.",
+        "function": "synthesis"
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "Teaching any mechanism of the four journeys; the page summarizes the journeys, which themselves point to the owning chapters of Parts I to VIII.",
+      "covered_in": [
+        "journey-card-payment",
+        "journey-failed-renewal",
+        "journey-platform-payment",
+        "journey-dispute"
+      ]
+    },
+    {
+      "topic": "The part's closing (what the four journeys have in common, set against the €412,000, and the step-table exercise for the reader's own system).",
+      "covered_in": [
+        "journey-dispute"
+      ]
+    },
+    {
+      "topic": "The breakdown of the €412,000 by cause.",
+      "covered_in": [
+        "payment-ledgers"
+      ]
+    },
+    {
+      "topic": "A 'Stripe and Adyen: Where They Differ' table, take-away tiers, failure-pattern callout and Questions to Ask; part intros do not carry them (style guide)."
+    },
+    {
+      "topic": "External factual claims of the page's own; every company, network and regulatory statement repeats a journey of the part, which cites it."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "The closing sentence 'Begin with …' sits under its own heading, 'Where to Begin', as the conclusion's one paragraph.",
+      "rejected": [
+        "Ending the 'Chapters in this part' section with it: the draft checker reads a conclusion only from a heading of its own, and the other part intros of this book use the same heading."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The dispute paragraph gives the Mastercard deadline of 40 days, as Journey 4 does.",
+      "rejected": [
+        "The journal spec's wording for Journey 4 ('within 18 days at Adyen for a Visa card'): the written chapter makes Bram de Wit's card a Mastercard and gives 18 days only as the Visa figure; the intro follows the chapter."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The hook gives the total and the three causes and links chapter 12 for the amounts per cause.",
+      "rejected": [
+        "Repeating the €317,200, €73,500 and €21,300: ruling 24 gives chapter 12 the breakdown, and Journeys 3 and 4 each cite their own share."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The comparison of the four journeys (promise against later record, per journey) is left to Journey 4, which carries the part's closing.",
+      "rejected": [
+        "A four-row table here, which would pre-empt the closing synthesis."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "journal-spec.json (part-9: thesis, opening, flow, transition_in; post entry part-9)",
+      "contributed": "Intent, thesis, role, hook, bridge, roadmap and the order of journeys."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "The Unexplained €0.4 Million, Mila's pass and renewal, the €84.00 refund, Bram de Wit's dispute, Keel."
+    },
+    {
+      "kind": "internal",
+      "ref": "posts/42-journey-card-payment, 43-journey-failed-renewal, 44-journey-platform-payment, 45-journey-dispute (index.md, read in full)",
+      "contributed": "What each journey argues, its dates and amounts and the documented Stripe and Adyen facts repeated here."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/consistency-issues.md (rulings 10, 12, 17, 22, 24 to 29)",
+      "contributed": "The dating of the €412,000, no external URLs in running text, the scoped wording on Adyen's Checkout API, the refund booked against the studio's balance, Mastercard facts through the providers."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Spec created from the journal spec and the four written journeys of Part IX."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "After the flow rubric: the statement that the step table is set up in the first journey moved from the conclusion (p11) to the paragraph that describes the table (p04); the roadmap paragraph (p06) no longer enumerates the four journeys, which the chapter list does, and keeps only the reason the order is not the calendar's. Notes not acted on: the evidence paragraph (p05) stays before p06, so it names a chargeback fee and Mastercard before the dispute journey is introduced (the hook glosses a chargeback); the introduction's pattern label large_to_small fits from the claim onward and the hook before it is a single case, as in the other part intros of this book."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 26 claims checked against journeys 42 to 45, their verification files and rulings 18 to 43 (26 agree, 0 corrected, 0 removed). No text changed."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation after verification (parts-9-10): part thesis so_what re-synced with the part fragment (ruling 28: the reconciliation runs on each provider's report-ready signal, not nightly). No unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Sweep of rulings 46 to 48: 'Adyen publishes no chargeback fee' replaced by 'Adyen's chargeback fee is set by contract', following chapter 45 (46f); p05 aligned."
+    }
+  ],
+  "length": {
+    "target_words": 1050,
+    "max_words": 1200
+  }
+}

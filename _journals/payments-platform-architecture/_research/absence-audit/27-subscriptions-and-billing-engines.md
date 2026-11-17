@@ -1,0 +1,11 @@
+# Absence audit — 27-subscriptions-and-billing-engines
+
+Audit of 17 November 2026. Corpora fetched in this session with a generic user agent: `docs.adyen.com/llms-full.txt` (68 MB, full text), `docs.adyen.com/sitemap.xml`, `docs.adyen.com/llms.txt`, `www.adyen.com/sitemap-en.xml`, `help.adyen.com/sitemap.xml`, `docs.stripe.com/sitemap.xml`, `docs.stripe.com/llms.txt`, `support.stripe.com/sitemap.xml`; web searches restricted to the providers' domains (stripe.com, docs.stripe.com, support.stripe.com, stripe.dev; adyen.com, docs.adyen.com, help.adyen.com, medium.com); pages named below read directly.
+
+| Statement | Where searched | Result | Change |
+| --- | --- | --- | --- |
+| Key point and prose: Orb is not documented as part of Adyen's platform; no page describes a billing product integrated into the platform (also table rows "no invoice object found", "no Adyen documentation page found") | Adyen docs full text (Orb: only a partner-integration link to docs.withorb.com; 0 hits for dunning, proration, metering, billing engine), docs sitemap, adyen.com sitemap (Orb articles, partner page, subscriptions pages read), help-center sitemap, two web searches | holds | Search scope added to the sentence in the Adyen section |
+| Inference block: "Stripe does not say why two modes coexist" | docs.stripe.com billing-mode page and changelog entries; web search | narrowed | Stripe states backward compatibility as the reason for keeping classic mode (already quoted on the page); what is not stated is why existing subscriptions are not converted. Block reworded |
+| Inference block: idempotent scheduler key is not a documented fact about Stripe | web search of stripe.com and stripe.dev; stripe.dev blog index | holds | none (labeled expectation) |
+| "Stripe has published one passage about its renewal scheduler"; table: partitioning, pacing, duplicate protection "Not public"; Larkfield table "its pacing is not public" | verification file (ruling 34) plus web search of stripe.com and stripe.dev and the stripe.dev blog index | holds | Table cell now says what was searched |
+| "Adyen documents no first-party scheduler"; table "Not public; no first-party scheduler is documented" | Adyen docs full text and sitemap; web search | holds | none |

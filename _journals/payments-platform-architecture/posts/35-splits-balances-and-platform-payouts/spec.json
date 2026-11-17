@@ -1,0 +1,1558 @@
+{
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "splits-balances-and-platform-payouts",
+  "journal": "payments-platform-architecture",
+  "part": "part-7",
+  "title": "Dividing the Money: Splits, Platform Balances and Seller Payouts",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "How a payment is divided on each provider: on Stripe an application fee or later transfers between balances, depending on the charge type; on Adyen a list of typed split instructions sent with the payment or applied from a store's profile.",
+        "Who pays the processing fee in each setup, and why on Adyen some fees are not known when the payment is made.",
+        "What a refund and a chargeback do to a payment that was already split and paid out, and the tools for recovering the seller's share.",
+        "How seller payouts are scheduled on each provider and what a top-up is."
+      ],
+      "believe": [
+        "A split is not final when the seller is paid; it is final when the payment can no longer be refunded or disputed.",
+        "'Payment succeeded' does not prove 'seller credited'; only reconciling each leg does."
+      ],
+      "can_do": [
+        "Write the ledger entries for one split payment, its payout and a later refund, keyed so the refund finds the bookings it must unwind.",
+        "Say, for a refund or chargeback after payout, whose balance is debited first and how the platform recovers the seller's share.",
+        "Compute a per-seller exposure figure from paid-out volume and the refund and dispute windows."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a split payment the chapter does not contain, refunded after the seller was paid, the reader says who is out of pocket if the seller cannot repay and what record the platform needed in order to unwind the split.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A marketplace charges a buyer €200 through its own account at the provider, keeps €20 and credits the seller €180, which is paid out to the seller's bank on Friday. On Monday the buyer is refunded in full. The seller's balance at the provider is empty and the seller does not answer. Using only this chapter: who has paid for the refund so far, how can the marketplace try to get the €180 back, and what must it have recorded on Friday to do so?",
+        "expected": "The marketplace has paid: the refund debits the balance the payment was booked through (the platform balance on Stripe, the liable balance account on Adyen, which also stands behind a seller balance that goes negative). It can reverse the seller's share so that the seller's balance turns negative and is refilled from future sales, or debit the seller's bank account where the seller consented. It needed a record linking the charge to each leg of the split (seller share, platform fee, provider fee, payout), so that the refund can find what to reverse."
+      },
+      {
+        "id": "AC-2",
+        "statement": "The reader can explain why an approved payment on Adyen does not prove that the seller was credited, and name what to reconcile.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "On Adyen, a payment with split instructions is approved. Using only this chapter: can the platform conclude that the seller's balance account was credited? Why or why not, and what should it check?",
+        "expected": "No. Adyen documents that the payment request validates only the format of the split instructions; if the named balance account does not exist or its account holder is closed, the whole amount and its fees are booked to the platform's liable balance account without an error. The platform should reconcile the bookings per split (transfer webhooks or the accounting report) against its own ledger."
+      },
+      {
+        "id": "AC-3",
+        "statement": "The worked example splits Mila's €120.00 into €117.47 for Studio Noord and a €2.53 Larkfield fee, with the €0.61 provider cost labeled as an assumption, and the refund of €84.00 on 18 March 2027 follows the payout of 11 March, all as in the scenario ledger.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "major"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "How is one payment divided among platform, seller and provider, and how does each get paid?",
+    "claim": "A payment is divided by booking parts of it to balances inside the provider: the seller's share to the seller's balance, the platform's fee to the platform's, and the provider's fee deducted from whichever of the two the configuration names; seller and platform are then paid by later payouts from their balances. Because sellers are paid before the refund and dispute window closes, the division is provisional: a refund or chargeback after payout is funded by the platform whenever the payment was booked through it, and the platform must then recover the seller's share itself.",
+    "disputed_by": "The view that a split is arithmetic done once at payment time (compute the fee, send the rest), that a refund runs the same arithmetic backwards, and that the provider keeps the parties square.",
+    "so_what": "The platform needs a ledger entry for every leg of a split, keyed so a refund can find what to reverse, a per-seller figure for paid-out volume that can still come back, and a reconciliation that checks each seller was credited; a platform that only tracks 'paid' discovers the shortfall later, as an unexplained difference between its own ledger and the provider's balances.",
+    "how_why": "On Stripe the division is a set of movements between the platform's and the seller's balances that follows the charge type; on Adyen it is a list of typed split instructions declared with the payment. Stripe's documentation (n.d., accessed November 2026) moves the full amount of a destination charge to the seller and the application fee back to the platform, debits the platform's balance for a refund or dispute on a charge made through the platform, and leaves recovery to a transfer reversal the platform requests; a direct charge debits the seller's balance instead. Adyen's (n.d., accessed November 2026) takes a splits list with types for the seller's share, the commission and each fee, calculates transaction fees after the payment, allows a refund to be deducted only from the balance accounts that were credited, and has the platform choose where a chargeback will be booked when it sends the payment. Two documented differences matter to an integrator: Adyen fixes the chargeback booking at payment time where Stripe leaves the reversal to dispute time, and a split naming a missing or closed balance account is booked to the liable account without an error on Adyen, where a Stripe transfer fails. Each company has published a general account of its internal ledger; how either books a platform's splits and transfers in it is not public.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "A split is a set of bookings to balances inside the provider: the seller's share to the seller's balance, the platform's fee to the platform's, the provider's fee deducted from whichever of the two the configuration names; each party is paid later, by a payout from its balance."
+      },
+      {
+        "id": "S2",
+        "claim": "On Stripe the division is a set of movements between the platform's and the seller's balances that follows the charge type; on Adyen it is a list of typed split instructions declared with the payment, in which fees are assigned by type because their amounts are calculated afterwards."
+      },
+      {
+        "id": "S3",
+        "claim": "The division is provisional because sellers are paid before the refund and dispute window closes: a refund or chargeback after payout debits the balance the payment was booked through, and the platform must recover the seller's share itself with the tools the provider documents."
+      },
+      {
+        "id": "S4",
+        "claim": "The two providers differ on two points an integrator must design for: Adyen fixes the booking of a chargeback when the payment is sent and books a split that names a missing or closed balance account to the liable account without an error; Stripe leaves the reversal to dispute time and fails the transfer."
+      },
+      {
+        "id": "S5",
+        "claim": "A platform therefore needs a ledger entry for every leg of a split, keyed so a refund can find what to reverse, a reconciliation that checks each seller was credited, and a per-seller figure for paid-out volume that can still come back."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Turns the loss assignment into money movements: shows where each euro of a payment is booked, when it leaves the provider, and whose balance funds a reversal that arrives afterwards.",
+    "supports": [
+      "P7-3",
+      "P7-1"
+    ]
+  },
+  "flow": {
+    "pattern": "problem_solution",
+    "additional_patterns": [
+      {
+        "pattern": "prerequisite_order",
+        "applies_to": "bookings, stripe-split, adyen-split, reversals, payouts: each supplies the vocabulary the next uses"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "designs, where-they-differ"
+      },
+      {
+        "pattern": "chronological",
+        "applies_to": "in-practice, when-it-goes-wrong"
+      }
+    ],
+    "rationale": "The reader meets €317,200 of unrecorded refunds before any term is defined, so the split-as-bookings arrives as the explanation of a loss they have already seen. The definition must precede the providers' mechanics, because both are read as instances of it. The forward split on each provider precedes reversals, since a refund or chargeback is described by which of those bookings it debits. Payout schedules follow reversals because the reader then knows why the emptying of the balance matters; placed earlier they would be configuration detail. Designs and the comparison need all the mechanics; the worked example needs the comparison, since it runs the same payment through both; the failures come last because each is a departure from the example."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "Dividing €120.00 among a studio, a platform and a payment provider looks like one line of arithmetic: €117.47, €2.53, and a processing cost taken out of the €2.53. Larkfield ran that line 31.4 million times in 2026. At the end of 2025 its books still said it owed studios €412,000 more than the two providers were holding for them, and €317,200 of the difference was refunds made after the studio had been paid."
+    },
+    "bridge": {
+      "from_reader_world": "An engineer sees a split as a pure function of the amount: compute the fee, send the rest, and run the same function backwards for a refund.",
+      "to_topic": "At a provider a split is a set of bookings to balances that are emptied on a schedule, so the backward run meets a balance that no longer holds the money."
+    },
+    "thesis_statement": {
+      "text": "A payment is divided by booking parts of it to balances inside the provider, and each party is paid later from its balance; because sellers are paid before the refund and dispute window closes, the division is provisional, and a reversal after payout is funded by the platform whenever the payment was booked through it.",
+      "placement": "KEY POINTS bullets 1 and 2, and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p04",
+      "promises": [
+        {
+          "promise": "Start from the €317,200 of refunds after payout that Larkfield's books had never recorded.",
+          "kept_in": [
+            "scene"
+          ]
+        },
+        {
+          "promise": "Define a split as bookings to balances and show why it stays open after the seller is paid.",
+          "kept_in": [
+            "bookings"
+          ]
+        },
+        {
+          "promise": "Read how each provider divides a payment: Stripe by charge type, Adyen by typed split instructions.",
+          "kept_in": [
+            "stripe-split",
+            "adyen-split"
+          ]
+        },
+        {
+          "promise": "Follow a refund and a chargeback against a payment that was already split, and the tools for recovering the seller's share.",
+          "kept_in": [
+            "reversals"
+          ]
+        },
+        {
+          "promise": "Describe seller balances, payout schedules, top-ups and sellers in other countries.",
+          "kept_in": [
+            "payouts"
+          ]
+        },
+        {
+          "promise": "Compare three places to book the split, then the two providers.",
+          "kept_in": [
+            "designs",
+            "where-they-differ"
+          ]
+        },
+        {
+          "promise": "Split Mila's €120 on both providers, refund €84 after the payout, and list what goes wrong.",
+          "kept_in": [
+            "in-practice",
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "Dividing €120.00 three ways looks like arithmetic, yet a platform that did it 31.4 million times a year ended with €317,200 of refunds after payout that its books had never recorded.",
+        "function": "context",
+        "organization": "narration",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's €120.00 pass divided into €117.47 and €2.53; 31.4 million payments in 2026; the Unexplained €0.4 Million of year-end 2025, of which €317,200 was refunds after payout.",
+            "shows": "Correct arithmetic at payment time did not keep the books right, which is the puzzle the chapter resolves.",
+            "source": "Larkfield scenario ledger"
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "A split is a set of bookings to balances inside the provider that are paid out on a schedule, so the division is provisional until the payment can no longer be refunded or disputed, and a reversal after payout is funded by the platform whenever the payment was booked through it.",
+        "function": "claim",
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "Arithmetic that was right and books that were wrong.",
+          "introduces": "The chapter's claim: a split is bookings that stay open, not a calculation done once.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "In the journey of Mila's class pass this chapter is the moment after capture when €120.00 becomes three bookings, and the moment nine days later when €84.00 has to come back out of a balance already paid.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Pass bought Tuesday 9 March 2027 at 19:42; studio paid Thursday 11 March; refund of €84.00 requested 18 March.",
+            "shows": "Places the chapter on the recurring payment at two points: the division and its partial undoing.",
+            "source": "Larkfield scenario ledger"
+          }
+        ],
+        "transition_in": {
+          "relationship": "place",
+          "carries_over": "The claim about splits in general.",
+          "introduces": "Its two positions on the recurring payment's journey.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "controlling_idea": "The chapter goes from Larkfield's unrecorded refunds to the split as bookings, then each provider's way of dividing a payment, reversals after payout, payouts and top-ups, three designs, the comparison, the worked example and the failures.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The claim and where it sits on the journey.",
+          "introduces": "The order in which the chapter argues it.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: €317,200 Nobody Had Booked",
+      "controlling_idea": "Larkfield computed each studio's share once, at payment time, and had no entry for a refund that arrived after the studio was paid, which accounts for €317,200 of its unexplained €412,000.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S5"
+        ],
+        "how": "Shows the cost of treating the split as final before any mechanism is named."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "What the books said, why they said it, then the questions it left for 2027: the reader arrives at the chapter's questions the way Femke did."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The claim that a split stays open after the seller is paid.",
+        "introduces": "One company whose books closed it at payment time.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p05",
+          "controlling_idea": "At year-end 2025 Larkfield's ledger said it owed studios €412,000 more than the two providers held for them, and refunds after payout were €317,200 of that.",
+          "function": "context",
+          "organization": "narration",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "The Unexplained €0.4 Million: €412,000, of which refunds after payout €317,200, chargeback fees €73,500, currency rounding €21,300.",
+              "shows": "Three quarters of the difference came from one kind of movement.",
+              "source": "Larkfield scenario ledger"
+            }
+          ]
+        },
+        {
+          "id": "p06",
+          "controlling_idea": "The cause was that Larkfield's posting job wrote an entry when a payment became paid and when a payout was created, and nothing when a refund reached a balance that had already been paid out.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "The 2025 ledger was posted by a nightly job on 'paid' and on payout creation; refunds after payout had no entries of their own until Keel (K3).",
+              "shows": "The provider's balances moved on the refund; Larkfield's 'owed to studios' figure did not.",
+              "source": "Larkfield scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The €317,200.",
+            "introduces": "Why it was invisible: no entry existed for the movement.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p07",
+          "controlling_idea": "The finding leaves Femke de Graaf three questions in 2027: where each euro of a payment is booked, whose balance funds a reversal that arrives after the seller was paid, and when the money leaves the provider.",
+          "function": "claim",
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The missing entry.",
+            "introduces": "The three questions the chapter answers.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "bookings",
+      "heading": "A Split Is a Set of Bookings, and the Bookings Stay Open",
+      "controlling_idea": "A split books parts of one payment to balances inside the provider, and because those balances are paid out within days while the payment stays reversible for months, the split is not final when the seller is paid.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S1",
+          "S3"
+        ],
+        "how": "Defines split, platform fee, seller balance, transfer and payout, and establishes the timing gap that makes the division provisional."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The split and its three parties are defined before the movements that carry it, the movements before the clock that reopens them, and the liability rule last because it needs all three."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The question of where each euro is booked.",
+        "introduces": "The split as bookings to three parties' balances.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p08",
+          "controlling_idea": "A split is the instruction that divides one customer payment among the seller, the platform and the provider by booking each part to a balance in the provider's books.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Three parties: what each receives from Mila's €120.00 (studio €117.47; platform fee €2.53; provider cost €0.61, an assumption), which balance it is booked to, and how it leaves.",
+              "shows": "The division is three bookings with three different exits, and the provider's part comes out of one of the other two.",
+              "source": "Larkfield scenario ledger"
+            }
+          ]
+        },
+        {
+          "id": "p09",
+          "controlling_idea": "A transfer moves money between two balances inside the provider and a payout moves it from a balance to a bank account, so a split consists of transfers and each party is paid by a later payout.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: an internal funds transfer 'moves funds between balance accounts within your platform. For comparison: a payout is an external funds transfer'.",
+              "shows": "A provider's own wording for the distinction the chapter relies on.",
+              "source": "docs.adyen.com/platforms/internal-fund-transfers (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The balances a split books to.",
+            "introduces": "The two kinds of movement, transfer and payout, and the seller balance between them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "controlling_idea": "The seller is paid within days and the payment can be refunded at any time and disputed for about four months, so every payout leaves behind exposure: an amount that can still come back through a reversal, meaning a refund or a chargeback.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Mila's pass: payout Thursday 11 March 2027; card dispute window closes about 7 July 2027.",
+              "shows": "Two days to pay, about 120 days of exposure, on one ordinary payment.",
+              "source": "Larkfield scenario ledger"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe on Instant Payouts for platforms: they 'deliver funds before the dispute window closes'.",
+              "shows": "A provider states the timing gap in its own risk guidance; the same holds, less sharply, for a two-day schedule.",
+              "source": "docs.stripe.com/connect/instant-payouts (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Bookings and payouts that look complete.",
+            "introduces": "The window during which they can be reopened.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "controlling_idea": "When a reversal arrives, it debits the balance the payment was booked through, and if that balance belongs to the platform, or stands behind a seller's empty one, the platform has paid and must recover the seller's share.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "The liability rule owned by the platform-models chapter: a loss falls first on the booked balance and then on the party assigned to cover that balance when it goes negative.",
+              "shows": "Connects this chapter's mechanics to the rule the previous chapters established, without re-teaching it."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Paid-out money that can come back.",
+            "introduces": "Whose balance it comes back out of, and the platform's position.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "stripe-split",
+      "heading": "Stripe: The Charge Type Decides Which Balances Move",
+      "controlling_idea": "On Stripe Connect a split is a set of movements between the platform's balance and the seller's, and which movements occur follows from the charge type.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S1",
+          "S2"
+        ],
+        "how": "Documents the three charge types as funds movements, with who pays Stripe's fee in each."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "An overview table first, then one paragraph per charge type in the order seller-first, platform-first, collect-then-distribute, which is the order the designs section later generalizes; if the types came in another order the reader could not map them one to one onto the three designs."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The split as bookings between balances.",
+        "introduces": "How Stripe documents those bookings.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p12",
+          "controlling_idea": "Stripe documents three charge types, and each fixes where the payment first lands, how the seller's share and the platform's fee are moved, and whose balance pays Stripe's fee.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Direct charge, destination charge, separate charges and transfers: where the charge is created, how the seller is credited, how the platform is credited, who pays Stripe's fee.",
+              "shows": "One table the following three paragraphs unpack.",
+              "source": "docs.stripe.com/connect/charges (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "quotation",
+              "what": "'The type of charge you create determines how the funds are distributed between your platform, the connected account, and Stripe.'",
+              "shows": "Stripe itself ties the division to the charge type.",
+              "source": "docs.stripe.com/connect/charges (n.d., accessed 2026-11)"
+            }
+          ]
+        },
+        {
+          "id": "p13",
+          "controlling_idea": "In a direct charge the payment lands in the seller's balance, the application fee moves to the platform, and the platform chooses per account whether Stripe's fee is debited from the seller or from the platform.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'You create a charge on your connected account, so the payment appears in the connected account’s balance, not in your platform’s balance'; 'You can choose whether to have Stripe debit fees directly from connected accounts or from your platform account.'",
+              "shows": "The same split with the roles of the two balances exchanged.",
+              "source": "docs.stripe.com/connect/charges (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The table's direct-charge row.",
+            "introduces": "A charge that lands on the seller, with the fee payer chosen per account.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p14",
+          "controlling_idea": "In a destination charge with an application fee the full amount is transferred to the seller after capture, the fee is transferred back to the platform, and Stripe's fee comes out of the platform's balance.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'the full charge amount is immediately transferred from the platform to the transfer_data[destination] account after the charge is captured. The application_fee_amount … is then transferred back to the platform.'",
+              "shows": "The split is two transfers, not a deduction.",
+              "source": "docs.stripe.com/connect/destination-charges (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "example",
+              "what": "Stripe's worked example: 10.00 USD charge, 1.23 USD application fee, 0.59 USD Stripe fees; 'The application fee amount minus the Stripe fees (1.23 USD - 0.59 USD = 0.64 USD) remains in your platform account’s balance.'",
+              "shows": "The provider's fee is deducted from the platform's share in this charge type.",
+              "source": "docs.stripe.com/connect/destination-charges (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A charge that lands on the seller.",
+            "introduces": "A charge that lands on the platform: the two transfers inside it and who pays the fee.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p15",
+          "controlling_idea": "With separate charges and transfers the platform creates the charge and the transfers as unrelated calls, so the link between them, and the check that the money exists, are the platform's to keep.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'The transfer_group only identifies associated objects. It doesn’t affect any standard functionality.'",
+              "shows": "The grouping field is a label, not a constraint.",
+              "source": "docs.stripe.com/connect/separate-charges-and-transfers (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "A transfer fails by default when it exceeds the platform's available balance and 'Stripe doesn’t automatically retry failed transfer requests'; source_transaction ties a transfer to a charge so it succeeds before the charge's funds are available.",
+              "shows": "What the platform must handle itself in this design.",
+              "source": "docs.stripe.com/connect/separate-charges-and-transfers (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Two charge types in which one call carries the split.",
+            "introduces": "The type in which the split is separate calls the platform must link.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "adyen-split",
+      "heading": "Adyen: Typed Bookings Declared With the Payment",
+      "controlling_idea": "On Adyen for Platforms a split is a list of typed bookings sent with the payment or applied from a store's profile; fees are assigned by type because their amounts are calculated afterwards, and the request does not check that the named balance accounts exist.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S4"
+        ],
+        "how": "Documents the splits list, the fee types, and the silent fallback that makes reconciliation per split necessary."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The splits list is needed to read the fee types, and both are needed to see what the fallback does to them."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "Stripe's movements chosen by charge type.",
+        "introduces": "Adyen's bookings declared item by item.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p16",
+          "controlling_idea": "An Adyen split is a splits array on the payment, capture or refund request in which each item has a type, an amount where one is known, and the balance account to book it to, and an item without an account is booked to the platform's liable balance account.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Split types used in this chapter: BalanceAccount, Commission, PaymentFee and its components (Interchange, SchemeFee, AdyenMarkup, AdyenCommission), with what each books and to which account by default.",
+              "shows": "The vocabulary of an Adyen split in one place.",
+              "source": "docs.adyen.com/platforms/online-payments/split-transactions (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "Split configuration profiles apply the same logic per store from rules; without a catch-all rule 'any transaction that doesn't match a specific rule will be booked to your liable balance account by default'.",
+              "shows": "The split can live in configuration instead of in each request, with the same default.",
+              "source": "docs.adyen.com/platforms/automatic-split-configuration (n.d., accessed 2026-11)"
+            }
+          ]
+        },
+        {
+          "id": "p17",
+          "controlling_idea": "The fee items carry no amount because Adyen calculates transaction fees after it receives the payment request, so the split names who bears each type of fee and the amount arrives later.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Transaction fees refer to the costs you incur on a transaction in your platform that are not known at the time of payment. They are calculated by Adyen after we receive the payment request. By default, these costs are deducted from your liable balance account'.",
+              "shows": "The provider's cost is not a known third amount at payment time, and falls on the platform unless the split says otherwise.",
+              "source": "docs.adyen.com/platforms/online-payments/transaction-fees (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "Processing costs 'are aggregated and also applicable to refused and cancelled payments. Therefore, they cannot be allocated to individual payments.'",
+              "shows": "Some provider costs can never be part of a per-payment split.",
+              "source": "docs.adyen.com/platforms/online-payments/transaction-fees (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The fee types in the splits list.",
+            "introduces": "Why they have no amounts, and who pays by default.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p18",
+          "controlling_idea": "An approved payment does not prove the seller was credited, because the request validates only the format of the split and books the whole amount and its fees to the liable balance account when the named account is missing or closed.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'The API request validates only the format of the split instructions, not the balance accounts specified in the request. This means that even if the transaction is successful, it is possible that the funds are not credited to/deducted from the specified balance account. If the balance account does not exist, or it is linked to an account holder with a closed status, the full transaction and its fees are booked to your platform's liable balance account.'",
+              "shows": "The fallback is documented, silent, and detectable only by comparing bookings with intentions.",
+              "source": "docs.adyen.com/platforms/online-payments/split-transactions/split-chargebacks and /split-refunds (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "The Balance Platform Accounting Report 'tracks all balance changes on all balance accounts in your balance platform, including liable accounts and the accounts of your users'; transfer webhooks report each credit or debit of a balance account.",
+              "shows": "The records a platform reconciles per split.",
+              "source": "docs.adyen.com/platforms/reports-and-fees/balance-platform-accounting-report (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A split accepted with the payment.",
+            "introduces": "What acceptance does not check, and what to reconcile.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "reversals",
+      "heading": "Refunds and Chargebacks Against a Payment Already Split",
+      "controlling_idea": "A refund or chargeback debits the balance the payment was booked through, on Stripe by charge type and on Adyen by refund split and by chargeback logic set when the payment was sent, and recovering the seller's share is a separate step the platform takes with documented tools.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S4"
+        ],
+        "how": "Shows on both providers which balance a reversal debits and what the platform can do when the seller's balance is short."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "Refund then dispute on Stripe, refund then chargeback on Adyen, so each pair can be read across; recovery comes last because it applies to all four."
+      },
+      "transition_in": {
+        "relationship": "time",
+        "carries_over": "Splits as they are booked at payment time.",
+        "introduces": "What happens to them when money comes back days or months later.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p19",
+          "controlling_idea": "On Stripe a refund debits the connected account for a direct charge and the platform for the other two types, and the platform recovers the seller's share by reversing the transfer, a step that is off by default.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Refund by charge type: balance debited; how the seller's share is recovered; what happens if the balance is short (refund pending, fails after 45 days with insufficient_funds).",
+              "shows": "Which balance funds a refund is fixed by the charge type chosen at payment time.",
+              "source": "docs.stripe.com/connect/charges (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "quotation",
+              "what": "'by default the destination account keeps the funds that were transferred to it, leaving the platform account to cover the negative balance from the refund.'",
+              "shows": "Unless the platform asks for the reversal, it pays the refund.",
+              "source": "docs.stripe.com/connect/destination-charges (n.d., accessed 2026-11)"
+            }
+          ]
+        },
+        {
+          "id": "p20",
+          "controlling_idea": "A dispute on Stripe follows the same rule, debits the amount and the fee at once, and leaves the timing of the transfer reversal to the platform.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "For charges created on the platform, 'with or without on_behalf_of, your platform balance is automatically debited for the disputed amount and fee'.",
+              "shows": "Naming the seller as the business of record does not move the debit.",
+              "source": "docs.stripe.com/connect/charges (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe's advice: 'If you challenge the dispute, wait for the dispute outcome before reversing the transfer'; 'Regardless of a dispute’s outcome, Stripe doesn’t automatically refund the application fee'. The second sentence stands under the guide's direct-charges heading.",
+              "shows": "The reversal is a decision taken at dispute time, and the fee is a separate decision.",
+              "source": "docs.stripe.com/connect/disputes and /direct-charges-fee-payer-behavior (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "Refunds debited by charge type.",
+            "introduces": "Disputes, debited the same way, with the reversal timed by the platform.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p21",
+          "controlling_idea": "On Adyen a refund carries its own split, which can debit only balance accounts the payment credited, and a refund sent without a split may be booked in full to the liable balance account.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Refunds can only be deducted from the balance accounts to which the payment was credited.' Splitting a refund 'allows you to choose who is liable for the refund'.",
+              "shows": "The refund split is the platform's decision on who funds it, bounded by the original split.",
+              "source": "docs.adyen.com/platforms/online-payments/split-transactions/split-refunds (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "Without instructions Adyen uses a store profile, then a balance-platform default, then the capture's split ratio for a full refund of one capture; 'In all other cases, such as for refunds of partial captures, we book the full refund amount to your platform's liable balance account.' The logic is marked as in pilot.",
+              "shows": "A partial refund with no split lands on the platform.",
+              "source": "docs.adyen.com/platforms/how-adyen-applies-split-instructions (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Stripe, where the charge type decides.",
+            "introduces": "Adyen, where each refund names its own bookings.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p22",
+          "controlling_idea": "On Adyen the booking of a chargeback is chosen before any chargeback exists, in a chargeback logic sent with the payment or capture, and the default is the platform's liable balance account.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Adyen withdraws the disputed funds from your platform's liable balance account'; the platform 'can change this behavior by booking the disputed amount to any of the balance accounts in your platform, or even splitting it between the accounts.'",
+              "shows": "The platform is the default payer of a chargeback.",
+              "source": "docs.adyen.com/platforms/online-payments/split-transactions/split-chargebacks (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "platformChargebackLogic.behavior: deductFromLiableAccount, deductFromOneBalanceAccount (with targetAccount), deductAccordingToSplitRatio; costAllocationAccount for the chargeback fees, by default the liable balance account.",
+              "shows": "The decision is a field on the payment, taken months before it matters.",
+              "source": "docs.adyen.com/platforms/online-payments/split-transactions/split-chargebacks (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A reversal decided when the dispute arrives.",
+            "introduces": "A reversal decided when the payment is sent.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p23",
+          "controlling_idea": "When the seller's balance cannot cover its share, the platform stands behind it, by default on Adyen and on Stripe wherever the platform is responsible for negative balances, and both providers document tools for recovery: netting against future sales, a debit of the seller's bank account, and a movement between balances.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Recovery tools: Stripe (offset against future payments; transfer reversal, possible only if the balance suffices or connected reserves are enabled; debit_negative_balances; account debits with consent; platform reserve and transfer after 180 days) and Adyen (liable balance account stands behind negative user balances; top-up by direct debit from the verified bank account; internal transfer).",
+              "shows": "The same three ideas under different names, with a documented time limit on each: 180 days on Stripe, 30 days on Adyen.",
+              "source": "docs.stripe.com/connect/account-balances, /risk-management, /account-debits, /separate-charges-and-transfers; docs.adyen.com/platforms/account-structure-resources, /top-up-balance-account, /internal-fund-transfers (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen: 'Adyen allows negative balances for up to 30 days. If a balance account has a negative balance for more than 30 days, Adyen compensates this by debiting your reserved compensation account on the first day of the following month.' A warning webhook is sent by default after 20 days. Managed Risk (pilot, limited availability): Adyen will 'assume the responsibility for negative balances' and writes them off after 180 days.",
+              "shows": "Adyen documents both the period and an arrangement in which it bears the loss; the first draft's statement that neither was public was wrong.",
+              "source": "docs.adyen.com/platforms/manage-liable-accounts; /platforms/reconciliation-use-cases/verify-balances; /platforms/managed-risk (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "Reversals that debit a balance already paid out.",
+            "introduces": "The documented ways to get the seller's share back, and where the documentation stops.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "payouts",
+      "heading": "Seller Balances, Payout Schedules and Top-Ups",
+      "controlling_idea": "The seller balance is emptied by a schedule the platform configures, on Stripe by interval and delay and on Adyen by sales day and settlement delay, and the schedule, together with top-ups, is the platform's main control over how much paid-out money can still come back.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S1",
+          "S3"
+        ],
+        "how": "Shows when each party is paid and that the payout schedule sets the size of the exposure."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "Stripe's schedule, Adyen's schedule, then the two special movements (money added from outside, money sent across a border) that the schedules do not cover."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "Reversals that find the balance empty.",
+        "introduces": "The schedule that empties it, and what the platform can set.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p24",
+          "controlling_idea": "On Stripe the platform sets each connected account's payout interval and, where it bears the losses, a delay of up to 31 days, and a negative balance stops payouts until it is positive again.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "settlement_timing.delay_days 'reflects how long it takes for on_behalf_of charges (or direct charges performed on the connected account) to become available for payout'; it can be overridden 'to a number up to 31' on accounts where the platform owns fraud and dispute liability; minimum balances per currency.",
+              "shows": "The platform that bears the loss is the one allowed to slow the payout.",
+              "source": "docs.stripe.com/connect/manage-payout-schedule (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "quotation",
+              "what": "'While an account’s balance is negative, you can’t send payouts to the account’s bank or debit card on their behalf.'",
+              "shows": "The seller balance nets reversals against later sales before anything is paid.",
+              "source": "docs.stripe.com/connect/account-balances (n.d., accessed 2026-11)"
+            }
+          ]
+        },
+        {
+          "id": "p25",
+          "controlling_idea": "On Adyen a seller's funds settle to the balance account per sales day after a settlement delay, net of that day's refunds and chargebacks, and leave by a managed payout schedule or by a sweep the platform defines.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Adyen settles a settlement batch after its sales day ends and the configured settlement delay has passed. The date when the schemes or payment methods transfer the funds to Adyen does not affect this timing.'",
+              "shows": "The schedule runs on the provider's clock, not the card network's.",
+              "source": "docs.adyen.com/platforms/settle-funds (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "Managed payouts (release note of 20 May 2026): Standard 'two business days after capture', Accelerated one; weekdays, weekly or monthly; minimum, maximum and retained amounts; local payouts only. Custom payouts: a sweep on the balance account with a schedule, a trigger amount and a target amount.",
+              "shows": "The platform's levers on Adyen: frequency, delay, and an amount kept back.",
+              "source": "docs.adyen.com/platforms/managed-payouts; /custom-payouts/scheduled-payouts; release notes (accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "Stripe's interval and delay.",
+            "introduces": "Adyen's sales day, settlement delay and sweeps.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p26",
+          "controlling_idea": "A top-up is bank money added to a balance at the provider that did not come from a customer payment, and the two providers scope it differently: Stripe documents it for the platform's balance, Adyen for a seller's balance account or the liable one.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: 'Platforms can add funds to their balance from a bank account'; the availability table lists 'General availability' for 'USA, UK, Japan' and 'Private preview' for 'EU, Canada, Australia, New Zealand'.",
+              "shows": "On Stripe a top-up funds the platform, and its availability is narrow as of November 2026.",
+              "source": "docs.stripe.com/connect/top-ups (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'A top-up refers to an incoming transfer of funds from an external source that increases the balance in their balance account'; use case 'To cover negative balances resulting from refunds or chargebacks'; 'If needed, you can also top up your liable balance account.'",
+              "shows": "On Adyen a top-up is the documented way to refill a seller's negative balance.",
+              "source": "docs.adyen.com/platforms/top-up-balance-account (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Money leaving a balance on a schedule.",
+            "introduces": "Money entering a balance from a bank account.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p27",
+          "controlling_idea": "Paying a seller in another country is restricted on both providers, by listed regions and charge types on Stripe and by one balance platform per acquiring region on Adyen, where cross-border payouts go by custom payouts with no guaranteed arrival time.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: 'Platforms based in the US, UK, EEA, Canada, or Switzerland can transfer funds to connected accounts in any of those regions'; supported for separate charges and transfers and destination charges without on_behalf_of, and top-ups and transfers.",
+              "shows": "Cross-border payout on Stripe is tied to charge types in which the platform is the business of record.",
+              "source": "docs.stripe.com/connect/cross-border-payouts (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen: 'You must have a separate balance platform for each region in which you acquire payments'; managed payout schedules support 'only … local payouts (within the same country and currency)', other cases use custom payouts. Custom payouts page: cross-border payouts may be processed through correspondent banks; 'The arrival time of the payout cannot be guaranteed'.",
+              "shows": "On Adyen the regional structure is visible to the platform.",
+              "source": "docs.adyen.com/platforms/account-structure-resources; /managed-payouts; /custom-payouts (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Schedules and top-ups within one country.",
+            "introduces": "What changes when the seller's bank account is in another one.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "designs",
+      "heading": "Three Places to Book the Split, and What Each Costs",
+      "controlling_idea": "A platform can book a payment to the seller first, to itself first, or collect it and distribute later, and the choice trades the platform's exposure against its control and its bookkeeping.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S5"
+        ],
+        "how": "Turns the provider mechanics into three provider-neutral designs and states what each requires of the platform's own records."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The three designs in order of how much the platform fronts and has to track, then the table that sets them side by side."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "Two providers' mechanics for splits, reversals and payouts.",
+        "introduces": "The three designs those mechanics allow.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p28",
+          "controlling_idea": "Seller-first booking puts the payment in the seller's balance and moves only the platform's fee, so reversals debit the seller first and the platform is exposed only when that balance goes negative.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stripe direct charges ('Refunds and chargebacks reduce the connected account’s balance'); Adyen split to the user's balance account with chargeback logic deductFromOneBalanceAccount.",
+              "shows": "The design exists on both providers under different configuration.",
+              "source": "docs.stripe.com/connect/charges; docs.adyen.com split-chargebacks (n.d., accessed 2026-11)"
+            }
+          ]
+        },
+        {
+          "id": "p29",
+          "controlling_idea": "Platform-first booking puts the payment in the platform's balance and moves the seller's share out, so every reversal debits the platform and recovery is a second step.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stripe destination charges ('Refunds and chargebacks reduce your platform’s balance'); Adyen's default chargeback booking to the liable balance account.",
+              "shows": "The platform fronts every reversal in exchange for control of the customer relationship and the refund.",
+              "source": "docs.stripe.com/connect/charges; docs.adyen.com split-chargebacks (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The seller's balance debited first.",
+            "introduces": "The platform's balance debited first.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p30",
+          "controlling_idea": "Collect-then-distribute keeps the payment on the platform until it decides who gets what, which handles several sellers and late decisions and makes the platform's own records the only link between the payment and its transfers.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stripe separate charges and transfers (Stripe: 'Use them only if your business use case requires them'; recommended 'only when you’re responsible for negative balances of your connected accounts'); Adyen split at capture or internal transfers.",
+              "shows": "The most flexible design is the one the provider tells platforms to avoid unless they need it.",
+              "source": "docs.stripe.com/connect/charges; /separate-charges-and-transfers (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Two designs in which the split rides on the payment.",
+            "introduces": "A third in which it is separate.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p31",
+          "controlling_idea": "The three designs differ in who is debited first, what the platform must record to unwind a payment, and which business they fit, and the choice follows from who the merchant is.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Design | Reversal debits first | Platform must record | Fits | Main risk — for the three designs.",
+              "shows": "A trade-off table the reader can apply to a platform not in the chapter."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "Three designs described one by one.",
+            "introduces": "Their trade-offs side by side and the author's rule for choosing.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "As documented in November 2026, Stripe divides a payment by charge type and decides reversals when they arrive, while Adyen divides it by typed bookings, fixes the chargeback booking at payment time and does not reject a split that names a missing account.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S4"
+        ],
+        "how": "Sets the documented differences side by side and says what an integrator does differently on each."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "Designs that exist on both providers.",
+        "introduces": "The points where the two providers' documented behavior differs.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p32",
+          "controlling_idea": "Six documented differences separate the two providers: how the payment is divided, when the provider's fee is known, how a refund after payout is booked, when a chargeback's booking is decided, what a bad split does, and what the payout timing is based on.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Aspect | Stripe | Adyen | What the difference suggests: six rows, every cell a fact cited earlier in the chapter; last column labeled inference.",
+              "shows": "The required comparison, traceable row by row to the sections above."
+            }
+          ]
+        },
+        {
+          "id": "p33",
+          "controlling_idea": "An integrator on Stripe must choose the charge type knowing it fixes the refund and dispute debit and must look for failed transfers and pending refunds, and on Adyen must set chargeback logic on every payment and reconcile bookings per split.",
+          "function": "recommendation",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The six differences.",
+            "introduces": "What to do differently on each provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ],
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The table of documented differences first and the integrator's consequences second, because each recommendation cites a row."
+      }
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: Mila's €120 Three Ways, Then €84 Back",
+      "controlling_idea": "Larkfield books Mila's €120.00 as four ledger entries keyed by the payment's reference, so that the payout of 11 March and the €84.00 refund of 18 March each find the entries they continue, on Adyen as it happened and on Stripe as it would have.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S5",
+          "S3"
+        ],
+        "how": "Works the ledger entries for one split, its payout and a later refund on both providers, and computes an exposure figure."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "9 March, 11 March, 18 March, then the figure that summarizes what stays open: the order of the events themselves."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The differences between the providers.",
+        "introduces": "One payment worked through both.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p34",
+          "controlling_idea": "On Adyen, Larkfield sends Mila's payment with two split items and a chargeback logic, and its ledger records three legs under the payment's reference, the provider's cost arriving as a later booking.",
+          "function": "example",
+          "organization": "illustration",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Splits: BalanceAccount 11747 to Studio Noord's balance account; Commission 253; fees left to the default (PaymentFee on the liable balance account). Result: €117.47 studio, €2.53 fee, €0.61 processing cost (assumption), €1.92 left to Larkfield.",
+              "shows": "The canonical figures as split instructions.",
+              "source": "Larkfield scenario ledger"
+            },
+            {
+              "kind": "table",
+              "what": "Ledger entries for 9 March under K3: funds at provider, owed to Studio Noord, fees owed to Larkfield, provider cost; each with the PSP reference and the business event id.",
+              "shows": "One entry per leg, keyed so later events can find them.",
+              "source": "Larkfield scenario ledger"
+            }
+          ]
+        },
+        {
+          "id": "p35",
+          "controlling_idea": "Had Studio Noord been on Stripe, the same division would be a destination charge with a €2.53 application fee, and the provider's cost would be a different, single figure known from the balance transaction.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Destination charge €120.00 with application_fee_amount 253 and on_behalf_of the studio: €120.00 transferred, €2.53 back; Stripe fee €0.87 at the ledger's blended rate of 0.6% + €0.15 (assumption), leaving Larkfield €1.66.",
+              "shows": "The same three parties, different bookings and a different platform margin.",
+              "source": "Larkfield scenario ledger"
+            },
+            {
+              "kind": "table",
+              "what": "Mila's €120.00 three ways on each provider: studio, Larkfield's fee, provider cost, Larkfield net.",
+              "shows": "The two splits side by side with the assumptions labeled.",
+              "source": "Larkfield scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The payment as Adyen booked it.",
+            "introduces": "The same payment as Stripe would have.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p36",
+          "controlling_idea": "The payout of Thursday 11 March moves €117.47 out of Studio Noord's balance toward its bank, and from that day the amount is exposure: paid out and still reversible.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Payout marked sent 11 March 2027, arrived 25 March under Larkfield's 10-business-day window; ledger: owed to studio, payouts in transit, funds at provider.",
+              "shows": "The split's forward half is complete while its backward half stays open.",
+              "source": "Larkfield scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "The bookings of 9 March.",
+            "introduces": "The payout two days later.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p37",
+          "controlling_idea": "The €84.00 refund of 18 March is sent with a refund split that debits Studio Noord's balance account, which that week's sales cover, and Larkfield's ledger books it against the original payment's entries.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Refund €84.00 for seven unused classes; Larkfield's policy: the refund is debited from the studio's balance account and Larkfield keeps its €2.53 fee (illustrative policy); the studio's balance on 18 March holds €212.40 of later sales (assumption).",
+              "shows": "The ordinary case: the refund is netted against later sales and is invisible unless it has its own entry.",
+              "source": "Larkfield scenario ledger"
+            },
+            {
+              "kind": "table",
+              "what": "Ledger entries for 18 March, and the variant in which the balance is empty: 'to recover from studio' opened for €84.00, the liable balance account standing behind it.",
+              "shows": "The entry that was missing in 2025, and the clearing account that carries a seller's debt.",
+              "source": "Larkfield scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "The payout.",
+            "introduces": "The refund a week after it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p38",
+          "controlling_idea": "On Stripe the same refund would debit Larkfield's platform balance for €84.00, and Larkfield would ask for the transfer reversal in the same call, which Stripe's charges page says returns an error if the studio's balance is short.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Refund with reverse_transfer=true: 'a proportional amount of the transfer is reversed'; the application fee stays with the platform unless refund_application_fee is set; 'If the refund request also attempts a transfer reversal, but the connected account has an insufficient balance, the refund request returns an error'. The guide to separate charges and transfers excepts accounts with connected reserves from the balance condition on a transfer reversal; the pages do not say which rule governs a reversal sent with a refund, and the chapter says so.",
+              "shows": "The Stripe version makes the platform's fronting explicit: refund first without the reversal, or not at all.",
+              "source": "docs.stripe.com/connect/destination-charges; /charges (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The refund on Adyen.",
+            "introduces": "The same refund on Stripe.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p39",
+          "controlling_idea": "Larkfield's exposure figure per studio is the card volume paid out in the last 120 days less what has already been refunded or disputed, about €64,000 for a studio selling €16,000 a month, and it measures what can come back, not what will.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Exposure = paid-out online card volume inside the 120-day dispute window, less reversals already booked; Studio Noord at an assumed €16,000 a month: 4 × €16,000 = €64,000. Larkfield-wide: about €156 million (ledger).",
+              "shows": "A figure computable from the ledger's own entries, with its limits stated.",
+              "source": "Larkfield scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "One payment's open half.",
+            "introduces": "The same quantity summed per studio.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong",
+      "controlling_idea": "Splits fail quietly: a booking lands on the wrong balance, a refund waits for money that is not there, a reversal is made too early, or a seller's debt ages with no owner, and each is found by reconciling legs, not by watching payment statuses.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "S5",
+          "S4"
+        ],
+        "how": "Lists the failures with detection and recovery, each tied to documented provider behavior."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The failures in the order a payment can meet them: at the split, at the refund, at the dispute, and long after."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The example as it should run.",
+        "introduces": "The ways it does not.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p40",
+          "controlling_idea": "A split can be booked to the wrong balance without any error at payment time, on Adyen through the fallback to the liable account and on Stripe through a transfer that fails and is not retried.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen: fallback to the liable balance account, corrected by an internal transfer ('To correct the balances, you can transfer the funds between the balance accounts'). Stripe: 'Stripe doesn’t automatically retry failures … You must explicitly attempt the transfer again.'",
+              "shows": "Detection is a comparison of intended legs with booked legs; recovery is a movement the platform starts.",
+              "source": "docs.adyen.com split-chargebacks; docs.stripe.com/connect/account-balances (n.d., accessed 2026-11)"
+            }
+          ]
+        },
+        {
+          "id": "p41",
+          "controlling_idea": "A refund can be accepted and still not reach the customer: on Stripe it waits as pending when the debited balance is short and fails after 45 days, and on Adyen its outcome arrives later by webhook.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: refund status pending; 'If your platform’s balance is still insufficient 45 days after you create the refund, the refund fails with a failure_reason of insufficient_funds.' Adyen: 'You get the outcome of the refund request asynchronously, in a REFUND webhook.'",
+              "shows": "A refund is a state to follow, on a platform as elsewhere.",
+              "source": "docs.stripe.com/connect/charges; docs.adyen.com split-refunds (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "A failure at the split.",
+            "introduces": "A failure at the refund.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p42",
+          "controlling_idea": "Recovering a disputed amount from the seller before the dispute is decided creates a second movement to undo if the dispute is won, and on Stripe that return transfer fails if the platform's balance is short.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: 'If you reverse the transfer for a disputed payment that you challenge and win, transfering those funds back to a connected account can have unexpected results: If your platform has an insufficient balance, the transfer fails.' Adyen books a chargeback reversal and a second chargeback by the logic set on the payment.",
+              "shows": "The provisional nature of a dispute applies to the split's recovery as well.",
+              "source": "docs.stripe.com/connect/disputes; docs.adyen.com split-chargebacks (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "A failure at the refund.",
+            "introduces": "A failure at the dispute.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p43",
+          "controlling_idea": "A seller's negative balance that nobody ages becomes the platform's loss by default, after 180 days on Stripe and after 30 days on Adyen, so the recovery account needs an owner and a write-off rule.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: 'if a connected account’s balance remains negative for 180 days, we transfer funds from the platform reserve to cover the negative amount.' Adyen: a balance account negative for more than 30 days is compensated from the platform's liable (reserved compensation) account on the first day of the following month.",
+              "shows": "Two documented deadlines that move the debt to the platform without collecting it, both arguing for the platform's own aging.",
+              "source": "docs.stripe.com/connect/risk-management; docs.adyen.com/platforms/manage-liable-accounts (n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "scenario",
+              "what": "Larkfield's 'to recover from studio' clearing account under K3; open items older than five business days go to Priya Raman's weekly review.",
+              "shows": "The ledger gives the debt an age and an owner.",
+              "source": "Larkfield scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "Failures tied to one event.",
+            "introduces": "The failure that is only the passing of time.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "The charge type, the splits list, the chargeback logic and the payout schedule are four settings that answer one question in advance: when money comes back, which balance pays first and how fast was that balance emptied. A platform sets all four at integration, usually for other reasons, and reads the answer only when the first late refund arrives.",
+    "so_what": "A platform that tracks only 'paid' will meet its split decisions later as an unexplained difference between its ledger and the provider's balances; one that books every leg, reconciles every split and keeps an exposure figure per seller can state its position on any day, and can price or shorten that exposure with the payout schedule.",
+    "callback": {
+      "to": "The €317,200 of refunds after payout inside Larkfield's unexplained €412,000.",
+      "how": "The reader can now say what those refunds were (debits to balances already paid out, with no ledger entry on Larkfield's side) and which entries and which reconciliation would have shown them the day they happened."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Record every leg of a split under the payment's reference, set the refund split and chargeback booking deliberately on each provider, reconcile bookings per seller against the provider's report, and keep a per-seller figure for paid-out volume still inside the refund and dispute windows."
+    },
+    "hand_off": {
+      "to": "embedded-finance",
+      "relationship": "elaboration",
+      "carries_over": "The seller balance, which exists between the split and the payout and is emptied on a schedule.",
+      "introduces": "What a platform can offer if that money stays, is spent or is advanced (an account, a card, financing), and what each requires of the provider's license and of the platform."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The failures and their recoveries.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p44",
+        "form": "list",
+        "controlling_idea": "Established: a split is bookings to balances; the debit for a reversal follows the booking; fees on Adyen are calculated after the payment; an approved payment does not prove the seller was credited.",
+        "function": "synthesis"
+      },
+      {
+        "id": "p45",
+        "form": "list",
+        "controlling_idea": "Depends on context: which design to use, how long to delay payouts, whether to return the platform's fee on a refund, and when to recover from the seller during a dispute.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is settled.",
+          "introduces": "What depends on the platform's sellers, margins and who the merchant is.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p46",
+        "form": "list",
+        "controlling_idea": "The author's synthesis: the split is final when the windows close, not when the seller is paid, and the €317,200 was a set of entries Larkfield never wrote.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "emphasis",
+          "carries_over": "Conditional recommendations.",
+          "introduces": "The author's own position, with the callback to Larkfield's unexplained difference.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p47",
+        "form": "list",
+        "controlling_idea": "Eight questions let the reader test a split design or a provider's platform product.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The take-aways.",
+          "introduces": "Questions to carry into a design review.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p48",
+        "controlling_idea": "The seller balance exists only between the split and the payout, and the next chapter asks what a platform can offer when that money stays, is spent or is advanced.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "elaboration",
+          "carries_over": "The seller balance that the schedule empties.",
+          "introduces": "Accounts, cards and financing built on that balance, and what each requires.",
+          "form": "paragraph",
+          "placement": "both"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "Who the merchant is, account configurations, the liable account as a concept and who bears a seller's negative balance.",
+      "covered_in": [
+        "platform-payment-models"
+      ]
+    },
+    {
+      "topic": "Verifying sellers, capabilities and requirements that pause payouts.",
+      "covered_in": [
+        "platform-onboarding-and-verification"
+      ]
+    },
+    {
+      "topic": "Payout rails, payout states, returns and the payee check.",
+      "covered_in": [
+        "payouts-and-money-movement"
+      ]
+    },
+    {
+      "topic": "Balance states, reserves and deposits, pre-financing of payouts.",
+      "covered_in": [
+        "balances-and-funds-flows"
+      ]
+    },
+    {
+      "topic": "How refunds and card disputes work between issuer, network and acquirer; dispute evidence and deadlines.",
+      "covered_in": [
+        "refunds-reversals-and-disputes"
+      ]
+    },
+    {
+      "topic": "What the provider's fee consists of (interchange, scheme fees, markup) and platform pricing models.",
+      "covered_in": [
+        "payment-economics"
+      ]
+    },
+    {
+      "topic": "Ledger design and clearing accounts in general; reconciliation method and reports.",
+      "covered_in": [
+        "payment-ledgers",
+        "payment-reconciliation-and-reporting"
+      ]
+    },
+    {
+      "topic": "Accounts, cards and financing built on the seller balance; instant payouts to a card as a product.",
+      "covered_in": [
+        "embedded-finance"
+      ]
+    },
+    {
+      "topic": "The step-by-step journey of the platform payment and its refund.",
+      "covered_in": [
+        "journey-platform-payment"
+      ]
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "How either company stores splits, transfers and balances and keeps them consistent internally: not public.",
+    "The consent wording Adyen supplies for debiting a seller's bank account could not be re-read in the terms-of-service page fetched in this session; the chapter does not quote it.",
+    "Adyen's refund split logic without instructions is documented as in pilot and not available for all platforms; the chapter marks it so.",
+    "Larkfield's Stripe charge type is not fixed by the scenario ledger; the chapter uses a destination charge with on_behalf_of as the 'had Studio Noord been on Stripe' version and records it as an addition."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "The liability rule (a loss falls on the booked balance, then on the party behind it) is stated in one paragraph with a link, since ruling 7 gives it to platform-payment-models; this chapter covers the mechanics.",
+      "rejected": [
+        "Re-deriving the rule from network rules and account configuration here"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The forward split gets one section per provider and the reversals one shared section, so refund and chargeback can be read across providers in pairs.",
+      "rejected": [
+        "One long section per provider covering split, refund, dispute and payout",
+        "A section per event with both providers in every paragraph"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Designs are stated provider-neutrally (seller-first, platform-first, collect-then-distribute) and mapped to each provider's configuration.",
+      "rejected": [
+        "Using Stripe's three charge types as the designs, which would leave Adyen as a footnote"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The Stripe version of Mila's pass is a destination charge with an application fee and on_behalf_of the studio; Larkfield's refund policy keeps its fee and debits the studio's balance. Both are labeled illustrative and appended to the scenario ledger.",
+      "rejected": [
+        "A direct charge, which would make the studio's balance the first debit and hide the platform's fronting",
+        "Returning the fee pro rata, which adds arithmetic without changing the argument"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Payout rails, returns and instant payouts are left to chapter 14 and chapter 36; this chapter covers only the schedule as a control on exposure.",
+      "rejected": [
+        "A full payouts section repeating chapter 14"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/PLAN.md, contract 35",
+      "contributed": "Scope, owned terms, the Larkfield examples."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/_research/scenario-ledger.md",
+      "contributed": "Mila's class pass, the refund after payout, the Unexplained €0.4 Million, Keel K3 accounts, cast."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/_research/consistency-issues.md, rulings 7 and 18",
+      "contributed": "Ownership of the liability rule; pre-financing documented for Adyen only."
+    },
+    {
+      "kind": "external",
+      "ref": "Stripe documentation (n.d., accessed 2026-11): connect/charges, destination-charges, direct-charges, separate-charges-and-transfers, disputes, direct-charges-fee-payer-behavior, account-balances, risk-management, account-debits, manage-payout-schedule, top-ups, cross-border-payouts, instant-payouts, funds-segregation",
+      "contributed": "Charge types, application fee flow, refunds and disputes by charge type, transfer reversal, negative balances and the 180-day rule, payout schedule, top-ups, cross-border payouts."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen documentation (n.d., accessed 2026-11): platforms/online-payments/split-transactions, transaction-fees, split-refunds, split-chargebacks; automatic-split-configuration; how-adyen-applies-split-instructions; account-structure-resources; settle-funds; managed-payouts; custom-payouts/scheduled-payouts; internal-fund-transfers; top-up-balance-account; reports-and-fees/balance-platform-accounting-report; release notes (20 May 2026)",
+      "contributed": "Split types, fees calculated after the payment, the fallback to the liable account, refund split limits, chargeback logic, sales day settlement, payout schedules, top-ups, the accounting report."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "After the flow rubric: direct charges now precede destination charges so the Stripe section runs in the order of the three designs; exposure is defined where the timing gap is introduced; the scene's three questions follow the chapter's order. Not acted on: cutting the paragraph on sellers in other countries, which the chapter contract requires."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "First draft of the spec from the PLAN contract, the journal spec entry and the research on platforms and ledgers; load-bearing documentation pages re-fetched the same day."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 84 claims checked (70 confirmed, 8 corrected, 4 hedged, 0 unsupported and removed or relabeled, 0 unreachable, 2 not checked); the two 'not public' statements about Adyen were wrong and were replaced by what Adyen documents: negative balances are allowed for up to 30 days and then compensated from the platform's reserved compensation account, and the Managed Risk pilot has Adyen assume responsibility for negative balances."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: 'how either company stores these bookings is not public' narrowed (both have published general accounts of their internal ledgers, cited in chapter 12; how platform splits and transfers are booked in them is not public)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('How either company stores and keeps these bookings consisten' -> 'Each company has published a general account of its internal')."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Sweep of rulings 46 to 48: thesis how_why aligned with the prose: both companies have published general accounts of their ledgers, and what is not public is how platform splits and transfers are booked in them. Prose and units unchanged."
+    }
+  ],
+  "length": {
+    "target_words": 5200,
+    "max_words": 6500
+  }
+}

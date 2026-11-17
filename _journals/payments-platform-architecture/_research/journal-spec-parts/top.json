@@ -1,0 +1,260 @@
+{
+  "$schema": "../../_wiring/outcome-specs/journal-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "journal",
+  "id": "payments-platform-architecture",
+  "title": "SETTLED: Architecting Payments and Revenue Infrastructure",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "basis": "Authored before any prose, from PLAN.md, config.yaml, the style guide, the scenario ledger and the verified research briefs in _research/. The author confirmed the journal thesis on 17 November 2026, then, after the research briefs showed the second half was only partly supported, approved its rewording ('built first', with convergence by 2026) and the ten part theses the same day, and set the spec to accepted.",
+  "intent": {
+    "outcome": {
+      "know": [
+        "How a payment moves between cardholder, issuer, network, acquirer, provider and merchant, from authorization through clearing, settlement and payout to the dispute window.",
+        "What each major component of payment and revenue infrastructure is for: payment state machines, idempotency, ledgers, reconciliation, tokens and vaults, risk scoring, authentication, billing engines, platform account models.",
+        "What Stripe and Adyen have each publicly documented about how they build these components, how old that evidence is, and where the public record stops.",
+        "The sixteen named failure patterns of payment systems."
+      ],
+      "believe": [
+        "The answer a payment API returns is the first of several promises, and a payment is done only when it is settled and every record of it agrees.",
+        "Most of the architecture exists to close the gap between the instant answer and the slow truth without losing or duplicating money.",
+        "Stripe and Adyen are two coherent answers to the same problem, and neither is the answer for every business."
+      ],
+      "can_do": [
+        "Trace a payment incident to the promise that was mistaken for the truth and name the mechanism that should have caught it.",
+        "Design the integration side of a payment system: keys, states, webhooks, a ledger entry per movement and a daily reconciliation.",
+        "Read a claim about a provider's architecture and say whether it is documented, dated, inferred or unknown.",
+        "Compare Stripe and Adyen for a stated business on license and money-holding, connectivity, API model, platform model and billing, citing the evidence for each difference."
+      ]
+    },
+    "audience": {
+      "who": "Software engineers and architects who are new to payments: people who build software for a living and have just been asked to integrate, operate, extend or evaluate payment and revenue infrastructure.",
+      "already_knows": [
+        "APIs, HTTP, databases, queues, webhooks as a mechanism, retries, replication and basic distributed-systems vocabulary.",
+        "What paying online and at a terminal is like from the customer's side."
+      ],
+      "does_not_know": [
+        "Payments vocabulary: issuer, acquirer, interchange, clearing, settlement, chargeback, 3-D Secure, network token, payment facilitator, safeguarding, dunning, merchant of record.",
+        "How card networks, banks and regulation constrain what software may do with money.",
+        "What Stripe and Adyen have and have not published about their internals."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Every supporting claim of the journal thesis is argued by at least one part, and every part except Reference supports at least one.",
+        "check": "children_cover_parent_thesis",
+        "method": "deterministic",
+        "severity": "blocker"
+      },
+      {
+        "id": "AC-2",
+        "statement": "A reader of the introduction alone can say what the book argues and list the subjects of its parts in order.",
+        "check": "intro_predicts_content",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "After reading only the introduction: what does this book argue, and what will its parts cover, in order?",
+        "expected": "The instant answer is not the truth and the architecture exists to close that gap; then the sequence: how money moves, getting a payment approved, ledgers and money movement, the API, trust (card data, fraud, authentication, compliance), billing and revenue, platforms, scale and reliability, four end-to-end journeys, and the Stripe and Adyen bets."
+      },
+      {
+        "id": "AC-3",
+        "statement": "Each part's last argued page hands off to the next part with the relationship that part declares in transition_in.",
+        "check": "transition_expresses_declared_relationship",
+        "method": "rubric",
+        "severity": "major"
+      },
+      {
+        "id": "AC-4",
+        "statement": "No chapter uses a payments, banking or billing term before the chapter that owns it, or a one-clause definition, has introduced it.",
+        "check": "known_before_new",
+        "method": "rubric",
+        "severity": "major"
+      },
+      {
+        "id": "AC-5",
+        "statement": "The page that carries the journal's closing synthesizes the parts and returns to Mila's class pass; it does not only hand off to the reference pages.",
+        "check": "conclusion_calls_back_to_introduction",
+        "method": "rubric",
+        "severity": "major"
+      },
+      {
+        "id": "AC-6",
+        "statement": "Given a described payment incident the book does not contain, a reader who finished the book names the promise that was mistaken for the truth and the mechanism that closes that gap.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A ticketing site shows 'payment failed' after a timeout, the customer pays again, and two charges appear on the statement the next day. What went wrong, in the book's terms, and what should have prevented it?",
+        "expected": "The timeout left the outcome unknown, and the site treated no answer as a failure; the retry was sent as a new request. An idempotency key derived from the business event, plus fetching the provider's record before retrying, would have made the second attempt a no-op (the Double Charge)."
+      },
+      {
+        "id": "AC-7",
+        "statement": "A reader can tell, for any statement in the book about Stripe or Adyen, whether it is a documented fact with a date, an inference, or an acknowledged gap in the public record.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "Why is payment and revenue infrastructure hard to build, and what explains the different ways Stripe and Adyen built it?",
+    "claim": "Payment infrastructure is hard because the instant answer a customer sees is not the truth: the truth arrives over days, from parties that cannot see each other, and can be reversed for months. Every major component (state machines, idempotency, ledgers, reconciliation, tokens, risk, platform accounts) exists to close that gap without losing or duplicating money, and Stripe and Adyen differ mainly in which side of the gap they built first: Adyen the regulated money path (license, acquiring, one platform it runs on servers it manages itself), Stripe the developer's abstraction over it (API, product suite, named acquirers). By 2026 each is building toward the other's side, and the public record shows the order of construction more clearly than the reasons for it.",
+    "disputed_by": "The view that payments are a solved commodity behind an API, so that the hard part is only integration breadth and scale, and that Stripe and Adyen differ only in which customers they sell to.",
+    "so_what": "A team that accepts the claim stops treating the API response as the outcome, designs for the unknown and the late (keys, states, ledger entries, reconciliation), and chooses or combines providers by what each built first and still does itself, instead of by reputation.",
+    "how_why": "An authorization is the issuer's promise, a capture is a claim, clearing and settlement move money days later through networks the merchant never sees, and a dispute can undo it months afterwards. A provider makes this look like one call, and each mechanism in the book is a way of keeping that appearance honest. Starting from the regulated path lets a provider control the slow truth directly; starting from the abstraction lets it hide the path's variety from developers. Each starting point has consequences for licenses, connectivity, API design, product breadth and what customers must do themselves.",
+    "supporting_claims": [
+      {
+        "id": "J1",
+        "claim": "A payment is a chain of promises made by different parties over days, and no single message makes it final."
+      },
+      {
+        "id": "J2",
+        "claim": "Whether a payment is approved depends on how the provider is connected to the networks and how it models the payment, not on a yes or no the network hands out."
+      },
+      {
+        "id": "J3",
+        "claim": "A provider knows where money is only because it records every movement twice and proves that record against parties outside itself."
+      },
+      {
+        "id": "J4",
+        "claim": "An API can safely hide a slow, multi-party process only if idempotency, versioning and events are part of its design from the start."
+      },
+      {
+        "id": "J5",
+        "claim": "Controls over card data, fraud, authentication and compliance move data and liability between parties; they do not remove risk."
+      },
+      {
+        "id": "J6",
+        "claim": "Billing adds a second, time-driven state machine on top of payments, and its typical failures are failures of time: late, twice, or in the wrong period."
+      },
+      {
+        "id": "J7",
+        "claim": "When a platform stands between payer and seller, the account model it chooses is its liability model."
+      },
+      {
+        "id": "J8",
+        "claim": "A money path must be correct before it is available, and that priority shapes how reliability, data stores and change are engineered."
+      },
+      {
+        "id": "J9",
+        "claim": "Followed end to end, one payment crosses every one of these mechanisms, and its failures occur at the hand-offs between them."
+      },
+      {
+        "id": "J10",
+        "claim": "Stripe and Adyen differ mainly in which side of the gap they built first, the regulated money path or the developer's abstraction over it; by 2026 each is building toward the other's side, and the public record shows the order of construction more clearly than the reasons for it."
+      }
+    ]
+  },
+  "flow": {
+    "pattern": "prerequisite_order",
+    "additional_patterns": [
+      {
+        "pattern": "chronological",
+        "applies_to": "part-1: the payment in the order it happens, from authorization to dispute"
+      },
+      {
+        "pattern": "small_to_large",
+        "applies_to": "part-6 to part-8: from one merchant's recurring revenue, to a platform with many sellers, to the whole system under load"
+      },
+      {
+        "pattern": "assertion_evidence_reasoning",
+        "applies_to": "part-9 and part-10: the mechanisms shown together on four payments, then tested against the two companies"
+      }
+    ],
+    "rationale": "Each part needs the vocabulary of the ones before it: the parties and the timeline (I) before approval (II); both before the ledger that records them (III); the ledger's balances and the state machine before the API that exposes them (IV); the API before the controls that sit in its path (V). Billing (VI) comes after the controls because recovering a failed renewal uses stored credentials and tokens from Part V; put before it, dunning would rest on terms not yet defined. Platforms (VII) need the balances of Part III and the verification state of Part V, not billing; they follow Part VI because one merchant's revenue is the smaller case and many sellers the larger, and swapping the two would cost little. Scale (VIII) comes after every mechanism because each of its chapters asks how one of them behaves under failure, load or change. The journeys (IX) and the company comparison (X) come last because they use all of it: moving the Stripe and Adyen cases to the front would ask the reader to judge two architectures before knowing what problem they solve."
+  },
+  "opening": {
+    "carried_by": "introduction",
+    "hook": {
+      "type": "vivid_anecdote",
+      "content": "At 19:42 on Tuesday 9 March 2027, Mila Janssen buys a ten-class pass for €120 in a studio's app and sees 'Payment successful' two seconds later. At that moment no money has moved: her bank has made a promise, and the studio will be paid on Thursday, by systems that never saw her tap the button."
+    },
+    "bridge": "From the developer's side, where a payment is one API call that returns success, to the provider's side, where that answer is the first of several promises kept over days by parties that cannot see each other.",
+    "roadmap": "Who the book is for; ten parts from how money moves to how Stripe and Adyen chose to build; how the 'Where They Differ' sections and evidence labels work; the fictional platform Larkfield and the recurring payment; what the book leaves to its sibling books."
+  },
+  "closing": {
+    "carried_by": "payments-what-is-moving",
+    "synthesis": "Every mechanism in the book answered the same question for a different kind of promise: what do we do between the instant answer and the slow truth. Agents, stablecoins and instant payments shorten or move the gap; none removes the need to know who promised what and to prove that the records agree.",
+    "so_what": "The reader can judge a new payment technology, or a provider, with one question before any feature comparison: which promise does it change, who now carries it, and how will I know the money arrived.",
+    "callback": "Mila's €120 from the introduction: successful at 19:42 on Tuesday, settled and paid to the studio on Thursday, and still reversible in June.",
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Start with the payment state card, the idempotency key card and the reconciliation card from the toolkit, for the reader's own integration."
+    }
+  },
+  "non_goals": [
+    {
+      "topic": "Reconciliation, clearing accounts and posting to the ERP from the enterprise finance side.",
+      "covered_in": [
+        "RECONCILED"
+      ]
+    },
+    {
+      "topic": "Payments as seen by a merchant's order system, and commerce platforms generally.",
+      "covered_in": [
+        "ORDERED"
+      ]
+    },
+    {
+      "topic": "A complete product guide to Stripe or Adyen, or integration tutorials for their APIs."
+    },
+    {
+      "topic": "Inferred internal topologies (service names, data-center layouts, database schemas) of any real company."
+    },
+    {
+      "topic": "Issuer-side and card-network-side system design beyond what an acquirer-side builder needs."
+    },
+    {
+      "topic": "Cryptocurrency trading, lending products and consumer banking apps."
+    }
+  ],
+  "open_questions": [],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "PLAN.md",
+      "contributed": "Positioning, the central idea, the structure, and each page's folder, permalink, title, question and coverage."
+    },
+    {
+      "kind": "internal",
+      "ref": "config.yaml",
+      "contributed": "Part titles and the reading order."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/style-guide.md",
+      "contributed": "Audience, evidence discipline, page format, failure-pattern names."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "Larkfield, the recurring payment and the incidents used in openings and closings."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-*.md",
+      "contributed": "The verified, dated evidence behind every thesis about Stripe, Adyen, the networks and regulation."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Journal level written; thesis confirmed by the author; parts specified from PLAN.md and the research briefs."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Flow rubric (fresh reader, order of ideas only): sound with notes. Flow rationale corrected (Part VII depends on Parts III and V, not VI); overlap and forward-reference notes recorded as rulings 1-10 in _research/consistency-issues.md."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Author approved the reworded second half of the thesis (J10: 'built first', convergence by 2026) and the ten part theses; status set to accepted on the author's instruction."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Part thesis claims of Parts I, V, VIII and X reworded as approved by the author: four clauses that verification showed to be too strong (payout timing, exemption liability, what is published on regions and failover, Adyen's license date, hosting and Stripe's named acquirers)."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Approved by the author: journal thesis wording ('runs on servers it manages itself', 'named acquirers'), Part VIII claim scoped to the payment path, chapter 48 section retitled 'First Customers and Today's Defaults'."
+    }
+  ]
+}

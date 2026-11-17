@@ -1,0 +1,1329 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "local-payment-methods",
+  "journal": "payments-platform-architecture",
+  "part": "part-2",
+  "title": "A Payment Is Not a Card: Local Methods and Real-Time Rails",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "The payment method families and the properties on which they differ from cards: who starts the payment, when the outcome is known, whether there is a hold to capture, whether and for how long the payer can take the money back, how a refund travels, whether a mandate is needed, and when funds settle.",
+        "How Stripe (a PaymentMethod object with a type; dynamic payment methods by default since API version 2023-08-16) and Adyen (a method type passed to the Checkout API, a documented flow type and capture mode per method, methods configured on the merchant account) each present methods through one API."
+      ],
+      "believe": [
+        "A status of 'succeeded' is a different promise for a card, a bank redirect and a direct debit, and no provider can change that because the scheme sets it.",
+        "'Real-time' describes how fast the payer's money moves, not whether the payment is final for the merchant or when the merchant has the funds."
+      ],
+      "can_do": [
+        "Given a payment method they have not used, list the questions that decide what their system may do after 'succeeded' and find the answers in a provider's method page.",
+        "Write a per-method-family policy (grant access, pay out, expect a reversal until when) instead of branching on the status alone."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a method the chapter does not walk through, the reader asks the questions that separate it from a card before deciding how to fulfill and pay out.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "Your company will start accepting a voucher method: the customer gets a barcode at checkout and pays cash at a convenience store within three days. Using only this chapter, list four questions you must answer before deciding when to ship the order and how refunds will work.",
+        "expected": "Four of: when and how the outcome is confirmed (days later or never, by webhook, not in the API response); whether there is any authorization or hold to capture (no, one step); whether the payer can take the money back afterwards and until when; how a refund is sent when there is no card to reverse to and whether it can fail; when funds settle; what the customer must do next and what happens if they do not."
+      },
+      {
+        "id": "AC-2",
+        "statement": "Given two providers' terms for the same scheme event, the reader recognizes them as one rule and maps them to a neutral term of their own.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "For a returned direct debit, one provider's report shows a 'dispute' and another's shows a 'chargeback'; the second provider also shows a 'chargeback' when the customer's account simply had no money. A dashboard adds these up as 'fraud disputes'. What is wrong, using only this chapter?",
+        "expected": "The two words name the same scheme event in different vocabularies, and an unpaid debit is a failed collection, not a customer dispute; summing them overstates disputes. The integration needs its own terms that separate a payer's refund claim, an unauthorized-debit claim and a failed collection."
+      },
+      {
+        "id": "AC-3",
+        "statement": "Scheme rules are attributed to the scheme or the law with their dates, provider behavior to the provider's documentation with its date, and items in preview or migration (iDEAL to Wero) are marked as likely to change.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "How does one API accept a hundred payment methods whose semantics differ?",
+    "claim": "One API accepts many payment methods by unifying how a payment is started and how its status is reported; it cannot unify what 'succeeded' means, because when the outcome is known, whether there is a hold to capture and whether the payer can take the money back are fixed by each scheme. The integration therefore has to carry a rule per method family for what it may do after 'succeeded'.",
+    "disputed_by": "The view that the provider's abstraction is complete: once every method sits behind the same call and the same status field, the integration can treat them alike, and the differences are edge cases the provider absorbs.",
+    "so_what": "A team that grants access, ships or pays a seller out on the status word alone has built the failure pattern A Card by Any Other Name. On a platform the cost lands in balances: a payment that can be taken back for weeks needs a payout rule that knows which method carried it.",
+    "how_why": "The scheme rules differ in kind. An iDEAL payment cannot be disputed through the payer's bank; a SEPA direct debit can be refunded without a reason for eight weeks and contested as unauthorized for thirteen months under PSD2 (2015, still in force), and is confirmed days after submission. Stripe's documentation says in general terms that a succeeded payment 'can still be refunded, disputed, returned, or reversed'. The two providers present the variety differently: Stripe stores the instrument as a PaymentMethod object and, by default since API version 2023-08-16, chooses which methods to show per session; Adyen takes the method as a parameter, returns the methods configured on the merchant account, and documents a flow type and a capture mode (immediate or separate) per method. They also name the same scheme event differently, a 'dispute' at Stripe and a 'chargeback' at Adyen. Neither publishes a list of the methods it reaches through another payment company (single method pages name a partner), so the chapter describes the contract each documents and not what is behind it.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "Payment methods differ from cards on a fixed set of properties (who starts the payment, when the outcome is known, whether there is a hold, whether and until when the payer can take the money back, how a refund travels, whether a mandate is needed, when funds settle) that the scheme or the law sets."
+      },
+      {
+        "id": "S2",
+        "claim": "A succeeded status is therefore a different promise for each method family, and real-time describes speed, not finality or the arrival of funds."
+      },
+      {
+        "id": "S3",
+        "claim": "Stripe and Adyen unify how a payment is started and how its status is reported through different abstractions: a stored instrument and a provider-chosen list, or a method parameter, a configured list and a documented flow and capture mode."
+      },
+      {
+        "id": "S4",
+        "claim": "Both abstractions leak at capture, refund, reversal and timing, the two providers name the same scheme event differently, and neither publishes what stands behind a method."
+      },
+      {
+        "id": "S5",
+        "claim": "The integration therefore has to carry a rule per method family, with terms of its own, for what it may do after success."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Shows that 'yes' has more than one meaning, so that the state model of the next chapter and every later use of 'approved' carries the method with it.",
+    "supports": [
+      "P2-2"
+    ]
+  },
+  "flow": {
+    "pattern": "problem_solution",
+    "additional_patterns": [
+      {
+        "pattern": "prerequisite_order",
+        "applies_to": "scene, seven-questions, method-by-method, one-api: each supplies the terms the next uses"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "one-api, three-designs, where-they-differ"
+      }
+    ],
+    "rationale": "The reader meets a payment that was paid and then was not before any vocabulary, so the seven questions arrive as the answer to a felt problem. The questions come before the method-by-method evidence because the evidence is read against them, and the schemes come before the providers because the providers' abstractions can only be judged once the reader knows what they are abstracting over. The integrator's designs follow the leaks they respond to; the provider comparison follows both; the worked example applies the chosen design; the failures close the body. Putting the providers first would present two APIs as the subject and hide that the differences come from the schemes."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "On the 1st of the month a member's €49 membership, paid by direct debit, shows as paid. She books three classes. On the 6th her bank sends the debit back: there was not enough money in the account. Was the payment ever paid?"
+    },
+    "bridge": {
+      "from_reader_world": "An engineer integrating a payment API sees one call, one status field and a list of method names, and reasonably treats the method as a parameter.",
+      "to_topic": "The status field is shared and its meaning is not: what a system may do after 'succeeded' depends on rules the provider did not write."
+    },
+    "thesis_statement": {
+      "text": "One API can unify how a payment is started and how its status is reported. It cannot unify what success means, so the integration carries a rule per method family.",
+      "placement": "KEY POINTS callout, first bullet, and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p05",
+      "promises": [
+        {
+          "promise": "Start from what broke at Larkfield when a direct debit was treated like a card.",
+          "kept_in": [
+            "scene"
+          ]
+        },
+        {
+          "promise": "Set out the seven questions that separate a method from a card.",
+          "kept_in": [
+            "seven-questions"
+          ]
+        },
+        {
+          "promise": "Read what success promises for each method family.",
+          "kept_in": [
+            "method-by-method"
+          ]
+        },
+        {
+          "promise": "Show how Stripe and Adyen each present many methods through one API, and where they differ.",
+          "kept_in": [
+            "one-api",
+            "where-they-differ"
+          ]
+        },
+        {
+          "promise": "Compare three ways to handle the differences in your own code.",
+          "kept_in": [
+            "three-designs"
+          ]
+        },
+        {
+          "promise": "Work a direct debit through Larkfield's rule per method family and end with the failures.",
+          "kept_in": [
+            "in-practice",
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "function": "context",
+        "controlling_idea": "A membership paid by direct debit can be reported as collected on the 1st and be taken back by the member's bank days or weeks later, with nothing in the status word to warn of it.",
+        "organization": "narration",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "A studio member's €49 membership debit is marked paid on the 1st, the member books classes, and on the 6th the bank returns the debit for lack of funds.",
+            "shows": "The same status that was safe to act on for a card was not safe for this method.",
+            "source": "Larkfield scenario ledger (fictional)"
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "function": "claim",
+        "controlling_idea": "One API can unify how a payment is started and how its status is reported, and it cannot unify what success means, because each scheme fixes when the outcome is known, whether there is a hold and whether the payer can take the money back.",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The debit that was paid and then was not.",
+          "introduces": "The reason: the meaning of success is set by the scheme, not by the provider's API.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "function": "explanation",
+        "controlling_idea": "The cost of reading every method as a card lands in three places: access granted too early, sellers paid out with money that can still leave, and reports that count a failed collection as a dispute.",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The claim that success differs by method.",
+          "introduces": "Where the difference costs money or trust, which is the book's gap between the instant answer and the slow truth.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "function": "context",
+        "controlling_idea": "Mila's class pass is a card payment made from a phone wallet, so this chapter covers the step before the journey starts, the choice of method at checkout, and asks what every later step would have looked like had she chosen iDEAL or a direct debit.",
+        "transition_in": {
+          "relationship": "place",
+          "carries_over": "The chapter's subject.",
+          "introduces": "Its position on the recurring payment's journey.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p05",
+        "function": "transition",
+        "controlling_idea": "The chapter starts at Larkfield, sets out seven questions that separate a method from a card, reads what success promises method by method, shows how Stripe and Adyen each present the variety through one API, compares three ways to handle the differences in your own code, sets the two providers side by side, works a direct debit through Larkfield's rule per method family, and ends with the failures.",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The position on the journey.",
+          "introduces": "The order of the sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: Paid Until It Was Not",
+      "controlling_idea": "Larkfield applied one rule to every payment method, and for direct debits the rule granted access, paid studios and counted disputes on a status that could still be reversed.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S5",
+          "S2"
+        ],
+        "how": "Shows the cost of acting on the status word alone before any vocabulary is introduced."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The introduction's claim that success means different things.",
+        "introduces": "One company where almost half the volume is not cards and one rule covered all of it.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p06",
+          "function": "context",
+          "controlling_idea": "In February 2027 Femke de Graaf, who leads Keel, Larkfield's 2027 program to repair its payments estate, finds that almost half of the online volume is not paid by card, while the payment record store applies one rule to every method: `paid` grants access and counts toward the studio's payout.",
+          "organization": "narration",
+          "evidence": [
+            {
+              "kind": "statistic",
+              "what": "Online method mix 2026 by volume: cards 52%, SEPA Direct Debit 21%, iDEAL 14%, Bacs Direct Debit 5%, Bancontact 4%, other 4%.",
+              "shows": "48% of volume runs on methods whose rules the one rule ignores.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ]
+        },
+        {
+          "id": "p07",
+          "function": "example",
+          "controlling_idea": "Treating a direct debit like a card produced three symptoms at Larkfield: members who had access and then lost it, studios whose balance was debited after payout, and a dispute report inflated by debits that had simply bounced.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "About 325,000 direct debits a month (21% of €910M a year at the typical €49); an assumed 1.5% come back, about 4,900 a month; on the Adyen side each arrived as a chargeback event and was recorded as `disputed`.",
+              "shows": "The failure is routine volume, not an edge case, and the two providers' words made it look like fraud.",
+              "source": "Larkfield scenario ledger (fictional); the return rate is a labeled assumption"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen: 'A SEPA chargeback notification can indicate that: ... There were insufficient funds in the shopper's bank account' (https://docs.adyen.com/payment-methods/sepa-direct-debit, n.d., accessed 2026-11).",
+              "shows": "The behavior shown in the scene is documented, not invented."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The one rule for every method.",
+            "introduces": "What it did when the method was a direct debit.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p08",
+          "function": "claim",
+          "controlling_idea": "The question Femke writes down is not which methods to offer but what Larkfield may do after `paid`, for each kind of method.",
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "Three symptoms of one rule.",
+            "introduces": "The question the rest of the chapter answers.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ],
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The finding, its three symptoms, then the question Femke writes down: the reader reaches the chapter's question the way she did. Stating the question first would make it an abstract one, with no cost attached."
+      }
+    },
+    {
+      "id": "seven-questions",
+      "heading": "Seven Questions That Separate a Method From a Card",
+      "controlling_idea": "Methods differ from cards on seven properties that the scheme or the law fixes, and push or pull is the one from which most of the others follow.",
+      "function": "definition",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "Supplies the properties in which the rest of the chapter states every difference."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "Femke's question of what may be done after `paid`.",
+        "introduces": "The properties that decide the answer, as seven questions.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p09",
+          "function": "definition",
+          "controlling_idea": "A payment method is a way of paying that runs on a scheme, a body of rules and a network of participants, and both providers sort methods into families whose members behave alike.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'Payment methods in the same family have similar features and checkout experiences' and its family list: cards, bank debits, bank redirects, bank transfers, buy now pay later, real-time payments, vouchers, wallets (https://docs.stripe.com/payments/payment-methods/overview, n.d., accessed 2026-11).",
+              "shows": "The family, not the brand, is the unit a design can reason about."
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen's catalog gives each method a payment type and a payment flow: Direct, Redirect, Additional action, await, qrCode, voucher (https://docs.adyen.com/payment-methods, n.d., accessed 2026-11).",
+              "shows": "The second provider classifies along the same lines with different words."
+            }
+          ]
+        },
+        {
+          "id": "p10",
+          "function": "claim",
+          "controlling_idea": "Seven questions separate any method from a card, and the answers decide what a system may do after success.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Question / the card answer / what other methods do, seven rows: who starts the payment, when the outcome is known, is there a hold to capture, can the payer take it back and until when, how does a refund travel, is a mandate needed, when do funds settle.",
+              "shows": "Gives the reader the checklist that the voucher probe and every unfamiliar method is answered with; synthesized by the author from both providers' per-method property lists."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "Families of methods that behave alike.",
+            "introduces": "The properties on which families differ.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "function": "definition",
+          "controlling_idea": "Who starts the payment matters most: in a push the payer instructs their own bank, and in a pull the merchant instructs the payer's bank under a permission, which is why pulls stay revocable and pushes mostly do not.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "A payer who approved a transfer in their own banking app has little ground to deny it; a payer whose account was debited by someone else is protected by a right to reverse it. Finality is the point after which the payer can no longer take the payment back through their bank.",
+              "shows": "Explains why the schemes differ instead of listing that they do."
+            }
+          ],
+          "transition_in": {
+            "relationship": "emphasis",
+            "carries_over": "The seven questions.",
+            "introduces": "The first one, push or pull, and the terms account-to-account payment and finality that follow from it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p12",
+          "function": "definition",
+          "controlling_idea": "A mandate is the payer's standing permission for a named creditor to pull money, and it is a record somebody must be able to produce years later.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: 'Checkout and the Payment Element automatically display the required mandate terms and record the customer's acceptance' (https://docs.stripe.com/payments/sepa-debit, n.d., accessed 2026-11); Adyen: 'By default, Adyen uses its creditor ID on your behalf' and 'Adyen is only notified of a cancelled SEPA mandate when a payment is charged back' (https://docs.adyen.com/payment-methods/sepa-direct-debit, n.d., accessed 2026-11).",
+              "shows": "Shows the mandate as data with an owner and with a blind spot: cancellation is learned from a failure."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "Pull payments made under a permission.",
+            "introduces": "The permission itself, the mandate, and who keeps it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ],
+      "flow": {
+        "pattern": "large_to_small",
+        "rationale": "Families first, then the seven questions, then the two terms (push or pull, mandate) that need more than a table cell; the terms would be unreadable before the table that places them."
+      }
+    },
+    {
+      "id": "method-by-method",
+      "heading": "What “Succeeded” Promises, Method by Method",
+      "controlling_idea": "Read against the seven questions, a succeeded status is a different promise for a bank redirect, a direct debit, a wallet, a real-time payment and a voucher, and speed is not finality.",
+      "function": "evidence",
+      "advances_thesis": {
+        "supports": [
+          "S1",
+          "S2"
+        ],
+        "how": "Carries the evidence that the differences are of kind and are set outside the provider."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The seven questions.",
+        "introduces": "The answers for each family, from law and from both providers' documentation.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p13",
+          "function": "claim",
+          "controlling_idea": "Stripe's own documentation says that a succeeded payment has completed according to its method's flow and can still be undone, so the status word is a statement about the method's process and not about the money.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'A `succeeded` status indicates that the payment completed successfully according to the payment method's processing flow, but funds can still be refunded, disputed, returned, or reversed' (https://docs.stripe.com/payments/payment-methods, n.d., accessed 2026-11).",
+              "shows": "A provider states the chapter's thesis about its own status field."
+            }
+          ]
+        },
+        {
+          "id": "p14",
+          "function": "explanation",
+          "controlling_idea": "A bank redirect such as iDEAL or Bancontact is a push with an immediate answer, no hold to capture and no dispute through the payer's bank.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe on iDEAL: 'immediate notification'; manual capture support No; 'Customers can't dispute iDEAL | Wero payments with their bank' (https://docs.stripe.com/payments/ideal, n.d., accessed 2026-11). Stripe on Bancontact: 'customers can't file a chargeback through their bank' (https://docs.stripe.com/payments/bancontact, n.d., accessed 2026-11). Adyen's iDEAL row: flow redirect, no separate captures, no chargebacks (https://docs.adyen.com/payment-methods/ideal, n.d., accessed 2026-11).",
+              "shows": "Both providers document the same scheme properties, so the properties belong to the scheme."
+            },
+            {
+              "kind": "figure",
+              "what": "Three lanes side by side: a card pull with a hold, a bank redirect push, a direct debit pull with no hold and a long take-back window.",
+              "shows": "Lets the reader see the three shapes before the detail of the third."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "Success defined per method.",
+            "introduces": "The first family, bank redirects, and the redirect flow.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p15",
+          "function": "evidence",
+          "controlling_idea": "For a direct debit in euros, EU law gives the payer two separate rights: a refund without a reason for eight weeks, and a claim that the debit was never authorized for thirteen months.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "PSD2, Directive (EU) 2015/2366, published 2015-12-23, still in force: Article 76(1) 'the payer has an unconditional right to a refund within the time limits laid down in Article 77'; Article 77(1) 'for a period of 8 weeks from the date on which the funds were debited'; Article 71(1) 'no later than 13 months after the debit date' (http://publications.europa.eu/resource/celex/32015L2366). Evidence age 11 years; PSD3 and the Payment Services Regulation are due to replace it.",
+              "shows": "The windows come from law, so no provider can shorten them."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A push that the payer cannot take back.",
+            "introduces": "A pull that the payer can take back, and the law that says so.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p16",
+          "function": "evidence",
+          "controlling_idea": "Both providers document a SEPA Direct Debit as an outcome that arrives days after the request and a reversal the merchant cannot contest.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: 'Payment confirmation timing: At least 6 business days after submission'; 'Wait at least 6 business days before treating a SEPA Direct Debit payment as successful'; 'You can't submit evidence or counter a SEPA Direct Debit dispute through Stripe' (https://docs.stripe.com/payments/sepa-debit, n.d., accessed 2026-11). Adyen: the API example answers with resultCode 'Received' (https://docs.adyen.com/payment-methods/sepa-direct-debit/api-only, n.d., accessed 2026-11); 'You cannot defend SEPA chargebacks'; 'Due to the risk of chargebacks, we do not recommend using SEPA for one-off payments or the sale of physical goods' (https://docs.adyen.com/payment-methods/sepa-direct-debit, n.d., accessed 2026-11).",
+              "shows": "The asynchronous outcome and the undefendable reversal appear on both sides."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The law's two rights.",
+            "introduces": "How the two providers' documentation presents the same rights.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p17",
+          "function": "evidence",
+          "controlling_idea": "Direct debit schemes outside the euro area have their own windows, and for the US scheme the two providers print different figures that this chapter could not check against the scheme's rules.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Bacs: Stripe 'typically takes 4 business days to confirm' and 'Refunds aren't part of the Bacs Direct Debit scheme and are provided outside of Bacs by Stripe' (https://docs.stripe.com/payments/bacs-debit, n.d., accessed 2026-11); Adyen 'Unpaid direct debits are booked as chargebacks' (https://docs.adyen.com/payment-methods/bacs, n.d., accessed 2026-11). ACH: Stripe 'up to 60 calendar days after a debit on a personal account'; Adyen 'up to two years after the settlement date' (https://docs.stripe.com/payments/ach-direct-debit and https://docs.adyen.com/payment-methods/ach-direct-debit, n.d., accessed 2026-11). Nacha's rule text was not verified.",
+              "shows": "The family behaves alike in kind and differs in numbers, and a provider page is not the rule."
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "SEPA Direct Debit's rights.",
+            "introduces": "Bacs and ACH, and a place where the evidence stops.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p18",
+          "function": "explanation",
+          "controlling_idea": "A wallet is not a family in this sense: Apple Pay and Google Pay carry a card and keep every card rule, while PayPal and buy-now-pay-later providers such as Klarna are schemes of their own with their own capture and dispute rules.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen: Apple Pay 'uses network tokenization' (https://docs.adyen.com/payment-methods/apple-pay, n.d., accessed 2026-11) and the catalog lists chargebacks and separate captures for it (https://docs.adyen.com/payment-methods, n.d., accessed 2026-11); Stripe on Klarna: 'Klarna collects the initial payment from your customer and any future installment payments' (https://docs.stripe.com/payments/klarna, n.d., accessed 2026-11).",
+              "shows": "The checkout button does not tell you the family; the scheme behind it does."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Methods that are not cards.",
+            "introduces": "Methods that look new at checkout and are cards underneath, and ones that are not.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p19",
+          "function": "claim",
+          "controlling_idea": "'Real-time' describes how fast the payer's money moves between banks, and says nothing about whether the payment is final for the merchant or when the merchant has the funds.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Regulation (EU) 2024/886, published 2024-03-19: the payee's provider must make the amount available 'within 10 seconds of the time of receipt of the payment order'. Stripe on Pix: settlement 'Up to 2 business days (T+2)' and full disputes supported (https://docs.stripe.com/payments/pix, n.d., accessed 2026-11); Adyen on Pix: a shopper can 'open a dispute with their bank within 90 days' (https://docs.adyen.com/payment-methods/pix, n.d., accessed 2026-11). FedNow 'went live on July 20, 2023' as an interbank service (https://www.federalreserve.gov/paymentsystems/fednow_about.htm, n.d., accessed 2026-11).",
+              "shows": "Ten seconds between banks coexists with two business days to the merchant and ninety days of dispute."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Methods sorted by family.",
+            "introduces": "Rails sorted by speed, and why speed is a different property.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "function": "example",
+          "controlling_idea": "Wero, the European scheme that is replacing iDEAL, shows what an authorization means on an account-to-account rail: a bank's guarantee to pay, with the funds arriving in a later step that can fail.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'Wero is currently in development'; 'The payment guarantee is the shopper's bank's commitment to pay Adyen. It is not the receipt of funds'; a CAPTURE_FAILED event if retries stop (https://docs.adyen.com/payment-methods/wero, n.d., accessed 2026-11). iDEAL: 'By the end of 2027 at the latest, all iDEAL merchants will have transitioned to Wero', with milestones 'subject to further consultation with the regulator' (https://ideal.nl/en/naar-wero, n.d., accessed 2026-11). Stripe: 'Switch to Wero in the course of 2026 and 2027' (https://docs.stripe.com/payments/ideal, n.d., accessed 2026-11).",
+              "shows": "Even on an instant rail the authorization and the money are two events; and the scheme under 14% of Larkfield's volume is mid-migration."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "Real-time rails.",
+            "introduces": "One of them documented step by step, and marked as still changing.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p21",
+          "function": "explanation",
+          "controlling_idea": "Vouchers sit at the far end: the API response is an instruction to the customer, and the outcome arrives days later by webhook or never arrives at all.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: with vouchers 'customers complete online purchases in person' (https://docs.stripe.com/payments/payment-methods/overview, n.d., accessed 2026-11). Adyen's catalog lists the flow 'voucher' for cash methods such as Boleto Bancário and OXXO (https://docs.adyen.com/payment-methods, n.d., accessed 2026-11).",
+              "shows": "For these methods there is nothing to capture and no answer to wait for in the request."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Methods whose answer comes in seconds.",
+            "introduces": "Methods whose answer may never come.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p22",
+          "function": "explanation",
+          "controlling_idea": "A refund outside the card networks is a new payment in the other direction, with its own window, its own delay and its own way of failing.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: SEPA Direct Debit refunds 'appear as separate credits to the customer's bank account instead of reversals', within 180 days; iDEAL refunds 'can remain in a pending state for up to 7 days'; Bancontact refunds within 730 days, 'never issued as a reversal' (Stripe method pages, n.d., accessed 2026-11). Adyen: for 'bank transfers, iDEAL, or Bancontact, the status of the payment can change from Refunded to RefundedReversed' (https://docs.adyen.com/online-payments/refund, n.d., accessed 2026-11).",
+              "shows": "The refund has a state machine of its own and the window differs by method and by provider."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "How the payment arrives in each family.",
+            "introduces": "How the money goes back in each.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ],
+      "flow": {
+        "pattern": "grouping",
+        "additional_patterns": [
+          {
+            "pattern": "order_of_importance",
+            "applies_to": "p14 to p17: redirects and direct debits first, the two families that carry Larkfield's non-card volume"
+          }
+        ],
+        "rationale": "The provider's general statement first, then one family at a time from the most final (redirect) to the least (direct debit), then the families the reader is likely to misfile (wallets, real-time, vouchers), and refunds last because they apply to all of them. Moving real-time ahead of direct debit would lose the contrast between push and pull that explains it."
+      }
+    },
+    {
+      "id": "one-api",
+      "heading": "How One API Presents Them: A Stored Instrument or a Parameter",
+      "controlling_idea": "Stripe and Adyen unify the start of a payment and the reporting of its status through different abstractions, and both leak at capture, refund, reversal and timing.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S4"
+        ],
+        "how": "Shows what the abstraction covers and exactly where the scheme shows through it."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "What the schemes fix.",
+        "introduces": "What a provider's API can and cannot make uniform, and the two ways it is done.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p23",
+          "function": "claim",
+          "controlling_idea": "What a provider can make the same for every method is the request that starts a payment, the instruction for what the customer must do next, and the channel on which status is reported.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: 'The Payment Methods API allows you to accept a variety of payment methods through a single API'; 'The `PaymentIntent` object's `next_action` property specifies the customer action' (https://docs.stripe.com/payments/payment-methods, n.d., accessed 2026-11). Adyen: the Advanced flow uses three requests, '/paymentMethods, /payments, and /payments/details', for every method (https://docs.adyen.com/online-payments/build-your-integration, n.d., accessed 2026-11).",
+              "shows": "Names exactly what is unified, so the next paragraphs can show what is not."
+            }
+          ]
+        },
+        {
+          "id": "p24",
+          "function": "description",
+          "controlling_idea": "Stripe models the instrument as a stored object, a PaymentMethod with a type and a type-specific block of data, which is combined with a PaymentIntent to pay or a SetupIntent to save.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'A PaymentMethod object contains the payment method details to create payments'; 'Each `PaymentMethod` has a type attribute, such as `\"type\": \"sepa_debit\"`, and a corresponding hash that contains information specific to the payment method'; single-use methods 'can't be attached to customers because they're consumed after a payment attempt' (https://docs.stripe.com/payments/payment-methods, n.d., accessed 2026-11).",
+              "shows": "The object is uniform at the top and method-specific one level down."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "What can be unified.",
+            "introduces": "The first provider's way of doing it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p25",
+          "function": "description",
+          "controlling_idea": "Since API version 2023-08-16 Stripe also chooses which methods a customer is shown, from settings in the dashboard instead of a list in the integration's code.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe blog, 17 August 2023 (evidence age 3 years, confirmed by current documentation): 'today, we're changing the default behavior of the PaymentIntents and SetupIntents API'. Changelog 2023-08-16: the previous default was to 'accept only card payments'. Current page: 'Stripe handles the logic for dynamically displaying the most relevant eligible payment methods to each customer'; 'Activation is generally instantaneous and doesn't require additional contracts' (https://docs.stripe.com/payments/payment-methods/dynamic-payment-methods and /payments/payment-methods, n.d., accessed 2026-11).",
+              "shows": "The default integration can start offering a method the integrator's code never named."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The stored instrument.",
+            "introduces": "Who decides which instruments are offered.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p26",
+          "function": "description",
+          "controlling_idea": "Adyen takes the method as a parameter of the payment request and returns the methods configured on the merchant account, and its documentation states a flow type for each method.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Payment requests carry paymentMethod.type, for example 'sepadirectdebit' (https://docs.adyen.com/payment-methods/sepa-direct-debit/api-only, n.d., accessed 2026-11); 'Sessions flow is the default integration that we recommend' (https://docs.adyen.com/online-payments/build-your-integration, n.d., accessed 2026-11); methods are requested in the Customer Area, 'we will contact you if there are additional requirements', and adding one to a store is 'an asynchronous process' confirmed by a paymentMethod.created webhook (https://docs.adyen.com/payment-methods/add-payment-methods, n.d., accessed 2026-11).",
+              "shows": "The method list is an account configuration the merchant requested, and the flow type tells the client what it must handle."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Stripe's stored object and provider-chosen list.",
+            "introduces": "Adyen's parameter and configured list.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p27",
+          "function": "description",
+          "controlling_idea": "Both providers document, method by method, whether a hold exists to capture, and Adyen names the two modes outright: direct capture, taken at once, and separate capture, where capture settings apply.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Most card payment methods use separate capture ... Some online banking payment methods, for example iDEAL, only support direct capture'; for direct capture 'Capture timing settings do not apply' (https://docs.adyen.com/online-payments/capture, n.d., accessed 2026-11). Stripe's equivalent is a per-method 'Manual capture support' property (method pages, n.d., accessed 2026-11).",
+              "shows": "The hold-to-capture question has a documented yes or no per method on both providers."
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "The two providers' ways of carrying the method.",
+            "introduces": "The capture mode each documents per method.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p28",
+          "function": "analysis",
+          "controlling_idea": "The abstraction leaks in the same places on both providers: capture, refund, the reversal's name and the time at which success is known.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Each leak is one of the seven questions: a capture flag that is rejected or ignored for some methods, a refund object that can fail, a 'dispute' or 'chargeback' that nobody can contest, a status that stays processing for days.",
+              "shows": "Ties the providers' designs back to the scheme properties of the earlier sections."
+            },
+            {
+              "kind": "figure",
+              "what": "One front door labeled as the API leading to rooms of different shapes behind it.",
+              "shows": "A memorable picture of the thesis: the door is shared, the rooms are not."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Two ways of presenting many methods through one API.",
+            "introduces": "The points at which the method shows through either one.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p29",
+          "function": "explanation",
+          "controlling_idea": "No page found at either company says how it adds a method or lists the methods it reaches through another payment company (single method pages name a partner, and Stripe's sub-processor list names three integration providers without their methods), so the chapter can describe the contract each documents and not what is behind it.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe's French SEPA mandate text authorizes 'Stripe, notre prestataire de services de paiement et/ou PPRO, son prestataire de services local' (https://docs.stripe.com/payments/sepa-debit, n.d., accessed 2026-11). Stripe's Pix page names Ebanx as 'our Pix partner' and says 'Ebanx appears as the payment recipient' (https://docs.stripe.com/payments/pix, n.d., accessed 2026-11). Adyen's ACH page mentions 'The legacy BOA acquirer' replaced by 'AdyenACH' (https://docs.adyen.com/payment-methods/ach-direct-debit, n.d., accessed 2026-11). No page found at either company lists partner-delivered methods or says how a method is added.",
+              "shows": "One visible trace that a method under one API can be delivered by another company, and nothing more; the generalization is labeled inference."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What the two contracts document.",
+            "introduces": "Where the public record stops.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ],
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "What can be unified, then Stripe, then Adyen on the same points, then the leaks common to both, then where the evidence stops. The leaks come after both descriptions so that they read as a property of the problem and not of one provider."
+      }
+    },
+    {
+      "id": "three-designs",
+      "heading": "Three Ways to Handle the Differences in Your Own Code",
+      "controlling_idea": "An integration either ignores the method, branches on its name or keeps a policy per family, and the third is the only one that survives a new or migrated method.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "Turns the scheme differences into a design choice the reader's own code makes."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "An abstraction that leaks at four points.",
+        "introduces": "The integrator's three ways of living with the leaks.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p30",
+          "function": "comparison",
+          "controlling_idea": "An integration can handle method differences in three ways: act on the status alone, branch on the method's name, or keep a policy per method family keyed by the seven questions.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Status-only is what a card-first integration already is; branching by name is what it becomes after the first incident; a family policy is the same knowledge held as data.",
+              "shows": "Frames the choice as one the reader's code has already made."
+            }
+          ]
+        },
+        {
+          "id": "p31",
+          "function": "comparison",
+          "controlling_idea": "The three designs trade first-day effort against what happens when a method is added, renamed or migrated.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Design / what it costs to build / what happens when a method is added / where it fails / when it is right: status only, branch per method, policy per family.",
+              "shows": "The trade-off table the style guide requires; the 'when it is right' column is the author's judgement."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "Three designs.",
+            "introduces": "Their costs side by side and when each is right.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p32",
+          "function": "recommendation",
+          "controlling_idea": "Whether to offer a revocable method at all is a pricing decision as much as a technical one: at Larkfield a direct debit costs the studio roughly half of what a card payment costs and can be taken back for eight weeks.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield's fee on a €49 membership: €0.64 by direct debit (0.8% + €0.25) against €1.18 by card (1.9% + €0.25); €0.35 flat for an iDEAL payment.",
+              "shows": "Ledger numbers that make the trade concrete.",
+              "source": "Larkfield scenario ledger (fictional)"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'we do not recommend using SEPA for one-off payments or the sale of physical goods' (https://docs.adyen.com/payment-methods/sepa-direct-debit, n.d., accessed 2026-11).",
+              "shows": "A provider's own guidance on where the trade stops paying."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "How to handle the methods you offer.",
+            "introduces": "Whether a cheap, revocable method is worth offering, and for what.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ],
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The designs, their trade-offs, then the prior question of whether to offer a revocable method at all, which only makes sense once the reader knows what handling it costs."
+      }
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "The two providers agree on the scheme rules and differ in the carrier of the method, the owner of the method list, activation and the words for a reversal.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S4"
+        ],
+        "how": "States the documented differences and what each asks of an integrator."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "The two abstractions and the designs built on them.",
+        "introduces": "The documented differences in one table, with the author's reading.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p33",
+          "function": "comparison",
+          "controlling_idea": "On payment methods the two providers document the same scheme rules and differ in the object that carries the method, in who chooses the list, in how a method is switched on and in the words used for a reversal.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Aspect / Stripe / Adyen / what the difference suggests, six rows: core abstraction; which methods are shown; turning a method on; capture; the word for a returned direct debit and how an unpaid one is reported; which methods are delivered through another company (not public at either).",
+              "shows": "Every provider cell is a fact cited earlier in the chapter or 'Not public'; the last column is the author's inference and is introduced as such."
+            }
+          ]
+        },
+        {
+          "id": "p34",
+          "function": "recommendation",
+          "controlling_idea": "On Stripe an integrator should decide whether the provider or the code names the methods and make the code safe for a method it has not met; on Adyen the list is fixed by configuration, and the work is in mapping chargeback events that are not disputes.",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The documented differences.",
+            "introduces": "What to do differently on each provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: A Rule per Method Family",
+      "controlling_idea": "Larkfield stores the method family and a reversal horizon with each payment and names reversals in its own four terms.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "Shows the rule per method family filled in and applied to one dated payment on both providers."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "What to do differently on each provider.",
+        "introduces": "One platform doing it on both.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p35",
+          "function": "example",
+          "controlling_idea": "Under Keel, Larkfield's payment record store keeps the method family beside each payment, and one table says for each family when `paid` is set, when access is granted and until when a reversal is expected.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Family / methods at Larkfield / `paid` is set when / access granted / expect a reversal until / unknown family: default deny. Rows: card (and wallets carrying a card), bank redirect (iDEAL, Bancontact), direct debit (SEPA, Bacs), anything else.",
+              "shows": "The per-family policy the intent asks the reader to be able to write, filled in with one company's choices.",
+              "source": "Larkfield scenario ledger (fictional) (addition by this chapter)"
+            }
+          ]
+        },
+        {
+          "id": "p36",
+          "function": "example",
+          "controlling_idea": "A €49 membership collected by SEPA Direct Debit on 1 April 2027 can be refunded to the member without a reason until 27 May 2027 and contested as unauthorized until 1 May 2028, and Larkfield's table turns those dates into what the studio and the member see.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Debit date Thursday 1 April 2027; eight weeks later is 27 May 2027; thirteen months later is 1 May 2028; fee €0.64, studio receives €48.36; access granted at submission as a stated risk the studio accepts.",
+              "shows": "Shows the horizon as dates a system can store.",
+              "source": "Larkfield scenario ledger (fictional) (illustrative member; dates computed from PSD2 Articles 77 and 71)"
+            },
+            {
+              "kind": "figure",
+              "what": "A timeline of the €49 debit with markers at 1 April 2027, six business days, 27 May 2027 and 1 May 2028.",
+              "shows": "Makes the length of the tail visible next to the one-day event of the request."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The policy table.",
+            "introduces": "One payment run through it with dates.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p37",
+          "function": "example",
+          "controlling_idea": "Larkfield records every reversal under one of four neutral terms of its own, because the two providers report the same scheme event with different words.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Scheme event / Stripe reports / Adyen reports / Larkfield's term: unpaid debit (failed payment with a failure code such as insufficient_funds / CHARGEBACK event with reason AM04) = failed collection; refund claimed within eight weeks (dispute / chargeback) = payer refund claim; debit contested as unauthorized (dispute / chargeback) = unauthorized-debit claim; card chargeback (dispute / chargeback) = card chargeback.",
+              "shows": "The mapping the second acceptance probe asks for. Sources: https://docs.stripe.com/payments/sepa-debit and https://docs.adyen.com/risk-management/chargeback-guidelines/sepa-chargebacks, n.d., accessed 2026-11."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "One payment's horizon.",
+            "introduces": "The vocabulary used when the horizon is hit.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ],
+      "flow": {
+        "pattern": "large_to_small",
+        "rationale": "The whole table, then one payment through it, then the vocabulary used when that payment is reversed. The dated example would have no rule to apply if it came before the table, and the four terms would have no event to name if they came before the example."
+      }
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong",
+      "controlling_idea": "The failures specific to non-card methods are a success the integration never hears of, a success withdrawn later, a refund paid twice and a scheme that changes under the integration.",
+      "function": "cause_effect",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S4",
+          "S5"
+        ],
+        "how": "Shows that each failure is one of the seven questions answered wrongly, with detection and recovery."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The rule working as designed.",
+        "introduces": "The cases where the method's rules still catch an integration out.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p38",
+          "function": "cause_effect",
+          "controlling_idea": "When the customer approves a redirect payment and never returns to the merchant's page, an integration that fulfills on the return loses a payment that succeeded.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'For payment methods that require customer action, configure webhook endpoints for notifications on whether a payment has succeeded or not' (https://docs.stripe.com/payments/payment-methods, n.d., accessed 2026-11). Adyen: 'with payment methods like iDEAL, it can take time to get a confirmation that the payment was completed' (https://docs.adyen.com/development-resources/webhooks, n.d., accessed 2026-11).",
+              "shows": "Both providers say the confirming message is the webhook, not the browser."
+            }
+          ]
+        },
+        {
+          "id": "p39",
+          "function": "cause_effect",
+          "controlling_idea": "When a payment fails after it was reported as collected, the provider takes the amount back from the balance at once, so detection has to come from a report of money at risk and not from the customer.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'If the payment fails after a delay, Stripe immediately deducts the payment amount from your Stripe balance'; 'In rare cases, a payment can fail later and appear as a dispute' (https://docs.stripe.com/payments/sepa-debit, n.d., accessed 2026-11).",
+              "shows": "The withdrawal is automatic and lands in the balance first."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "A success the integration missed.",
+            "introduces": "A success that is withdrawn.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p40",
+          "function": "cause_effect",
+          "controlling_idea": "When a merchant refunds a direct debit that the payer has also asked their bank to return, the payer is paid twice, and both providers warn of it.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'If you refund while the bank also starts a dispute, the customer can receive two credits' (https://docs.stripe.com/payments/sepa-debit, n.d., accessed 2026-11). Adyen: 'Shoppers can dispute a payment with their bank even after you've issued a refund, potentially resulting in two credits for the same payment' (https://docs.adyen.com/payment-methods/sepa-direct-debit, n.d., accessed 2026-11).",
+              "shows": "A documented double payout that no idempotency key prevents, because the second credit is not the merchant's request."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "A payment withdrawn by the bank.",
+            "introduces": "A payment returned by two routes at once.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p41",
+          "function": "recommendation",
+          "controlling_idea": "A scheme migration arrives as a provider deadline, and the integration that names methods in code is the one that has to change before it.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen: API-only integrators had 'between January 29, 2026 and March 31, 2026' to rename iDEAL and change its logo (https://docs.adyen.com/payment-methods/ideal, n.d., accessed 2026-11); Stripe: 'Rebrand your integration in the first quarter of 2026 to iDEAL | Wero' (https://docs.stripe.com/payments/ideal, n.d., accessed 2026-11). The two providers currently document different capture support for Wero (Stripe: manual capture Yes; Adyen: the immediate flow 'is the only Wero flow Adyen supports today').",
+              "shows": "Dated, scheme-driven work that lands on the integrator, with details still moving."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Failures of single payments.",
+            "introduces": "A failure that arrives for a whole method at once.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ],
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "In the order the failures occur in a payment's life: at the redirect, days after collection, at the refund, and across the life of the scheme. Any other order would separate each failure from the stage at which it is detected."
+      }
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "The seven questions, the two abstractions, the three designs and the failures are one observation made four times: the provider owns the verb (start, report) and the scheme owns the noun (what was promised). An integration that stores only the provider's status has stored the verb.",
+    "so_what": "On a platform the difference is money in someone else's balance: a payment that can be taken back for eight weeks needs a payout and access rule that knows which method carried it, and a report that calls every return a dispute misstates fraud.",
+    "callback": {
+      "to": "The introduction's membership that was paid on the 1st and returned on the 6th.",
+      "how": "The reader can now say that it was collected under a rule that let the bank return it, that 'paid' was never the right word for it on day one, and which neutral term the return belongs under."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "For every method you offer, answer the seven questions from the provider's method page and the scheme's rules, store the method family and the reversal horizon with the payment, and map each provider's reversal words to terms of your own. A list of eight questions for a provider evaluation or a design review follows."
+    },
+    "hand_off": {
+      "to": "payment-state-machines",
+      "relationship": "problem_solution",
+      "carries_over": "Methods that differ in whether the customer must act and whether the outcome arrives now or days later.",
+      "introduces": "The one model that holds all of them: a payment as a record with states, and the two ways Stripe and Adyen present it."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The failures and their detection.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p42",
+        "function": "synthesis",
+        "controlling_idea": "Established: the properties that separate methods are set by schemes and law, a succeeded status is a statement about the method's flow, and real-time is a property of speed.",
+        "form": "list"
+      },
+      {
+        "id": "p43",
+        "function": "synthesis",
+        "controlling_idea": "Depends on context: which revocable methods to offer, who names the method list, and when to grant access for a payment that is not yet confirmed.",
+        "form": "list",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What the field agrees on.",
+          "introduces": "What changes with the business.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p44",
+        "function": "recommendation",
+        "controlling_idea": "The author's synthesis: store the method family and a reversal horizon with every payment, and let a table, not the status word, decide what happens next.",
+        "form": "list",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is established and what depends on context.",
+          "introduces": "The author's own position, labeled as such.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p45",
+        "function": "recommendation",
+        "controlling_idea": "Eight questions to ask turn the chapter's seven properties and its provider comparison into a checklist for a provider evaluation or a design review.",
+        "form": "list",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The take-aways.",
+          "introduces": "Questions that apply them.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p46",
+        "function": "transition",
+        "controlling_idea": "Methods differ in whether the customer must act and whether the outcome arrives now or days later, and the next chapter gives the one model that can hold all of them: a payment as a record with states.",
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "The differences this chapter leaves the integration to carry.",
+          "introduces": "The state machine that carries them.",
+          "form": "paragraph",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "The card authorization, clearing, refund and dispute flows that serve as the baseline",
+      "covered_in": [
+        "payment-authorization",
+        "clearing-and-settlement",
+        "refunds-reversals-and-disputes"
+      ]
+    },
+    {
+      "topic": "The states of a payment object and how to mirror them (PaymentIntent, result codes, next actions)",
+      "covered_in": [
+        "payment-state-machines"
+      ]
+    },
+    {
+      "topic": "Which entity acquires a local scheme and under which license",
+      "covered_in": [
+        "acquiring-and-network-connectivity",
+        "licences-and-safeguarding"
+      ]
+    },
+    {
+      "topic": "Payout timing, reserves and negative balances on a platform",
+      "covered_in": [
+        "platform-payment-models",
+        "splits-balances-and-platform-payouts"
+      ]
+    },
+    {
+      "topic": "Wallet credentials and network tokens",
+      "covered_in": [
+        "network-tokens",
+        "tokenization-vaulting-and-pci"
+      ]
+    },
+    {
+      "topic": "Retrying failed recurring collections",
+      "covered_in": [
+        "invoicing-collections-and-dunning",
+        "authorization-optimization"
+      ]
+    },
+    {
+      "topic": "Per-method pricing and market shares by country",
+      "covered_in": [
+        "payment-economics"
+      ]
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "The ACH consumer return window: Stripe prints 60 calendar days and Adyen 'up to two years'; neither was checked against Nacha's rules.",
+    "The SEPA Direct Debit rulebook (pre-notification period, reason codes) was not read directly; the eight-week and thirteen-month rights are cited from PSD2.",
+    "Pix and UPI scheme rules are known only through the two providers' documentation.",
+    "The iDEAL to Wero end dates are subject to change; Wero's capture behavior differs between the two providers' current pages.",
+    "No list of the methods either provider delivers through another payment company was found; single method pages name a partner (Ebanx for Pix and PPRO in a SEPA mandate text at Stripe, a legacy bank acquirer for ACH at Adyen)."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "Organize the method evidence by the seven questions and by family, not as a catalog of methods, because the reader outcome is to ask the questions of a method the chapter does not cover.",
+      "rejected": [
+        "One subsection per method",
+        "A country-by-country tour"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Keep Larkfield's five-state vocabulary unchanged and add a method family field and four neutral reversal terms beside it, since the state vocabulary is owned by the next chapter.",
+      "rejected": [
+        "Adding a sixth state for returned debits"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Do not print a count of payment methods for either provider: Stripe's '125+' is undefined and no Adyen count was found.",
+      "rejected": [
+        "Comparing '125+' with a tally of Adyen's catalog"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Treat UPI, PayPal detail and buy-now-pay-later mechanics briefly; the chapter's worked depth goes to bank redirects and direct debits, which carry Larkfield's non-card volume.",
+      "rejected": [
+        "Equal space per family"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/PLAN.md, chapter 7 contract",
+      "contributed": "Scope, owned terms and the Larkfield line."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/journal-spec.json, entry local-payment-methods",
+      "contributed": "Intent, acceptance criteria, thesis and role, copied unchanged."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-acquiring-methods-and-terminals.md, Part 2; brief-stripe-payments-and-api.md 1.5; brief-adyen-payments-and-api.md 1.5",
+      "contributed": "Tagged claims with URLs and dates; every load-bearing quotation was re-fetched on 2026-11-17."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "Method mix, fees, cast, Keel decisions."
+    },
+    {
+      "kind": "external",
+      "ref": "Stripe documentation: Payment Methods API, payment method overview, dynamic payment methods, SEPA Direct Debit, iDEAL | Wero, Wero, Bancontact, Bacs, Pix, ACH (n.d., accessed 2026-11); changelog 2023-08-16; blog 2023-08-17",
+      "contributed": "The Stripe abstraction and per-method properties."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen documentation: payment methods catalog, SEPA Direct Debit, SEPA chargebacks, iDEAL | Wero, Wero, capture, refund, add payment methods, build your integration (accessed 2026-11)",
+      "contributed": "The Adyen abstraction and per-method properties."
+    },
+    {
+      "kind": "external",
+      "ref": "Directive (EU) 2015/2366 (PSD2), 2015-12-23; Regulation (EU) 2024/886, 2024-03-19; iDEAL 'naar Wero' page; Federal Reserve FedNow page",
+      "contributed": "The legal refund rights, the instant-payment obligation and the migration dates."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 95 claims checked (82 confirmed, 5 corrected, 7 hedged, 1 unsupported and relabeled, 0 unreachable); the statement that only one public trace exists of a method delivered through another payment company was corrected, since Stripe's Pix page names Ebanx as its Pix partner and Adyen's ACH page mentions a legacy bank acquirer."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Evidence lists aligned with the draft after cutting for length: the method mix is given in prose, the per-method summary table, the bank-transfer quotation and the custom-payment-methods citation were dropped. No unit added, dropped or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "After the flow rubric: Keel introduced in the scene, section rationales say what would break, the capture paragraph covers both providers, the questions list reworded. Notes not acted on: merging the comparison table into the one-api section (the section is required by the style guide), folding the ACH paragraph into the SEPA one, cutting the introduction's cost paragraph."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Spec written from the PLAN contract, the journal spec entry and the research briefs."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation after verification: journal-spec entry and spec body brought into line with the verified page and consistency rulings (journal entry thesis.how_why (ch7 verification rows 69, 70) re-synced; ch7 verification rows 69, 70; ruling 30). Adyen documentation pages are now cited 'n.d., accessed 2026-11' instead of with 'last modified' metadata dates (ruling 30). No unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: 3 statements of absence re-tested with a wide search (0 overturned, 1 narrowed, 2 hold; table in _research/absence-audit/07-local-payment-methods.md). Narrowed: Stripe's sub-processor list (27 September 2026) names three payment method integration providers, without the methods they serve."
+    }
+  ],
+  "length": {
+    "target_words": 5200,
+    "max_words": 6500
+  }
+}

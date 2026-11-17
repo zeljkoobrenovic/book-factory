@@ -1,0 +1,1468 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "subscriptions-and-billing-engines",
+  "journal": "payments-platform-architecture",
+  "part": "part-6",
+  "title": "Charging Again and Again: Subscriptions and the Billing Engine",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "The parts of a billing engine (scheduler, price calculator, subscription state machine) and the objects Stripe documents for them: product, price, subscription, schedule, invoice, and the payment created for an invoice.",
+        "What a billing cycle anchor, a proration and a subscription status are, and how Stripe documents month ends, UTC instants, eight statuses and two billing modes.",
+        "That Adyen's documented recurring model is a stored token charged with a declared processing model, and that Orb, acquired on 1 July 2026, is not documented as part of Adyen's platform as of November 2026."
+      ],
+      "believe": [
+        "A subscription is a state machine that produces invoices, not a job that charges a card.",
+        "Billing rules such as proration are part of the agreement with the customer and cannot be changed under invoices already issued."
+      ],
+      "can_do": [
+        "List the decisions their own code must make if they run renewals on a bare payment API.",
+        "Say, for a given provider, where the schedule, the amount and the invoice live."
+      ]
+    },
+    "audience": {
+      "who": "A software engineer or architect who has integrated or is about to integrate a payment API and has been asked to make it charge customers repeatedly.",
+      "already_knows": [
+        "Authorization, stored credentials and merchant-initiated transactions (payment-authorization, tokenization-vaulting-and-pci).",
+        "Payment states and why a webhook is not the record (payment-state-machines, payment-webhooks-and-events).",
+        "Idempotency keys (idempotency-and-retries).",
+        "Larkfield, its two providers, the 2026 incidents and the Keel decisions (meet-larkfield, part-6)."
+      ],
+      "does_not_know": [
+        "Subscription, billing cycle, billing cycle anchor, proration, billing scheduler, dunning (named only), invoice as the engine's output.",
+        "What Stripe Billing documents, what Adyen documents for recurring payments, and the status of Orb."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a subscription case the chapter does not contain, the reader names the decisions a billing engine makes that a payment API does not.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A language-learning app charges €12 a month. A customer signs up on 31 January and, halfway through March, moves to the €20 plan. The team uses only a payment API with saved cards. Which decisions does their own code now have to make?",
+        "expected": "On which day the February charge falls (the last day of the month) and at which instant and in which time zone a period starts; what the unused half of the old price is worth and what the rest of the new one costs (proration), and whether that is charged now or on the next invoice; what identifies each period's charge so a retry does not charge it twice; and what state the subscription is in while a charge is unpaid."
+      },
+      {
+        "id": "AC-2",
+        "statement": "The reader can state what Adyen's documentation provides for recurring payments and what must be supplied elsewhere, with the Orb acquisition's status as of November 2026.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A colleague says 'we are on Adyen, so Adyen handles our subscriptions'. From this chapter: what does Adyen's documentation provide, and what has to live somewhere else?",
+        "expected": "Adyen provides a stored token and a merchant-initiated payment flagged as a subscription payment. The schedule, the amount, proration, the invoice and the subscription's state live in the merchant's system or a billing system connected to Adyen. Adyen bought the billing company Orb (closed 1 July 2026), which still runs as a stand-alone product; no integrated Adyen billing product is documented as of November 2026."
+      },
+      {
+        "id": "AC-3",
+        "statement": "Every statement about how Stripe's scheduler or Adyen's platform works internally is either a dated documented fact or a labeled inference, and the chapter says where the public record on renewal scheduling stops: one 2024 Stripe engineering post describes a scheduling service, and neither company has published how that work is partitioned, paced or kept from running twice.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "What does a billing engine do that a payment API does not?",
+    "claim": "A billing engine decides what is owed, for which period and when to ask: it is a scheduler, a price calculator and a subscription state machine whose output is an invoice, and the payment API executes only the last step. Stripe keeps that engine in its platform, with subscription, invoice and payment as separate objects; Adyen's documentation offers a stored token charged with a recurring flag and leaves the schedule, the amount and the invoice to the merchant or a connected billing system, and Orb, acquired on 1 July 2026, is not documented as part of Adyen's platform as of November 2026.",
+    "disputed_by": "The view that a subscription is a monthly job that charges a saved card, so a payment API with stored credentials is enough and a billing engine is packaging around it.",
+    "so_what": "A team choosing between running renewals itself and using a billing engine knows what it is taking on: period boundaries, a proration rule it cannot change later, a status for every unpaid state, and one charge per period. A team on Adyen knows it must name the system that holds those, because the payment provider does not.",
+    "how_why": "Charging on a clock raises questions a customer-started payment never asks: what 'the 31st' means in February, at which instant a period starts (Stripe stores anchors as UTC seconds), what a mid-period plan change is worth, and what a subscription is while its invoice is unpaid. Stripe's documentation answers each with a rule: eight subscription statuses, month-end anchoring, proration to the second, and since 2025 two billing modes with one-way migration, which the chapter reads, as a labeled inference, as a sign that billing rules cannot be changed in place once invoices exist. The public record stops at the scheduler itself: Stripe documents its visible timing (a renewal invoice stays in draft for about an hour, and finalization waits for webhook acknowledgment) and one 2024 Stripe engineering post describes a scheduling service that finds subscriptions whose billing periods have just ended and triggers a new invoice; no Stripe or Adyen publication describes how that work is partitioned, paced or kept from running twice.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "A charge made on a clock raises decisions a customer-started payment never asks: on which day and at which instant a period starts, what a mid-period change is worth, what the subscription is while its charge is unpaid, and what makes each period's charge one charge."
+      },
+      {
+        "id": "S2",
+        "claim": "A billing engine is the system that makes those decisions: a scheduler, a price calculator and a subscription state machine whose output is an invoice, with the payment API executing only the last step."
+      },
+      {
+        "id": "S3",
+        "claim": "Stripe documents that engine inside its platform, with subscription, invoice and payment as separate objects and a stated rule for each decision; of its renewal scheduler only one passage is public (a 2024 engineering post), and its partitioning, pacing and duplicate protection are not."
+      },
+      {
+        "id": "S4",
+        "claim": "Adyen's documentation offers a stored token charged with a declared recurring model and leaves the schedule, the amount and the invoice to the merchant or a connected billing system; Orb, acquired on 1 July 2026, is not documented as part of Adyen's platform as of November 2026."
+      },
+      {
+        "id": "S5",
+        "claim": "Billing rules such as proration are part of the agreement with the customer and cannot be changed under invoices already issued."
+      },
+      {
+        "id": "S6",
+        "claim": "Whether the engine is the provider's, a dedicated billing system's or the team's own code, the same decisions are made somewhere, and when one is left unmade the failure is a charge that is late, taken twice or computed under the wrong rule."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Defines the second state machine and its output, the invoice, which every later chapter of the part fills, collects or reads; and establishes where that machine sits on each provider.",
+    "supports": [
+      "P6-1",
+      "P6-5"
+    ]
+  },
+  "flow": {
+    "pattern": "prerequisite_order",
+    "additional_patterns": [
+      {
+        "pattern": "problem_solution",
+        "applies_to": "scene to in-practice: the question 'where do the schedule, the amount and the invoice live' is posed in the first section and answered for both Larkfield engines in the eighth"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "stripe-billing, adyen-recurring, designs, where-they-differ"
+      }
+    ],
+    "rationale": "The reader meets two billing problems, then the decisions a clock forces, then the engine that makes them, because Stripe's eight statuses and two billing modes read as a feature list until each is seen as the answer to a decision already posed. Stripe comes before Adyen because Adyen's documentation is understood by what it lacks relative to an engine. The general designs follow both companies because they generalize them, the comparison table closes the company material, and the worked example and failures come last because they use every term. Moving the companies ahead of the decisions would make the chapter a product tour. The comparison table comes after the three designs because its row on the billing companies each bought in 2026 needs the designs to be read."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "On 1 November 2026 a renewal job at Larkfield timed out on a provider call and tried again, and 1,840 members paid for November twice. Every one of those 3,680 payments was valid: approved by the member's bank, captured, reported as successful. Which system was supposed to know that there is only one November?"
+    },
+    "bridge": {
+      "from_reader_world": "An engineer who has integrated a payment API sees a subscription as a cron job over a table of saved cards: once a month, for each row, charge the amount.",
+      "to_topic": "The job hides a second system that decides what is owed, for which period and when to ask; that system is a billing engine, and the payment API only executes its last step."
+    },
+    "thesis_statement": {
+      "text": "A billing engine decides what is owed, for which period and when to ask: it is a scheduler, a price calculator and a subscription state machine whose output is an invoice, and the payment API executes only the last step. Stripe keeps that engine in its platform; Adyen's documentation offers a stored token charged with a recurring flag and leaves the schedule, the amount and the invoice to the merchant or a connected billing system.",
+      "placement": "KEY POINTS bullets 1 and 2, and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p04",
+      "promises": [
+        {
+          "promise": "Start at Larkfield, which runs two billing engines and had noticed only one of them.",
+          "kept_in": [
+            "scene"
+          ]
+        },
+        {
+          "promise": "Set out the decisions a charge made on a clock forces, with the vocabulary: subscription, billing cycle, anchor, proration.",
+          "kept_in": [
+            "clock-decisions"
+          ]
+        },
+        {
+          "promise": "Assemble the engine that makes those decisions from three parts whose output is an invoice.",
+          "kept_in": [
+            "engine"
+          ]
+        },
+        {
+          "promise": "Read what Stripe documents about its engine and what Adyen documents about recurring payments and Orb, and put the two side by side.",
+          "kept_in": [
+            "stripe-billing",
+            "adyen-recurring",
+            "where-they-differ"
+          ]
+        },
+        {
+          "promise": "Compare the three places the engine can be kept.",
+          "kept_in": [
+            "designs"
+          ]
+        },
+        {
+          "promise": "Work one upgrade and one renewal at Larkfield, then the ways billing goes wrong.",
+          "kept_in": [
+            "in-practice",
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "function": "context",
+        "organization": "narration",
+        "controlling_idea": "The Double Charge of 1 November 2026 was made of valid payments, so the fault lay in whatever was supposed to know that a member owes one charge per month.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "The Double Charge: 1 November 2026, a timed-out renewal call retried under a new idempotency key, 1,840 members charged twice, €71,300 refunded, 212 disputes anyway.",
+            "shows": "A payment API can execute two correct payments for one debt; knowing they are the same debt is another system's job.",
+            "source": "scenario ledger"
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "function": "claim",
+        "controlling_idea": "The system that knows is a billing engine, which decides what is owed, for which period and when to ask, and Stripe keeps one in its platform while Adyen's documentation leaves it to the merchant.",
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "Two valid payments for one month.",
+          "introduces": "The billing engine as the missing system, and the thesis in plain words, with where the engine sits on each provider.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "function": "context",
+        "controlling_idea": "Mila's class pass was a payment she started herself; this chapter is about the payments nobody starts, such as her €49.00 membership renewal on the 1st of each month.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's class pass (€120.00, 9 March 2027, started by her in the app) against her €49.00 monthly membership at Studio Noord, set up 12 January 2027 and renewed on the 1st.",
+            "shows": "Places the chapter beside the recurring payment's path: same payer and card, but the clock, not the customer, starts the charge.",
+            "source": "scenario ledger"
+          }
+        ],
+        "transition_in": {
+          "relationship": "place",
+          "carries_over": "The chapter's claim.",
+          "introduces": "Its position relative to the recurring payment of the book.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "function": "transition",
+        "controlling_idea": "The chapter goes from Larkfield's two billing engines, through the decisions a clock forces and the engine that makes them, to what Stripe and Adyen document, the three places to keep the engine, a worked upgrade and renewal, and the failures.",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "Where the chapter sits.",
+          "introduces": "The order of its sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: Two Billing Engines, One of Them Unnoticed",
+      "controlling_idea": "Larkfield runs two billing engines, a bought one for 6,200 studio subscriptions and a home-built one for about 940,000 member renewals a month, and its 2026 incidents fall on the one nobody called an engine.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S6"
+        ],
+        "how": "Poses the chapter's question through two real billing problems inside one company, before any vocabulary."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "What the inventory finds, the incidents each engine produced, then the question those incidents raise; the question is the problem the chapter solves."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The introduction's claim that something above the payment decides.",
+        "introduces": "Larkfield's two versions of that something.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p05",
+          "function": "context",
+          "organization": "narration",
+          "controlling_idea": "When the billing integration moved to the payments team in May 2027, Femke de Graaf's inventory found two engines: Stripe Billing for the studios' software plans, and the booking app's renewal job for members' memberships on both providers.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Studio subscriptions: plans at €89, €189 and €349 a month per location, billed with Stripe Billing since 2018, €24.5M in 2026, owned by the growth team until 2027. Member memberships: about 940,000 renewals a month, about €46 million, charged by Larkfield's own renewal job through the payment service.",
+              "shows": "The same company has the same problem twice, at very different volumes, with different owners.",
+              "source": "scenario ledger; the May 2027 hand-over date is a new ledger addition"
+            }
+          ]
+        },
+        {
+          "id": "p06",
+          "function": "evidence",
+          "controlling_idea": "Sorted by engine, the 2026 incidents show the pattern: the Double Charge and the Renewal Wave happened in the home-built engine, and the Version Cliff in the integration with the bought one.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows: studio subscriptions vs member memberships. Columns: who is billed, typical amount, renewals a month, where the engine runs, 2026 incident.",
+              "shows": "Makes the two problems comparable and shows which engine failed how.",
+              "source": "scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Two engines.",
+            "introduces": "The incidents each one produced.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p07",
+          "function": "claim",
+          "controlling_idea": "Femke's question for each engine is where the schedule, the amount and the record of what is owed for a period (the invoice) live, and for the member memberships the honest answer before Keel was a cron expression, a column and nowhere.",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Incidents sorted by engine.",
+            "introduces": "The three-part question the rest of the chapter answers.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "clock-decisions",
+      "heading": "What a Charge on a Clock Has to Decide",
+      "controlling_idea": "A recurring charge has no moment, no amount and no identity until something computes them, and computing them means deciding the day, the instant, the value of a mid-period change, the state while unpaid and what counts as one period's charge.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S1",
+          "S5"
+        ],
+        "how": "Establishes the decisions and the owned vocabulary (subscription, billing cycle, anchor, proration) that the engine in the next section exists to make."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "Subscription first, then the period and its two boundary questions (day, instant), then what happens inside a period (proration), then what happens when its charge fails (status), then what ties them together (one charge per period)."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The question of where schedule, amount and invoice live.",
+        "introduces": "Why those three things do not exist until something decides them.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p08",
+          "function": "definition",
+          "controlling_idea": "A subscription is a standing agreement to charge a customer on a schedule, and unlike a payment the customer starts, the charge it produces has neither a moment nor an amount until a system supplies both.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Mila's pass: she tapped pay at 19:42 for €120.00, so the moment and amount came from her. Her renewal: nobody is present; the card networks call this a merchant-initiated transaction.",
+              "shows": "Contrasts the two kinds of payment by who supplies the inputs.",
+              "source": "scenario ledger; payment-authorization owns merchant-initiated transactions"
+            }
+          ]
+        },
+        {
+          "id": "p09",
+          "function": "definition",
+          "controlling_idea": "A billing cycle is the repeating period a subscription bills for, fixed by an anchor, and the first decision is which day a period starts on when the anchor's day does not exist in a month.",
+          "evidence": [
+            {
+              "kind": "example",
+              "what": "A membership started on 31 March: does it renew on 30 April, 1 May, or 'every 30 days'? Each answer bills a different number of periods per year (12 or about 12.17).",
+              "shows": "'Monthly' is not a duration; a rule has to be chosen.",
+              "source": "author's arithmetic: 365/30 = 12.17"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "A charge with no moment of its own.",
+            "introduces": "The period and its anchor, and the month-end question.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "function": "explanation",
+          "controlling_idea": "The second decision is the instant: a period is an interval between two points in time, and 'the first of the month' is a different instant for customers in different time zones.",
+          "evidence": [
+            {
+              "kind": "example",
+              "what": "1 April 2027 00:00 UTC is 02:00 on 1 April in Amsterdam (CEST, UTC+2) and 20:00 on 31 March in New York (EDT, UTC-4).",
+              "shows": "A single stored instant gives two local dates, so the business must choose whose midnight counts.",
+              "source": "author's arithmetic from standard time-zone offsets"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Which day.",
+            "introduces": "Which instant, and in whose time zone.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "function": "definition",
+          "controlling_idea": "The third decision is proration, charging or crediting a fraction of a price because the customer changed plan part-way through a period, and it is a rule with choices that becomes part of what the customer agreed to.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "The choices: the unit of time (second or day), whether the difference is charged now or on the next invoice, and whether a credit is computed from what was actually paid.",
+              "shows": "Three engines can produce three amounts for the same upgrade, and the customer was promised one of them."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "Where a period starts.",
+            "introduces": "What a change inside a period is worth.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p12",
+          "function": "explanation",
+          "controlling_idea": "The fourth decision is what the subscription is at any moment (in a trial, unpaid, paused, canceled), because the product has to decide every day whether the customer still gets the service.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Mila's renewal is declined on 1 April 2027 and succeeds on 4 April: on 2 April the front desk has to know whether to let her in.",
+              "shows": "A two-state flag (paid or not) cannot express 'owed, being retried, still welcome'.",
+              "source": "scenario ledger"
+            },
+            {
+              "kind": "reasoning",
+              "what": "A trial that ends, a pause that ends and a cancellation date that arrives are changes of state that the clock makes, with no request behind them.",
+              "shows": "Status changes come from time as well as from payments, which the engine and Stripe sections rely on."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "Changes inside a period.",
+            "introduces": "The subscription's state when its charge has failed or the clock has changed it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p13",
+          "function": "claim",
+          "controlling_idea": "The fifth decision is identity: something must record that one amount is owed for one period, once, before any payment is attempted, and that record is the invoice.",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "The Double Charge: the retry created a second payment because no record said 'November for this membership has already been asked for'.",
+              "shows": "The invoice is defined here by its job, as the thing that makes two attempts one debt; invoicing-collections-and-dunning owns its life cycle.",
+              "source": "scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "Day, instant, proration and status.",
+            "introduces": "The record that holds their result, the invoice.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine",
+      "heading": "The Engine: A Scheduler, a Price Calculator and a State Machine",
+      "controlling_idea": "A billing engine is three cooperating parts that turn a subscription and the clock into an invoice, and it hands that invoice to a payment engine whose answer it then has to wait for.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "S2"
+        ],
+        "how": "Builds the mechanism from the decisions of the previous section, as a reference design not tied to either company."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The parts in the order a renewal passes through them: the overview, the scheduler that wakes, the calculator that fills the invoice, the state machine that reacts, the hand-off to the payment."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "Five decisions and the invoice that records them.",
+        "introduces": "The parts of the system that makes them.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p14",
+          "function": "claim",
+          "controlling_idea": "The engine has three parts, a scheduler that decides when, a price calculator that decides how much and a state machine that decides what the subscription now is, and its output is an invoice that a payment engine is asked to collect.",
+          "evidence": [
+            {
+              "kind": "figure",
+              "what": "Component layout: clock and catalog feed scheduler, calculator and state machine; an invoice crosses a boundary line to the payment engine; a result returns.",
+              "shows": "Shows the invoice as the only object that crosses from billing to payments."
+            }
+          ]
+        },
+        {
+          "id": "p15",
+          "function": "process",
+          "controlling_idea": "The scheduler finds every subscription whose period has ended and creates exactly one invoice for that subscription and period, and its hard requirements are about being neither late nor twice.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Requirements table: how fast (minutes to hours after the boundary is acceptable; days is not), how consistent (exactly one invoice per subscription and period), how available (a stopped scheduler must catch up without skipping or doubling), what happens on failure (a rerun must find the existing invoice).",
+              "shows": "States the scheduler's contract as requirements; labeled as a reference design, not either company's."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The three parts.",
+            "introduces": "The first to act, the scheduler.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p16",
+          "function": "process",
+          "controlling_idea": "The price calculator turns an entry in the price list (the catalog), a quantity and any mid-period changes into invoice lines, and it must give the same answer whenever it is rerun for the same period.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Inputs: product and price (what is sold, how much and how often), quantity, trial or discount, proration lines for changes; output: lines with a service period each.",
+              "shows": "The amount is computed, not stored, and the computation is what a rule change would alter."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "An empty invoice for a period.",
+            "introduces": "How it is filled.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p17",
+          "function": "process",
+          "controlling_idea": "The state machine moves the subscription between statuses on two kinds of event, an invoice's outcome and the passing of time, and the product reads access from it.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Events from invoices: paid, payment failed, retries exhausted. Events from the clock: trial ended, pause ended, cancellation date reached.",
+              "shows": "Half of the transitions have no request behind them, which is why the machine cannot live in request handlers."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "A filled invoice.",
+            "introduces": "What its outcome does to the subscription.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p18",
+          "function": "explanation",
+          "controlling_idea": "Between the engine and the money sits an ordinary payment, which can be declined, wait for authentication or come back weeks later as a dispute, so the billing engine inherits the gap between the instant answer and the slow truth.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "A direct-debit renewal is accepted today and can be returned days later; a card renewal can be charged back months later. Links: payment-state-machines, payment-webhooks-and-events, local-payment-methods.",
+              "shows": "The invoice's 'paid' is only as true as the payment record behind it."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The invoice handed over.",
+            "introduces": "What the payment's slower truth means for the engine.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "stripe-billing",
+      "heading": "Stripe Billing's Object Model, as Documented",
+      "controlling_idea": "Stripe documents an engine with separate subscription, invoice and payment objects and a stated rule for each decision, including two versions of the proration rule, and has published one 2024 engineering post that describes a scheduling service, but not how that work is partitioned, paced or kept from running twice.",
+      "function": "evidence",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S5"
+        ],
+        "how": "Supplies the documented half of the thesis for Stripe and the evidence for the claim that billing rules cannot be changed in place."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "Objects first, then Stripe's rule for each decision in the order section two raised them (day and instant, proration and its two modes, status, the clock's changes), then what is visible of the scheduler and where the record stops, so the reader maps each rule to a decision already posed."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The engine as a reference design.",
+        "introduces": "One real engine, read from its documentation as of November 2026.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p19",
+          "function": "evidence",
+          "controlling_idea": "Stripe's documentation splits the engine's work across objects: product and price for the catalog, subscription for the agreement and its status, invoice for what is owed, and a PaymentIntent created for the invoice.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Object table with documented wording: Product ('what your business offers'), Price ('how much and how often to charge'), Subscription, Invoice ('statements of amounts owed by a customer'), InvoicePayment ('the mapping between payment objects, such as Payment Intent, and Invoices'), PaymentIntent.",
+              "shows": "The three parts of the reference design map onto named objects, and the invoice is separate from the payment.",
+              "source": "docs.stripe.com/products-prices/how-products-and-prices-work.md; https://docs.stripe.com/billing/subscriptions/overview.md; docs.stripe.com/billing/invoices/subscription.md; docs.stripe.com/api/invoice-payment.md, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "quotation",
+              "what": "'When you create a subscription, Stripe automatically generates invoices, attempts payment collection, and manages the subscription status throughout its lifecycle.'",
+              "shows": "Stripe's own statement that the engine, not the integrator, runs the cycle.",
+              "source": "https://docs.stripe.com/billing/subscriptions/overview.md, n.d., accessed 2026-11"
+            }
+          ]
+        },
+        {
+          "id": "p21",
+          "function": "evidence",
+          "controlling_idea": "For the first two decisions, the day and the instant, Stripe documents one rule each: a month-end anchor bills on the last day of shorter months, and an anchor is a UTC timestamp in seconds.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'A monthly subscription with a billing cycle anchor date of January 31 bills the last day of the month closest to the anchor date, so February 28 (or February 29 in a leap year), then March 31, April 30, and so on.' 'Billing cycle anchors are UNIX timestamps in seconds from the current epoch.' 'The billing cycle anchor uses Coordinated Universal Time (UTC).'",
+              "shows": "Both boundary decisions of section two are made by the platform and written down.",
+              "source": "https://docs.stripe.com/billing/subscriptions/billing-cycle.md, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The objects.",
+            "introduces": "Stripe's rules for the period boundaries.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p22",
+          "function": "evidence",
+          "controlling_idea": "For proration Stripe documents a default for each choice: computed to the second, not billed until the next invoice unless asked, and selectable per change.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'By default, Stripe calculates prorations down to the second.' 'Negative prorations aren't automatically refunded and positive prorations aren't immediately billed, although you can do both manually.' Worked example: 10 USD to 20 USD halfway through the period gives a 5 USD credit and a 10 USD debit. `proration_behavior` values: create_prorations, always_invoice, none.",
+              "shows": "The proration choices named in section two each have a documented default.",
+              "source": "https://docs.stripe.com/billing/subscriptions/prorations.md, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "Period boundaries.",
+            "introduces": "Changes inside a period.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p23",
+          "function": "analysis",
+          "controlling_idea": "Since 2025 Stripe has run two billing modes side by side, classic and flexible, with migration allowed in one direction only, which I read as public evidence that a billing rule cannot be changed under subscriptions that already have invoices.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'You can't migrate a subscription from flexible billing mode to classic billing mode.' 'For API version `2025-09-30.clover` and later, the default is `flexible`. For earlier versions, the default is `classic`.' Classic is 'maintained for backward compatibility with older integrations'.",
+              "shows": "Two rule sets coexist per subscription instead of one being replaced.",
+              "source": "https://docs.stripe.com/billing/subscriptions/billing-mode.md, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "example",
+              "what": "Stripe's documented scenario: a 10 USD plan is upgraded to 20 USD without proration on April 11 and downgraded on April 21; classic credits 'a third of the month for 20 USD (-6.67 USD), even though the customer never paid for' that price; flexible credits the 3.33 USD actually billed, total 0 USD.",
+              "shows": "The two modes give different money for the same history, so switching mode changes what a customer is owed.",
+              "source": "https://docs.stripe.com/billing/subscriptions/prorations.md, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "reasoning",
+              "what": "INFERENCE, NOT DOCUMENTED block: Stripe does not say why the modes coexist; the reading that issued invoices pin the rule is the author's.",
+              "shows": "Keeps the interpretation apart from the documented facts (AC-3)."
+            }
+          ],
+          "transition_in": {
+            "relationship": "emphasis",
+            "carries_over": "A documented default for each proration choice.",
+            "introduces": "The fact that there are now two sets of defaults, and what that implies.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "function": "evidence",
+          "controlling_idea": "For the fourth decision Stripe documents eight subscription statuses, and two of their details matter to an integrator: 'active' does not mean every invoice is paid, and what follows failed retries is a setting, not a fixed path.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Status table: incomplete (23 hours to pay), incomplete_expired, trialing, active, past_due, unpaid, canceled (terminal), paused, with condensed documented meanings.",
+              "shows": "The answer to 'what is the subscription while unpaid' is a vocabulary of eight, not a flag.",
+              "source": "https://docs.stripe.com/billing/subscriptions/overview.md, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "quotation",
+              "what": "'`active` doesn't necessarily indicate that all outstanding invoices associated with the subscription have been paid.' After retries end, failed payment settings 'determine whether the subscription remains `past_due` or changes to `unpaid` or `canceled`'.",
+              "shows": "Status is a summary under a configurable rule, so access logic must know the rule.",
+              "source": "https://docs.stripe.com/billing/subscriptions/overview.md, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "Proration and its two modes.",
+            "introduces": "The subscription's status vocabulary.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p24",
+          "function": "evidence",
+          "controlling_idea": "The changes the clock makes each have documented behavior too: trials, two different kinds of pause, cancellation and schedules of up to ten current or future phases.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Pause payment collection (status stays active, invoices still generated, not collected) vs pause subscription (status paused, invoice generation stops, requires flexible billing mode); schedules: 'Phase transitions happen automatically after the `end_date` on a phase is reached'; canceled is terminal and resubscribing needs a new subscription.",
+              "shows": "'Pause' alone is ambiguous: two features differ in status, invoices and access.",
+              "source": "https://docs.stripe.com/billing/subscriptions/pause.md; https://docs.stripe.com/billing/subscriptions/pause-payment.md; https://docs.stripe.com/billing/subscriptions/subscription-schedules.md; https://docs.stripe.com/billing/subscriptions/overview.md, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Statuses driven by invoices.",
+            "introduces": "Status changes driven by the clock.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p25",
+          "function": "analysis",
+          "controlling_idea": "Of the scheduler itself Stripe documents only the timing an integrator can observe (a renewal invoice stays in draft for about an hour, and collection waits for webhook acknowledgment), and one passage in a 2024 Stripe engineering post describes a scheduling service that finds subscriptions whose billing periods have ended and triggers invoice creation; nothing public says how that scan is partitioned, paced or kept from running twice.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "At renewal Stripe 'Leaves the invoice in a `draft` status for about an hour'. 'We wait 1 hour after receiving a successful response to the `invoice.created` event from all listening webhooks before attempting payment. If we don't receive a successful response within 72 hours, we attempt to finalize and send the invoice.'",
+              "shows": "The observable contract of the scheduler, including a dependency on the integrator's webhook endpoint.",
+              "source": "https://docs.stripe.com/billing/invoices/subscription.md; https://docs.stripe.com/invoicing/integration/workflow-transitions.md, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe's engineering posts touching Billing (online migrations, 2017-02-02: 'hundreds of millions of Subscriptions objects', evidence age 9 years; usage-based billing, 2025-01-28; real-time analytics, 2025-09-16) do not describe the scheduler. The test clocks post (stripe.dev, 2024-05-09) does, in one passage: 'a scheduling service that looks for database records meeting certain criteria, and which triggers certain events when it finds them'; a subscription is picked up by the part that looks for subscriptions 'whose billing periods have just ended, and triggers the creation of a new Invoice'.",
+              "shows": "Where the evidence stops: scale, timing and the existence of a scanning scheduling service are public; partitioning, pacing and duplicate protection are not.",
+              "source": "research brief sections 1.7 and 1.8; https://stripe.com/blog/online-migrations; https://docs.stripe.com/billing/testing/test-clocks.md"
+            },
+            {
+              "kind": "reasoning",
+              "what": "INFERENCE, NOT DOCUMENTED block: that invoice creation is keyed on subscription and period so a rerun cannot double it is a reference-design expectation, not a Stripe fact.",
+              "shows": "Satisfies AC-3: internals are labeled."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Rules that are documented in detail.",
+            "introduces": "The component that is not: the scheduler.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "adyen-recurring",
+      "heading": "Adyen's Recurring Model: A Token and a Flag",
+      "controlling_idea": "Adyen's documentation describes recurring payments as a stored token charged with a declared processing model, contains no subscription or invoice object in the pages read, and does not yet show Orb, which Adyen bought in July 2026, as part of the platform.",
+      "function": "evidence",
+      "advances_thesis": {
+        "supports": [
+          "S4"
+        ],
+        "how": "Supplies the documented half of the thesis for Adyen and states the Orb status with dates."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "What the documentation has long offered, what it leaves out, then the 2026 acquisition and its status, then where the record stops."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "A provider that documents a billing engine.",
+        "introduces": "A provider whose documentation offers the payment step of one.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p26",
+          "function": "evidence",
+          "controlling_idea": "Adyen documents a recurring charge as a payment made with a stored token under one of three processing models, started by the merchant.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'**Subscription** (`Subscription`): A payment where you initiate a subscription payment to bill the shopper at regular intervals.' Also CardOnFile and UnscheduledCardOnFile; merchant-initiated payments use shopperInteraction ContAuth. Tokenization overview: 'Subscriptions: recurring transactions you initiate at regular intervals for a product or a service'.",
+              "shows": "The word 'subscription' in Adyen's documentation names a flag on a payment, and 'you' is the one who initiates.",
+              "source": "https://docs.adyen.com/online-payments/tokenization/make-token-payments.md, n.d., accessed 2026-11; https://docs.adyen.com/online-payments/tokenization.md, n.d., accessed 2026-11"
+            }
+          ]
+        },
+        {
+          "id": "p27",
+          "function": "analysis",
+          "controlling_idea": "The Adyen pages read for this chapter describe no plan, price, subscription object, billing cycle, proration or invoice, so the schedule, the amount and the invoice sit with the merchant or a billing system connected to Adyen, which is an inference from absence that three sources support.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Auto Rescue (Adyen's payment-level retry): the merchant provides 'a unique `merchantOrderReference`. This should represent a specific billing cycle or subscription'.",
+              "shows": "Adyen asks the merchant to supply the identity of the period, which shows it does not hold it.",
+              "source": "https://docs.adyen.com/online-payments/auto-rescue/cards.md, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "quotation",
+              "what": "Orb's documentation: 'Orb integrates with payment gateways like Adyen and Stripe for payment processing'; 'For gateways without a synced default (such as Adyen), you designate the customer's default payment method yourself.' Adyen, 2026: seat-based subscription billing 'is well-served today, including by partners we work with closely'.",
+              "shows": "Billing systems treat Adyen as the gateway below them, and Adyen describes that arrangement itself.",
+              "source": "https://docs.withorb.com/invoicing/payments.md, n.d., accessed 2026-11; https://www.adyen.com/knowledge-hub/why-adyen-acquired-orb, published 2026-09-29"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What Adyen's documentation offers.",
+            "introduces": "What it does not contain, and who therefore holds it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p28",
+          "function": "evidence",
+          "controlling_idea": "Adyen announced the acquisition of the billing company Orb on 11 June 2026 for $335 million and closed it on 1 July 2026; its own statements describe a separately run product that still supports other payment providers, with convergence as an intention.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Announcement, 2026-06-11: 'The total consideration for the transaction is $335 million'; 'Adyen is adopting an incubator model, preserving Orb's operational continuity during the first phase of the acquisition and continuing to support multi-PSP environments. Beyond this first phase, the strategic intent is convergence: a single infrastructure experience for merchants across billing and payments.' Closing release, 2026-07-01: 'Both transactions officially closed on July 1, 2026'. Knowledge-hub article, 2026-09-29: 'You'll soon see how we bring this unified Adyen and Orb experience to life across our platform.'",
+              "shows": "Acquired is not integrated: every statement about a unified product is in the future tense.",
+              "source": "https://www.adyen.com/press-and-media/jtrg4qd7j3p4rj; https://www.adyen.com/press-and-media/adyen-closes-talonone-and-orb-acquisitions-announces-leadership-updates; https://www.adyen.com/knowledge-hub/why-adyen-acquired-orb"
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "The documentation as it has long stood.",
+            "introduces": "What changed in 2026.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p29",
+          "function": "analysis",
+          "controlling_idea": "As of 17 November 2026 no Adyen documentation page on billing or Orb was found and Adyen documents no first-party renewal scheduler (Stripe has published one passage about its own), so on Adyen the engine's place has to be named by the merchant.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Searches of docs.adyen.com, adyen.com/knowledge-hub and Adyen's technology blog (research brief, 17 November 2026) found no page describing an integrated billing product; Orb's rationale is usage-priced software, which usage-metering-and-rating covers.",
+              "shows": "States where the evidence stops and what would change the conclusion.",
+              "source": "research brief sections 1.10 and 1.11 (absence; not a statement by Adyen)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The acquisition and its stated status.",
+            "introduces": "Where the public record stops and what follows for a merchant.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "designs",
+      "heading": "Three Places to Keep the Engine",
+      "controlling_idea": "The engine can live in the payment provider, in a dedicated billing system above one or more providers, or in the team's own code, and the choice is about where the decisions of this chapter are made, not whether they are.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S6"
+        ],
+        "how": "Turns the two company accounts into a general design choice with a trade-off table."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "Three designs in order of how much the team builds itself, then the table that compares them."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "One provider with an engine and one without.",
+        "introduces": "The general choice of where an engine can be kept.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p30",
+          "function": "description",
+          "controlling_idea": "In the first design the payment provider runs the engine, as Stripe Billing does: one platform holds the subscription, the invoice and the payment, and the team configures rules instead of writing them.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe announced in October 2024 'the ability to manage subscriptions with Stripe while processing transactions with other payments providers' (current availability not re-checked).",
+              "shows": "Even the provider's engine is being offered as separable from its payments.",
+              "source": "https://stripe.com/blog/our-biggest-ever-upgrades-to-stripe-billing, published 2024-10-29"
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe completed its acquisition of the usage-billing company Metronome on 14 January 2026, and its documentation calls Metronome 'Stripe's primary usage-based billing platform' (usage-metering-and-rating covers it).",
+              "shows": "Stripe's engine now has a second, acquired engine beside it, which the comparison table uses.",
+              "source": "https://stripe.com/newsroom/news/stripe-completes-metronome-acquisition, published 2026-01-14; https://docs.stripe.com/billing/subscriptions/usage-based.md, n.d., accessed 2026-11"
+            }
+          ]
+        },
+        {
+          "id": "p31",
+          "function": "description",
+          "controlling_idea": "In the second design a dedicated billing system holds the engine and sends payment requests to one or more providers, and it makes the same decisions with its own defaults.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Chargebee documents proration as a site-wide choice: 'There are two proration modes: day-based and millisecond-based'. Orb charges through 'payment gateways like Adyen and Stripe'. Zuora's documentation could not be fetched and is not characterized.",
+              "shows": "A second engine's answer to the same proration question differs from Stripe's default, which shows the decision is real and vendor-specific.",
+              "source": "https://www.chargebee.com/docs/billing/2.0/subscriptions/proration, n.d., accessed 2026-11; https://docs.withorb.com/invoicing/payments.md, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The engine inside the provider.",
+            "introduces": "The engine above the provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p32",
+          "function": "description",
+          "controlling_idea": "In the third design the team's own code is the engine and the provider supplies only stored credentials and a payment call, which is justified when the subscription cannot be separated from the product's own rules.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield's member memberships: the amount depends on studio-specific rules, the money goes to the studio with Larkfield's fee split off, and the members are on two providers.",
+              "shows": "A real reason to own the engine, and the list of decisions that come with it.",
+              "source": "scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Engines somebody else runs.",
+            "introduces": "The engine you write.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p33",
+          "function": "recommendation",
+          "controlling_idea": "Set side by side, the three designs trade the cost of building against control over the rules and freedom to change provider, and my default is to buy the engine unless the billing rules are the product.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Trade-off table. Rows: provider's engine, dedicated billing system, own engine. Columns: who decides period and proration rules; where the invoice lives; provider independence; what you must build; when it is right.",
+              "shows": "The required trade-off comparison; the last column is the author's judgement."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "Three designs described.",
+            "introduces": "Their trade-offs and the author's default.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "In the public record Stripe holds the subscription, the schedule and the invoice and Adyen holds the token and the payment, and Adyen's 2026 purchase of Orb has not yet changed that for an Adyen integrator.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S4"
+        ],
+        "how": "The required comparison: documented facts per aspect, 'Not public' where they stop, and the author's reading marked as inference."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "Each company's documentation and the three designs.",
+        "introduces": "The two companies set side by side.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p34",
+          "function": "comparison",
+          "controlling_idea": "Aspect by aspect, Stripe documents a billing engine and Adyen documents the payment step under one, with the last column of the table as the author's inference.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows: subscription and its status; schedule and amount; who holds the invoice; billing company bought in 2026 (Metronome completed 14 January 2026; Orb closed 1 July 2026); design of the renewal scheduler (Stripe: a scheduling service that scans for ended billing periods, engineering post 2024, the rest Not public; Adyen: Not public). Columns: Stripe, Adyen, what the difference suggests.",
+              "shows": "Every Stripe and Adyen cell is a fact cited earlier in the chapter or 'Not public'.",
+              "source": "sources of sections stripe-billing and adyen-recurring; Metronome date from https://stripe.com/newsroom (research brief section 2.3)"
+            }
+          ]
+        },
+        {
+          "id": "p35",
+          "function": "recommendation",
+          "controlling_idea": "On Stripe the integrator's work is to choose the rules deliberately and read them back per subscription; on Adyen it is to name the system that holds the schedule, the amount and the invoice before the first renewal runs.",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The differences in the table.",
+            "introduces": "What to do differently on each provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: One Upgrade, One Renewal",
+      "controlling_idea": "One plan upgrade on Stripe Billing and one membership renewal on Larkfield's own engine show the same decisions being made by configuration in the first case and by Larkfield's code in the second.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S1",
+          "S2",
+          "S6"
+        ],
+        "how": "Works the chapter's decisions with ledger numbers on both of Larkfield's engines."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The bought engine first (amount, then instant), then the home-built one, then the two in one table."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The comparison of the two providers.",
+        "introduces": "Both engines at work on Larkfield's own numbers.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p36",
+          "function": "example",
+          "controlling_idea": "When Studio Noord moves from the €89 plan to the €189 plan exactly halfway through April 2027, Stripe's default proration credits €44.50, debits €94.50 and adds the €50.00 difference to the 1 May invoice, which comes to €239.00.",
+          "evidence": [
+            {
+              "kind": "statistic",
+              "what": "Period 1 April to 1 May 2027 (30 days); change at 16 April 00:00 UTC (15 days in). Credit 89 × 15/30 = 44.50; debit 189 × 15/30 = 94.50; net 50.00; next invoice 189.00 + 50.00 = 239.00. Default behavior: positive prorations are not billed immediately.",
+              "shows": "Larkfield wrote none of this arithmetic; it chose one parameter.",
+              "source": "scenario ledger (plan prices); Studio Noord's plan and upgrade date are a new ledger addition; rule from https://docs.stripe.com/billing/subscriptions/prorations.md"
+            }
+          ]
+        },
+        {
+          "id": "p37",
+          "function": "example",
+          "controlling_idea": "The same subscription shows the instant: Larkfield anchors studio plans at 00:00 UTC on the 1st, which is 02:00 in Utrecht and 20:00 the evening before for a studio in New York.",
+          "evidence": [
+            {
+              "kind": "example",
+              "what": "1 April 2027 00:00 UTC = 02:00 CEST in Utrecht = 20:00 EDT on 31 March in New York; a US studio's 'April invoice' is dated 31 March locally.",
+              "shows": "The UTC rule is harmless until an invoice date or a usage cut-off has to match a customer's calendar.",
+              "source": "author's arithmetic; anchor choice is a new ledger addition"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The amount of the upgrade.",
+            "introduces": "The instant its period starts.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p38",
+          "function": "example",
+          "controlling_idea": "For Mila's €49.00 membership, on Adyen, every one of those decisions is Larkfield's code: the renewal job picks 1 April, computes €49.00, sends a token payment flagged as a subscription payment, and must itself know what the membership is between the decline on 1 April and the success on 4 April.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Mila's renewal: declined 1 April 2027 (insufficient funds), retried 4 April as scheduled attempt 2 under its own key (K1: membership id + billing period + attempt number). Under Keel the booking app writes a period record (membership, period, amount, state open/paid/void) before the first attempt; the membership is past_due and keeps access inside the retry window.",
+              "shows": "The period record is Larkfield's invoice in all but name, and K1's key is derived from it.",
+              "source": "scenario ledger (K1, renewal dates); the period record and the past_due access rule are new ledger additions"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A renewal the bought engine runs.",
+            "introduces": "A renewal Larkfield's own engine runs.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p39",
+          "function": "comparison",
+          "controlling_idea": "Put in one table, the five decisions and the scheduler's pacing are settings in Larkfield's Stripe Billing integration and code in its renewal job, and the 2026 incidents sit in the rows where a decision had been left unmade.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows: day of renewal; instant and time zone; proration; status; one charge per period; plus the scheduler's pacing. Columns: studio subscriptions (Stripe Billing), member memberships (own engine, before Keel), member memberships (under Keel).",
+              "shows": "Shows the worked example as a decision inventory and ties K1 and K5 to rows.",
+              "source": "scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "Two worked renewals.",
+            "introduces": "The decisions behind them, side by side.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong: Late, Twice, the Wrong Rule and the Wrong State",
+      "controlling_idea": "Billing engines fail in four recognizable ways, a renewal that runs late, one that runs twice, one computed under a rule nobody chose and a status that reports the wrong thing, and each has a check that finds it.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "S5",
+          "S6"
+        ],
+        "how": "Gives detection and recovery for the failures the mechanism makes possible, using documented provider behavior and Larkfield's incidents."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "The two failures of the scheduler (late, twice), then the failure of the calculator (wrong rule), then the failure of the state machine (wrong state): one group per part of the engine."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The engines working as designed.",
+        "introduces": "The ways they fail.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p40",
+          "function": "analysis",
+          "controlling_idea": "A renewal runs late when the scheduler waits on something slow: on Stripe a webhook endpoint that does not acknowledge invoice.created holds collection back for up to 72 hours, and in a home-built engine the provider's rate limit does the same, as in Larkfield's Renewal Wave.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: while the webhook is being retried 'we won't attempt to charge the customer unless we receive a successful response'.",
+              "shows": "A documented dependency of collection on the integrator's own endpoint.",
+              "source": "https://docs.stripe.com/invoicing/integration/workflow-transitions.md, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "case",
+              "what": "The Renewal Wave, 1 October 2026: 7,900 renewals delayed a day by the provider's rate limit, and members received dunning emails; K5 paces renewals over 18 hours.",
+              "shows": "The home-built version of late, with its cost in trust.",
+              "source": "scenario ledger"
+            }
+          ]
+        },
+        {
+          "id": "p41",
+          "function": "analysis",
+          "controlling_idea": "A renewal runs twice when the charge is not tied to one record per subscription and period, and the check is a count of successful charges grouped by subscription and period.",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "The Double Charge: 1,840 members, €71,300 refunded, 212 disputes anyway; K1 derives the key from membership, period and attempt number.",
+              "shows": "Detection is a query; prevention is the period record and a key derived from it; idempotency-and-retries owns the key mechanics.",
+              "source": "scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Late.",
+            "introduces": "Twice.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p42",
+          "function": "analysis",
+          "controlling_idea": "A renewal is computed under the wrong rule when a default changes underneath the integration, as Stripe documents for an API upgrade that changes the billing mode of new subscriptions.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Upgrading your API version to `2025-09-30.clover` or later changes the default billing mode for new subscriptions from `classic` to `flexible`. Flexible billing mode changes how subscriptions calculate prorations, handle trials, and process cancellations.'",
+              "shows": "The rule can change for new subscriptions without any change to billing code.",
+              "source": "https://docs.stripe.com/billing/subscriptions/billing-mode.md, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "scenario",
+              "what": "Femke's May 2027 audit finds studio subscriptions in both modes, split at the SDK upgrade of March 2026 (the Version Cliff); the fix is to set the mode explicitly and store it per subscription.",
+              "shows": "Ties the documented behavior to K7 and gives the detection (read the mode back).",
+              "source": "scenario ledger (Version Cliff, K7); the audit finding is a new ledger addition"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Failures of the scheduler.",
+            "introduces": "A failure of the calculator's rules.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p43",
+          "function": "analysis",
+          "controlling_idea": "A status reports the wrong thing when 'not yet confirmed' is stored as 'unpaid', so the state machine needs a state for not knowing and the access decision needs to read it.",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "The Silent Webhook, Monday 14 September 2026: 9 hours of failed events, 3,200 memberships shown as unpaid, members turned away at check-in on Monday morning though no payment had failed.",
+              "shows": "The cost of a two-valued status; K2's sweep and the past_due access rule are the recovery.",
+              "source": "scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Wrong amount.",
+            "introduces": "Wrong state.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "Scheduler, calculator and state machine are three views of one answer to one question, what is owed for which period, and the invoice is the place where that answer is written down once. Late, twice and the wrong rule are that answer arriving after its period, existing twice, or being computed by a rule the customer never agreed to. Where the invoice lives is therefore the first fact about any recurring business: it says who can be asked what a customer owes.",
+    "so_what": "A team that runs renewals on a bare payment API is running a billing engine whether it calls it one or not, and it should write down the five decisions and the scheduler's pacing before the next first of the month. A team on Adyen must name the system that holds them; a team on Stripe must read back the rules it was given.",
+    "callback": {
+      "to": "The 1,840 members who paid for November twice.",
+      "how": "The reader can now say what was missing: a record of one debt per membership and period, written before any payment, from which the key and the status are derived."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "For each recurring product, write one line per decision (day, instant and time zone, proration rule, status while unpaid, what identifies a period's charge, pacing) and next to it the system that makes it and where its answer can be read back."
+    },
+    "hand_off": {
+      "to": "usage-metering-and-rating",
+      "relationship": "contrast",
+      "carries_over": "The billing period, the invoice as the engine's output, and a price that is known the moment the period starts.",
+      "introduces": "A price that is not known until the period ends, because it depends on usage events that arrive late and more than once."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The failure modes.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p44",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Established: a recurring charge needs a schedule, an amount and a record of one debt per period; Stripe documents all three as platform objects and Adyen documents a token payment with a recurring flag."
+      },
+      {
+        "id": "p45",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Depends on context: whether to use the provider's engine, a dedicated one or your own, whether UTC anchors are acceptable, and how much to rely on Orb for an Adyen estate.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is settled.",
+          "introduces": "What changes with the situation.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p46",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "The author's synthesis: the invoice, not the charge, is the unit to design around, and a billing rule is a contract term to be stored per subscription.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is established and what depends.",
+          "introduces": "The author's own position, returning to the doubled November.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p47",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "Eight questions let the reader test a recurring product or a provider for where the engine's decisions are made.",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The take-aways.",
+          "introduces": "Questions that apply them.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p48",
+        "function": "transition",
+        "controlling_idea": "This chapter's price was known when the period started; the next chapter's is not known until the period ends, because it depends on usage events that arrive late and twice.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "A period, an invoice and a fixed price.",
+          "introduces": "A price that has to be counted before it can be charged.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "Usage events, meters, rating, credits and commitments; Orb's and Metronome's designs.",
+      "covered_in": [
+        "usage-metering-and-rating"
+      ]
+    },
+    {
+      "topic": "The invoice's life cycle, finalization, credit notes, retry schedules, Smart Retries, Auto Rescue in detail, card updating and customer communication.",
+      "covered_in": [
+        "invoicing-collections-and-dunning"
+      ]
+    },
+    {
+      "topic": "Tax on invoices.",
+      "covered_in": [
+        "billing-and-payment-tax"
+      ]
+    },
+    {
+      "topic": "Revenue schedules and deferred revenue, including the annual plan.",
+      "covered_in": [
+        "billing-revenue-recognition"
+      ]
+    },
+    {
+      "topic": "Merchant-initiated transaction rules, stored-credential frameworks and decline codes.",
+      "covered_in": [
+        "payment-authorization",
+        "authorization-optimization"
+      ]
+    },
+    {
+      "topic": "Idempotency key mechanics and provider retention windows.",
+      "covered_in": [
+        "idempotency-and-retries"
+      ]
+    },
+    {
+      "topic": "Pacing a renewal peak and provider rate limits.",
+      "covered_in": [
+        "payment-peak-load",
+        "payment-developer-platform"
+      ]
+    },
+    {
+      "topic": "Mila's failed renewal end to end.",
+      "covered_in": [
+        "journey-failed-renewal"
+      ]
+    },
+    {
+      "topic": "Entitlements as a product, pricing-page design and subscription analytics."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "How Stripe partitions, paces and de-duplicates renewals is not public; the chapter states the observable contract and the one passage of a 2024 engineering post on the scheduling service.",
+    "Whether and when Orb becomes a documented part of Adyen's platform; as of 17 November 2026 only forward-looking statements exist.",
+    "Current availability of Stripe Billing with third-party processors (announced October 2024) was not re-checked.",
+    "Zuora's documentation could not be fetched (404); the chapter names Zuora only as a member of the product category.",
+    "The ledger addition that the March 2026 SDK upgrade crossed API version 2025-09-30.clover must agree with payment-api-versioning, which was not yet written.",
+    "The Adyen knowledge-hub article on Orb displays the date 29 September 2026 (ruling 21); the research brief dated it 2026-10-19, and its sentence 'We completed our acquisition of Orb on 1 July.' is not on the page fetched, which reads 'On July 1st, we acquired Orb.'"
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "The Larkfield scene is an inventory that finds two billing engines, because the contract asks for 'two different billing problems' and the ledger's 2026 incidents already divide between them.",
+      "rejected": [
+        "Opening with the Double Charge as the scene: it is the part intro's opening and returns here only as the hook and a failure case.",
+        "Inventing a new billing incident."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The invoice is defined by its job (one debt per period) and its life cycle is left to invoicing-collections-and-dunning, under consistency ruling 6, which gives this chapter 'who holds the invoice'.",
+      "rejected": [
+        "Teaching draft, open, paid, void and uncollectible here."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The worked proration uses a studio plan upgrade at the exact midpoint of a 30-day month so the arithmetic is checkable by eye, and the AC-1 probe's case (31 January sign-up, €12 to €20) is not used.",
+      "rejected": [
+        "Reusing Stripe's 10 to 20 USD example as the Larkfield example."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Dedicated billing systems appear only as far as fetched documentation supports: Chargebee's proration modes and Orb's gateway model. Zuora and Recurly are named without characterization.",
+      "rejected": [
+        "Describing Zuora's object model from memory."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "_research/brief-billing-and-revenue.md",
+      "contributed": "Part 1 (sections 1.1 to 1.11), section 3.2 (Auto Rescue), section 7.1, the research limitations and open questions 1, 3, 4 and 14."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "Larkfield's business lines, incidents, K1, K2, K5, K7, Mila's membership renewal."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/consistency-issues.md",
+      "contributed": "Rulings 6, 12 and 13."
+    },
+    {
+      "kind": "internal",
+      "ref": "journal-spec.json",
+      "contributed": "Intent, acceptance criteria, thesis and role, copied unchanged; neighbours' transitions."
+    },
+    {
+      "kind": "external",
+      "ref": "Pages fetched by the writer on 2026-11-17: Stripe documentation (subscriptions overview, billing cycle, prorations, billing mode and comparison, subscription invoices, workflow transitions, pause, pause payment collection, subscription schedules, test clocks, trials, products and prices, InvoicePayment API reference); Stripe blog post of 2024-10-29; Adyen documentation (tokenization, make token payments, Auto Rescue for cards); Adyen press releases of 2026-06-11 and 2026-07-01 and knowledge-hub article of 2026-09-29; Orb documentation (payments); Chargebee documentation (proration).",
+      "contributed": "Verification of every quotation used."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation pass (parts 6-8): fields copied from the journal spec and unit-level controlling ideas and evidence brought into line with the verified page and the consistency rulings; no unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 58 claims checked (48 confirmed, 8 corrected, 0 hedged, 0 unsupported and removed or relabeled, 0 unreachable; 2 not checked); the claim that no Stripe publication describes how renewals are scheduled was wrong: a 2024 Stripe engineering post on test clocks describes a scheduling service that finds subscriptions whose billing periods have ended and triggers invoice creation, so S3, p25, p29 and the comparison row now say that only its partitioning, pacing and duplicate protection are not public (thesis.how_why still carries the old wording because it must equal the journal spec). Also: Silent Webhook is Monday 14 September 2026 (ruling 20), Adyen documentation dates per ruling 30, schedules hold up to ten current or future phases, inline URLs removed (ruling 22)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "While drafting: the comparison table's row on billing separable from the provider's payments was dropped for length (the fact stays in the designs section), and the schedule object left the object table (it stays in the paragraph on clock-driven changes). No unit added, dropped or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes). Notes acted on: the Stripe section now follows the order of the decisions (day and instant, proration, status, clock-driven changes); the status decision covers trial, pause and cancellation; 'invoice' and 'catalog' are glossed where first used; the count of decisions is five plus pacing throughout; the claim about Adyen's unpublished scheduler moved to the Adyen section; Metronome is introduced before the comparison table. Notes not acted on: moving the comparison section before the three designs (the style guide's body order and two table rows depend on the designs); trimming the comparison table."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "First version, written from the PLAN contract, the journal spec entry and the research brief."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('but no Stripe or Adyen publication describes how renewals ar' -> 'and one 2024 Stripe engineering post describes a scheduling ')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: 'Stripe does not say why two modes coexist' narrowed (its stated reason for classic mode is backward compatibility; why existing subscriptions are not converted is not stated). Adyen billing-product and scheduler absences re-tested against the documentation sitemap and full text, help center, site and domain-restricted web search: hold; search scope stated."
+    }
+  ],
+  "length": {
+    "target_words": 5000,
+    "max_words": 6500
+  }
+}

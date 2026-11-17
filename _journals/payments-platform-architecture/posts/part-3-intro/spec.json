@@ -1,0 +1,537 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "part-3",
+  "journal": "payments-platform-architecture",
+  "part": "part-3",
+  "title": "Part III — LEDGER: Recording and Moving Money",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "basis": "Written from the journal spec's part-3 entry (thesis, opening, flow) and the five Part III chapters as written (read in full on 2026-11-17). The KEY POINTS callout and the shape figure are evidence of the claim paragraph (p03); the reading-order figure is evidence of the roadmap paragraph (p04).",
+  "intent": {
+    "outcome": {
+      "know": [
+        "Part III answers five questions in order: how the provider records money, what a balance means, how money leaves, how the record is proven, and who may hold the money."
+      ],
+      "believe": [
+        "A payment marked paid says nothing yet about who owes whom; that is a second record."
+      ],
+      "can_do": [
+        "Pick the Part III chapter that answers a money question in front of them: an unexplained difference, a balance that moved, a payout that did not arrive, a close that will not tie, or a funds flow that might need a license."
+      ]
+    },
+    "audience": {
+      "who": "Engineers and architects new to payments who have read Parts I and II and are about to start the ledger chapters, or who arrive with one money question in hand (an unexplained difference, a balance that moved, a payout that did not arrive, a close that will not tie, a funds flow that might need a license) and want the chapter that answers it.",
+      "already_knows": [
+        "What a database row, an append-only log, a webhook and a state machine are.",
+        "Parts I and II: issuer, acquirer and card network; authorization, capture, clearing and settlement in outline; refunds and chargebacks; a payment held as a state machine.",
+        "Larkfield in outline: a fictional studio-software platform that uses Stripe and Adyen, and its 2027 repair program Keel."
+      ],
+      "does_not_know": [
+        "Double-entry ledger, clearing account, balance, payout, payout return, reconciliation, safeguarding: each is owned by a Part III chapter and is glossed in a clause here.",
+        "How Stripe's and Adyen's documented models differ on each; the page states the difference in a clause per chapter and leaves the evidence to the chapter."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "A reader of this page alone can name the five chapters' subjects in reading order and say why the ledger comes first.",
+        "check": "intro_predicts_content",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "After reading only this page: what will each of the next five chapters tell you, in order, and why does the first one come first?",
+        "expected": "Ledgers; balances and funds flows; payouts; reconciliation and reporting; licenses and safeguarding. The ledger comes first because balances, payouts and reports are all read from it."
+      },
+      {
+        "id": "AC-2",
+        "statement": "The page states the part thesis in a form a reader can repeat: the provider knows where money is only from a record kept twice and proven against outside parties.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "After reading only this page: according to Part III, how does a provider know where the money is?",
+        "expected": "From its own double-entry ledger, which it must keep proving against the networks' and banks' records; not from the payment's status and not by looking at a bank balance."
+      }
+    ]
+  },
+  "thesis": {
+    "question": "Between the customer paying and the merchant being paid, how does a payment provider know where the money is and whose it is?",
+    "claim": "A provider knows where money is and whose it is only from a double-entry record it keeps itself, and that record counts as knowledge only while it is matched against records the provider did not write: network clearing files, bank statements and the statements of the accounts where customer funds are held. A balance and a report are that record read at a given moment, a payout is one of its entries becoming a bank transfer, and the provider's license decides which accounts the record must contain.",
+    "disputed_by": "The view that the money is simply 'at the provider', so that the balance in a dashboard is a count of cash like a bank balance, and ledgers and reconciliation are back-office accounting added later for the finance team.",
+    "so_what": "An engineer who accepts the claim stops reading 'available', 'paid' and 'settled' as facts about cash, keeps an entry of their own for every movement, books from reports instead of from notifications, and asks of any funds flow who is licensed to hold the money in it.",
+    "how_why": "The cash behind a payment is never where the API objects are: it is in transit through networks and pooled in bank accounts across thousands of merchants, so 'where is this €120' can be answered only as entries that say who owes whom since when. Recording each movement twice makes a missing or wrong movement visible as an account that does not empty, but only a record kept by someone else can show that a recorded movement happened. Stripe (2024) and Adyen (2021) each describe a ledger built on this invariant and differ in where they enforce it; the merchant's balance, the payout and the settlement report are views of it; and safeguarding law turns the comparison between the ledger and the bank account into a legal duty for a provider that is not a bank.",
+    "supporting_claims": [
+      {
+        "id": "P3-1",
+        "claim": "A ledger makes money errors visible by recording each movement as balanced, immutable entries through accounts that must empty; Stripe (2024) checks that invariant after the fact across many writing systems, and Adyen (2021) enforces it at the moment of writing."
+      },
+      {
+        "id": "P3-2",
+        "claim": "A merchant's balance is the provider's record of what it owes, and 'pending', 'available' and 'reserved' are the provider's decisions about when and how much it will pay, not reports of where the cash is."
+      },
+      {
+        "id": "P3-3",
+        "claim": "A payout turns a ledger balance into a transfer on a bank rail the provider does not control, so 'sent' and 'arrived' are different states and a transfer that fails comes back as a new movement."
+      },
+      {
+        "id": "P3-4",
+        "claim": "A ledger is proof only when its entries are matched against records it did not write, and the scheduled report, not the webhook, is the form in which a provider passes that proof to its customers."
+      },
+      {
+        "id": "P3-5",
+        "claim": "The license a provider holds decides which accounts its ledger must contain, which funds may never be mixed and what must be reconciled against a bank."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Performs the part's opening: poses the question with Larkfield's €412,000 difference, states the part thesis and gives the reading order.",
+    "supports": []
+  },
+  "flow": {
+    "pattern": "large_to_small",
+    "additional_patterns": [
+      {
+        "pattern": "prerequisite_order",
+        "applies_to": "chapters: the five chapter paragraphs, in the part's reading order"
+      }
+    ],
+    "rationale": "The page opens on one unexplained difference at Larkfield, says why a record of payments could not contain it (Part II's record says what happened to a payment, not who owes whom), widens that into the part's claim (a ledger kept twice and proven against outside records, of which balance, payout, report and license are aspects), and then narrows: to the five questions in order with the reason for the order, to one paragraph per chapter with its Larkfield case, to a guide from a problem to a chapter and where to begin. The difference comes first because the claim answers it; the claim precedes the chapter list because each chapter paragraph describes one aspect of the ledger, and a reader who has not been told that the ledger is the centre reads five unrelated topics. Put the chapter list first and the reader has no reason for its order; put the problem-to-chapter guide before the list and it points at chapters the reader has not met. In the closing, the problem-to-chapter guide precedes the synthesis so that the page ends on one instruction for the reader who starts at the beginning: begin with the ledger chapter."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "At year-end 2025 Larkfield's ledger said one thing about what it owed its studios, and the balances at Stripe and Adyen said another: the two differed by €412,000. It took three weeks to trace the difference to refunds made after payout, chargeback fees and a currency-conversion rounding rule."
+    },
+    "bridge": {
+      "from_reader_world": "Part II, where the question was whether a payment is approved and the record was one payment's state (authorized, captured, refunded).",
+      "to_topic": "The days after approval, where every approval has created debts between card network, provider and merchant that are paid over days, the question is who owes whom, and the record is a set of accounts that must agree with the banks."
+    },
+    "thesis_statement": {
+      "text": "A provider knows where money is, and whose it is, only from a double-entry ledger it keeps itself, and that record counts as knowledge only while it is matched against records the provider did not write: network clearing files and bank statements. A balance and a report are that ledger read at a given moment, a payout is one of its entries becoming a bank transfer, and the provider's license decides which accounts the ledger must contain.",
+      "placement": "KEY POINTS bullets 1 to 3 and paragraph p03"
+    },
+    "roadmap": {
+      "placement": "paragraph p04",
+      "promises": [
+        {
+          "promise": "Five chapters in order, each needing the one before: how a provider builds the ledger that records every movement twice; what a merchant's balance says and does not say; how money leaves the provider and what happens when it does not arrive; how the provider proves its books against networks and banks and what it gives customers to prove theirs; and who is legally allowed to hold the money.",
+          "kept_in": [
+            "chapters"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "At year-end 2025 every payment at Larkfield, the fictional studio-software platform, had the right status, yet its books said it owed its studios €412,000 more than the balances at Stripe and Adyen showed, and it took three weeks to trace the difference to refunds made after payout, chargeback fees and a currency-conversion rounding rule.",
+        "function": "example",
+        "organization": "narration",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "The Unexplained €0.4 Million (fictional): €412,000 at year-end 2025; three weeks; refunds after payout, chargeback fees, a currency-conversion rounding rule. Payout and chargeback are glossed in a clause each.",
+            "source": "_research/scenario-ledger.md; payment-ledgers",
+            "shows": "A set of payments that are each correct can still leave a money difference nobody can explain."
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "Part II's record, one payment's state, could not contain that difference, because every approval creates debts (the card network owes the provider, the provider owes the merchant) that are paid over days, and a payment's state does not say who owes whom.",
+        "function": "cause_effect",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "The three causes all happened after the payment row was last correct (payment-ledgers: 'Each is money that moved after the payment row was last correct'); between approval and payout the amount is owed by the card network to the provider and by the provider to the merchant (payment-ledgers).",
+            "source": "payment-ledgers",
+            "shows": "Why the difference was never in the payments: it was in debts the payment record has no place for."
+          }
+        ],
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The €412,000 that correct payment statuses could not explain, and Part II's result: an approved payment held in a state machine.",
+          "introduces": "Every approval creates debts paid over days; a payment's state does not say who owes whom, so a second record is needed, with a way to prove it.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "Part III's claim: a provider knows where money is and whose it is only from a double-entry ledger it keeps itself, which counts as knowledge only while it is matched against records the provider did not write, and the balance, the report, the payout and the license are each that ledger seen from one side.",
+        "function": "claim",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "KEY POINTS callout: a balance is a record of a debt, not a count of cash; the record is knowledge only while someone else's record agrees; 'available', 'paid' and 'settled' are one party's statement at one moment and can be reversed by a later entry.",
+            "shows": "The part's argument in three lines for a reader who skims."
+          },
+          {
+            "kind": "figure",
+            "what": "Shape figure: a ledger book at the centre; three views read from it (balance, payout, report); outside records it is matched against (network file, bank statement); a frame around it for the license.",
+            "shows": "Balance, payout and report are readings of one record, proof comes from outside it, and the license bounds what it must contain."
+          },
+          {
+            "kind": "reasoning",
+            "what": "The disputed view, from the part thesis: the money is simply 'at the provider' and a dashboard balance counts cash like a bank balance.",
+            "shows": "What the reader is asked to stop assuming."
+          }
+        ],
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "The second record that the debts require, and the need to prove it.",
+          "introduces": "What that record is (a double-entry ledger, glossed), what makes it knowledge (matching against outside records) and how balance, report, payout and license relate to it.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "controlling_idea": "Five chapters take five questions in an order in which each needs the one before: the ledger comes first because balances, payouts and reports are all read from it, and licenses come last because safeguarding is then one more comparison between a ledger and a bank account, this time required by law.",
+        "function": "description",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "The part's flow rationale in the journal spec: ledger, then balance as a view of entries, then payout as an entry becoming a transfer, then reconciliation of all three with outside records, then the legal duty reconciliation serves. Safeguarding glossed as the legal duty to keep customers' money apart from the firm's own.",
+            "source": "journal-spec.json, part-3 flow",
+            "shows": "Why the order is a prerequisite order and not a list of topics."
+          },
+          {
+            "kind": "figure",
+            "what": "Reading-order figure: five steps left to right labeled Ledger, Balance, Payout, Proof, License, each with its question as an icon, joined by arrows.",
+            "shows": "The reading order at a glance, with the ledger as the first step the others stand on."
+          }
+        ],
+        "transition_in": {
+          "relationship": "elaboration",
+          "carries_over": "The claim that balance, payout, report and license are aspects of one ledger.",
+          "introduces": "The five questions, their order and the reason for it.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "chapters",
+      "heading": "Chapters in this part",
+      "controlling_idea": "Each of the five chapters answers one question about the record of money, states where Stripe's and Adyen's documented models differ, and works it on one Larkfield case.",
+      "function": "description",
+      "advances_thesis": {
+        "supports": [
+          "P3-1",
+          "P3-2",
+          "P3-3",
+          "P3-4",
+          "P3-5"
+        ],
+        "how": "Each paragraph introduces the chapter that argues one of the part's supporting claims, so the list is the part's argument in outline."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "Each chapter uses what the one before fixed. The ledger chapter supplies entries, accounts and clearing accounts; the balance chapter reads one merchant's claim out of those entries; the payout chapter follows that claim onto a bank rail; the reconciliation chapter generalizes the payout's two disagreeing records into matching every movement against an outside record; the license chapter asks whose bank account that outside record describes. Put reconciliation before the ledger and the reader matches records without knowing what they contain; put licenses first and safeguarding has nothing in the system to attach to."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The five questions in order.",
+        "introduces": "One paragraph per chapter: the question in bold, what the chapter argues and the Larkfield case it works.",
+        "form": "sentence",
+        "placement": "end_of_previous"
+      },
+      "paragraphs": [
+        {
+          "id": "p05",
+          "controlling_idea": "The ledger chapter answers how a payment company knows whose money it holds and where it is: from balanced, never-edited entries and clearing accounts that must return to zero, enforced at the write as Adyen described in 2021 or proven afterwards as Stripe described in 2024, and it replays Larkfield's €412,000 through six accounts.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P3-1"
+            ],
+            "how": "Introduces the chapter that establishes the ledger and its two published enforcement points."
+          },
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "As chapter 12 documents: Adyen's 2021 engineering post says records enter its books only through templates proven to net to zero; Stripe's 2024 post describes many systems publishing into an immutable log checked afterwards, with 99.99% of dollar volume verified within four days.",
+              "source": "payment-ledgers (Adyen, 2021-08-23; Stripe, 2024-02-16)",
+              "shows": "The same invariant is enforced at two different points."
+            },
+            {
+              "kind": "scenario",
+              "what": "The €412,000 in three causes (refunds after payout €317,200, chargeback fees €73,500, rounding €21,300), replayed through Larkfield's six accounts and one posting function (fictional).",
+              "source": "payment-ledgers; _research/scenario-ledger.md",
+              "shows": "Each cause would have been an entry on the day it began."
+            }
+          ]
+        },
+        {
+          "id": "p06",
+          "controlling_idea": "The balances chapter asks where the money is, and whose, between the customer paying and the merchant being paid: a balance is the merchant's claim on the provider, 'pending', 'available' and 'reserved' are the provider's decisions about that debt, and Mila's €120.00 class pass becomes three figures in the provider's books.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P3-2"
+            ],
+            "how": "Introduces the chapter that reads a balance as a claim and its states as decisions."
+          },
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "As chapter 13 documents (and ruling 18): Adyen's Sales Day Payout terms (2024) and documentation say it pays whether or not the card network has paid it, and takes back what has not settled within 30 days; Stripe publishes a schedule and, for standard payouts, does not say whether it waits for the network, beyond services terms (28 September 2026) that let a payout wait when a network fails to settle to Stripe.",
+              "source": "balances-and-funds-flows",
+              "shows": "'Available' is not a report that the cash arrived."
+            },
+            {
+              "kind": "scenario",
+              "what": "Mila's €120.00 pass of 9 March 2027 as three figures: €117.47 owed to Studio Noord, €1.92 to Larkfield, €0.61 processing cost (an assumption) (fictional).",
+              "source": "balances-and-funds-flows; _research/scenario-ledger.md",
+              "shows": "One payment is several claims in the provider's book, none of them a bank account of the studio's."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The provider's whole two-sided record.",
+            "introduces": "One merchant's claim in it, and when that claim becomes payable.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p07",
+          "controlling_idea": "The payouts chapter asks how money leaves the provider and reaches a bank account, and what happens when it does not arrive: 'paid' means sent, a failed transfer comes back days later as a new credit, and Larkfield's Payout That Bounced shows what a one-state payout record costs.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P3-3"
+            ],
+            "how": "Introduces the chapter that separates sent from arrived and treats a return as a new movement."
+          },
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "As chapter 14 documents: Stripe's documentation says a failed payout 'might initially show as paid'; both providers book a return as a separate transaction that credits the balance.",
+              "source": "payouts-and-money-movement",
+              "shows": "The provider's status describes its own action, not the bank's."
+            },
+            {
+              "kind": "scenario",
+              "what": "The Payout That Bounced, June 2026: 412 payouts worth €386,000 returned over three weeks; 19 days to pay every studio (fictional).",
+              "source": "payouts-and-money-movement; _research/scenario-ledger.md",
+              "shows": "A return needs an open payout to attach to."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The studio's claim, now payable.",
+            "introduces": "The claim leaving the ledger for a bank network the provider does not control.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p08",
+          "controlling_idea": "The reconciliation chapter asks how a provider proves its own books against the networks and banks and what it gives customers to prove theirs: it matches each expected movement against a record it did not write, hands customers the same proof as scheduled reports (per payout at Stripe, per payable batch at Adyen), and the chapter closes one Larkfield day on both providers.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P3-4"
+            ],
+            "how": "Introduces the chapter that makes outside records the proof and the report the form in which it is passed on."
+          },
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "As chapter 15 documents: Stripe's payout reconciliation report itemizes each payout; Adyen's settlement details report itemizes each payable batch; both providers' own words separate a webhook that informs from a report that confirms.",
+              "source": "payment-reconciliation-and-reporting",
+              "shows": "The report, not the webhook, carries the proof."
+            },
+            {
+              "kind": "scenario",
+              "what": "Closing Tuesday 9 March 2027 on two providers; before Keel the nightly job covered Adyen only, while Stripe carried 44% of 2026 member payment volume booked from webhooks (fictional).",
+              "source": "payment-reconciliation-and-reporting; _research/scenario-ledger.md",
+              "shows": "Almost half the money had nothing outside to check it against."
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "A payout that is 'paid' at the provider and absent at the bank: two records that disagree.",
+            "introduces": "The general answer: match every movement against the other party's record, and book from reports.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p09",
+          "controlling_idea": "The licenses chapter asks who is legally allowed to hold customer money and where it sits: only a licensed institution may, Stripe states that it is a licensed non-bank and Adyen that it is a bank, neither names the banks that hold the money, and Larkfield's proposed 14-day buffer of about €43 million shows how a platform comes to hold funds by accident.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P3-5"
+            ],
+            "how": "Introduces the chapter that makes the license decide what the ledger must contain and compare with a bank."
+          },
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "As chapter 16 documents: Stripe states it is an e-money institution in Europe and 'not a bank' in the United States; Adyen N.V. states it is a Dutch credit institution with UK and US branches; neither names the banks that hold the money (Adyen's terms say balances are 'held by Adyen prior to Settlement' and its documentation gives a country per settlement currency).",
+              "source": "licences-and-safeguarding",
+              "shows": "The two anchors differ in kind, and the public record stops short of the accounts."
+            },
+            {
+              "kind": "scenario",
+              "what": "The refund buffer proposed in April 2027: studio payouts held 14 days in Larkfield's own account, about €43 million against €46.0 million of annual revenue; stopped in review by Jonas Weber (fictional).",
+              "source": "licences-and-safeguarding; _research/scenario-ledger.md",
+              "shows": "One arrow through the platform's own bank account raises a license question."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "Reconciliation as a comparison between a ledger and a bank's record.",
+            "introduces": "Whose bank account that is, and the law that makes the comparison a duty for a provider that is not a bank.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "Where to Begin",
+    "synthesis": "Read together, the five chapters ask one question five times: what does this record say is owed, and whose independent record agrees? That is why a reader can enter at the chapter matching the problem in front of them, and why the opening difference stops being a mystery: every payment status was right, and the €412,000 was in what no payment status records.",
+    "so_what": "A reader with a money problem opens the chapter that owns it, and a reader starting from the beginning has each chapter's terms in place before the next uses them.",
+    "callback": {
+      "to": "The opening's €412,000 that correct payment statuses could not explain (p01).",
+      "how": "The reader is told where it sat: in movements that came after the payment and in a rounding rule, which a record of payments has no place for."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Open the chapter that matches the problem in front of you, or begin with payment-ledgers, because every later chapter reads from the ledger."
+    },
+    "hand_off": {
+      "to": "payment-ledgers",
+      "relationship": "elaboration",
+      "carries_over": "The part intro's claim that a provider knows where money is only from a record kept twice, and Larkfield's €412,000 difference that a list of paid payments could not explain.",
+      "introduces": "What that record is made of: balanced immutable entries, accounts, clearing accounts that must empty, and the two published ways of enforcing the invariant."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The five chapters and the question each answers.",
+      "introduces": "How to enter them from a problem, what they explain together about the opening difference, and where to begin.",
+      "form": "sentence",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p10",
+        "controlling_idea": "A reader who arrives with a problem can go straight to its chapter: an unexplained difference to the ledger chapter, a balance that moved without a payout to the balances chapter, a payout marked paid that has not arrived to the payouts chapter, a close that will not tie to the reconciliation chapter, and a funds flow through the reader's own bank account to the licenses chapter.",
+        "function": "recommendation"
+      },
+      {
+        "id": "p11",
+        "controlling_idea": "Read in order, the chapters explain the opening: every payment status was right, and the €412,000 sat in movements that came after the payment and in a rounding rule, which a record of payments has no place for; begin with the ledger chapter.",
+        "function": "synthesis",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "Entering at one chapter for one problem.",
+          "introduces": "Reading in order, what the chapters explain about the opening difference, and the first chapter.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "Teaching ledgers, balances, payout rails, reconciliation or licensing; the page summarizes and does not re-argue the chapters.",
+      "covered_in": [
+        "payment-ledgers",
+        "balances-and-funds-flows",
+        "payouts-and-money-movement",
+        "payment-reconciliation-and-reporting",
+        "licences-and-safeguarding"
+      ]
+    },
+    {
+      "topic": "The part's closing (ledger, balance, payout, reconciliation and license as one control seen five ways, and Keel decision K3 as the course of action).",
+      "covered_in": [
+        "licences-and-safeguarding"
+      ]
+    },
+    {
+      "topic": "A 'Stripe and Adyen: Where They Differ' table, take-away tiers, failure patterns and Questions to Ask; part introductions carry none."
+    },
+    {
+      "topic": "External factual claims of its own; every statement about Stripe, Adyen or a regulation is already in a chapter of the part and is linked, not cited."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "The closing sits under its own short heading, 'Where to Begin', after 'Chapters in this part', as the Part II introduction does; the structure checker needs a heading to find the conclusion.",
+      "rejected": [
+        "Ending the chapter list with 'Begin with …' and no conclusion heading (the checker cannot align a conclusion without one)"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The problem-to-chapter guide (the entry's can_do outcome) is a prose paragraph in the closing, not a table, to stay within 1,200 words.",
+      "rejected": [
+        "A five-row table after the chapter list"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Flow rubric notes not acted on: the closing keeps the guide (p10) before the synthesis (p11) because the page must end on 'Begin with payment-ledgers' (INTRO-BRIEF); p10 addresses the reader with a problem and p11 the reader who reads in order, so the two instructions do not compete. Safeguarding is glossed inside p04, where it is first used.",
+      "rejected": [
+        "Swapping p10 and p11",
+        "Moving safeguarding into the claim paragraph p03"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "journal-spec.json (part-3: thesis, opening, flow, transition_in; post entry part-3; payment-ledgers transition_in)",
+      "contributed": "Intent, thesis, role, hook, bridge, roadmap, the order of chapters and the hand-off."
+    },
+    {
+      "kind": "internal",
+      "ref": "posts/12-payment-ledgers, 13-balances-and-funds-flows, 14-payouts-and-money-movement, 15-payment-reconciliation-and-reporting, 16-licences-and-safeguarding (index.md, read in full)",
+      "contributed": "What each chapter argues, its Larkfield case, its numbers and the documented Stripe and Adyen facts repeated here."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md; _research/consistency-issues.md (ruling 18); _research/INTRO-BRIEF.md; _research/style-guide.md",
+      "contributed": "The fictional facts, the wording on pre-financing (documented for Adyen, not for Stripe's standard payouts), and the shape and length of a part introduction."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Initial spec. Status draft. (AI-mediated session)"
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass (part introduction, checked against the corrected chapters 12-16): 17 claims checked (17 agree, 0 corrected, 0 removed); no edit to the text."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: 1 statement of absence re-tested (narrowed, following chapter 13): Stripe's services terms let a standard payout wait when a network fails to settle to Stripe; table in _research/absence-audit/part-3-intro.md."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Sweep of rulings 46-48: 'neither publishes which accounts hold the money' narrowed to 'neither names the banks that hold the money' (ruling 47g; owner chapter 16)."
+    }
+  ],
+  "length": {
+    "target_words": 1000,
+    "max_words": 1200
+  }
+}

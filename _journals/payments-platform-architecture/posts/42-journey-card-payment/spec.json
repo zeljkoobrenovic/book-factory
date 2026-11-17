@@ -1,0 +1,1210 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "journey-card-payment",
+  "journal": "payments-platform-architecture",
+  "part": "part-9",
+  "title": "Journey 1: Mila's Class Pass, From Tap to Settled",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "The twelve steps of the path on which nothing fails (checkout, tokenization, risk scoring, authentication, authorization, capture, clearing, settlement, ledger entries, split, payout, reconciliation) and, for each, the party that acts, the message or record it leaves, the promise made and the failure that can occur there, with the chapter that owns it.",
+        "The canonical figures: €120.00 paid with a Dutch Visa debit card held in a phone wallet; approved and captured automatically at 19:42 on Tuesday 9 March 2027; Larkfield's fee €2.53 and the studio's €117.47; the payout that contains it sent on Thursday 11 March.",
+        "How the same steps are recorded on each provider as documented in 2026: on Adyen a result code, then webhooks keyed by the PSP reference, then report lines, with no endpoint in the Checkout API that returns a payment by its identifier and no webhook when a payment settles; on Stripe a PaymentIntent with a status, a balance that moves from pending to available, and a payout object.",
+        "Where the public record stops: the card networks' settlement cut-off times and cycles, and whether Stripe's standard payout schedule makes funds available before Stripe has received them (Stripe documents paying ahead only for Instant Payouts)."
+      ],
+      "believe": [
+        "'Payment successful' is a true statement about the issuer's authorization and says nothing about the eleven steps around it.",
+        "A payment is finished when the payout has been matched to the provider's settlement record, and reopenable for months after that."
+      ],
+      "can_do": [
+        "Fill in the step table for a card payment in their own system and name, for each row, the record that confirms the row before it.",
+        "Decide for each state in their own payment vocabulary which provider record justifies entering it, on Adyen and on Stripe."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a payment that was approved and never reached the merchant, the reader lists the steps at which it can be lost without an error on the day, and the later record that shows each.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A bike-rental app marks a €45 rental 'Paid' when the provider's API returns an approved authorization (the card issuer's agreement to honor the amount). The app collects the amount later, when the bike is returned. Nine days afterwards, support finds that the rental never appeared in any payout to the shop. Using only this chapter: at which steps could the money have been lost with no error on the day, and which record would have shown each loss?",
+        "expected": "At capture: an authorization is valid for a limited number of days, so a late capture fails; the capture result shows it. After capture: the card scheme can reject a capture that the provider had accepted, days later (on Adyen a CAPTURE_FAILED event after a successful CAPTURE event); the later event and the settlement report show it. At funding: the amount can be held in the provider balance or set off against refunds, a reserve or a negative balance; the balance and settlement report show it. At payout: the bank transfer can fail or be returned; the payout record and the bank statement show it. The app should not call a payment paid on the authorization alone: it should keep a state for 'approved, not yet confirmed', sweep what stays in it, and match captured payments against the settlement report and payouts every day."
+      },
+      {
+        "id": "AC-2",
+        "statement": "The reader can say, for at least two steps, which record an integration should wait for on Adyen and which on Stripe.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "The same €120 pass is bought at a studio whose payments run on Stripe instead of Adyen. Using only this chapter: name two steps of the journey at which the record an integration should rely on differs between the two providers, and say what each provider gives at that step.",
+        "expected": "Any two of: the outcome of the payment (Stripe: a PaymentIntent whose status can be fetched at any time; Adyen: a result code in the response and an AUTHORISATION webhook keyed by the PSP reference, with no endpoint in the Checkout API that returns the payment by its identifier); the capture (Adyen: a CAPTURE webhook that can be followed by CAPTURE_FAILED days later; Stripe: the PaymentIntent's status, with nothing published on whether a capture can fail later at the network); funds reaching the studio's balance (Stripe: a balance that moves from pending to available on a published schedule counted from the payment; Adyen for Platforms: a batch settled to the balance account after the sales day ends and a settlement delay passes, independent of when the schemes pay Adyen, and no webhook when a payment settles)."
+      },
+      {
+        "id": "AC-3",
+        "statement": "Every row of the step table names a party, a record, a promise and a failure, and links the failure to the chapter of Parts I to VIII that owns the mechanism, so a reader can go from any step to its full explanation.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "major"
+      }
+    ],
+    "audience": {
+      "who": "A software engineer or architect who integrates or operates card payments through a provider and wants to see one payment whole, with every record it leaves.",
+      "already_knows": [
+        "The six-step overview of a card payment and its parties (journey-of-a-payment), and the mechanisms of Parts I to VIII, each from its own chapter.",
+        "Larkfield, its payment record store, ledger, reconciliation job and the Keel decisions (meet-larkfield).",
+        "The part introduction's claim that payments go wrong at hand-offs, and the step table's five columns."
+      ],
+      "does_not_know": [
+        "Which record each of the twelve steps leaves on Adyen and on Stripe, and which later record confirms it.",
+        "At which steps an approved payment can be lost with no error on the day."
+      ]
+    }
+  },
+  "thesis": {
+    "question": "What happens to Mila's €120, step by step and party by party, between her tap at 19:42 on 9 March 2027 and Studio Noord's reconciled payout, and what does each step promise?",
+    "claim": "Between Mila's tap at 19:42 on Tuesday 9 March 2027 and Studio Noord's payout on Thursday 11 March, her €120 passes through twelve steps. The first eleven each end in a promise by the party that ran them; only the twelfth, matching the payout to the provider's settlement record, establishes that the studio's €117.47 arrived. The 'Payment successful' on her screen reports the fifth step, the issuer's authorization. The losses on this path are the ones a step's own success message cannot report: an authorization that expires before capture, a capture the scheme rejects days later, a payout the bank returns.",
+    "disputed_by": "The view that a card payment is one request with one result: once Adyen answers 'Authorised' or a Stripe PaymentIntent is 'succeeded', the payment is done, and everything after it is the provider's internal bookkeeping, which an integrator can safely ignore.",
+    "so_what": "A team that accepts this decides, for each state in its own payment vocabulary, which provider record justifies it, and keeps a state for 'promised, not yet confirmed'. Larkfield's Keel program adds the two checks this journey calls for: a job that sweeps every payment still pending against the provider's record (K2) and a reconciliation of both providers' reports against the ledger, run when each provider's reports are ready (K3).",
+    "how_why": "The twelve steps belong to different parties on different clocks. The wallet's device token, the provider's risk score, the authentication on Mila's phone and the issuer's approval take seconds; clearing, network settlement and the bank transfer of the payout take days. Each step passes the next a reference and its own result, which is all it knows. On Adyen, as documented in 2026, the Checkout API has no endpoint that returns a payment by its identifier: the integration gets a result code, then webhooks keyed by the PSP reference, then reports; a CAPTURE webhook marked successful can be followed days later by CAPTURE_FAILED, and no webhook is sent when a payment settles. On Stripe there is one PaymentIntent with a status that can be fetched, a balance that moves from pending to available, and a payout object. Adyen for Platforms settles funds to balance accounts after the sales day and a settlement delay, independent of when the schemes pay Adyen; Stripe publishes an availability schedule and documents paying ahead only for Instant Payouts; for standard payouts its services terms (28 September 2026) count a network's failure to settle to Stripe as a 'Payout Delay' and do not say whether its own receipt of funds otherwise comes first. Cut-off times and settlement cycles of the card networks are not in the public rule texts, so the walkthrough gives the clearing and settlement rows as a documented sequence and labels their timing as industry practice.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "The path with no failure has twelve steps run by different parties on different clocks, and each passes the next only a reference and its own result."
+      },
+      {
+        "id": "S2",
+        "claim": "The first five steps (checkout, tokenization, risk scoring, authentication, authorization) take about two seconds, and the 'Payment successful' on Mila's screen reports the fifth, the issuer's promise to honor a claim for a limited number of days."
+      },
+      {
+        "id": "S3",
+        "claim": "Steps six to eleven take days and each reports that something was accepted, booked or sent; only the twelfth, the match of the payout against the provider's settlement record, checks those promises against another party's record."
+      },
+      {
+        "id": "S4",
+        "claim": "Adyen and Stripe record the same twelve steps differently, as documented in 2026: Adyen as a result code, webhooks keyed by a PSP reference and report lines; Stripe as a PaymentIntent with a fetchable status, a balance that moves from pending to available and a payout object."
+      },
+      {
+        "id": "S5",
+        "claim": "The losses on this path are the ones a step's own success message cannot report (an authorization that expires before capture, a capture the scheme rejects later, funds held or set off in the balance, a payout the bank returns), so a payment system needs a state for 'promised, not yet confirmed', a sweep of that state and a daily reconciliation."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Walks the recurring payment through all twelve steps once on Adyen and once on Stripe, sets up the step table that the other three journeys reuse, and shows on a payment with no failure that the customer's success message and the merchant's money are seven steps and at least two days apart.",
+    "supports": [
+      "P9-1",
+      "P9-5"
+    ]
+  },
+  "flow": {
+    "pattern": "chronological",
+    "additional_patterns": [
+      {
+        "pattern": "comparison",
+        "applies_to": "on-stripe: the same twelve steps set against the Adyen walkthrough"
+      },
+      {
+        "pattern": "problem_solution",
+        "applies_to": "silent-losses: the losses first, then the state and the two checks that catch them"
+      }
+    ],
+    "rationale": "The body follows the payment in time: the scene fixes the reading question and the references, then the three stretches walk the twelve steps in the order the payment meets them (two seconds, two days, the books). The table comes after the walkthrough because each cell restates something the reader has just seen with its source; placed first it would be twelve rows of terms not yet tied to Mila's payment. The Stripe replay needs the Adyen walkthrough as its baseline, since it says only where the record differs. The silent losses come last because each is a hand-off the reader has seen working on both providers, and naming the confirming record for a loss needs both versions. Move the Stripe section before the table and the table could no longer be read as the Adyen path; move the losses before the walkthrough and the reader would meet failures of steps not yet shown."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "At 19:42 on Tuesday 9 March 2027 Mila Janssen's phone says 'Payment successful' for a €120.00 class pass. Five steps lie behind that message and seven are still ahead, and Studio Noord's €117.47 will not be established as arrived until a job at Larkfield matches a payout against a report. Which of the twelve steps did the message report?"
+    },
+    "bridge": {
+      "from_reader_world": "The reader has met each mechanism in its own chapter and has the part introduction's claim that payments go wrong at hand-offs.",
+      "to_topic": "Walking one payment on which nothing fails through all the mechanisms in order shows every hand-off working, and shows what each one passes on and what it leaves out."
+    },
+    "thesis_statement": {
+      "text": "Between Mila's tap at 19:42 on Tuesday 9 March 2027 and Studio Noord's payout on Thursday 11 March, her €120 passes through twelve steps. The first eleven each end in a promise by the party that ran them; only the twelfth, matching the payout to the provider's settlement record, establishes that the studio's €117.47 arrived. The message on her screen reports the fifth.",
+      "placement": "KEY POINTS callout, first bullet, and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p05",
+      "promises": [
+        {
+          "promise": "Start at Larkfield, where every record of one payment is laid out with the references that tie the records together.",
+          "kept_in": [
+            "scene"
+          ]
+        },
+        {
+          "promise": "Follow the first five steps, which fit in two seconds and end in the answer Mila sees.",
+          "kept_in": [
+            "two-seconds"
+          ]
+        },
+        {
+          "promise": "Follow capture, clearing and settlement, which take days and send Larkfield almost nothing.",
+          "kept_in": [
+            "days"
+          ]
+        },
+        {
+          "promise": "Follow the ledger entries, the split, the payout and the reconciliation that closes the payment.",
+          "kept_in": [
+            "books"
+          ]
+        },
+        {
+          "promise": "Set all twelve steps in one table with the promise each makes and the failure each can hide.",
+          "kept_in": [
+            "step-table"
+          ]
+        },
+        {
+          "promise": "Replay the same pass on Stripe and name the steps at which the record to wait for differs.",
+          "kept_in": [
+            "on-stripe"
+          ]
+        },
+        {
+          "promise": "List where an approved payment can be lost with no error on the day, and the checks that catch it.",
+          "kept_in": [
+            "silent-losses"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "function": "context",
+        "organization": "narration",
+        "controlling_idea": "At 19:42 on Tuesday 9 March 2027 the message on Mila's screen is true, and it reports the fifth of twelve steps her €120.00 must pass, the other seven taking from one second to two weeks.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's class pass: Tuesday 9 March 2027, 19:42, a ten-class pass for €120.00 at Studio Noord (on Adyen), Dutch Visa debit card in her phone's wallet; Larkfield introduced as fictional. The part introduction's claim that payments go wrong at hand-offs is picked up in the first sentence.",
+            "shows": "Gives the walkthrough its one payment and poses the question of what the success message covers.",
+            "source": "Larkfield scenario ledger"
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "function": "claim",
+        "controlling_idea": "The €120 passes through twelve steps between the tap and the payout on Thursday 11 March: the first eleven each end in a promise by the party that ran them, the message on the screen reports the fifth, and only the twelfth establishes that the studio's €117.47 arrived.",
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "The question of which step the message reported.",
+          "introduces": "The answer and the chapter's claim: twelve steps, eleven promises, one check.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "function": "explanation",
+        "controlling_idea": "This journey teaches no new mechanism: it puts the mechanisms of the earlier chapters in the order one payment meets them, on a payment where nothing fails, so that what passes at each hand-off can be seen.",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "Chapter 1 (journey-of-a-payment) gave the same payment as six steps seen from the banks' side; this page adds the steps that happen in the provider's and Larkfield's systems (checkout, tokenization, risk scoring, authentication, ledger entries, the split, reconciliation) and names the record and reference at each.",
+            "shows": "Tells the reader what is new here and why a payment without a failure is the right first case."
+          }
+        ],
+        "transition_in": {
+          "relationship": "elaboration",
+          "carries_over": "The claim that eleven steps end in promises.",
+          "introduces": "What kind of chapter this is and how it relates to the six-step overview.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "function": "context",
+        "controlling_idea": "This chapter covers the whole of Mila's class pass, from the tap at 19:42 on Tuesday 9 March 2027 to the payout of Thursday 11 March and the day Larkfield marks that payout arrived.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Ledger: approved and captured at 19:42 on 9 March; payout on Thursday 11 March; payout marked arrived on Thursday 25 March (addition by 14-payouts-and-money-movement).",
+            "shows": "Places the chapter on the recurring payment's path.",
+            "source": "Larkfield scenario ledger"
+          }
+        ],
+        "transition_in": {
+          "relationship": "example",
+          "carries_over": "The twelve steps as a claim.",
+          "introduces": "The stretch of Mila's payment the chapter covers.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p05",
+        "function": "transition",
+        "controlling_idea": "The chapter goes from a scene at Larkfield through three stretches of the payment (two seconds, two days, the books), then sets the twelve steps in one table, replays the pass on Stripe and ends with the places where an approved payment is lost without an error.",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The payment the chapter follows.",
+          "introduces": "The order of the chapter's sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: One Payment, Every Record",
+      "controlling_idea": "Laid out in full, one ordinary payment is a set of records held by several systems under several references, and the walkthrough reads each record for what it promises and what later confirms it.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "Shows before any step is walked that the payment exists as many records with different owners and keys, which is why hand-offs need a shared reference."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The introduction's claim that each step ends in a promise.",
+        "introduces": "A review at Larkfield in which every record of Mila's pass is put on one page.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p06",
+          "function": "context",
+          "organization": "narration",
+          "controlling_idea": "In late March 2027 Femke de Graaf and Tom Hendriks lay out every record that exists of Mila's pass and find that no single system holds the payment.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger addition by 08-payment-state-machines: Femke's review of the payment record store with Tom Hendriks is in late March 2027. Local detail: for that review they pull every record of one payment (the row in the payment record store, the stored webhook, the lines of two Adyen reports, the ledger entries, the payout record).",
+              "shows": "A team that owns the integration still has to assemble one payment from several systems.",
+              "source": "Larkfield scenario ledger"
+            }
+          ]
+        },
+        {
+          "id": "p07",
+          "function": "explanation",
+          "controlling_idea": "Each row of the walkthrough is read with one question (which later record confirms this one?), and the answer depends on references that survive from one system to the next.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "References that carry Mila's pass across hand-offs. On Adyen: Larkfield's payment ID, written before any provider call and sent as Adyen's `reference`; the idempotency key derived from the business event; Adyen's PSP reference, returned with the result and carried by every webhook and report line; the merchant account and batch number of the sales day; the transfer that is the payout. On Stripe: Larkfield's payment ID in the object's metadata; the idempotency key; the PaymentIntent ID and its latest Charge; the balance transaction; the payout ID.",
+              "shows": "A hand-off works only if the next record can be found from the previous one; the table names the key at each.",
+              "source": "Ledger additions by 17-api-design-and-object-models (payment ID as Stripe metadata and Adyen `reference`), 18-idempotency-and-retries (key written before the first send) and 15-payment-reconciliation-and-reporting (matching keys: payout ID on Stripe; merchant account plus batch number and the balance platform's daily report on Adyen)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The records Femke and Tom put on one page.",
+            "introduces": "How the chapter reads them: the step table's columns and the references that link the rows.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "two-seconds",
+      "heading": "19:42, Two Seconds: Five Steps End in One Answer",
+      "controlling_idea": "Checkout, tokenization, risk scoring, authentication and authorization happen within about two seconds, each hands the next a narrower fact than it seems to, and the answer Mila sees is the last of them.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "S1",
+          "S2"
+        ],
+        "how": "Walks steps one to five in order and shows that the success message is the issuer's promise, the fifth step, and nothing more."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The five steps in the order the request meets them; the closing paragraph can only say what the screen reports once all five have been walked."
+      },
+      "transition_in": {
+        "relationship": "sequence",
+        "carries_over": "The references and the reading question.",
+        "introduces": "The first stretch of the payment: the five steps before the answer.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p08",
+          "function": "process",
+          "controlling_idea": "Step 1, checkout: before any provider is called, the payment service writes a `pending` row with Larkfield's own payment ID and an idempotency key, so the request that leaves carries a reference Larkfield already holds.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger K1 and additions by 17-api-design-and-object-models and 18-idempotency-and-retries: a Larkfield payment ID written before any provider call and sent as Adyen's `reference`; a row with the idempotency key, a request fingerprint, the time of first send and state `pending`. The request also carries the split instruction (addition by 35-splits-balances-and-platform-payouts).",
+              "shows": "If the answer is lost, Larkfield still has a key to ask again with and a reference to search by.",
+              "source": "Larkfield scenario ledger"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen: idempotency keys 'are valid for a period of 7 to 14 days after first submission' (https://docs.adyen.com/development-resources/api-idempotency, n.d., accessed 2026-11). Stripe keeps keys for at least 24 hours (https://docs.stripe.com/api/idempotent_requests, n.d., accessed 2026-11).",
+              "shows": "The key is a promise by the provider with its own expiry."
+            }
+          ]
+        },
+        {
+          "id": "p09",
+          "function": "process",
+          "controlling_idea": "Step 2, tokenization: Mila's wallet hands over a device token and a one-time cryptogram in place of her card number, so nothing that reaches Larkfield could be used to charge her again.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'Apple Pay uses network tokenization, stores payment information securely in the shopper's Apple Pay eligible device, and confirms the payment through Touch ID or Face ID authentication.' Google's developer guide: its API returns cards on file (`PAN_ONLY`) 'or a device token on an Android-powered device authenticated with a 3-D Secure cryptogram (`CRYPTOGRAM_3DS`)' (https://developers.google.com/pay/api/web/guides/tutorial, n.d., accessed 2026-11).",
+              "shows": "Both large phone wallets are documented as presenting a token and a cryptogram; the ledger does not say which wallet Mila uses.",
+              "source": "Adyen documentation, 'Apple Pay', https://docs.adyen.com/payment-methods/apple-pay, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "scenario",
+              "what": "Ledger K4 (card numbers never touch Larkfield); the stored card behind Mila's membership dates from 12 January 2027 and is not used for the pass (ruling 14).",
+              "shows": "Places the step on Mila's payment and separates it from the stored-card token.",
+              "source": "Larkfield scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The request leaving Larkfield with its own reference.",
+            "introduces": "What the request carries in place of a card number.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "function": "process",
+          "controlling_idea": "Step 3, risk scoring: Adyen's risk checks run before Mila's bank is asked, and a pass is a judgement that the payment did not cross a block threshold, not a finding that it is genuine.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'Pre-authorization: the risk rule conditions are assessed before the payment is authorized. This saves issuer and scheme fees compared to blocking after authorization.' (https://docs.adyen.com/risk-management/configure-your-risk-profile, n.d., accessed 2026-11). Refusal reason 20, FRAUD: 'The pre-authorization risk checks resulted in a fraud score of 100 or more.' (https://docs.adyen.com/development-resources/refusal-reasons, n.d., accessed 2026-11). Stripe records a risk block on the charge as `network_status: not_sent_to_network`, `type: blocked` (https://docs.stripe.com/radar/risk-evaluation, n.d., accessed 2026-11).",
+              "shows": "Both providers document that the decision sits before the issuer and that a blocked payment never reaches the bank."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The token and cryptogram arriving at the provider.",
+            "introduces": "The provider's own decision before it asks the bank.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "function": "process",
+          "controlling_idea": "Step 4, authentication: the check that Mila is the cardholder was done by her phone before the request was sent, so it reaches the issuer as data inside the authorization request and no 3-D Secure challenge runs.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'If you are implementing in Europe, Apple Pay is PSD2 SCA-compliant.' and 'Apple Pay supports liability shift for American Express, Discover, JCB, Mastercard, and Visa cards.'",
+              "shows": "A wallet payment is documented as meeting the European authentication rule on the device, and as moving fraud-dispute liability to the issuer for Visa.",
+              "source": "Adyen documentation, 'Apple Pay', https://docs.adyen.com/payment-methods/apple-pay, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "scenario",
+              "what": "Ledger: the wallet authenticates Mila on the device (fingerprint), no 3-D Secure challenge; addition by 25-3ds-and-sca: three fields per card payment (authentication outcome, exemption requested, liability shift expected) and the loss table row 'wallet payment: issuer'.",
+              "shows": "Shows what Larkfield records of a step it never sees.",
+              "source": "Larkfield scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The provider's risk decision, made during the request.",
+            "introduces": "A step that finished before the request began and travels inside it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p12",
+          "function": "process",
+          "controlling_idea": "Step 5, authorization: Mila's bank approves through Visa, Adyen returns the result code `Authorised` with a PSP reference, and Larkfield's row stays `pending`, its state for promised and not yet confirmed, until the `AUTHORISATION` webhook moves it to `paid`.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'Although you can use the payment result from the API, we recommend that you rely on the webhook to trigger any business logic'. Adyen result codes page: 'The status of a payment can sometimes change after you get the result code, so we recommend that you do not use the result code to update your order management system.' (https://docs.adyen.com/online-payments/build-your-integration/payment-result-codes, n.d., accessed 2026-11).",
+              "shows": "The provider itself tells integrators that the synchronous answer is not the record to act on.",
+              "source": "Adyen documentation, 'Webhook structure and types', https://docs.adyen.com/development-resources/webhooks/webhook-types, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "fact",
+              "what": "Visa Core Rules, edition of 24 October 2026, Table 5-11: a cardholder-initiated card-absent transaction must be processed within 10 calendar days of a valid authorization (https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf).",
+              "shows": "The approval is a promise with an expiry."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The authentication data and the risk pass.",
+            "introduces": "The issuer's decision and the two records it produces at Larkfield.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p13",
+          "function": "analysis",
+          "controlling_idea": "The 'Payment successful' on Mila's screen reports step five alone: a bank's promise to honor a claim, with €120 reserved in her own account and no money moved.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Of the five records so far, Larkfield holds one row and one stored webhook; the token is the wallet's, the risk result the provider's, the approval and the hold the issuer's.",
+              "shows": "The message is true and covers one promise out of eleven."
+            },
+            {
+              "kind": "figure",
+              "what": "Conceptual figure: twelve numbered stepping stones in a row, a phone with a check mark standing on stone 5 and a studio's bank building at stone 12 (placeholder 42-message-at-step-five).",
+              "shows": "Makes the distance between the customer's message and the merchant's money visible: seven steps."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The five steps walked.",
+            "introduces": "What the answer on the screen does and does not cover.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "days",
+      "heading": "Tuesday Night to Thursday: Capture, Clearing and Settlement Send No Message",
+      "controlling_idea": "The three steps that turn the approval into money between banks are the ones Larkfield hears least about: the capture has no event of its own, clearing and settlement have none at all, and the networks do not publish their timing.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "S1",
+          "S3"
+        ],
+        "how": "Walks steps six to eight and shows that each is reported, if at all, as accepted or submitted, with the confirming record arriving later or never."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "Capture, clearing and settlement in the order they occur; the paragraph on where the public record stops comes last because it qualifies the timing of the two steps before it."
+      },
+      "transition_in": {
+        "relationship": "time",
+        "carries_over": "The approval at 19:42 and the row marked `paid`.",
+        "introduces": "What happens to the claim over the next two days, mostly out of Larkfield's sight.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p14",
+          "function": "process",
+          "controlling_idea": "Step 6, capture: Adyen submits the claim automatically within the same second as the approval and sends no separate event for it, and whether the claim holds is known only days later, because the card scheme can still reject it.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'By default, payments are captured automatically without a delay, immediately after authorization of the payment request.'; 'A payment that is automatically captured does *not* trigger a separate CAPTURE webhook.'; a CAPTURE webhook with success true means the request 'is valid (for example, the authorization has not expired, and the balance is available) and has been submitted to the bank/third-party processor'; 'In rare cases, a capture fails even after you received a CAPTURE webhook with success: true ... This can even happen a few days after you submitted the capture request.' Webhook types page: 'Technical failures are automatically re-captured by Adyen within 10 business days.'",
+              "shows": "On Adyen 'captured' is documented as submitted, with a later failure path.",
+              "source": "Adyen documentation, 'Capture', https://docs.adyen.com/online-payments/capture, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "scenario",
+              "what": "Ledger addition by 08-payment-state-machines: with automatic capture the row becomes `paid` on AUTHORISATION success; `paid` means 'the provider has confirmed the capture', never 'settled'; a late CAPTURE_FAILED moves the row back to `authorized`.",
+              "shows": "Shows how Larkfield's record treats a success that can be withdrawn.",
+              "source": "Larkfield scenario ledger"
+            }
+          ]
+        },
+        {
+          "id": "p15",
+          "function": "process",
+          "controlling_idea": "Step 7, clearing: the acquirer presents a clearing record to Mila's bank through Visa, which fixes the final amount and the fee her bank keeps, and no record of it reaches Larkfield.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Visa Core Rules (24 October 2026) define a presentment as 'A Clearing Record that an Acquirer presents to an Issuer through Interchange'. Regulation (EU) 2015/751 caps consumer debit interchange at 0.2%: at most €0.24 on €120.00 (ledger addition by 05-payment-economics, assumed charged in full).",
+              "shows": "Names the record and the one number fixed at this step.",
+              "source": "https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf; http://publications.europa.eu/resource/celex/32015R0751"
+            },
+            {
+              "kind": "reasoning",
+              "what": "That Adyen N.V. is the acquirer of record is an inference (ledger addition by 01-journey-of-a-payment): Adyen's EMEA license page says Adyen N.V.'s authorisation includes cross-border acquiring in all EEA countries, and its documentation lists the regions where it has its own acquiring connection; no page lists the acquiring entity per country (ruling 27).",
+              "shows": "Keeps a documented fact apart from a labeled inference."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The claim submitted by the provider.",
+            "introduces": "The claim as a record presented to the issuer through the network.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p16",
+          "function": "process",
+          "controlling_idea": "Step 8, settlement: Visa transfers one net amount per member bank per day, so Mila's €120 moves inside a total, and Adyen sends no webhook when a payment settles.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa Core Rules: settlement amounts are 'The daily net amounts expressed in a Member's Settlement Currency resulting from Clearing'. Adyen: 'Adyen does not send a webhook message when a payment settles successfully.'",
+              "shows": "The first movement of money has no per-payment record on the merchant's side.",
+              "source": "Adyen documentation, 'Webhook structure and types', https://docs.adyen.com/development-resources/webhooks/webhook-types, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen for Platforms: 'If Adyen does not receive the funds within 30 days after a payment's capture, we subtract those funds from the current settlement batch.'",
+              "shows": "The only trace of a settlement that never happened is a reversal a month later.",
+              "source": "Adyen for Platforms documentation, 'Settle funds', https://docs.adyen.com/platforms/settle-funds, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The clearing record.",
+            "introduces": "The money that follows it, as a net amount between banks.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p17",
+          "function": "explanation",
+          "controlling_idea": "The public record stops at the timing of steps seven and eight: Visa's rule text gives no settlement cut-off times and no number of cycles a day, so the Tuesday-night and Wednesday timing in this walkthrough is industry practice and an assumption.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Visa Core Rules (24 October 2026) define Settlement Date, Settlement Bank and Settlement Currency; cut-off times and cycles per day were not found in the rule text (established in clearing-and-settlement).",
+              "shows": "States where the evidence ends and how the walkthrough labels what lies beyond it.",
+              "source": "https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The sequence of clearing and settlement, which is documented.",
+            "introduces": "Their timing, which is not.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "books",
+      "heading": "Wednesday to Thursday 25 March: Entries, the Split, the Payout and the Match",
+      "controlling_idea": "The last four steps happen in books and bank transfers: Larkfield writes its ledger entries from the provider's report, the split becomes funds in two balance accounts, the payout is sent, and the reconciliation is the first step that checks any earlier promise against a record from another party.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S5"
+        ],
+        "how": "Walks steps nine to twelve and shows that booked and sent are still promises, and that the match against the settlement record is what closes the payment."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The four steps in the order their records appear, from the report of Wednesday morning to the payout marked arrived on 25 March; the dispute window comes last because it outlasts all of them."
+      },
+      "transition_in": {
+        "relationship": "time",
+        "carries_over": "Clearing and settlement, which left Larkfield no record.",
+        "introduces": "The first records that do arrive after the approval: report lines, bookings and a payout.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p18",
+          "function": "process",
+          "controlling_idea": "Step 9, ledger entries: when Adyen's batch for the sales day of 9 March closes, Larkfield's reconciliation job (the one that does the matching at step 12, started on Adyen's report-ready signal) writes the payment into Larkfield's ledger from the report lines, under the PSP reference and Larkfield's own event ID.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'For Sales day payout, the payable batch always closes two hours after your sales day closing time.' (https://docs.adyen.com/account/sales-day-payout, n.d., accessed 2026-11). The Balance Platform Accounting Report 'is a daily report that tracks all balance changes on all balance accounts in your balance platform, including liable accounts and the accounts of your users.' (https://docs.adyen.com/platforms/reports-and-fees/balance-platform-accounting-report, n.d., accessed 2026-11).",
+              "shows": "Names the provider records the entries are written from and when they exist."
+            },
+            {
+              "kind": "scenario",
+              "what": "Ledger additions by 15-payment-reconciliation-and-reporting (the job runs on the provider's report-ready signal and writes ledger entries only from report lines; the batch for 9 March closes at 02:00 on 10 March) and 35-splits-balances-and-platform-payouts (entries per leg: studio's share €117.47, Larkfield's fee €2.53, provider's cost €0.61 when reported, an assumption).",
+              "shows": "The ledger records claims, written from the provider's statement and not from the webhook.",
+              "source": "Larkfield scenario ledger"
+            }
+          ]
+        },
+        {
+          "id": "p19",
+          "function": "process",
+          "controlling_idea": "Step 10, the split: the instruction to divide the €120 travelled with the payment at 19:42, and it becomes payable funds on Thursday 11 March, when Adyen settles the sales day to Studio Noord's balance account and to Larkfield's, as its daily accounting report then shows.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'Adyen settles a settlement batch after its sales day ends and the configured settlement delay has passed. The date when the schemes or payment methods transfer the funds to Adyen does not affect this timing.' Accounting report: 'The booking date is when the event (like a payment) took place, and the value date is when the actual balance is credited or debited to a balance account.'",
+              "shows": "The split has two dates, and the second is set by the provider's schedule, not by the network.",
+              "source": "Adyen for Platforms documentation, 'Settle funds', https://docs.adyen.com/platforms/settle-funds, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'The API request validates only the format of the split instructions, **not** the balance accounts specified in the request. This means that even if the transaction is successful, it is possible that the funds are not credited to/deducted from the specified balance account.' (https://docs.adyen.com/platforms/online-payments/split-transactions/split-chargebacks, n.d., accessed 2026-11).",
+              "shows": "An approved payment does not prove that the studio was credited."
+            },
+            {
+              "kind": "scenario",
+              "what": "Ledger additions by 13-balances-and-funds-flows and 35-splits: €117.47 in Studio Noord's balance account; €2.53 less €0.61 processing cost (assumption) = €1.92 in Larkfield's liable balance account; settlement delay of two business days (addition by 03-clearing-and-settlement).",
+              "shows": "The amounts and dates of the step on Mila's payment.",
+              "source": "Larkfield scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The entries Larkfield wrote from the report.",
+            "introduces": "The bookings at the provider that those entries mirror, and the day they become funds.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "function": "process",
+          "controlling_idea": "Step 11, the payout: on Thursday 11 March Adyen reports the transfer of €117.47 to Studio Noord's bank as `booked`, which says the money was sent and does not say it arrived.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen payout webhooks for platforms, on `booked`: 'This status is not final. Instant payouts may be rejected by the counterparty's bank and thus fail, and regular and wire transfers may be returned by the counterparty's bank.' (https://docs.adyen.com/platforms/payout-webhooks, n.d., accessed 2026-11).",
+              "shows": "The provider documents its own payout status as a report of sending."
+            },
+            {
+              "kind": "scenario",
+              "what": "Ledger addition by 14-payouts-and-money-movement: payout states instructed, sent, arrived, returned; the payout carrying Mila's €117.47 is marked sent on Thursday 11 March 2027 and stays open for 10 business days (Larkfield's policy, an assumption).",
+              "shows": "Shows how Larkfield records a promise of delivery.",
+              "source": "Larkfield scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The funds settled to the studio's balance account.",
+            "introduces": "The transfer that moves them to the studio's bank.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p21",
+          "function": "analysis",
+          "controlling_idea": "Step 12, reconciliation: the job matches the payout to the provider's settlement record, clears the ledger's transit account, and on Thursday 25 March, when a return window of ten business days has passed with no return, marks the payout arrived, which makes it the only step that tests the earlier promises against another party's record.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger additions by 15 (matching keys on Adyen: merchant account plus batch number, and the balance platform's daily report per studio; unmatched amounts become open items with an amount, an age and an owner), 12 (clearing account 'payouts in transit' must return to zero) and 14 (marked arrived on Thursday 25 March when the window closes with no return).",
+              "shows": "The match is what turns eleven promises into a checked fact, and 'arrived' on a non-instant route is still an inference from the absence of a return.",
+              "source": "Larkfield scenario ledger"
+            },
+            {
+              "kind": "reasoning",
+              "what": "Every earlier success (Authorised, the automatic capture, the booked split, the booked payout) was reported by the party that performed the step; the settlement record and the bank's silence are the first evidence from outside that party.",
+              "shows": "Explains why the thesis singles out the twelfth step."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A payout reported as sent.",
+            "introduces": "The step that checks it, and the others, against the provider's settlement record.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p22",
+          "function": "explanation",
+          "controlling_idea": "After the twelfth step the payment is finished and still reopenable: Mila can dispute it through her bank until about 7 July 2027, so the row and its ledger entries must stay correctable for months after the payout.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger addition by 01-journey-of-a-payment: the basic card dispute window is taken to close on 7 July 2027 (120 calendar days from 9 March; the author's arithmetic). The €84.00 refund of 18 March (Journey 3) is the first reopening.",
+              "shows": "Separates 'finished' from 'final' with a date.",
+              "source": "Larkfield scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The payment as closed by reconciliation.",
+            "introduces": "The window in which it can still be reopened.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "step-table",
+      "heading": "The Twelve Steps in One Table",
+      "controlling_idea": "Set side by side, the first eleven steps each end in a promise by the party that ran them, and each has a failure that its own success message cannot report.",
+      "function": "synthesis",
+      "advances_thesis": {
+        "supports": [
+          "S1",
+          "S3",
+          "S5"
+        ],
+        "how": "Collects the walkthrough into the step table the other journeys reuse, with the promise and the hidden failure per row and the chapter that owns each mechanism."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "The twelve steps walked in three stretches.",
+        "introduces": "The same steps as one table with the promise and the failure of each.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p23",
+          "function": "synthesis",
+          "controlling_idea": "The step table gives, for each of the twelve steps on Adyen, the party or system that acts, the message or record it leaves, the promise that record makes and the failure that can occur there, with the chapter that owns the mechanism.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Step table with columns Step | Party or system | Message or record | Promise made | What can fail here → chapter; twelve rows (checkout, tokenization, risk scoring, authentication, authorization, capture, clearing, settlement, ledger entries, split, payout, reconciliation), each failure linked to its chapter in Parts I to VIII.",
+              "shows": "The table is the reading device of Part IX; every cell restates a fact from the three walkthrough sections."
+            },
+            {
+              "kind": "figure",
+              "what": "Sequence-style figure: six lanes (member's phone, platform, provider, card network, member's bank, studio's bank) with twelve numbered arrows in order, grouped under three time bands (placeholder 42-twelve-step-sequence).",
+              "shows": "Shows which party each step belongs to and that only four of the twelve touch the platform."
+            }
+          ]
+        },
+        {
+          "id": "p24",
+          "function": "analysis",
+          "controlling_idea": "Read downward, the table shows that the record confirming a row is always in a later row and usually arrives on another channel: the approval is confirmed by the report line, the split by the accounting report, the payout by the match and the passing of the return window.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Authorization (response and webhook) is confirmed by the capture's survival and the settlement report line; capture by the absence of CAPTURE_FAILED and the report line; the split by the Balance Platform Accounting Report; the payout by reconciliation and the return window. Clearing and settlement have no confirming record on the merchant's side at all.",
+              "shows": "Turns the table into the exercise the reader can repeat: for each row, name the record that confirms the row before it."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The table's rows.",
+            "introduces": "How to read down it: which later record confirms each row.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "on-stripe",
+      "heading": "Had Studio Noord Been on Stripe: The Same Steps, Other Records",
+      "controlling_idea": "On Stripe the same pass passes the same twelve steps and leaves different records: an object whose status can be read again, a balance transaction with a date, and a payout object, so the record an integration waits for changes at three hand-offs.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S4"
+        ],
+        "how": "Replays the payment on the second provider and names where the confirming record sits in a different place and form."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The table of records first, then the dated replay it summarizes, then the three hand-offs where an integration must behave differently, and last the points on which Stripe's public record is silent, which qualify the comparison."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The twelve steps as recorded on Adyen.",
+        "introduces": "The same twelve on Stripe, where the records take another form.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p25",
+          "function": "comparison",
+          "controlling_idea": "Step by step, Stripe replaces Adyen's result code, webhooks and report lines with a PaymentIntent, a Charge, a balance transaction and a payout, each an object with an identifier and a status.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Table: Step | On Adyen (as it happened) | On Stripe (had it been) for the steps whose record differs: checkout (reference vs PaymentIntent created by the server), authorization (result code and AUTHORISATION webhook vs status `succeeded`, read back), capture (no event; CAPTURE_FAILED possible vs status, nothing published on later failure), ledger entries (report lines vs balance transaction with amount, fee, net), split (splits array and balance accounts vs destination charge with application fee), funds (sales-day batch after settlement delay vs pending to available at `available_on`), payout (transfer `booked` vs Payout `paid`, possibly `failed`), reconciliation (batch and accounting report vs payout reconciliation report by payout ID).",
+              "shows": "Makes the provider difference concrete per step.",
+              "source": "Stripe documentation, n.d., accessed 2026-11: https://docs.stripe.com/payments/paymentintents/lifecycle ; https://docs.stripe.com/payments/payment-intents/verifying-status ; https://docs.stripe.com/payments/balances ; https://docs.stripe.com/api/payouts/object ; https://docs.stripe.com/reports/payout-reconciliation ; https://docs.stripe.com/connect/destination-charges"
+            }
+          ]
+        },
+        {
+          "id": "p26",
+          "function": "example",
+          "controlling_idea": "Replayed on Stripe, Mila's pass is a destination charge that reads `succeeded` at 19:42, whose funds become available on Friday 12 March and are paid out from then on.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger additions by 33-platform-payment-models (legacy Custom connected accounts; destination charges with `on_behalf_of` and an application fee equal to Larkfield's fee), 08 (on Stripe a row moves only after the PaymentIntent is re-read), 03 (Dutch default of 3 business days from capture: available Friday 12 March) and 05 (blended rate 0.6% + €0.15, an assumption: €0.87, leaving Larkfield €1.66).",
+              "shows": "The same amounts and a different date, from the ledger.",
+              "source": "Larkfield scenario ledger"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'Stripe uses \"T\" to refer to the transaction time, which indicates the time of the original payment confirmation or capture'; 'Funds in a Balance transition from `pending` to `available` at the corresponding available_on time for each balance transaction.'; Netherlands: 7 calendar days initially, 3 business days by default.",
+              "shows": "Stripe's clock counts from the capture, per transaction.",
+              "source": "https://docs.stripe.com/payouts and https://docs.stripe.com/payments/balances, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The table of records.",
+            "introduces": "The pass replayed on Stripe with its dates and amounts.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p27",
+          "form": "list",
+          "function": "analysis",
+          "controlling_idea": "The record to wait for differs at three hand-offs: the outcome of the payment, the capture, and the moment funds reach the studio's balance.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Outcome: Stripe's PaymentIntent can be retrieved by its ID at any time; Adyen's Checkout API specification, version 72, has three GET operations (/paymentLinks/{linkId}, /sessions/{sessionId}, /storedPaymentMethods), none returning a payment (https://github.com/Adyen/adyen-openapi, accessed 2026-11). Capture: Adyen documents CAPTURE_FAILED after a success; Stripe's pages do not say whether a capture can fail later. Funds: Stripe moves each transaction from pending to available on a schedule counted from capture; Adyen settles a sales day's batch after a settlement delay and sends no webhook when a payment settles.",
+              "shows": "These are the three places named in the chapter's second acceptance criterion; each is a documented difference in where the confirming record lives."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The different records on the two providers.",
+            "introduces": "What an integration must wait for at each of three hand-offs.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p28",
+          "function": "explanation",
+          "controlling_idea": "Stripe's public pages leave a gap on two points this journey depends on: they do not say whether a capture can be rejected by the network after the status reads `succeeded`, and for standard payouts its services terms count a network's failure to settle to Stripe as a 'Payout Delay' without saying whether funds otherwise become available before Stripe has received them; Adyen's terms say it pays irrespective of receipt, which its Annual Report 2025 ('default setup': only after funds are received) does not reconcile.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe lifecycle page on `succeeded`: 'the corresponding payment flow is complete. The funds are now in your account and you can confidently fulfill the order.' Stripe payment methods page: 'A `succeeded` status indicates that the payment completed successfully according to the payment method's processing flow, but funds can still be refunded, disputed, returned, or reversed.'",
+              "shows": "Stripe's own two sentences show that 'in your account' means the Stripe balance and that success has exits; neither says what happens at the network afterwards.",
+              "source": "https://docs.stripe.com/payments/paymentintents/lifecycle and https://docs.stripe.com/payments/payment-methods, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen documents paying ahead of the network: its Sales Day Payout Terms of Service (last update 17 June 2024) say it initiates payout 'irrespective of whether the funds are actually received by Adyen from the Acquirer or Scheme Owner' (https://www.adyen.com/legal/sales-day-payout-terms-of-service). Adyen's Annual Report 2025 (risk section) calls paying 'only after funds have been received' the 'default setup'; public text does not reconcile the two (ruling 47m). Stripe documents paying ahead only for Instant Payouts (ruling 18); its services terms (last modified 28 September 2026, https://stripe.com/legal/ssa-services-terms) define a 'Payout Delay' to include 'a delay or failure of a Financial Provider to settle a Transaction to Stripe' and state no pre-financing (ruling 47e).",
+              "shows": "The gap is in Stripe's record only; it is not 'not public' for both."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What the two providers document.",
+            "introduces": "What Stripe does not document, and how the chapter treats the silence.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "silent-losses",
+      "heading": "Where an Approved Payment Is Lost Without an Error",
+      "controlling_idea": "An approved payment can fail to reach the merchant at four steps without any error on the day, and each loss is shown only by a later record, which is why Larkfield's two Keel checks are a sweep of unconfirmed payments and a daily reconciliation.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "Names the losses the thesis lists, the record that reveals each on both providers, and the checks that follow from them."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "A payment on which every hand-off worked, on both providers.",
+        "introduces": "The same hand-offs when the promise is not kept and nothing says so on the day.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p29",
+          "function": "analysis",
+          "controlling_idea": "The four silent losses sit at capture, after capture, at funding and at payout, and in each case the step's own success message was true when it was sent.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Table: Where | What happens | Why no error on the day | The record that shows it (Adyen; Stripe). Rows: an authorization that expires before a delayed capture (Visa: 10 days; Stripe sets the PaymentIntent to `canceled`; Adyen sends EXPIRE, or a late capture fails); a capture the scheme rejects later (Adyen CAPTURE_FAILED and a CaptureFailed report entry; Stripe: not public); funds held or set off in the balance against refunds, a deposit or reserve, or a negative balance (accounting report and settlement details report; balance transactions); a payout the bank returns (Adyen transfer `returned`; Stripe Payout `paid` then `failed` within 5 business days).",
+              "shows": "Each loss is tied to the later record that reveals it, on both providers.",
+              "source": "Adyen: https://docs.adyen.com/online-payments/capture ; https://docs.adyen.com/account/sales-day-payout ; https://docs.adyen.com/platforms/payout-webhooks . Stripe: https://docs.stripe.com/payments/place-a-hold-on-a-payment-method ; https://docs.stripe.com/api/payouts/object ('Some payouts that fail might initially show as paid, then change to failed'), all n.d., accessed 2026-11. Visa Core Rules, 24 October 2026, Table 5-11."
+            }
+          ]
+        },
+        {
+          "id": "p30",
+          "function": "recommendation",
+          "controlling_idea": "Larkfield's answer is a state that means 'promised, not yet confirmed' with two checks behind it: a job that sweeps every payment still in that state against the provider's record (K2) and a reconciliation of both providers' reports against the ledger, run per provider when its reports are ready (K3).",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger K2 and K3; addition by 08 (`paid` means the provider has confirmed the capture, never settled; an unknown status is raised for review) and by 15 (open items older than five business days go to Priya Raman's weekly review).",
+              "shows": "The checks are placed at hand-offs, not inside components, and add no provider and no product.",
+              "source": "Larkfield scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "Four losses that no success message reports.",
+            "introduces": "The state and the two checks that catch them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "The three stretches of the walkthrough are three kinds of evidence: in the first two seconds every party answers and each answer is a promise; in the next two days nobody answers at all; in the last stretch the answers are bookings and a transfer marked sent. Nothing in the first eleven steps is a check of an earlier one. The payment's truth is therefore not in any step: it is in the twelfth, where Larkfield compares what it was told with what the provider's settlement record and the bank show.",
+    "so_what": "A team that accepts this stops treating 'Authorised' or `succeeded` as the end of a payment. It decides, state by state, which provider record justifies each word in its own vocabulary, keeps a state for 'promised, not yet confirmed', sweeps it, and reconciles every day; and it knows that the record to wait for is a different one on Adyen and on Stripe.",
+    "callback": {
+      "to": "The 'Payment successful' on Mila's screen at 19:42 and the question of which step it reported.",
+      "how": "The reader can now say it reported the fifth of twelve, name the seven that followed, and say which record at Larkfield confirmed each, up to the payout marked arrived on 25 March and the window that stays open until July."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Fill in the twelve-row step table for one card payment in your own system; for every row write the record that confirms the row before it and the provider record that justifies your own state, and start work where that cell is empty."
+    },
+    "hand_off": {
+      "to": "journey-failed-renewal",
+      "relationship": "contrast",
+      "carries_over": "Journey 1's twelve steps on a payment that Mila started herself and that was approved the first time.",
+      "introduces": "The same member and the same stored card with two things removed: Mila is not present when the charge is made, and the issuer says no. The steps that replace authentication and approval are a decline code, a schedule and a notice."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The silent losses and the two checks.",
+      "introduces": "What holds across the journey, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p31",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Established: the provider's synchronous answer is not the record to act on, a payout can fail after it was reported as sent on both providers, a capture can be rejected after it was accepted on Adyen, and funding runs on the provider's own schedule."
+      },
+      {
+        "id": "p32",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Depends on context: which record justifies a state, when funds reach the seller and how a capture failure appears all depend on the provider and on the account's settings.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What both providers document.",
+          "introduces": "What changes with provider and configuration.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p33",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "The author's synthesis: a card payment is finished at the twelfth step and final only when the dispute window closes, so the cheapest reliability work is at the hand-offs: one reference, one unconfirmed state, a sweep and a daily match.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is established and what depends on context.",
+          "introduces": "The author's own position, labeled as such.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p34",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "Eight questions let the reader walk a card payment of their own through the step table.",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The take-aways.",
+          "introduces": "Questions that apply them to the reader's own system.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p35",
+        "function": "transition",
+        "controlling_idea": "Mila's pass had her present and her bank saying yes; the next journey keeps the member and the card and removes both, following a renewal that is declined on the first of the month.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "Twelve steps on a payment the customer started and the issuer approved.",
+          "introduces": "A payment the merchant starts alone and the issuer refuses.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "How any of the twelve mechanisms works inside: authorization messages and codes, capture models, clearing and settlement, the state machine, ledgers, balances, payouts, reconciliation, webhooks, tokens, risk scoring, 3-D Secure, splits.",
+      "covered_in": [
+        "payment-authorization",
+        "clearing-and-settlement",
+        "payment-state-machines",
+        "payment-ledgers",
+        "balances-and-funds-flows",
+        "payouts-and-money-movement",
+        "payment-reconciliation-and-reporting",
+        "payment-webhooks-and-events",
+        "tokenization-vaulting-and-pci",
+        "network-tokens",
+        "payment-fraud-and-risk",
+        "three-d-secure-and-sca",
+        "splits-balances-and-platform-payouts"
+      ]
+    },
+    {
+      "topic": "The six-step overview, the four-party model and the positions a provider can take.",
+      "covered_in": [
+        "journey-of-a-payment"
+      ]
+    },
+    {
+      "topic": "A renewal that is declined, the retry rules and the billing state.",
+      "covered_in": [
+        "journey-failed-renewal"
+      ]
+    },
+    {
+      "topic": "The split in detail, the €84.00 refund after payout and who funds it.",
+      "covered_in": [
+        "journey-platform-payment"
+      ]
+    },
+    {
+      "topic": "A chargeback and the dispute process.",
+      "covered_in": [
+        "journey-dispute"
+      ]
+    },
+    {
+      "topic": "A 'Stripe and Adyen: Where They Differ' section: journeys show both providers inline (style guide)."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "The chapters disagree on what triggers Larkfield's first ledger entry for a sale: payment-ledgers shows it posted on the webhook into 'sales awaiting settlement report', while the ledger additions of chapters 15, 14 and 20 say ledger entries are written only from report lines. This journey follows the report-line rule and does not show an entry at webhook time; a reviewer should reconcile chapter 12.",
+    "The scenario ledger does not say which phone wallet Mila uses; the chapter cites Adyen's Apple Pay page and Google's developer guide and says so.",
+    "Whether Adyen N.V. is the acquirer of record for the pass is an inference (ledger addition by chapter 1).",
+    "Stripe's pages do not say whether a capture can be rejected at the network after `succeeded`, or whether availability waits for Stripe's own receipt of funds.",
+    "Visa's settlement cut-off times and cycles are not in the public rule text; the Tuesday-night and Wednesday timing is an assumption."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "Walk the twelve steps as narrative in three stretches first and give the step table afterwards as the consolidation, so that every table cell restates a sourced sentence the reader has just read.",
+      "rejected": [
+        "Table first, then narrative: twelve rows of terms before any is tied to Mila's payment.",
+        "One section per step: twelve short sections that would bury the hand-offs between them."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Tell the journey on Adyen, Studio Noord's provider, and replay it on Stripe in one section with a per-step table of records, as the PLAN's 'shown once on each provider' asks.",
+      "rejected": [
+        "Two full step tables, one per provider: most cells would repeat.",
+        "A Stripe sentence in every paragraph: it would hide the three hand-offs where the difference matters."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Keep the journal spec's order of steps nine to twelve (ledger entries, split, payout, reconciliation) and date each by when its record becomes usable to Larkfield: entries from the report of Wednesday morning, the split as funds on Thursday, the payout on Thursday, the match closed on 25 March. The split instruction is said to travel with the payment at 19:42.",
+      "rejected": [
+        "Placing the split at step five because the instruction is sent then: the journal thesis fixes the order, and the bookings become funds only after the settlement delay."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "No research brief is named in this page's PLAN contract; every provider fact is taken from the chapters that own it and was re-fetched from the provider's page in this session."
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "PLAN.md, contract 42-journey-card-payment; _research/consistency-issues.md rulings 10, 12, 14, 18, 22",
+      "contributed": "Scope, the twelve steps, the hand-off rule, the wallet, the pre-financing ruling, no inline URLs."
+    },
+    {
+      "kind": "internal",
+      "ref": "journal-spec.json, entries journey-card-payment, part-9 and journey-failed-renewal",
+      "contributed": "Intent, acceptance criteria, thesis, role, transition in, hand-off."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md, including Additions by chapter (01, 03, 05, 08, 12, 13, 14, 15, 17, 18, 25, 33, 35)",
+      "contributed": "Every Larkfield date, amount, system and Keel decision."
+    },
+    {
+      "kind": "internal",
+      "ref": "posts 01, 02, 03, 08 (read in full) and the Larkfield and 'Where They Differ' sections of 12, 13, 14, 15, 20, 22, 23, 24, 25, 35",
+      "contributed": "The provider facts and their sources, re-fetched for this page."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen documentation (capture, webhook types, result codes, settle funds, split transactions and split chargebacks, payout webhooks, sales day payout, Balance Platform Accounting Report, risk profile, refusal reasons, API idempotency, Apple Pay), n.d., accessed 2026-11; Adyen Sales Day Payout Terms of Service, 2024-06-17; Adyen OpenAPI Checkout v72",
+      "contributed": "The Adyen record at each step."
+    },
+    {
+      "kind": "external",
+      "ref": "Stripe documentation (PaymentIntent lifecycle, payment status updates, payment methods, balances, payouts, Payout object, payout reconciliation report, destination charges, Radar risk evaluation, idempotent requests), n.d., accessed 2026-11",
+      "contributed": "The Stripe record at each step."
+    },
+    {
+      "kind": "external",
+      "ref": "Visa Core Rules and Visa Product and Service Rules, 2026-10-24; Regulation (EU) 2015/751; Google Pay API tutorial, n.d., accessed 2026-11",
+      "contributed": "Authorization validity, presentment and settlement definitions, the interchange cap, the device token."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 51 claims checked (42 confirmed, 8 corrected, 1 hedged, 0 unsupported and removed or relabeled, 0 unreachable); the unscoped “no call that returns a payment” is now scoped to Adyen's Checkout API for online payments (ruling 29), and the acquirer, report, pre-financing and expiry statements were brought into line with rulings 18, 27, 28 and 32. Three evidence and controlling-idea wordings updated to match (acquiring connection; reconciliation job on the report-ready signal); no unit added, dropped or reordered. Copied intent and thesis fields left for the author."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "While drafting: paragraph p27 (the three hand-offs where the record differs) changed from prose to a list with a lead-in; order and content unchanged, so the flow rubric verdict stands."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "After the flow rubric: five controlling ideas reworded without changing the order (the intro no longer counts capture as not yet happened at 19:42; `pending` named as the unconfirmed state at step 5; the accounting report named at step 10 and the return window at step 12; the Established bullet no longer says both companies document a late capture failure). Note not acted on, left to the author: merge the where-we-are paragraph into the roadmap (the style guide requires both)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "First version, written from the PLAN contract, the journal spec entry, the scenario ledger and the chapters that own the twelve mechanisms."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation after verification (parts-9-10): intent, thesis and role re-synced with the corrected journal-spec entry. No unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: statements of absence re-tested with a wide search (documentation and support sitemaps, company sites, web search). Narrowed: 'Adyen names no acquiring entity per country' (its EMEA license page says Adyen N.V.'s authorisation includes cross-border acquiring in all EEA countries; no per-country list). Holds: Stripe on a network rejection of a capture after `succeeded`, and on funds available before receipt outside Instant Payouts (sentence now says what was searched). One source added; units unchanged."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Sweep of rulings 46 to 48: step 7 now says Adyen's license pages name an acquiring entity for some markets and that no complete per-country list exists (46j); the evidence paragraph on Stripe's standard payouts cites the services terms' definition of Payout Delay in place of 'I found nothing' (47e) and adds the Annual Report 2025 caveat to Adyen's pre-financing terms (47m). Three sources added; p28 aligned; no unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('Stripe publishes an availability schedule and, outside Insta' -> 'Stripe publishes an availability schedule and documents payi')."
+    }
+  ],
+  "length": {
+    "target_words": 4900,
+    "max_words": 6500
+  }
+}

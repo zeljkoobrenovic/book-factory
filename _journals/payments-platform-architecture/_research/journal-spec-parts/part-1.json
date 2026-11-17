@@ -1,0 +1,545 @@
+{
+  "id": "part-1",
+  "title": "Part I — MONEY: How a Payment Actually Moves",
+  "detail": "full",
+  "intent": {
+    "outcome": {
+      "know": [
+        "The parties to a card payment (cardholder, issuer, network, acquirer, processor, gateway, provider, payment facilitator, merchant, platform) and which of them holds the money and the risk at each step.",
+        "The timeline of one payment: authorization in seconds, capture, clearing and net settlement over the following days, payout, and a dispute window of about 120 days.",
+        "The three parts of the fee on a card payment (interchange, scheme fees, markup) and the two ways a provider prices them."
+      ],
+      "believe": [
+        "The answer a payment API returns is the first of several promises, each made by a different party on its own clock, and none of them makes the payment final.",
+        "'Approved', 'captured', 'settled' and 'paid out' are four different facts held by four different parties, and a system that stores one status word for them will be wrong for days at a time."
+      ],
+      "can_do": [
+        "Given a payment and a point in time, say which promises have been made, by whom, whether any money has moved, and until when the payment can still be undone.",
+        "Read a provider's status, decline code, payout line or dispute event and say which party's decision it reports.",
+        "Split a quoted card fee into its three parts and say which of them a blended price hides."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Every supporting claim of the part thesis is argued by at least one chapter, and every chapter supports at least one.",
+        "check": "children_cover_parent_thesis",
+        "method": "deterministic",
+        "severity": "blocker"
+      },
+      {
+        "id": "AC-2",
+        "statement": "Each chapter's closing hand-off expresses the relationship its successor declares in transition_in.",
+        "check": "transition_expresses_declared_relationship",
+        "method": "rubric",
+        "severity": "major"
+      },
+      {
+        "id": "AC-3",
+        "statement": "A reader who has read only Part I can say, for a payment the part does not contain, which promises exist at a given moment and why the merchant cannot yet treat the money as final.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A bike shop's dashboard shows a €900 card payment as 'captured' on Monday evening. On Wednesday the owner asks: 'Is that money mine now?' Using only Part I, list what has happened, what may not have happened yet, and until when the €900 can still be taken back.",
+        "expected": "The cardholder's bank (the issuer) has promised to honor the claim and the shop has claimed it; the clearing record, the net settlement between the banks through the card network and the provider's payout may or may not be complete by Wednesday; 'captured' is not 'received'; and even after payout the cardholder can dispute through the issuer for about 120 days, so the money is not final when it arrives."
+      },
+      {
+        "id": "AC-4",
+        "statement": "A reader who has read only Part I can name who is paid out of a card fee and which part of it the law caps.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A Dutch web shop pays its provider one flat percentage on every card payment. Which three parties share that fee, and which share does EU law cap for a consumer card?",
+        "expected": "The cardholder's bank receives interchange, the card network receives scheme fees, and the provider or acquirer keeps a markup; EU law caps the interchange share (0.2% for consumer debit, 0.3% for consumer credit), not the other two."
+      }
+    ]
+  },
+  "thesis": {
+    "question": "What actually happens between the moment an app says 'Payment successful' and the moment the merchant has money it can keep?",
+    "claim": "A card payment is not one event but a chain of separate promises made by different parties on different clocks: the issuer's authorization in seconds, the merchant's claim at capture, the acquirer's clearing record and the network's net settlement over the following days, and the provider's payout on its own schedule. None of them makes the payment final: the cardholder's right to dispute it runs for about 120 days and outlasts them all, so the money is the merchant's to keep only when that window closes, and what the merchant keeps is net of a fee divided among the same parties.",
+    "disputed_by": "The integrator's working model: a payment is a request that either succeeds or fails, the provider's 'succeeded' status means the money has been taken, and what happens after the API responds is the provider's internal plumbing.",
+    "so_what": "A team that accepts the claim stops storing one status per payment and starts recording which promise it holds, from whom, and when it expires; it treats a missing answer as unknown instead of failed, books refunds and disputes as events that arrive long after the sale, and reads a provider's price as three separate costs.",
+    "how_why": "The party that answers the API call is not the party that decides (the issuer), that moves the money between banks (the network's settlement process) or that can take it back (the cardholder, through the issuer). Each of those parties keeps its own record and works to its own deadline: Visa's public rules give an authorization, in their general table, 5 to 30 days of validity, define settlement as daily net amounts between members, and give the issuer up to 120 days to dispute most transactions. The provider can only report other parties' promises as they arrive, which is why its records, and the merchant's, lag the truth.",
+    "supporting_claims": [
+      {
+        "id": "P1-1",
+        "claim": "The provider that answers the API call does not decide the approval, does not move the money between banks and cannot stop it being taken back; each of those belongs to a different party with its own record and its own clock."
+      },
+      {
+        "id": "P1-2",
+        "claim": "An authorization is the issuer's time-limited promise to honor a claim for an amount; it moves no money, and a request that gets no answer has an unknown outcome, not a failed one."
+      },
+      {
+        "id": "P1-3",
+        "claim": "Money moves only at clearing and settlement, a day or more after the approval, as net amounts between network members, so 'settled' names a different event at the network, at the provider and at the merchant's bank."
+      },
+      {
+        "id": "P1-4",
+        "claim": "Money goes back through new transactions and a network-run dispute process, each with its own failures and deadlines, so a payment stays reversible for months after it was paid out."
+      },
+      {
+        "id": "P1-5",
+        "claim": "Each party in the chain is paid separately (interchange to the issuer, scheme fees to the network, a markup to the provider), and whether a provider blends these costs or passes them through decides which of them the merchant can see."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Establishes the parties, the timeline and the vocabulary of promises (authorization, capture, clearing, settlement, payout, dispute, interchange) that every later part builds a mechanism on, and argues J1 directly.",
+    "supports": [
+      "J1"
+    ]
+  },
+  "flow": {
+    "pattern": "chronological",
+    "additional_patterns": [
+      {
+        "pattern": "large_to_small",
+        "applies_to": "journey-of-a-payment to payment-authorization: the whole timeline first, then its first step in detail"
+      }
+    ],
+    "rationale": "After one chapter that lays out the whole timeline and names the parties, the chapters follow the payment in the order it happens: the promise, the money moving forward, the money moving back. Economics comes last because a fee can only be assigned to a party and a step once the reader knows both, and because the costs of declines, late captures, refunds and disputes are costs of events the earlier chapters define. Put authorization before the journey and the reader meets issuer and acquirer with no picture of where they sit; put disputes before settlement and there is no settled money to take back; put economics first and interchange is a number with no owner. The order is a timeline, but the chapters are not a list: each one overturns a belief the previous one left standing (approved means paid; settled means final; the fee is one charge)."
+  },
+  "opening": {
+    "carried_by": "part-1",
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "On 2 February 2027 a €120.00 class pass is bought with Bram de Wit's card at Studio Noord, a yoga studio on the fictional platform Larkfield, and the payment is approved. On 24 February a chargeback arrives: the €120 is taken back, with a €15.00 dispute fee on top, because he told his bank he did not recognize the charge. No step of the payment had failed."
+    },
+    "bridge": "From the reader's view as an engineer, where a payment is a request that returned success, to the view of the parties behind the API, where that success was one bank's promise and three more steps and one long waiting period were still to come.",
+    "roadmap": "Five chapters in the order a payment happens: the whole journey and the parties on it; the authorization, which is the first promise; capture, clearing and settlement, where money actually moves; refunds, reversals and disputes, where it moves back; and who earns what at each step."
+  },
+  "closing": {
+    "carried_by": "payment-economics",
+    "synthesis": "Set side by side, the timeline and the fee stack are the same picture: each party that makes a promise on the way forward (the issuer, the network, the acquirer or provider) is the party that takes a share of the fee, and each backward flow sends the cost to whoever was left holding the promise, which is usually the merchant. No single chapter says this; it appears only when the four promises and the three fees are laid on one line.",
+    "so_what": "A reader can now look at any payment status, payout line or fee and say whose promise it reports, and knows that everything a provider builds afterwards (states, ledgers, reconciliation, webhooks) is a way of keeping track of promises that other parties make and can still withdraw.",
+    "callback": "Bram de Wit's €120 from the part opening: the reader can now name each party that said yes on 2 February, what each earned for saying it, and why none of those yeses stopped the €120 and a €15 fee being taken back on 24 February.",
+    "takeaway": {
+      "type": "provocative_insight",
+      "content": "Part I treated the issuer's yes as given. It is not: the same payment can be approved or declined depending on how the provider reaches the networks and how it models the payment, which is the subject of Part II."
+    }
+  },
+  "transition_in": {
+    "relationship": "elaboration",
+    "carries_over": "The preface's central idea that the instant answer is not the truth, the sixteen named failure patterns, and Larkfield with its recurring payment, Mila's €120 class pass.",
+    "introduces": "The slow truth itself, before any software: who the parties behind the API are, what each one promises and when, and how long the promises stay open.",
+    "form": "paragraph",
+    "placement": "end_of_previous"
+  },
+  "posts": [
+    {
+      "id": "part-1",
+      "folder": "part-1-intro",
+      "title": "Part I — MONEY: How a Payment Actually Moves",
+      "kind": "part_intro",
+      "detail": "full",
+      "question": "What does Part I argue, and in what order should its chapters be read?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "Part I argues that a card payment is a chain of promises by different parties, none of which makes it final.",
+            "The five chapters follow the payment in order: the journey, authorization, clearing and settlement, the backward flows, the economics."
+          ],
+          "can_do": [
+            "Pick the Part I chapter that answers a question about a payment status, a delay, a reversal or a fee."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "A reader of this page alone can state the part's claim and name the five chapters' subjects in reading order.",
+            "check": "intro_predicts_content",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "After reading only this page: what does Part I argue, and what will each of the next five chapters tell you, in order?",
+            "expected": "A payment is several promises by different parties and none is final; then: the parties and the timeline, what an authorization promises, how capture, clearing and settlement move the money, how refunds and disputes move it back, and who earns what."
+          },
+          {
+            "id": "AC-2",
+            "statement": "The page opens with the €120 dispute of 24 February 2027 as an actual scene with its dates and amounts, labeled as fictional, not with a description of the part.",
+            "check": "no_weak_introduction_pattern",
+            "method": "rubric",
+            "severity": "major"
+          }
+        ]
+      },
+      "role": {
+        "contribution": "Performs the part's opening: the hook, the part thesis and the reading order.",
+        "supports": []
+      },
+      "post_spec": "posts/part-1-intro/spec.json"
+    },
+    {
+      "id": "journey-of-a-payment",
+      "folder": "01-journey-of-a-payment",
+      "title": "Follow the Money: What Happens Between “Pay” and “Paid”",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "What has to happen, between which parties, for one card payment to be approved, collected, moved, paid out and possibly taken back?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "The four-party model (cardholder, issuer, acquirer, merchant, with the network between the two banks) and how three-party networks, bank-transfer schemes and wallets differ from it.",
+            "What processor, gateway, payment service provider, payment facilitator and platform mean, and which of them is a network member and holds money.",
+            "The six steps of the timeline (authorization, capture, clearing, settlement, payout, dispute window), with what moves at each: a message, a record or money."
+          ],
+          "believe": [
+            "The provider that answers the API call reports other parties' decisions; it does not make the decisive ones."
+          ],
+          "can_do": [
+            "For any step of a card payment, name the party that acts, what it promises and whether money has moved.",
+            "Ask of any provider, in any country, which legal entity is the acquirer for the payment."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a card payment the chapter does not contain, the reader names the parties in the order they act and says which of them holds the money at a stated moment.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A customer in Lyon pays €60 by card in a bakery's ordering app at 08:10. At 08:11, who has decided what, who holds the €60, and which parties have not yet done anything?",
+            "expected": "The customer's bank (the issuer) has approved and holds the money, now reserved on the customer's account; the card network carried the request and the bakery's acquirer or provider relayed it; no money has moved; clearing, settlement between the banks and the payout to the bakery are still to come, and the customer can dispute for months."
+          },
+          {
+            "id": "AC-2",
+            "statement": "Every term the rest of the book relies on from this chapter (issuer, acquirer, network, provider, payment facilitator, authorization, capture, clearing, settlement, payout, dispute) is defined in one plain clause before it is used.",
+            "check": "known_before_new",
+            "method": "rubric",
+            "severity": "major"
+          },
+          {
+            "id": "AC-3",
+            "statement": "Every statement about which role Stripe or Adyen plays is a dated, sourced fact or is marked as not public; the table of who holds money and risk is labeled as a generalization that contracts and local law can change.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "What has to happen, between which parties, for one card payment to be approved, collected, moved, paid out and possibly taken back?",
+        "claim": "One card payment takes six steps spread over days and carried out by at least five parties (the acquirer and the provider may be one company): the issuer approves, the merchant captures, the acquirer presents a clearing record through the network, the network nets what its member banks owe each other, the provider pays the merchant, and for about 120 days the cardholder can have it taken back. The provider that answers the API call controls none of the three steps that decide the outcome: it does not make the approval decision, does not run the settlement between banks and cannot stop a dispute.",
+        "disputed_by": "The view that a payment is a transaction between the merchant and its payment provider, in which the provider takes the money and the other parties are details the API rightly hides.",
+        "so_what": "If the provider only relays and records other parties' promises, then its status fields are reports with a delay, and an integrator must ask of each one whose decision it reports and what is still open; the first question to put to any provider becomes which entity is the acquirer for this payment in this country.",
+        "how_why": "The annual reports Visa and Mastercard published in 2026 describe the same four-party structure and say the networks neither issue cards nor hold customers' money; they route the authorization, exchange clearing records and settle between members. A provider packages the acquirer's side of that structure, and which role it plays is a per-country fact. Stripe's acquirer disclosure (n.d., accessed November 2026) names Stripe entities as acquirer in Europe and six acquirers in the United States (five banks and Stripe's own limited-purpose bank), where Stripe acts as a payment facilitator; Adyen holds a banking license from the Dutch central bank and lists the countries and regions where it has an acquiring connection and names the acquiring entity for some markets only. Neither publishes an end-to-end description of its own role by region."
+      },
+      "role": {
+        "contribution": "Supplies the parties, the six-step timeline and the distinction between messages and money that every later chapter places itself on.",
+        "supports": [
+          "P1-1"
+        ]
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The part's claim that a payment is a chain of promises by different parties, and the €120 that came back three weeks after it succeeded.",
+        "introduces": "One payment, Mila's class pass, followed party by party from 19:42 on Tuesday to the studio's payout on Thursday and into the dispute window.",
+        "form": "sentence",
+        "placement": "end_of_previous"
+      },
+      "post_spec": "posts/01-journey-of-a-payment/spec.json"
+    },
+    {
+      "id": "payment-authorization",
+      "folder": "02-authorization",
+      "title": "The First Promise: Authorization",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "What exactly does an authorization promise, who decides, and what can change before the money moves?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "What the authorization message carries and the path it takes, at an introductory level, and what a hold, a response code and a validity window are.",
+            "The variants: pre-authorization, incremental, partial and zero-value authorization, reversal, and stand-in processing.",
+            "The difference between customer-initiated and merchant-initiated transactions and what the stored-credential rules require.",
+            "How Stripe and Adyen each report a decline: a normalized reason, the raw network code and retry advice."
+          ],
+          "believe": [
+            "An approval is a perishable promise, not a payment, and a timeout is an unknown outcome, not a decline."
+          ],
+          "can_do": [
+            "Given an authorization and a planned capture date, say whether the promise will still be valid and where to read its expiry.",
+            "Given a decline, decide whether a retry is allowed, from the network's retry advice and not from the provider's message alone.",
+            "Given a request that timed out, state the steps to take before sending it again."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a timeout on an authorization request the chapter does not contain, the reader says the outcome is unknown and names what to do before retrying.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A ticket shop sends a €45 card payment to its provider and the connection drops after ten seconds with no response. The code path marks the order 'payment failed' and shows the customer a 'try again' button. What is wrong with that, and what should the shop do instead?",
+            "expected": "No answer does not mean no approval: the customer's bank may have approved and reserved the €45. The shop should treat the outcome as unknown, look the payment up at the provider (or cancel it by its own reference) and only then retry, with the same request identifier so a second attempt cannot create a second charge."
+          },
+          {
+            "id": "AC-2",
+            "statement": "Given a decline with its codes, the reader says whether to retry and why.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A monthly membership charge comes back declined with the card network's code for 'not sufficient funds'. A second one comes back with a code from the group the network labels 'issuer will never approve'. Which may the merchant try again, how do you know, and what does it cost to get it wrong?",
+            "expected": "Insufficient funds is a 'cannot approve at this time' decline that may be retried within the network's limit of attempts; the second must never be sent again for that card. The category comes from the network's code and retry advice, which providers pass along next to their own reason, and retrying against it brings network fees."
+          },
+          {
+            "id": "AC-3",
+            "statement": "Validity windows and retry limits are given with their source and date (the Visa rules edition, or the provider's documentation with its access date), Mastercard rules are attributed to the provider that reports them, and the 7-day versus 10-day difference is stated without an invented reason.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "What exactly does an authorization promise, who decides, and what can change before the money moves?",
+        "claim": "An authorization promises one thing: that the issuer will honor a claim for up to the approved amount if the claim arrives inside a validity window, which Visa's rules set, in their general table, at 5 to 30 days depending on the kind of transaction. The issuer alone decides, and by Stripe's account issuers return most refusals as a generic code. Until the claim arrives the promise can expire, be reversed or be changed in amount, and after a timeout it can exist without the merchant knowing.",
+        "disputed_by": "The view that an approved authorization means the customer has paid, and that an error or a timeout means they have not, so the safe response to a missing answer is to send the request again.",
+        "so_what": "The merchant must store when each approval expires, read it from the provider instead of computing it, keep the provider's reason, the raw network code and the network's retry advice as three separate facts, and resolve every timeout by looking the payment up before any retry; the Double Charge at Larkfield is what the other reading costs.",
+        "how_why": "The authorization is a message, not a transfer: the issuer reserves the amount on the cardholder's account and nothing moves. If the response is lost on the way back, the reservation still stands and the merchant does not know it. Visa's rules (edition of 24 October 2026) fix how long the acquirer has to present the transaction and sort declines into categories with retry limits, and Stripe's documentation says issuers return most declines as generic. The two providers document the same promise differently (both n.d., accessed November 2026): Stripe gives a 7-day window for a customer-initiated online Visa payment where Visa's rule and Adyen's page say 10, and gives no reason; Stripe says it and the network classify a payment as customer- or merchant-initiated from signals, while Adyen's pages take the merchant's declared fields; Adyen documents canceling by the merchant's own reference within 24 hours, which fits the case where no provider reference came back. Neither says whether an approval came from the issuer or from the network standing in for it, and the public record stops there."
+      },
+      "role": {
+        "contribution": "Shows that the first and most visible step moves no money and can lapse, which is the strongest single piece of evidence that the instant answer is a promise.",
+        "supports": [
+          "P1-2"
+        ]
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The six-step timeline and its parties, with authorization named as the first step and the only one the customer sees.",
+        "introduces": "What that first step contains: the message, the issuer's decision and codes, the hold and its expiry, and the case where no answer comes back.",
+        "form": "paragraph",
+        "placement": "end_of_previous"
+      },
+      "post_spec": "posts/02-authorization/spec.json"
+    },
+    {
+      "id": "clearing-and-settlement",
+      "folder": "03-clearing-and-settlement",
+      "title": "The Slow Truth: Capture, Clearing and Settlement",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "How does an approved payment become money in the acquirer's account, and why does it take days?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "What capture, clearing, presentment, net settlement, settlement cycle and funding mean, and how dual-message and single-message systems differ.",
+            "That interchange is fixed at clearing from the data and timing of the clearing record, not at authorization.",
+            "What the network guarantees (payment between its members) and what it does not (the acquirer's payment to the merchant).",
+            "What Stripe and Adyen each document about capture models, capture results and when funds become available, and what neither publishes."
+          ],
+          "believe": [
+            "'Captured' is the merchant's claim, not the merchant's money, and the records of one payment legitimately disagree until settlement and payout are complete."
+          ],
+          "can_do": [
+            "Given a provider's statement that a payment is 'settled' or will be paid at 'T+2', say which event is meant and what the clock starts from.",
+            "Given a late or partial capture, name the consequences: a failed capture, a higher interchange fee or a dispute right for late presentment."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given two systems that disagree about one payment, the reader explains the disagreement by the layer each system reports and does not call either one wrong.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "On Friday afternoon a furniture shop's order system shows Thursday's €2,400 card payment as 'paid', its provider dashboard shows the amount as 'pending', and its bank account shows nothing. Is one of the three wrong? Explain what each is reporting.",
+            "expected": "None is necessarily wrong. The order system reports the approval and the shop's claim (capture); the provider reports that funds have not yet settled into the shop's balance; the bank shows nothing because the payout has not been sent. Money moves between the banks as net amounts a day or more after the approval, and the payout follows on the provider's own schedule."
+          },
+          {
+            "id": "AC-2",
+            "statement": "Given a merchant that captures on shipment, the reader says what can go wrong when shipment is late.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A shop gets card approvals when orders are placed and collects the money only when it ships. A supplier delay pushes one shipment to three weeks after the order. What may happen when the shop then tries to collect, and why?",
+            "expected": "The approval was valid only for a limited number of days, so the bank's promise may have lapsed: the collection can fail, or go through at a higher fee, or give the cardholder's bank a right to take the money back for late presentment. The shop should have asked for a new or extended approval."
+          },
+          {
+            "id": "AC-3",
+            "statement": "The chapter says in so many words that network settlement cut-off times and the number of cycles per day are not public and labels the timings it uses as industry practice or illustration; it states Adyen's documented pre-financing of payouts with its source and date, and states that Stripe documents nothing equivalent for standard payouts.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "How does an approved payment become money in the acquirer's account, and why does it take days?",
+        "claim": "An approved payment becomes money through three further steps, each on its own schedule: the merchant's capture, the acquirer's clearing record presented through the network, and the network's daily net settlement between its member banks. It takes days because the records travel in batches and the money moves only as one net amount per member per day, not per payment, and the provider's payout to the merchant is a fourth step, on the provider's own schedule. 'Settled' therefore names a different event at the network, at the provider and at the merchant's bank.",
+        "disputed_by": "The view that the delay has no meaning for an integrator: once the provider reports a payment as captured the money is as good as received, and 'settled' is one well-defined moment.",
+        "so_what": "A merchant that books revenue or releases goods on 'captured' is acting on its own claim; it should record capture, the provider's available balance and the payout as separate facts, expect them to disagree for days, and ask every provider what its 'T' counts from before comparing payout speeds.",
+        "how_why": "Visa's rules (edition of 24 October 2026) define clearing as the exchange and valuation of records between Visa and its members and settlement as the transfer of daily net amounts that result from it, and the network's guarantee covers members paying each other: Mastercard's annual report for 2025 says it does not guarantee payments to merchants by their acquirers. The interchange fee is fixed from the clearing record, which is why Adyen's documentation warns that a late capture can raise it. The two providers describe the last steps differently (both n.d., accessed November 2026): Stripe counts its settlement timing from the time of capture and uses 'settlement' for the release of funds to the merchant's available balance; Adyen separates the scheme sending funds to Adyen, Adyen's payable batch and the bank's processing, and reports a capture that fails later by webhook. Paying the merchant before the network's funds arrive is documented for Adyen and not for Stripe: Adyen's Sales Day Payout terms (17 June 2024) say it pays 'irrespective of whether the funds are actually received by Adyen', with pre-financing capped at 30 days and then reversed, while Stripe states nothing of the kind for standard payouts. Network cut-off times and cycles, and whether a Stripe capture can fail later, are not public; the chapter's timings for Mila's €120 are industry practice and ledger illustration."
+      },
+      "role": {
+        "contribution": "Locates the moment money actually moves and shows why every system's record of a payment differs in the meantime, which Part III's ledger and reconciliation chapters depend on.",
+        "supports": [
+          "P1-3"
+        ]
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The authorization as a promise that reserves an amount and moves nothing.",
+        "introduces": "The steps that do move money, which run later, in batches and in net amounts, between parties the merchant never sees.",
+        "form": "paragraph",
+        "placement": "end_of_previous"
+      },
+      "post_spec": "posts/03-clearing-and-settlement/spec.json"
+    },
+    {
+      "id": "refunds-reversals-and-disputes",
+      "folder": "04-refunds-reversals-and-disputes",
+      "title": "Money Flowing Backward: Refunds, Reversals and Disputes",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "How does money go back, who decides, and why can a payment be undone months later?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "The difference between canceling an authorization, a reversal, a refund and a chargeback, and who starts each.",
+            "The stages of a card dispute, the four families of dispute reasons, and that the merchant's evidence is submitted once against a deadline.",
+            "What pre-dispute tools and network monitoring programs are, and that monitoring counts disputes whatever their outcome.",
+            "How disputes differ outside cards, and how Stripe and Adyen each represent a dispute and move the money."
+          ],
+          "believe": [
+            "A paid-out payment is provisional for months, and a refund is a new payment in the other direction that can fail."
+          ],
+          "can_do": [
+            "Given a payment and its state, choose between cancel, reversal and refund and say what each costs.",
+            "Given a dispute notification, say what the deadline is read from, what evidence must already exist, and when the money leaves and may return on each provider.",
+            "Say how long the financial record of a payment must stay open."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a customer-service case the chapter does not contain, the reader chooses the right backward flow and names its failure mode.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A hotel took a card approval for €300 on Monday for a stay that the guest cancels on Tuesday, before the hotel has collected anything. A second guest, already charged €300 and paid out to the hotel last month, also wants the money back. What should the hotel do in each case, and what can go wrong in the second?",
+            "expected": "First case: cancel or reverse the approval, so no payment ever appears and no money moves. Second case: a refund, which is a new transaction funded from the hotel's balance; it can be delayed or fail, the original fees are generally not returned, and if the guest asks the bank instead it becomes a dispute."
+          },
+          {
+            "id": "AC-2",
+            "statement": "Given a dispute that arrives after payout, the reader says who decides, what the merchant may do and what stays true even if the merchant wins.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A language school is told that a €500 course fee paid ten weeks ago has been disputed by the student's bank. The school has proof the student attended. Who decides the outcome, how many times can the school make its case, and what cost remains even if it wins?",
+            "expected": "The student's bank decides under the card network's rules, with the network as arbiter if escalated; the school submits its evidence once, before a deadline; even on a win it has had the money withheld or taken in the meantime, may pay a dispute fee, and the dispute still counts in the network's monitoring ratio."
+          },
+          {
+            "id": "AC-3",
+            "statement": "Visa rules are cited from the dated rulebook; Mastercard cycles, deadlines and thresholds are attributed to the provider that reports them and not presented as Mastercard's own text; thresholds and fees carry an 'as of' date; Adyen's dispute fee is stated as set by contract, with the one amount on its site (CAD 24.00, in Adyen Canada's fee disclosure) named.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "How does money go back, who decides, and why can a payment be undone months later?",
+        "claim": "Money goes back by three routes that are not variations of one 'undo': a reversal, which the merchant sends, cancels the issuer's promise before any money has moved; a refund is a new transaction that the merchant starts and that can itself fail; and a dispute is started by the cardholder's issuer and ruled on by that issuer under the network's rules, with the network as arbiter at the last stage and the merchant allowed one submission of evidence. A payment can be undone months later because those rules give the issuer its own clock, up to 120 days from the transaction for most Visa dispute conditions, and that clock runs regardless of settlement and payout.",
+        "disputed_by": "The view that a refund is the original payment run in reverse, that the merchant and its provider decide what goes back, and that a payment the provider has paid out is final.",
+        "so_what": "The merchant's record of a payment has to stay open in its financial effect for at least the dispute window, backward flows need their own states and ledger entries instead of a 'refunded' flag, and the evidence for a dispute has to be captured at the time of sale because the single submission comes with a deadline of days.",
+        "how_why": "Each route belongs to a different party and a different point on the timeline: before capture only a promise exists, so it can be canceled and no payment ever appears; after capture the money has moved, so sending it back is a second payment with its own funding and failure; and the dispute right belongs to the cardholder through the issuer, under Visa's four categories of conditions (rules edition of 24 October 2026), where monitoring programs count every dispute whatever its outcome. The two providers model the dispute differently (both n.d., accessed November 2026): Stripe gives it one Dispute object, debits the amount and a published fee when it is created and returns the amount only on a win; Adyen reports a series of events against the payment, in which a defended chargeback can be credited back provisionally and taken again by a second chargeback, and adds a reversal call for a payment whose capture state is unknown. Adyen's dispute fee is set by contract (the one amount on its site is CAD 24.00, in Adyen Canada's fee disclosure), and Mastercard's rules are known here only as the two providers report them."
+      },
+      "role": {
+        "contribution": "Shows that the chain of promises has no final link: after authorization, settlement and payout the payment can still be withdrawn, which is what 'no single message makes it final' means in J1.",
+        "supports": [
+          "P1-4"
+        ]
+      },
+      "transition_in": {
+        "relationship": "time",
+        "carries_over": "Money that has been cleared, settled between the banks and paid out to the merchant, the last forward step.",
+        "introduces": "What can still happen afterwards, for weeks or months: the merchant sends money back, or the cardholder's bank takes it back.",
+        "form": "paragraph",
+        "placement": "end_of_previous"
+      },
+      "post_spec": "posts/04-refunds-reversals-and-disputes/spec.json"
+    },
+    {
+      "id": "payment-economics",
+      "folder": "05-payment-economics",
+      "title": "Who Earns What: Interchange, Scheme Fees and Provider Pricing",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "Where does the fee on a payment go, and how does the way a provider earns its share shape what it builds?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "What interchange, scheme fees and the acquirer's markup are, who sets each and who receives it.",
+            "The legal caps: the EU Interchange Fee Regulation's 0.2% and 0.3% for consumer cards, and the US debit cap and routing rule with their status in court as of November 2026.",
+            "Blended pricing and interchange-plus-plus, and which is each company's published default.",
+            "What Adyen reports (net revenue, processed volume, take rate) and what Stripe does not publish."
+          ],
+          "believe": [
+            "A provider's pricing model is an architectural fact: it decides which network costs the merchant sees and what the provider has to calculate for every transaction.",
+            "Declines, late captures, refunds and disputes each have a price, paid by whoever is left holding the promise."
+          ],
+          "can_do": [
+            "Split a quoted card fee into interchange, scheme fees and markup, and say which parts are known, capped or not public.",
+            "Compare a blended quote with a pass-through quote for a stated card mix without treating the two percentages as like for like.",
+            "Say why a provider's reported volume, another's net revenue and a take rate cannot be ranked against each other."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a fee quote the chapter does not contain, the reader splits it into its parts and says which part the provider keeps.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "An Austrian online bookshop is offered two prices for a €50 payment with a consumer debit card: provider A charges a flat 1.4% + €0.25; provider B charges the card's interchange and the network's fees at cost, plus 0.6% + €0.10. What is the most the customer's bank can receive, what does each provider keep, and what can you not work out from the quote?",
+            "expected": "The bank's share (interchange) is capped by EU law at 0.2%, so at most €0.10. Provider B keeps 0.6% + €0.10 = €0.40 and passes the rest on; provider A charges €0.95 in total and keeps whatever is left after interchange and network fees. The network's fees are not public, so A's exact margin and B's exact total cannot be worked out from the quote."
+          },
+          {
+            "id": "AC-2",
+            "statement": "The reader can say who gains when a network cost falls under each pricing model.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A card network lowers a fee it charges on every transaction. Under a flat all-in price, who gains? Under a price that passes network fees through at cost, who gains? What does that suggest about which provider has a reason to build cost-reducing features into its own systems?",
+            "expected": "Under the flat price the provider keeps the saving, because the merchant's price does not change; under pass-through the merchant gets it. A provider on flat pricing gains directly from features that lower network costs; under pass-through such features are something the provider offers the merchant. The answer should mark the last step as reasoning, not as a documented fact about a company."
+          },
+          {
+            "id": "AC-3",
+            "statement": "Every price, cap, court ruling and reported figure carries its source and date; Stripe's take rate is stated as not computable from public figures and no estimate is presented as fact; the Larkfield fee stack is labeled illustrative; Stripe's and Adyen's volumes are not ranked against each other.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          },
+          {
+            "id": "AC-4",
+            "statement": "The closing of this chapter performs the part's closing: it lays the four promises and the three fees on one line, returns to the €120 dispute of the part opening, and hands off to Part II with the question of what decides the issuer's yes.",
+            "check": "conclusion_calls_back_to_introduction",
+            "method": "rubric",
+            "severity": "major"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "Where does the fee on a payment go, and how does the way a provider earns its share shape what it builds?",
+        "claim": "The fee on a card payment is three payments to three parties: interchange to the issuer, scheme fees to the network, and a markup to the acquirer or provider. A provider's default price either blends the three into one rate, as Stripe's published standard pricing does, or passes the first two through at cost, as Adyen's published Interchange++ pricing does, and that choice decides which network costs the merchant can see, who keeps the saving when one of them falls, and what the provider must calculate and report for every transaction. In the one case the public record documents, features follow the pricing model: Stripe offers five authorization and capture features on interchange-plus pricing.",
+        "disputed_by": "The view that pricing is a commercial term settled by procurement: the fee is what the provider charges for its service, the cheapest percentage wins, and none of it has anything to do with how the provider's systems are built.",
+        "so_what": "A reader can cost a payment, including its declines, late captures, refunds and disputes, before choosing a provider, will not compare a blended rate with a pass-through markup as if they measured the same thing, and knows to ask which features and reports depend on the pricing plan before signing.",
+        "how_why": "The annual reports Visa and Mastercard published in 2026 say the networks set default interchange but do not earn it, and that the acquirer sets the merchant's price; EU Regulation 2015/751 caps consumer interchange at 0.2% for debit and 0.3% for credit and obliges acquirers to offer unblended prices. Stripe's Netherlands price list (n.d., accessed November 2026) prices a standard European Economic Area card at 1.5% + €0.25; Adyen's (same date, marked indicative) charges a fixed processing fee plus interchange and scheme fees at cost plus 0.60%, and says its pricing model tracks those costs for each transaction. Stripe's documentation labels five authorization and capture features as available on interchange-plus pricing, which ties features to the model where their network cost is passed on. Adyen reports net revenue and a take rate (16.2 basis points for the first half of 2026); Stripe publishes total volume and no revenue for the company, so its take rate cannot be computed. Scheme fee schedules, Stripe's interchange-plus markup and Adyen's negotiated markup are not public, and any reading of the pricing difference beyond these documented points is the author's inference."
+      },
+      "role": {
+        "contribution": "Assigns a payment to each party and step the earlier chapters named, shows the cost of every backward and failed flow, and carries the part's closing.",
+        "supports": [
+          "P1-5"
+        ]
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "The full chain in both directions: an issuer that promises and can take the money back, a network that guarantees settlement, an acquirer or provider that pays out and stands behind the merchant.",
+        "introduces": "What each party charges for the promise it carries, who sets that price, and what the provider's own share leads it to build.",
+        "form": "paragraph",
+        "placement": "end_of_previous"
+      },
+      "post_spec": "posts/05-payment-economics/spec.json"
+    }
+  ]
+}

@@ -1,0 +1,1305 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "payment-safe-change",
+  "journal": "payments-platform-architecture",
+  "part": "part-8",
+  "title": "Changing the Engine in Flight: Deploys, Migrations and Incidents",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "The terms progressive rollout, feature flag, dark launch, zero-downtime migration and postmortem.",
+        "What Stripe's 2023 annual letter (published March 2024) says about its deployment pipeline, and what happened on 8 February 2024 when a change reached 1% of its critical traffic.",
+        "What Adyen has published about release practice (2018, 2021, and current documentation that says releases are applied continuously and frozen around named peak days) and database change without downtime (2018 to 2025), and that Adyen's Infrastructure page says it publishes new releases of its core system every week, while no figure comparable to Stripe's deploy count is public for it.",
+        "The engineering-culture facts each company has stated that bear on change: one dominant language and a monorepo at both, software built in-house or on open source at both, cloud rented at Stripe and hardware owned at Adyen."
+      ],
+      "believe": [
+        "On a money path, frequent small reversible changes are safer than rare large ones, and one percent of traffic is still real payments.",
+        "A deployment or migration is finished when the records agree afterwards, not when the rollout reaches 100%."
+      ],
+      "can_do": [
+        "Plan a change to a money path as stages with a bounded share of traffic, a signal that withdraws it and a way back at each stage.",
+        "Plan a table or version migration with dual writing, comparison and a reconciliation check before the old path is removed.",
+        "After a withdrawn rollout, find the payments it touched and prove their state."
+      ]
+    },
+    "audience": {
+      "who": "A software engineer or architect who deploys, or is about to deploy, changes to a system that calls a payment provider, and who knows continuous delivery in general.",
+      "already_knows": [
+        "Continuous integration, canary releases, feature flags, blue-green deployment and schema migrations as general engineering.",
+        "Idempotency keys and the unknown outcome (idempotency-and-retries), the webhook receiver's contract (payment-webhooks-and-events), the ledger and reconciliation (payment-ledgers, payment-reconciliation-and-reporting) and the Version Cliff (payment-api-versioning).",
+        "The four earlier chapters of Part VIII and the incidents they cite; Larkfield and the Keel decisions (meet-larkfield)."
+      ],
+      "does_not_know": [
+        "What Stripe and Adyen have each published, with dates, about deployment, migration and incident practice, and where that record stops.",
+        "Why a rollout's own metrics cannot close a change on a money path."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a rollout that was withdrawn automatically, the reader says the work is not finished and names what remains.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A change to your payment service went to 1% of live traffic for ten minutes, error rates rose, and the rollout was withdrawn automatically. Your manager says the system worked and nothing more is needed. Using this chapter, what is still to do?",
+        "expected": "One percent of live traffic is real payments: some failed and some may be left with an unknown outcome or a half-written record. Find the payments handled by the new code in those ten minutes, compare each with the provider's record and with the ledger, repair differences, and only then close the change. The reader may cite Stripe's 8 February 2024 incident, where a change reached 1% of critical traffic and payments failed."
+      },
+      {
+        "id": "AC-2",
+        "statement": "Given a migration the chapter does not contain, the reader orders its steps so that each can be reversed and says when the old path may be removed.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "Your team must move from one version of a provider's API to another that renames a field your finance export reads, with no downtime and no wrong reports. Put the steps in order and say when the old code may be deleted.",
+        "expected": "Run the new version alongside the old without using its results (a dark launch against recorded or live traffic); compare outputs, including the finance export, field by field; switch a small share of traffic, then more, with a way back at each step; delete the old path only after a full reporting period reconciles on the new one. The reader ties this to a planned calendar of upgrades, not a forced one."
+      },
+      {
+        "id": "AC-3",
+        "statement": "The chapter does not compare the two companies' deployment frequency and says why the public record cannot support that comparison; it presents reconciliation after a change as the author's recommendation, and states that neither company has published such a gate.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      },
+      {
+        "id": "AC-4",
+        "statement": "As the page that carries the part's closing, the conclusion returns to the two Larkfield first-of-month runs and states what the five chapters show together that none shows alone.",
+        "check": "conclusion_calls_back_to_introduction",
+        "method": "rubric",
+        "severity": "major"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "How do you ship changes many times a day to a system that moves money?",
+    "claim": "A money path can take hundreds of changes a day when each one is first exposed to a bounded share of live traffic, is withdrawn automatically when its metrics deviate, and has a way back that has itself been tested; because even a change limited to 1% of traffic fails real payments, the author's rule is that a change is finished only when the records agree after it.",
+    "disputed_by": "The view that systems that move money should change rarely: release windows, freezes before busy periods and manual sign-off are safer than hundreds of deployments a day.",
+    "so_what": "The reader stops defending their payment system by pinning versions and avoiding change, which is how Larkfield reached the Version Cliff, and instead schedules small staged changes with a comparison step and a reconciliation after each, as K7 does.",
+    "how_why": "Stripe's 2023 annual letter (published March 2024) describes about 400 deployments a day to one core API service, each rolled out to test-mode traffic first and then to rising shares of live traffic, inspected against 55,000 metrics and withdrawn automatically. The same letter reports the limit: on 8 February 2024 an erroneous change reached 1% of critical traffic and payments failed. Its 2019 root-cause analysis shows a rollback causing the second outage of the day, which is why the way back has to be tested too; its 2017 and 2024 migration accounts keep both paths writable until a comparison passes. Adyen's 2018 account describes development on one main line, release branches, and features switched on one by one and then tried on a small share of traffic. So the documented difference is that Stripe describes gating the deployed code by traffic share (2024) and Adyen gating the feature (2018); each may do both; Adyen states a weekly release of its core system and no deploy count, so frequency cannot be compared number for number. Neither company has published a check of money correctness tied to a deployment; the last clause of the claim is the author's recommendation, drawn from the book's own test for a single payment.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "Exposure can be bounded: Stripe's 2023 annual letter describes each change reaching test-mode traffic, one machine and then rising shares of live traffic, withdrawn automatically when metrics deviate, and Adyen's 2018 account separates deploying code from activating a feature."
+      },
+      {
+        "id": "S2",
+        "claim": "Bounded exposure still fails real payments, and the way back is a change that can fail too: on 8 February 2024 a change at 1% of Stripe's critical traffic failed payments, and on 10 July 2019 a revert caused Stripe's second outage of the day."
+      },
+      {
+        "id": "S3",
+        "claim": "A change to stored data is made reversible by keeping the old and the new path both working until a comparison passes, as Stripe described in 2017 and 2024 and as Adyen's database posts of 2018 to 2025 show from the database side."
+      },
+      {
+        "id": "S4",
+        "claim": "The public record supports a comparison of what each company gates and of a few engineering-culture facts, and does not support a comparison of deployment frequency or a claim that either ties a check of money correctness to a deployment."
+      },
+      {
+        "id": "S5",
+        "claim": "Error metrics cannot see a change that writes wrong records without failing a request, so the author's rule is that a change to a money path is finished only when the records agree after it."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Names change as the cause behind the incidents the part has cited and gives the reader the staged, reversible, reconciled change as the practice; carries the part's closing.",
+    "supports": [
+      "P8-5"
+    ]
+  },
+  "flow": {
+    "pattern": "problem_solution",
+    "additional_patterns": [
+      {
+        "pattern": "prerequisite_order",
+        "applies_to": "rollout, migrations, designs: code change before data change, mechanisms before the comparison of designs"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "incidents-and-culture and where-they-differ"
+      }
+    ],
+    "rationale": "The Larkfield deploy comes first because it poses four questions (exposure, withdrawal, way back, records), and the body answers them in that order. The cost of a bad change precedes the mechanisms because its third kind of damage, a wrong record with no error, is what none of the mechanisms catches; without it the last rule would look like an afterthought. Rollout precedes migrations because a migration is a rollout whose effects cannot be withdrawn by routing, so it needs the rollout vocabulary. The four designs come after both because the table compares mechanisms the reader has now seen documented, and it is where the fourth answer, a reconciliation after the change, is named as the step none of the designs supplies. Incident and culture facts follow the designs and precede the comparison because the comparison table cites them; placed before the designs they would separate the mechanisms from the table that sorts them. Larkfield's upgrade comes after the comparison because it opens with what a small team should take from the providers and then applies all four answers; moved earlier it would use dark launch and reconciliation before they are defined. The withdrawn rollout comes last because it is the failure of the plan the upgrade section has just laid out."
+  },
+  "introduction": {
+    "hook": {
+      "type": "intriguing_example",
+      "content": "On 8 February 2024, between 21:46 and 21:52 UTC, a change at Stripe reached 1% of what the company calls its critical tier of traffic. The staged pipeline had kept it from the other 99%. In those six minutes the three most affected users had 39, 15 and 12 payments fail."
+    },
+    "bridge": {
+      "from_reader_world": "An engineer protects a system that must not break by changing it rarely: release windows, a freeze before the busy season, a pinned dependency nobody touches.",
+      "to_topic": "A payment system has no quiet hour and no freeze that fits around its peaks, and Larkfield's Version Cliff shows where avoiding change leads; the question becomes how to make each change small, bounded and reversible, and how to know it is done."
+    },
+    "thesis_statement": {
+      "text": "A money path can take hundreds of changes a day when each one is first exposed to a bounded share of live traffic, is withdrawn automatically when its metrics deviate, and has a way back that has itself been tested; because even a change limited to 1% of traffic fails real payments, the author's rule is that a change is finished only when the records agree after it.",
+      "placement": "KEY POINTS bullets 1 and 3 and paragraph p03"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p05",
+      "promises": [
+        {
+          "promise": "Start from Larkfield's March 2026 upgrade read as a change, and the four questions it could not answer.",
+          "kept_in": [
+            "scene"
+          ]
+        },
+        {
+          "promise": "Say why a money path cannot stop changing and which three kinds of damage a bad change does.",
+          "kept_in": [
+            "problem"
+          ]
+        },
+        {
+          "promise": "Explain progressive rollout from Stripe's 2023 letter, its limit on 8 February 2024, Adyen's 2018 account and the 2019 rollback.",
+          "kept_in": [
+            "rollout"
+          ]
+        },
+        {
+          "promise": "Explain migrations that keep two paths alive until a comparison passes, with Stripe's and Adyen's published cases.",
+          "kept_in": [
+            "migrations"
+          ]
+        },
+        {
+          "promise": "Compare four ways to limit a change.",
+          "kept_in": [
+            "designs"
+          ]
+        },
+        {
+          "promise": "Report what each company has shown in public about incidents and about engineering choices that shape change.",
+          "kept_in": [
+            "incidents-and-culture"
+          ]
+        },
+        {
+          "promise": "Set the two providers side by side.",
+          "kept_in": [
+            "where-they-differ"
+          ]
+        },
+        {
+          "promise": "Walk Larkfield's May 2027 upgrade as a staged change and recover from a withdrawn rollout.",
+          "kept_in": [
+            "in-practice",
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "function": "context",
+        "organization": "narration",
+        "controlling_idea": "Chapter 40 left a system that cannot be stopped for its peaks, and the incidents on record show what threatens it: on 8 February 2024 a change at Stripe got no further than 1% of critical traffic, and payments still failed for six minutes.",
+        "evidence": [
+          {
+            "kind": "case",
+            "what": "Stripe 2023 annual letter (published 2024-03-13): 'the most significant recent issue which happened on February 8, 2024 between 21:46 and 21:52 UTC'; 'the three most impacted users had 39, 15, and 12 payments fail'; 'an erroneous change rolled out all the way to 1% of the critical tier of traffic'.",
+            "shows": "A rollout bounded at 1% still costs real payments.",
+            "source": "Stripe 2023 annual letter, section 'How we engineer for reliability', published 2024-03-13, https://stripe.com/annual-updates/2023"
+          },
+          {
+            "kind": "case",
+            "what": "Adyen, 'Partitioning an environment, not individual tables' (2025-09-16): the near miss before a December season was set off by 'automatically adding one more partition to an already partitioned table'.",
+            "shows": "Carries over chapter 40's point that the peak near miss on record was caused by a change, not by load.",
+            "source": "https://www.adyen.com/knowledge-hub/partitioning-an-environment-not-individual-tables"
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "function": "counterargument",
+        "controlling_idea": "The usual defense of a system that must not break is to change it rarely, and Larkfield, the fictional platform this book follows, shows where that leads: an integration nobody touched for three years crossed all of its postponed changes in one deploy.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Ledger: the Version Cliff, March 2026: the billing integration was pinned to a three-year-old API version; a forced SDK upgrade moved it across a breaking release; subscription revenue reports were wrong for 6 days.",
+            "shows": "Avoided change accumulates and arrives at once.",
+            "source": "scenario ledger"
+          }
+        ],
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "The six minutes in which a small, bounded change failed payments.",
+          "introduces": "The opposite instinct, changing rarely, and its cost at Larkfield.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "function": "claim",
+        "controlling_idea": "A money path can take hundreds of changes a day when each is first exposed to a bounded share of live traffic, is withdrawn automatically when its metrics deviate and has a tested way back; because 1% of traffic is still real payments, the author's rule is that a change is finished only when the records agree after it.",
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "Two ways to be hurt by change: a bounded one that still failed payments and an avoided one that arrived all at once.",
+          "introduces": "The thesis: bounded, withdrawable, reversible change, and reconciliation as the test that it is done.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "function": "context",
+        "controlling_idea": "This chapter is off the path of Mila's class pass and bears on every step of it: her request at 19:42 was handled by whichever build of each system was live that minute, at Larkfield and at Adyen.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's €120.00 ten-class pass at Studio Noord (on Adyen), Tuesday 9 March 2027 at 19:42.",
+            "shows": "Ties rollout stages to the one request the book follows.",
+            "source": "scenario ledger"
+          }
+        ],
+        "transition_in": {
+          "relationship": "place",
+          "carries_over": "The chapter's claim.",
+          "introduces": "Its position relative to the recurring payment.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p05",
+        "function": "transition",
+        "controlling_idea": "The chapter goes from Larkfield's upgrade through the cost of a bad change, progressive rollout, migrations, the four designs and what each company has published on incidents and engineering choices, to the comparison, Larkfield's May 2027 upgrade and the recovery from a withdrawn rollout.",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "Where the chapter sits.",
+          "introduces": "The order of its sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: An Upgrade That Was Finished When It Deployed",
+      "controlling_idea": "Read as a change and not as a versioning problem, Larkfield's March 2026 upgrade reached all traffic in one step, had no signal that could withdraw it, no rehearsed way back and no check of the records, and was called finished at deploy.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "Poses the chapter's four questions through an incident in which no request failed, so that error metrics alone are shown to be insufficient before any mechanism is named."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The introduction's Version Cliff.",
+        "introduces": "The same incident examined as a deployment.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p06",
+          "function": "context",
+          "organization": "narration",
+          "controlling_idea": "The March 2026 library upgrade, the incident Larkfield calls the Version Cliff, went to every request of the billing integration in one deploy, raised no error and fired no alert, and was found six days later by finance, not by engineering.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger and the chapter 19 addition: the upgraded library carried 2026-02-25.clover; the finance export read the Invoice object's subscription field, removed in 2025-03-31.basil; the export raised no error and filed invoices as one-off sales; reports wrong for 6 days. Priya Raman, Finance Controller, owns the close.",
+              "shows": "A change can be wrong with every technical signal green; the first detector was a person reading a report.",
+              "source": "scenario ledger; [[payment-api-versioning]] owns the versioning detail"
+            }
+          ]
+        },
+        {
+          "id": "p07",
+          "function": "analysis",
+          "controlling_idea": "Femke de Graaf's 2027 review asked four questions of that deploy, and it had an answer to none: what share of traffic it reached first, which signal would have withdrawn it, what the way back was and whether it had been tried, and which check showed afterwards that the records were right.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Femke de Graaf leads Keel; K7: versions are upgraded on a calendar, tested against recorded traffic (ledger).",
+              "shows": "Turns the incident into the four questions that order the chapter: exposure, withdrawal, way back, records.",
+              "source": "scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What the deploy did.",
+            "introduces": "The four questions the review asked, which the chapter answers in order.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "problem",
+      "heading": "Why a Money Path Cannot Stop Changing, and What a Bad Change Costs",
+      "controlling_idea": "Change is the usual trigger of payment outages and cannot be avoided by changing rarely; a bad change does three kinds of damage (failed payments, unknown outcomes, wrong records), and only the first shows on an error graph.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S5"
+        ],
+        "how": "Establishes change as the cause behind the part's incidents, refutes the freeze as a defense and names the damage that the rest of the chapter bounds."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "The cause comes first, then the tempting defense and why it fails, then the damage sorted by how visible it is, because the third kind of damage is the reason for the chapter's last rule."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Femke's four questions.",
+        "introduces": "Why they matter more on a money path than elsewhere.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p08",
+          "function": "evidence",
+          "controlling_idea": "The incidents this part has cited were set off by changes: Stripe's 2023 letter says so in general, and its 2019 and 2024 incidents and Adyen's partition near miss are each a change that went wrong.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe 2023 annual letter (published 2024-03-13): 'many outages at internet companies are in some way triggered by a change gone wrong'.",
+              "shows": "The provider itself names change as the usual trigger.",
+              "source": "Stripe 2023 annual letter, section 'How we engineer for reliability', published 2024-03-13, https://stripe.com/annual-updates/2023"
+            },
+            {
+              "kind": "case",
+              "what": "Stripe RCA of 10 July 2019: 'two different database bugs and a configuration change interacted in an unforeseen way'; the database minor version had been installed three months earlier. Adyen (2025-09-16): incident number 2016, an automatically added partition before December.",
+              "shows": "Three of the part's incidents trace to a version upgrade, a configuration change or an automated schema change.",
+              "source": "Stripe, 'Root cause analysis: significantly elevated error rates on 2019-07-10', published 2019-07, https://stripe.com/rcas/2019-07-10 (evidence age: 7 years)"
+            }
+          ]
+        },
+        {
+          "id": "p09",
+          "function": "refutation",
+          "controlling_idea": "Changing rarely, through release windows (fixed times at which changes may go out) and freezes (periods in which none may), does not remove the risk: a payment system has no quiet hour in which to change, both companies describe changing live systems without maintenance windows, and a rarer release is also a larger one.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (2017, evidence age 9 years): 'We perform all infrastructure upgrades online, rather than relying on planned maintenance windows.' Adyen (2024-01-19, 'Maintenance under pressure'): 'Our tables are being used 24/7, so there is no such thing as \"outside office hours.\"' Adyen (2018, evidence age 8 years): a large group committing code 'brings an element of risk to each deployment as all of this new functionality is activated at once'; live deployment likened to 'changing the wheels on a moving car'. Stripe Sessions talk (2024-04-25): 'today's Sessions, there's no code freeze', said of the conference day.",
+              "shows": "Both companies state that there is no window to stop in, and Adyen states the risk of batching.",
+              "source": "Stripe, 'Online migrations at scale', Jacqueline Xu, 2017-02-02, https://stripe.com/blog/online-migrations (evidence age: 9 years); https://www.adyen.com/knowledge-hub/maintenance-under-pressure; Adyen, 'From 0 to $100 billion: Scaling infrastructure and workflow at Adyen', Michiel Toneman, 2018-01-03, https://www.adyen.com/knowledge-hub/from-0-100-billion-scaling-infrastructure-and-workflow-at-adyen (evidence age: 8 years); https://stripe.com/sessions/2024/building-a-culture-of-system-reliability"
+            },
+            {
+              "kind": "reasoning",
+              "what": "A release that carries a month of changes makes the cause of a failure hard to find and the rollback take the other changes with it.",
+              "shows": "Why small and frequent is the safer shape, as the author's reasoning."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Change as the trigger.",
+            "introduces": "The defense of changing rarely, and why it does not hold.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "function": "definition",
+          "controlling_idea": "A bad change on a money path does three kinds of damage: payments that fail, payments left with an unknown outcome when the code handling them is withdrawn mid-request, and records that are written wrong without any request failing; error metrics see only the first.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "A failed payment returns an error and is counted. A request in flight when an instance is withdrawn may have reached the provider without its answer being stored (the unknown outcome of [[idempotency-and-retries]]). A wrong record, as in the Version Cliff, returns success.",
+              "shows": "Sorts the damage by visibility and prepares the claim that a rollout's own metrics cannot close a change."
+            },
+            {
+              "kind": "figure",
+              "what": "Conceptual figure: an aircraft in flight with four engines, a mechanic swapping one small part on one engine while the others run; a gauge panel watches the engines and a ledger book on board is out of the gauges' view.",
+              "shows": "Makes the chapter's two ideas memorable: bounded exposure, and a record the gauges do not watch."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Change that cannot be avoided.",
+            "introduces": "What a bad change costs, sorted by what monitoring can see.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "rollout",
+      "heading": "Progressive Rollout: Bounding How Much Traffic a Mistake Reaches",
+      "controlling_idea": "A progressive rollout bounds a mistake by exposing each change to a rising share of live traffic and withdrawing it on deviating metrics; Stripe described this in 2024 and Adyen described gating features in 2018, and Stripe's own incidents show the two limits: 1% is real payments, and the way back can fail.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S1",
+          "S2",
+          "S4"
+        ],
+        "how": "Gives the documented mechanism at each company with dates, then its two documented limits, then where the record stops."
+      },
+      "flow": {
+        "pattern": "assertion_evidence_reasoning",
+        "rationale": "Terms first, then Stripe's account because it is the fuller and newer one, then its limit from the same source, then Adyen's older account and where the record stops, then the rollback, which presupposes the reader knows what is being rolled back."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "The three kinds of damage.",
+        "introduces": "The mechanism that bounds the first two.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p11",
+          "function": "definition",
+          "controlling_idea": "A progressive rollout releases a change to a small share of live traffic and widens the share only while metrics stay healthy, and a feature flag separates deploying code from switching its behavior on; each stage catches something the one before cannot.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Stages: automated tests; pre-production with synthetic traffic; test-mode traffic; one machine; rising shares of live traffic; full traffic. Columns: who is exposed; what it can catch; what it cannot. The author's analysis, using the stages Stripe's 2023 letter names.",
+              "shows": "Shows why stages exist: each has a blind spot the next one covers, and the last column of the last row is wrong records."
+            }
+          ]
+        },
+        {
+          "id": "p12",
+          "function": "evidence",
+          "controlling_idea": "Stripe's 2023 annual letter, published in March 2024, describes about 400 deployments a day to one core API service, each tested, tried in pre-production (including whether it can be undone), sent to test-mode traffic and one machine, then to 0.5%, 1%, 5% and 20% of live traffic, watched on 55,000 metrics and withdrawn automatically.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe 2023 annual letter: 'approximately 400 times in a typical day'; 'a battery of around 1.4 million tests'; pre-production is 'a mock production environment with synthetic API traffic' where 'we check that the change can not only be safely rolled out to production, but also that it can be safely undone if required'; 'a single production machine with a small sliver of traffic, before gradually advancing to 0.5%, then 1%, then 5%, then 20%, and so on'; 'We roll all changes out to test-mode API traffic before hitting live-mode traffic'; 'Each progressive rollout is inspected against 55,000 different metrics. If at any moment the system detects anomalous telemetry, the machines running the new code are automatically withdrawn from the pool and traffic is redirected to machines running an older, known-good version.'",
+              "shows": "The only public description of Stripe's deployment system: bounded exposure, automatic withdrawal and a rehearsed undo, in the company's words.",
+              "source": "Stripe 2023 annual letter, section 'How we engineer for reliability', published 2024-03-13, https://stripe.com/annual-updates/2023"
+            },
+            {
+              "kind": "figure",
+              "what": "Structure figure: a pipeline left to right of tests, a rehearsal environment, a test-traffic lane, one machine, then widening lanes labeled 0.5%, 1%, 5%, 20%, a monitor above and a return arrow labeled Withdraw.",
+              "shows": "Shows the stages and the automatic way back in one picture."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The stages in general.",
+            "introduces": "The one public account of them at Stripe.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p13",
+          "function": "analysis",
+          "controlling_idea": "The same letter gives the limit of the mechanism: on 8 February 2024 an erroneous change got as far as 1% of the critical tier, and in those six minutes payments failed, so a stage bounds the damage and does not remove it; the letter does not say what stopped the change.",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "Stripe 2023 annual letter: 8 February 2024, 21:46 to 21:52 UTC; 'an erroneous change rolled out all the way to 1% of the critical tier of traffic'; 'the three most impacted users had 39, 15, and 12 payments fail'; 'multiple problems had to coincide for users to be impacted'. No separate root-cause analysis was found; 'critical tier' is not defined in the letter.",
+              "shows": "One percent of a payment provider's traffic is real payments; the letter itself reports the residue.",
+              "source": "Stripe 2023 annual letter, section 'How we engineer for reliability', published 2024-03-13, https://stripe.com/annual-updates/2023"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The pipeline as designed.",
+            "introduces": "What it let through on one evening.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p14",
+          "function": "evidence",
+          "controlling_idea": "Adyen's 2018 account describes a different gate: everyone develops on one main line, a release branch is stabilized and pushed to production, and features are then switched on one by one and tried on a small share of traffic; Adyen states weekly releases of its core system, a different unit from Stripe's deployments to one service, so the two companies' frequencies cannot be compared.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen (2018-01-03, evidence age 8 years): 'everybody develops on the main line'; 'When we want to do a new release, we create a new branch, which we stabilize, and once it gets pushed to production, the old branch is terminated'; 'a centralized and systematic approach to the separation of code deployment and activation'; 'we toggle features one-by-one on production, and then canary them'. Adyen (2021-02-24, evidence age 5 years), one team: 'Our team has weekly release cycles'. Adyen infrastructure page (n.d., accessed November 2026): 'we publish new releases of our core system every week'. No newer platform-wide description of the release model was found.",
+              "shows": "Adyen documents gating the feature after a batched release; the record is old and partial, which is why no frequency comparison is made.",
+              "source": "Adyen, 'From 0 to $100 billion: Scaling infrastructure and workflow at Adyen', Michiel Toneman, 2018-01-03, https://www.adyen.com/knowledge-hub/from-0-100-billion-scaling-infrastructure-and-workflow-at-adyen (evidence age: 8 years); https://www.adyen.com/knowledge-hub/the-adyen-way-of-engineering--engineers-as-designers-architects-coders-and-testers"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Stripe gating the deployed code by traffic share.",
+            "introduces": "Adyen gating the feature, and where its public record stops.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p15",
+          "function": "analysis",
+          "controlling_idea": "A rollback is itself a change and can fail: Stripe's 2019 root-cause analysis reports that the revert made during the first outage of 10 July caused the second, which is why the 2023 letter's pre-production stage checks that a change can be undone.",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "Stripe RCA (2019-07, evidence age 7 years): API severely degraded 16:35 to 17:02 UTC and 21:14 to 22:47 UTC; 'our revert to a known stable version interacted poorly with a recently-introduced configuration change to the production shards'; remediation includes 'further procedures and tooling to increase the safety with which operators can make rapid configuration changes during incident response'. Stripe's 2024 post describes its database platform five years later.",
+              "shows": "The way back was the cause of the longer outage; an untested rollback is an untested deployment.",
+              "source": "Stripe, 'Root cause analysis: significantly elevated error rates on 2019-07-10', published 2019-07, https://stripe.com/rcas/2019-07-10 (evidence age: 7 years)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Withdrawal as the safety of a rollout.",
+            "introduces": "The documented case in which the withdrawal was the failure.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "migrations",
+      "heading": "Migrations Without Downtime: Two Paths Until a Comparison Passes",
+      "controlling_idea": "Stored data cannot be rolled back by redeploying code, so a migration is made safe by keeping the old and the new path both working and comparing them before the old one is removed; Stripe has published this at the application level (2017) and the storage level (2024), Adyen at the database level (2018 to 2025).",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S4"
+        ],
+        "how": "Extends bounded, reversible change from code to data with each company's dated cases, and says which kind of migration Adyen has not described."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The reason data differs from code comes first; the 2017 pattern is the simplest statement of two paths and a comparison; the 2024 case shows the same shape one level down; dark launch generalizes the comparison step; Adyen's cases come last because they are database-level and need the vocabulary built before them."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "Code, which can be withdrawn by routing traffic back to the old version.",
+        "introduces": "Data, which the old version must still be able to read after the new one has written it.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p16",
+          "function": "definition",
+          "controlling_idea": "A zero-downtime migration changes a schema or moves data while requests continue, and it is harder than a code rollout because data written by the new code remains after the code is withdrawn.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Routing traffic back to old machines undoes a code change; it does not undo rows the new code wrote in a shape the old code cannot read. A reversible migration therefore keeps every intermediate state readable by both versions.",
+              "shows": "States the constraint that the four-step pattern answers."
+            }
+          ]
+        },
+        {
+          "id": "p17",
+          "function": "process",
+          "controlling_idea": "Stripe's 2017 account gives the pattern in four steps (write to both stores, move the reads, move the writes, remove the old data) and compares the two read paths in production before trusting the new one.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (2017-02-02, evidence age 9 years; whether the same tooling is used today is not public): the '4 step dual writing pattern': 'Dual writing to the existing and new tables to keep them in sync', 'Changing all read paths in our codebase to read from the new table', 'Changing all write paths in our codebase to only write to the new table', 'Removing old data that relies on the outdated data model'; the example moved 'hundreds of millions of Subscriptions objects'; reads verified with GitHub's Scientist, 'alerting you if two expressions ever yield different results in production'.",
+              "shows": "Each step is reversible until the last, and the comparison is what licenses the next step.",
+              "source": "Stripe, 'Online migrations at scale', Jacqueline Xu, 2017-02-02, https://stripe.com/blog/online-migrations (evidence age: 9 years)"
+            },
+            {
+              "kind": "figure",
+              "what": "Structure figure in four panels: an application and two stores, old and new; panel 1 writes to both, panel 2 reads move to the new store with a compare symbol between the stores, panel 3 writes go only to the new store, panel 4 the old store is removed.",
+              "shows": "Shows where the comparison sits and that only the last step cannot be undone."
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The constraint on data changes.",
+            "introduces": "The published pattern that meets it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p18",
+          "function": "evidence",
+          "controlling_idea": "Stripe's 2024 account of moving data between database shards has the same shape one level down: changes are replicated in both directions so that traffic can be sent back, a snapshot comparison precedes the switch, and the switch takes under two seconds and is absorbed by retries.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (2024-06-06): mutations 'get replicated bidirectionally'; 'We made this design choice to provide the flexibility to revert traffic to the source shards if any issues emerge'; 'a comprehensive check for data completeness and correctness by comparing point-in-time snapshots'; 'The entire traffic switch protocol takes less than two seconds to execute, and all failed reads and writes directed to the source shard succeed on retries.'",
+              "shows": "Seven years after the 2017 post the same three properties are designed in: two live paths, a comparison, a way back.",
+              "source": "Stripe, 'How Stripe's document databases supported 99.999% uptime with zero-downtime data migrations', 2024-06-06, https://stripe.dev/blog/how-stripes-document-databases-supported-99.999-uptime-with-zero-downtime-data-migrations; [[payment-data-stores-and-consistency]] owns the sharding detail"
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "Dual writing at the application level.",
+            "introduces": "The same shape at the storage level, in a current source.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p19",
+          "function": "definition",
+          "controlling_idea": "A dark launch runs the new code on real traffic without letting its result reach the customer, which generalizes the comparison step; on a money path the shadow may read and compute, and it may not send a second instruction to move money.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (2017-03-30, evidence age 9 years): 'Dark launch each rate limiter to watch the traffic they would block.' The Scientist experiment of the 2017 migration post is a dark read.",
+              "shows": "Both published uses observe what the new code would do without acting on it.",
+              "source": "https://stripe.com/blog/rate-limiters; Stripe, 'Online migrations at scale', Jacqueline Xu, 2017-02-02, https://stripe.com/blog/online-migrations (evidence age: 9 years)"
+            },
+            {
+              "kind": "reasoning",
+              "what": "A shadow copy of a 'create payment' call that reached a provider would charge the customer again; shadowing on a money path is therefore done against recorded traffic or in the provider's test environment, or stops before the provider call. Industry practice and the author's judgement, not a documented practice of either company.",
+              "shows": "Names the limit of dark launching that is specific to payments."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The comparison inside a migration.",
+            "introduces": "The comparison as a technique of its own, and its limit where money moves.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "function": "evidence",
+          "controlling_idea": "Adyen's published cases of change without downtime are at the database level: a 2018 major-version upgrade behind a queue that kept accepting payments, a 2024 rule that maintenance may not lock a table for more than a few seconds, and a 2025 account of a partition change that nearly failed a critical database before a December season; no Adyen account of an application-level migration pattern was found.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen (2018-03-14, evidence age 8 years): 'we can stop traffic to our PostgreSQL databases, queue the transactions, and run a PostgreSQL update without affecting payments acceptance'. Adyen (2024-01-19): 'In most cases, it is not possible to lock the table for more than a few seconds.' Adyen (2025-09-16): 'automatically adding one more partition to an already partitioned table would bring one of our most critical databases to its knees'; 'We partitioned individual tables, not the environment.'",
+              "shows": "Adyen's documented way to change the database is to let the books wait behind a queue while the edge answers, and its near miss was an automated schema change.",
+              "source": "https://www.adyen.com/knowledge-hub/updating-a-50-terabyte-postgresql-database; https://www.adyen.com/knowledge-hub/maintenance-under-pressure; https://www.adyen.com/knowledge-hub/partitioning-an-environment-not-individual-tables"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Stripe's application-level and storage-level accounts.",
+            "introduces": "Adyen's database-level accounts, and the kind it has not published.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "designs",
+      "heading": "Four Ways to Limit a Change, and What Each Costs",
+      "controlling_idea": "Release windows, rollout by traffic share, flag-gated activation and dark launch each bound a different thing and miss the same thing, a record that is wrong without an error, which only a reconciliation after the change detects.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S1",
+          "S5"
+        ],
+        "how": "Turns the documented mechanisms into designs a reader can choose between, shows that none of the four closes a change by itself and names reconciliation as the step that does."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "The mechanisms as each company described them.",
+        "introduces": "The same mechanisms as four designs with their costs.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p21",
+          "function": "comparison",
+          "controlling_idea": "The four designs differ in what they bound (when a change happens, how much traffic it reaches, which behavior is on, whether the result counts) and none of them detects a record that is wrong without an error; that takes a fifth step after the change, a reconciliation that compares the system's records with the provider's and with the ledger.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows: release window or freeze; rollout by traffic share; flag-gated activation; dark launch against recorded or live traffic. Columns: what it bounds; what it cannot catch; what it costs; when it is the right choice. The author's analysis.",
+              "shows": "The last gap in every row is the same: silent wrong records, which only a comparison of records closes."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "incidents-and-culture",
+      "heading": "Incidents, Postmortems and the Engineering Choices Behind Them",
+      "controlling_idea": "What each company has shown in public about incidents is small (two root-cause analyses (an outage in 2019, a data exposure at a vendor in 2020) and one paragraph at Stripe, one incident update and a follow-up at Adyen), and the engineering-culture facts each has stated are similar for software and opposite for hardware.",
+      "function": "evidence",
+      "advances_thesis": {
+        "supports": [
+          "S4"
+        ],
+        "how": "Completes the documented record the comparison table draws on: postmortems, language and repository, build or buy, hosting."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "Incident practice first because it follows from the failures just discussed; then the two culture facts, language and repository before build-or-buy, because the second explains the hosting difference the comparison ends on."
+      },
+      "transition_in": {
+        "relationship": "sequence",
+        "carries_over": "How a change is bounded.",
+        "introduces": "What each company does and publishes when one gets through, and the engineering choices that shape its changes.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p23",
+          "function": "evidence",
+          "controlling_idea": "A postmortem is a written account of what failed, why and what will change, and public ones are rare at both companies: Stripe has published two root-cause analyses (an outage in 2019, a data exposure at a vendor in 2020) and one paragraph (2024), Adyen one incident update and a follow-up, both about a denial-of-service attack in April 2025, with the detailed review promised to customers only.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: the RCA of 10 July 2019; the paragraph on 8 February 2024 in the 2023 letter; Sessions talk (2024-04-25): 'Incident reviews are not done by some central SRE team. They're done by the service-owning engineering team'; 2023 letter: 'we inspect every incident manually', 'On average, 520 calls per day go out to our staff'. Adyen (2025-04-21), on the DDoS attack of 21 April 2025: 'A detailed post-incident review, including root cause analysis and long term prevention measures, will be made available to our customers'; follow-up 'Strengthening our platform resilience' (2025-10-31).",
+              "shows": "Both describe internal review; neither has a standing practice of public postmortems, so an integrator has to ask.",
+              "source": "Stripe, 'Root cause analysis: significantly elevated error rates on 2019-07-10', published 2019-07, https://stripe.com/rcas/2019-07-10 (evidence age: 7 years); Stripe 2023 annual letter, section 'How we engineer for reliability', published 2024-03-13, https://stripe.com/annual-updates/2023; https://www.adyen.com/knowledge-hub/mitigating-a-ddos-april-2025; https://www.adyen.com/knowledge-hub/strengthening-our-platform-resilience"
+            }
+          ]
+        },
+        {
+          "id": "p24",
+          "function": "evidence",
+          "controlling_idea": "Both companies have stated that most of their code is in one language and one large repository (Ruby at Stripe, Java at Adyen), and both have published test selection as the price of keeping that workable.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe (2026-04-09): 'our monorepo is the order of 50 million lines of Ruby code', 'roughly 100,000 Ruby test files and approximately 1.2 million test units'; Go proxies (2024, 2026) beside it. Adyen (2021-07-28, evidence age 5 years): 'a single platform, in a single repository (monorepo), almost exclusively written in Java'; (2026-08-23): 'Our monorepo alone runs to hundreds of thousands of files, and it's far from the only one'; 'Test selection at Adyen' (2024-09-23).",
+              "shows": "The same choice at both, and the same tooling cost; the reading that one repository means one pipeline for every change is the author's inference.",
+              "source": "https://stripe.dev/blog/selective-test-execution-at-stripe-fast-ci-for-a-50m-line-ruby-monorepo; https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture; https://www.adyen.com/knowledge-hub/architect-blog-1; https://www.adyen.com/knowledge-hub/test-selection-at-adyen"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "Who reviews an incident.",
+            "introduces": "The shared code base those teams change.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p25",
+          "function": "comparison",
+          "controlling_idea": "On software both companies build in-house or on open source where the core flow is concerned, and on hardware they chose opposite: Stripe rents cloud capacity from Amazon Web Services and Adyen runs its own infrastructure in data centers.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen (2021, evidence age 5 years): for core flows 'we never choose a proprietary solution because we want to have full control'; 'We manage our own infrastructure in several data centers around the world'; (2023-10-30) 'At Adyen, we use open-source software or we build in-house'; H1 2026 results (2026-08-13): 'The majority of our CapEx is invested in data centers.' Stripe (2026-08-26), on replacing Envoy with its own proxy: 'It's a little counterintuitive that building something in-house would be more reliable than operating a battle-tested open-source project'; (2023-01-23, evidence age 3 years) 'Stripe has long relied on AWS to provide the core compute infrastructure on which Stripe is built.'",
+              "shows": "The documented culture facts that bear on change: who controls the code being changed and who owns the machines it runs on.",
+              "source": "https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture; https://www.adyen.com/knowledge-hub/implementing-service-level-objectives; https://www.adyen.com/press-and-media/adyen-publishes-h1-2026-financial-results-3wjne; https://stripe.dev/blog/building-a-data-plane-from-scratch-stripes-own-high-performance-distributed-proxy; https://stripe.com/newsroom/news/amazon-and-stripe"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "One language and one repository.",
+            "introduces": "What each builds, adopts and rents.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "The documented difference is what each company describes gating (deployed code by traffic share at Stripe in 2024, features at Adyen in 2018) and who owns the hardware; frequency cannot be compared, and neither has published a check of money correctness tied to a deployment.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S4",
+          "S5"
+        ],
+        "how": "The required comparison: documented facts per aspect, 'Not public' where they stop, the reading marked as inference, and the statement AC-3 requires."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "Rollout, migration, incident and culture facts as each company published them.",
+        "introduces": "The two set side by side.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p26",
+          "function": "comparison",
+          "controlling_idea": "Aspect by aspect the two companies are documented to different depths and dates, which rules out a comparison of deployment frequency and leaves one row, a check of money correctness tied to a deployment, empty for both.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows: deployment frequency; what is gated; data change without downtime; public incident accounts; language and repository; software and hardware; check of money correctness tied to a deployment. Columns: Stripe, Adyen, what the difference suggests (the author's inference).",
+              "shows": "Every cell is a fact cited in the three preceding sections or 'Not public'; the frequency row says why no comparison is made."
+            }
+          ]
+        },
+        {
+          "id": "p27",
+          "function": "recommendation",
+          "controlling_idea": "With either provider the integrator cannot see or schedule the provider's changes, so it measures payment success on its own side, asks under contract for incident reviews, and treats reconciliation after its own changes as its own job, since neither company documents doing it for a deployment.",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The differences and the empty row.",
+            "introduces": "What an integrator does on each, and the statement that reconciliation after change is the author's recommendation.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: The May 2027 Upgrade as a Staged Change",
+      "controlling_idea": "A team of Larkfield's size takes the stages and the comparison, not the provider's scale, and under K7 its May 2027 Stripe upgrade answers Femke's four questions: a dark run against recorded traffic that compares the finance export, a first stage of 62 studios behind a flag, a way back tried before the first stage, and a close only after a month's reports reconcile.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S1",
+          "S3",
+          "S5"
+        ],
+        "how": "Works the practice with ledger numbers at a scale a reader's team has, and shows the step that would have caught the Version Cliff in a day."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The steps are told in the order they are carried out, because each one licenses the next and the old path may be removed only after the last."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The recommendation that reconciliation after a change is the integrator's job.",
+        "introduces": "What a small team takes from the providers, and one upgrade at Larkfield carried out that way.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p22",
+          "function": "recommendation",
+          "controlling_idea": "For a team of Larkfield's size the transferable parts are a first stage small enough to count by hand, one signal that withdraws, a way back that has been tried and a comparison of records; a provider's 55,000 metrics and 400 deployments a day answer a scale it does not have.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Ledger: Larkfield's payments team has 11 engineers. Stripe 2023 letter: 55,000 metrics, about 400 deployments a day to one core API service.",
+              "shows": "Sets the provider's tooling beside the team that would copy it (the Borrowed Blueprint).",
+              "source": "scenario ledger; Stripe 2023 annual letter, section 'How we engineer for reliability', published 2024-03-13, https://stripe.com/annual-updates/2023"
+            }
+          ]
+        },
+        {
+          "id": "p28",
+          "function": "process",
+          "organization": "process",
+          "controlling_idea": "The upgrade starts dark: recorded requests are replayed at the new version in a Stripe sandbox and the finance export is built from both sets of responses for one closed month and compared line by line, which is the step that would have shown the Version Cliff's missing field in a day.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger K7 and the chapter 19 addition: one planned upgrade per provider per half-year, tested against recorded traffic; Tom Hendriks runs the upgrades, Stripe in May and November. New here: the comparison includes the finance export built from April 2027's recorded responses in both shapes, and it must agree in invoice count and in total. Studio subscriptions are €24.5M a year (ledger), about €2.04M a month.",
+              "shows": "The dark run compares the record a person reads, not only the response shape; the March 2026 failure was in exactly that record.",
+              "source": "scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The four parts a small team should take.",
+            "introduces": "The first of them at Larkfield: the comparison, run dark.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p29",
+          "function": "process",
+          "controlling_idea": "The live change is staged by studio: the pull request adds the new version beside the old and a flag chooses per studio, first for 62 of the 6,200 studios the integration bills (1%), then 10%, 50% and all, with the flag switched off and on once in the sandbox before the first stage.",
+          "evidence": [
+            {
+              "kind": "statistic",
+              "what": "Ledger: 6,200 studios, all billed for their Larkfield subscription through Stripe Billing whichever provider carries their members' payments; 1% is 62 studios. Stage sizes and the one-day pause between stages are Larkfield's settings (assumptions). The withdrawal signals are the error rate of Stripe calls for flagged studios and any difference in the nightly comparison of their export lines.",
+              "shows": "Exposure, withdrawal signal and a tested way back, at a size where the first stage can be read by a person.",
+              "source": "scenario ledger; labeled assumptions"
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe documentation as cited in [[payment-api-versioning]]: dynamically typed SDKs accept an explicit version per request.",
+              "shows": "The per-studio flag relies on a documented provider behavior.",
+              "source": "[[payment-api-versioning]]"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The dark comparison passing.",
+            "introduces": "The staged exposure and its way back.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p30",
+          "function": "recommendation",
+          "controlling_idea": "The change stays open after the flag reaches every studio: it is closed, and the old version and the flag are deleted, only when the reconciliation job (run when each provider's reports are ready) has shown no new open item from the change and the May close ties the finance export to Stripe's own report.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger K3 and the chapter 15 addition: the reconciliation job, run when each provider's reports are ready, covers both providers; unmatched amounts are open items with an owner; Priya Raman owns the close. New here: under Keel a change to a money path has an owner and stays open until a named reconciliation passes.",
+              "shows": "Finished means the records agree for a full reporting period, which is the author's rule applied.",
+              "source": "scenario ledger"
+            },
+            {
+              "kind": "figure",
+              "what": "Conceptual figure: a running track with a dashed line labeled 100% that a runner has passed, and the real finish line further on, beside a balance scale with two stacks of documents level, labeled Records agree.",
+              "shows": "Fixes the chapter's rule: the rollout reaching everyone is not the finish."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The flag at every studio.",
+            "introduces": "What still has to happen before the change is done.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong: After a Rollout Is Withdrawn",
+      "controlling_idea": "A withdrawn rollout is an incident still open: the payments the new code handled must be found, each compared with the provider's record and the ledger, and repaired, and the way back and the leftover flags are failure modes of their own.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S5"
+        ],
+        "how": "Applies the rule to the case the probe of AC-1 poses and gives the detection and recovery steps."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The upgrade that went to plan.",
+        "introduces": "The rollout that is withdrawn, and what remains to do.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p31",
+          "function": "analysis",
+          "controlling_idea": "Ten minutes at 1% is a small number of real payments at Larkfield, about 5 on an ordinary evening and about 90 during the paced renewal run, and each is in one of three states: failed, unknown or recorded wrong.",
+          "evidence": [
+            {
+              "kind": "statistic",
+              "what": "Author's arithmetic from the ledger: 27.6 million online payments a year is about 52.5 a minute, 525 in ten minutes, about 5 at 1%; during the paced renewal run, at the K5 bucket settings of 10 requests a second on Stripe and 5 on Adyen (chapter 21 and 40 additions; assumptions), 15 a second is 9,000 in ten minutes, about 90 at 1%.",
+              "shows": "Small enough to check one by one, and not zero.",
+              "source": "scenario ledger; author's arithmetic"
+            }
+          ]
+        },
+        {
+          "id": "p32",
+          "function": "process",
+          "organization": "process",
+          "controlling_idea": "Recovery has four steps: list the payments the withdrawn build handled, confirm each against the provider's own record, compare each with the ledger, and repair the differences before the change is closed.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "New here: under Keel the payment record store writes the identifier of the build and the flag state on every attempt row, so the list is one query. K2 (ledger, ruling 12): on Stripe the PaymentIntent is re-read; on Adyen, whose Checkout API has no endpoint that returns a payment by its identifier, the confirming record is the webhook and then the settlement report. K1: a resend of an attempt reuses its stored idempotency key. K3: every movement has a ledger entry.",
+              "shows": "Each recovery step uses a Keel mechanism an earlier chapter built; the new part is knowing which payments the build touched.",
+              "source": "scenario ledger; [[idempotency-and-retries]]; [[payment-webhooks-and-events]]; [[payment-ledgers]]"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The three states a touched payment can be in.",
+            "introduces": "The steps that settle each one.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p33",
+          "function": "analysis",
+          "controlling_idea": "Three further failures belong to the mechanisms themselves: a way back that was never tried, a data change the old code cannot read, and flags left in place after the change is done.",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "Stripe RCA (2019): the revert caused the second outage. Stripe (2017): the four-step pattern keeps both stores in sync until reads have moved. Adyen (2018): 'By maintaining ownership over toggling, we automate the process of alerting our developers about cleaning up old code paths'.",
+              "shows": "Each failure has a documented counterpart: test the rollback, expand before you contract, remove the flag.",
+              "source": "Stripe, 'Root cause analysis: significantly elevated error rates on 2019-07-10', published 2019-07, https://stripe.com/rcas/2019-07-10 (evidence age: 7 years); Stripe, 'Online migrations at scale', Jacqueline Xu, 2017-02-02, https://stripe.com/blog/online-migrations (evidence age: 9 years); Adyen, 'From 0 to $100 billion: Scaling infrastructure and workflow at Adyen', Michiel Toneman, 2018-01-03, https://www.adyen.com/knowledge-hub/from-0-100-billion-scaling-infrastructure-and-workflow-at-adyen (evidence age: 8 years)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Recovery after a withdrawal.",
+            "introduces": "Failures of the way back, of data changes and of flags.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "Read together, the five chapters show one asymmetry. What the two providers have documented is what they let give way: lagging books, a write pause of seconds, features cut in one country, a per-account limit, a rollout withdrawn at one percent. What neither has documented (the topology and timing of a failover, cells, which data is replicated synchronously) is the part a merchant cannot verify. A merchant's own reliability therefore rests on three things it can check: the contract, the documented limits, and its own measurement and reconciliation.",
+    "so_what": "The reader plans against the provider's contractual commitment and documented limits, measures payment success on their own side, and treats every outage, peak and deployment as finished only when the records agree, which is the same test the book applies to a single payment.",
+    "callback": {
+      "to": "The six minutes of 8 February 2024 from the opening and, for the part, the two Larkfield first-of-month runs of the part opening.",
+      "how": "The two first-of-month runs from the part opening: 7,900 renewals a day late in October 2026, 1,840 members charged twice in November 2026. Keel's K5 accepts lateness on purpose by pacing renewals over 18 hours, and K1 removes the wrong outcome by deriving the key from the membership, the billing period and the number of the scheduled attempt."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "For each path in your system that moves money, write one line: when the provider is slow, at peak, and during a deploy, what gives way, and which check proves afterwards that the record did not."
+    },
+    "hand_off": {
+      "to": "part-9",
+      "relationship": "example",
+      "carries_over": "The mechanisms of Parts I to VIII, each taught in its own chapter, ending with Part VIII's rule that a money path must be correct before it is available and that a change is verified by reconciliation.",
+      "introduces": "Four single payments followed through all of those mechanisms at once, in the order the payment meets them, to show what passes between them."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The failure modes.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p34",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Established: staged rollout with automatic withdrawal is documented at Stripe (2024) and feature gating at Adyen (2018), a bounded rollout still failed payments on 8 February 2024, a rollback caused an outage in 2019, and dual writing with comparison is the published migration pattern."
+      },
+      {
+        "id": "p35",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Depends on context: how many stages, whether to gate by traffic share or by feature, how long to keep the old path, and whether to freeze before a peak depend on traffic volume, on whether the change touches stored data and on the reporting period.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is settled.",
+          "introduces": "What changes with the situation.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p36",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "The author's synthesis: a change to a money path is finished when the records agree, not when the rollout reaches 100%; neither company has published such a gate, and the rule is the book's test for a single payment applied to a deployment.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is established and what depends.",
+          "introduces": "The author's own position.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p37",
+        "function": "synthesis",
+        "controlling_idea": "Across Part VIII each chapter named what gives way so that the record does not: what the two providers have documented is what they let give way, what neither has documented is what a merchant cannot verify, and Larkfield's two first-of-month runs of 2026, one late and one wrong, show why its Keel decisions on pacing and on idempotency keys choose late on purpose.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Ledger: 1 October 2026, 7,900 renewals delayed to the next day; 1 November 2026, 1,840 members charged twice, €71,300 refunded, 212 disputes; K5 paces renewals over 18 hours; K1 derives the key from the business event.",
+            "shows": "The part opening's two months, now readable as late against wrong.",
+            "source": "scenario ledger"
+          },
+          {
+            "kind": "fact",
+            "what": "Established in chapters 37 to 41 and pointed to here, not re-argued: lagging books (Adyen 2021), a write pause under two seconds (Stripe 2024), features cut in one country (Stripe, India page updated 2023), a per-account limit (Stripe documentation, accessed November 2026), a rollout withdrawn at 1% (Stripe 2024); the topology and timing of a failover, cells and which data is replicated synchronously not public for either (Adyen names regions and states that its load balancers fail over between data centers).",
+            "shows": "The asymmetry the five chapters show together.",
+            "source": "chapters 37 to 41 of this part"
+          }
+        ],
+        "transition_in": {
+          "relationship": "conclusion_summary",
+          "carries_over": "This chapter's take-aways.",
+          "introduces": "The part's closing: the asymmetry between what is documented and what is not, the two Larkfield months and the one-line exercise.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p38",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "Nine questions let the reader test how a team or a provider changes a system that moves money.",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The closing argument.",
+          "introduces": "Questions that apply it.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p39",
+        "function": "transition",
+        "controlling_idea": "Parts II to VIII taught the mechanisms one chapter at a time, ending with the rule that a change is verified by reconciliation; Part IX follows four single payments through all of them at once to show what passes between them.",
+        "transition_in": {
+          "relationship": "example",
+          "carries_over": "The mechanisms and Part VIII's rule.",
+          "introduces": "Four payments followed through all of them.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "How API versions are pinned, released and retired, and the detail of the Version Cliff.",
+      "covered_in": [
+        "payment-api-versioning"
+      ]
+    },
+    {
+      "topic": "Availability targets, failure isolation, graceful degradation and what status pages show.",
+      "covered_in": [
+        "payment-reliability-and-availability"
+      ]
+    },
+    {
+      "topic": "Sharding, the Data Movement Platform in detail, accounting clusters and the outbox.",
+      "covered_in": [
+        "payment-data-stores-and-consistency"
+      ]
+    },
+    {
+      "topic": "Hosting, regions and data residency beyond the one-sentence culture fact.",
+      "covered_in": [
+        "payment-multi-region-and-data-residency"
+      ]
+    },
+    {
+      "topic": "Load testing, capacity and pacing a peak.",
+      "covered_in": [
+        "payment-peak-load"
+      ]
+    },
+    {
+      "topic": "How reconciliation works and what the reports contain.",
+      "covered_in": [
+        "payment-reconciliation-and-reporting"
+      ]
+    },
+    {
+      "topic": "Adyen's 2026 acquisitions and what they change about building in-house.",
+      "covered_in": [
+        "case-adyen"
+      ]
+    },
+    {
+      "topic": "Chaos testing and game days as a subject of their own.",
+      "covered_in": [
+        "payment-reliability-and-availability"
+      ]
+    },
+    {
+      "topic": "Continuous-delivery tooling in general (build systems, deployment orchestrators), which the reader knows."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "Adyen states weekly releases of its core system (infrastructure page, n.d.); whether the 2018 release-branch model still holds is not public; the chapter says so and compares nothing.",
+    "Whether Stripe still uses the 2017 dual-writing tooling (Scientist) is not public.",
+    "'Critical tier of traffic' is not defined in Stripe's 2023 letter; the 2017 rate-limiter post's example of a critical method is creating charges.",
+    "No separate root-cause analysis of 8 February 2024 was found; the letter's paragraph is the whole record.",
+    "Neither company has published a check of money correctness tied to a deployment; Stripe's 2024 Ledger post describes continuous verification, which is not the same thing.",
+    "Adyen's Annual Report 2025 sentence that each incident triggers a root-cause analysis was read by the research brief from a copy that is not the official filing; the chapter does not quote it."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "The chapter is planned at 39 units and about 5,700 words by the checker's count (which includes the three tables and the source list of about 600 words; about 4,900 before Sources), a typical chapter's length, because the fixed elements and the part closing take eleven units and the public record supports one section each on rollout and migration and a combined section on incidents and engineering culture.",
+      "rejected": [
+        "Separate sections for postmortems and for engineering culture, which the evidence would not fill.",
+        "A 2,000 to 3,000 word chapter, which could not carry the part closing and both acceptance probes."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Reconciliation after a change is presented only as the author's recommendation, in the claim paragraph, the comparison section and the synthesis, with the statement that neither company has published such a gate (AC-3).",
+      "rejected": [
+        "Citing Stripe's Ledger post as evidence of a deployment gate, which it does not describe."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Larkfield's 'migration behind the Version Cliff' is told as the March 2026 deploy read as a change (scene) and the May 2027 upgrade as a staged change (in practice); versioning detail stays in chapter 19. New ledger facts: the staged flag by studio (62 of 6,200 studios first), the finance-export comparison in the dark run, the build identifier on attempt rows, and a change staying open until a named reconciliation passes.",
+      "rejected": [
+        "Inventing a schema migration of the payment record store, which the ledger does not contain.",
+        "Naming the Stripe release crossed in May 2027, which would invent a future version."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Dark launch on a money path (the shadow must not move money) is given as industry practice and the author's judgement, since neither company documents shadowing of payment calls.",
+      "rejected": [
+        "Presenting shadow traffic as a documented Stripe or Adyen practice for payments."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The quotation of the 2023 letter uses the US-English edition linked from stripe.com/annual-updates/2023.",
+      "rejected": [
+        "The en-GB PDF, whose wording differs slightly ('most affected users', 'failed payments')."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "_research/brief-reliability-and-scale.md",
+      "contributed": "Part 5 (safe change), sections 1.3, 2.1, 2.2, the blunt table and the open questions."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-companies-and-bets.md",
+      "contributed": "Hosting and capital-expenditure statements; the in-house self-description."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "The Version Cliff, the Renewal Wave, the Double Charge, K1, K2, K3, K5, K7, the cast, studio counts, and the additions of chapters 15, 19 and 21."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/consistency-issues.md",
+      "contributed": "Rulings 12 and 16."
+    },
+    {
+      "kind": "external",
+      "ref": "Pages fetched by the writer on 2026-11-17: Stripe 2023 annual letter (US-English PDF linked from stripe.com/annual-updates/2023); stripe.com/rcas/2019-07-10; stripe.com/blog/online-migrations; stripe.com/blog/rate-limiters; the stripe.dev posts on document databases (2024), selective test execution (2026) and the mesh proxy (2026); the Stripe Sessions 2024 reliability talk; stripe.com/newsroom/news/amazon-and-stripe; Adyen knowledge-hub posts 'From 0 to $100 billion' (2018), 'Updating a 50 terabyte PostgreSQL database' (2018), 'Design to Duty' part 1 (2021), 'engineers as designers, architects, coders and testers' (2021), 'Implementing Service Level Objectives' (2023), 'Maintenance under pressure' (2024), 'Test selection at Adyen' (2024), the DDoS incident update and follow-up (2025), 'Partitioning an environment, not individual tables' (2025), 'We built Architect for humans' (2026); Adyen H1 2026 results release.",
+      "contributed": "Verification of every quotation used."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation pass (parts 6-8): fields copied from the journal spec and unit-level controlling ideas and evidence brought into line with the verified page and the consistency rulings; no unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 75 claims checked (58 confirmed, 7 corrected, 6 hedged, 4 unsupported and removed or relabeled, 0 unreachable); Stripe has two root-cause analyses on its site (2019 outage, 2020 vendor data exposure), not one. Three inline inferences moved into INFERENCE blocks, nine sources added, Adyen's documented peak-day code freeze, continuous releases and four-weekly terminal releases added (rulings 39 and 42), displayed dates applied (ruling 25), reconciliation described as run on the report-ready signal (chapter 15), max_words raised from 5800 to 6100 for the added attributions."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes). Notes acted on: the small-team paragraph moved from the designs section to open the Larkfield upgrade; release windows and freezes are defined where changing rarely is refuted; reconciliation is named in the designs section as the step no design supplies; the Version Cliff is named in the scene; the 2025 Adyen incident is identified as the denial-of-service attack; the part-closing paragraph no longer relies on unglossed labels; the declared reason says what breaks for the incident section and the last section. Not acted on: cutting the paragraph on language and repository, which the journal entry's outcome requires."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "First version, written from the PLAN contract, the journal spec entry and the research briefs."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: absences re-tested with a wide search (documentation and help-center sitemaps, company sites, web search). Overturned: 'no deployment frequency found for Adyen's platform' (Adyen's infrastructure page: new releases of the core system every week); text, table row and p14 updated, one source added. Holds: no check of money correctness tied to a deployment found for either company (cells now name the support sites searched). Locked intent.know sentence 'no platform-wide deployment frequency is public for Adyen' is now too strong and was reported, not edited."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('and that no platform-wide deployment frequency is public for' -> 'and that Adyen's Infrastructure page says it publishes new r')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('each may do both, and no platform-wide deployment frequency ' -> 'each may do both; Adyen states a weekly release of its core ')."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Sweep of rulings 45 to 48: the closing sentence on what neither provider has documented now names the topology and timing of a failover, cells and synchronous replication, since Adyen names its regions and states failover in general terms (45a, 46g); conclusion synthesis and p37 evidence aligned with the part's closing."
+    }
+  ],
+  "length": {
+    "target_words": 5300,
+    "max_words": 6100
+  }
+}

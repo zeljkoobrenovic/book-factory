@@ -1,0 +1,1494 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "payment-compliance-and-regulation",
+  "journal": "payments-platform-architecture",
+  "part": "part-5",
+  "title": "Know Your Customer, Watch the Money: Compliance as a System",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "The duties in outline: verifying a business and its beneficial owners, sanctions and politically-exposed-person screening, transaction monitoring and suspicious-activity reporting, periodic re-verification.",
+        "How Stripe and Adyen each expose verification to a platform: requirements or verification errors, deadlines and capabilities, as documented in November 2026.",
+        "The regulatory dates that matter as of November 2026: DORA in application since 17 January 2025, the EU anti-money-laundering regulation from 10 July 2027, instant payments and verification of payee, and PSD3 and the Payment Services Regulation not yet adopted.",
+        "What neither company publishes: transaction-monitoring scenarios, sanctions-screening logic, re-verification intervals."
+      ],
+      "believe": [
+        "Onboarding is the first run of a loop: an account that was fully enabled can become restricted later without the seller doing anything.",
+        "A provider's verification does not discharge a platform's own obligations, and a missed deadline shows up as stopped payouts."
+      ],
+      "can_do": [
+        "Design a platform's handling of verification as mirrored state: requirements, deadlines, capability status, an owner for each deadline, and a way to tell the seller.",
+        "Given a seller whose payouts stopped, list the causes the providers' documented models allow and where to look.",
+        "Tell apart fraud scoring and anti-money-laundering monitoring by timing and output.",
+        "Place a regulatory change on the calendar with its status: in application, adopted with a future date, or not adopted."
+      ]
+    },
+    "audience": {
+      "who": "A software engineer or architect who builds a platform on a payment provider and has met verification only as a sign-up flow.",
+      "already_knows": [
+        "Webhooks as notifications that can be late, repeated or missing, and the rule to confirm against the provider's record (payment-webhooks-and-events).",
+        "Fraud scoring in the authorization path and its outputs (payment-fraud-and-risk); authentication and liability shift (three-d-secure-and-sca).",
+        "That only a licensed institution may hold customers' money, and which licenses Stripe and Adyen state they hold (licences-and-safeguarding).",
+        "Payouts and their states (payouts-and-money-movement)."
+      ],
+      "does_not_know": [
+        "KYC, KYB, beneficial owner, sanctions screening, politically exposed person, transaction monitoring, suspicious-activity report, financial intelligence unit, obliged entity.",
+        "Capability, requirement and verification deadline as account state, in either provider's vocabulary.",
+        "DORA, the instant-payments regulation, verification of payee, the EU AML Regulation and the status of PSD3 and the Payment Services Regulation."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a seller whose payouts stop long after onboarding with no action on the seller's part, the reader names at least two causes consistent with the documented models and what the platform should have had in place.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A marketplace for second-hand furniture onboarded a seller a year ago, and payouts have worked ever since. This morning the seller's payouts stopped. The seller changed nothing. Name two explanations that fit how payment providers handle verification, and say what the marketplace should have had in place.",
+        "expected": "Two of: a requirement changed or a new one became due and its deadline passed; the seller crossed a volume or time threshold that needs more information; a periodic review asked the seller to confirm its data; a sanctions, ownership or other compliance review opened. The marketplace should store each seller's outstanding requirements, deadlines and capability status from the provider's API and webhooks, show them to the seller, and have a named owner and a monitored channel for every deadline."
+      },
+      {
+        "id": "AC-2",
+        "statement": "Given a proposal to reuse the fraud engine for money-laundering monitoring, the reader states how the two differ in timing and output.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "minor",
+        "probe": "An engineer proposes to detect money laundering with the same component that scores payments for fraud during authorization (the real-time request to the cardholder's bank). Give two ways in which the two jobs differ.",
+        "expected": "Fraud scoring decides in milliseconds on one payment and its output is allow, block or challenge. Money-laundering monitoring looks at behavior over days or weeks after the fact, and its output is a case for a person, possibly a confidential report to an authority or a freeze, which the customer may not be told about. They can share data; they should not share a decision path."
+      },
+      {
+        "id": "AC-3",
+        "statement": "The chapter states that neither Stripe nor Adyen publishes how it monitors transactions or screens against sanctions lists, and labels its own account of those systems as reference-architecture inference.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      },
+      {
+        "id": "AC-4",
+        "statement": "The chapter's conclusion performs the part's closing: it connects the five controls to one another, returns to the Card-Testing Weekend beside the Frozen Studios, and hands off to billing.",
+        "check": "conclusion_synthesizes_and_answers_so_what",
+        "method": "rubric",
+        "severity": "major"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "What must a payment company know about its customers and their transactions, and how does that become software?",
+    "claim": "A payment company must know who each business it serves and pays is, who owns and controls it, whether any of them is under sanctions, and whether its transactions look like money laundering, and it must keep knowing this for as long as it serves that business; in software the verification duties become state on an account, made of requirements with deadlines that switch capabilities such as payouts on and off, and that state can change months after onboarding without the customer doing anything. How the monitoring of transactions becomes software is not public for Stripe or Adyen.",
+    "disputed_by": "The view that compliance is an onboarding form: identity is checked once at sign-up, the provider takes care of it, and an approved seller stays approved.",
+    "so_what": "A platform that embeds payments must store and display each seller's verification state and give every deadline an owner, because the provider enforces a missed requirement by stopping the seller's payouts, and the provider's checks do not replace the platform's own legal duties.",
+    "how_why": "The duties are continuous by law: sanctions lists change and must be re-checked on new designations, ownership changes, and the EU regulation that applies from 10 July 2027 caps the interval between reviews at one year for higher-risk customers and five years for others. A one-time record cannot satisfy that, so both providers model verification as account state that gates capabilities and deliver changes by webhook. Stripe's documentation (n.d., accessed November 2026) lists requirements as currently due, eventually due and past due against a deadline, announces rule changes in a 'future_requirements' structure, and warns: 'Don't rely on Stripe's verification to meet any independent legal KYC or verification requirements.' Adyen's documents capabilities with a verification status, standard deadlines of 30 or 60 days, and a periodic data review as an API flow; Stripe's own periodic re-verification is announced (support article, last updated October 2026) and in preview, and Adyen announces rule changes in release notes without an API structure. That difference, Stripe exposing rule changes in its API and Adyen the periodic review, is what the public record shows. How either company monitors transactions or screens against sanctions lists, and at what intervals it re-verifies, is not public, and part of it may not lawfully be disclosed to the customer concerned; the chapter describes those systems only as labeled inference.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "The duties (verifying a business and its beneficial owners, screening for sanctions and politically exposed persons, monitoring transactions and reporting suspicion) are continuous by law: each has a trigger that makes it run again after onboarding."
+      },
+      {
+        "id": "S2",
+        "claim": "Stripe and Adyen both turn the verification duties into state on an account, made of requirements with deadlines that switch capabilities on and off and delivered by webhook, and that state can regress without the seller doing anything."
+      },
+      {
+        "id": "S3",
+        "claim": "Monitoring transactions for money laundering differs from fraud scoring in timing and output, and how Stripe or Adyen monitor, screen and schedule reviews is not public, so any account of those systems is inference."
+      },
+      {
+        "id": "S4",
+        "claim": "The provider's verification leaves the platform its own legal duties and the work of tracking each seller's requirements and deadlines, because a missed deadline is enforced by stopping the seller's payouts."
+      },
+      {
+        "id": "S5",
+        "claim": "The rules behind the requirements change on a calendar, and each change has a status (in application, adopted with a future date, not adopted) that must be stated with its date."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Shows the fifth relocation, from the payer's side to the seller's: the duty to know the customer sits with the provider and returns to the platform as state to track; the chapter also carries the part's closing.",
+    "supports": [
+      "P5-5"
+    ]
+  },
+  "flow": {
+    "pattern": "prerequisite_order",
+    "additional_patterns": [
+      {
+        "pattern": "problem_solution",
+        "applies_to": "scene to in-practice: the Frozen Studios are posed in the first section and replayed under K6 in the eighth"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "state-model (Stripe, then Adyen), designs and where-they-differ"
+      }
+    ],
+    "rationale": "The reader meets an approved seller that stops being paid, then the legal duties that explain why approval is never final, then the data structure both providers use to hold the current result. Monitoring follows verification because it is the same duties' other half and because its section says where the public record stops. The calendar is not a prerequisite of what follows it; it sits after the mechanism because its items can only be read as causes of requirement changes once requirements are known, and before the designs so that the practical sections (designs, comparison, the incident replayed, failures) run uninterrupted to the end. The comparison follows the designs so that its last column can speak to an integrator's choices, and the incident is replayed only when every field it uses has been cited. Putting the provider models before the duties would show fields with no reason for their deadlines; putting the replay before the comparison would use Adyen's terms before they are set beside Stripe's."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "In May 2026, 230 fitness studios on Larkfield's platform stopped receiving payouts. None of them had changed its owner, its bank account or its business. Each had been verified and approved years earlier."
+    },
+    "bridge": {
+      "from_reader_world": "An engineer meets compliance as an onboarding form: collect the documents once, get approved, move on.",
+      "to_topic": "The provider's duty to know the business it pays never ends, so its result is held as state on an account, with deadlines, and that state can change with no action by the business."
+    },
+    "thesis_statement": {
+      "text": "A payment company must know who each business it serves is, who owns and controls it, whether any of them is under sanctions and whether its transactions look like money laundering, and must keep knowing it; in software the verification duties become requirements with deadlines that switch capabilities such as payouts on and off, and that state can change months after onboarding. How transaction monitoring becomes software is not public for Stripe or Adyen.",
+      "placement": "KEY POINTS bullets 1 to 3, and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p04",
+      "promises": [
+        {
+          "promise": "Start from the Frozen Studios.",
+          "kept_in": [
+            "scene"
+          ]
+        },
+        {
+          "promise": "Set out what the law asks a payment company to know and keep knowing.",
+          "kept_in": [
+            "duties"
+          ]
+        },
+        {
+          "promise": "Show how both providers turn verification into requirements, deadlines and capabilities.",
+          "kept_in": [
+            "state-model"
+          ]
+        },
+        {
+          "promise": "Say what is public and what is inference about transaction monitoring.",
+          "kept_in": [
+            "monitoring"
+          ]
+        },
+        {
+          "promise": "Give the regulatory calendar as of November 2026.",
+          "kept_in": [
+            "calendar"
+          ]
+        },
+        {
+          "promise": "Compare three ways a platform can hold verification state.",
+          "kept_in": [
+            "designs"
+          ]
+        },
+        {
+          "promise": "Put Stripe and Adyen side by side.",
+          "kept_in": [
+            "where-they-differ"
+          ]
+        },
+        {
+          "promise": "Replay the incident under Keel decision K6.",
+          "kept_in": [
+            "in-practice"
+          ]
+        },
+        {
+          "promise": "List the ways this goes wrong.",
+          "kept_in": [
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "function": "context",
+        "organization": "narration",
+        "controlling_idea": "In May 2026, 230 Larkfield studios stopped receiving payouts although none of them had changed anything about its business.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "The Frozen Studios: a verification requirement changed, 230 studios missed the deadline, payouts paused for up to 12 days.",
+            "shows": "An approved seller can stop being paid with no action of its own, which the 'onboarding form' view cannot explain.",
+            "source": "scenario ledger"
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "function": "claim",
+        "controlling_idea": "Where the last four chapters each described a decision about one payment and its payer, compliance is a standing state on the account of the business being paid: requirements with deadlines that switch capabilities such as payouts on and off, which can change months after onboarding, while the monitoring of transactions behind it is not public for Stripe or Adyen.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "Four chapters about the payer and the card: where the number is kept, which credential is sent, whether the payment looks like fraud, whether the cardholder was authenticated.",
+          "introduces": "The other end of the payment: the business being paid, known as a state on an account instead of decided per payment; the thesis.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "function": "context",
+        "controlling_idea": "This chapter is off the path of Mila's class pass and still decides its last step: Studio Noord's €117.47 reaches its bank on 11 March 2027 only because the studio's payout capability is switched on that day.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's €120.00 pass, Tuesday 9 March 2027; Studio Noord receives €117.47 on Thursday 11 March 2027.",
+            "shows": "Ties account state to the one payment the reader has followed since chapter 1.",
+            "source": "scenario ledger"
+          }
+        ],
+        "transition_in": {
+          "relationship": "place",
+          "carries_over": "The claim that compliance is account state.",
+          "introduces": "Where that state touches the recurring payment.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "function": "transition",
+        "controlling_idea": "The chapter goes from the Frozen Studios, through the legal duties and the way both providers turn them into account state, to what is and is not public about monitoring, the regulatory calendar, three designs for a platform, the comparison of Stripe and Adyen, the incident replayed under K6 and the ways this fails.",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "Where the chapter sits on the payment's journey.",
+          "introduces": "The order of its sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: The Frozen Studios",
+      "controlling_idea": "In May 2026 a changed requirement and a passed deadline paused the payouts of 230 studios for up to 12 days, although every fact Larkfield needed was readable from the provider and no person owned the deadline.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S4"
+        ],
+        "how": "Poses the chapter's question with a ledger incident in which an approved seller's state regressed and the platform had not tracked it."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "What happened, what it cost, what Larkfield had in place: the reader meets the incident before the vocabulary."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The introduction's 230 studios.",
+        "introduces": "The incident in detail, as Femke de Graaf reviews it in 2027.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p05",
+          "function": "context",
+          "organization": "narration",
+          "controlling_idea": "The Frozen Studios were on Stripe Connect: a verification requirement changed, the change had been announced ahead with a deadline, the deadline passed for 230 studios and their payouts were paused.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "May 2026; 230 studios; payouts paused; Larkfield's reminder went to an unmonitored address. New ledger addition: the studios were on Stripe Connect and Larkfield was the party responsible for collecting requirements.",
+              "shows": "Fixes the incident on one provider so that its steps can later be matched to that provider's documented fields.",
+              "source": "scenario ledger (with this chapter's addition)"
+            }
+          ]
+        },
+        {
+          "id": "p06",
+          "function": "evidence",
+          "controlling_idea": "The cost was studios' own money standing still: at the average studio's volume, up to about €1.4 million waited in provider balances.",
+          "evidence": [
+            {
+              "kind": "statistic",
+              "what": "€1.12 billion ÷ 6,200 studios ÷ 365 ≈ €495 per studio per day; × 230 studios × 12 days ≈ €1.37 million, an upper bound because 12 days was the longest wait.",
+              "shows": "No money was lost, but a platform whose product is getting studios paid failed at exactly that for 230 of them.",
+              "source": "scenario ledger (author's arithmetic)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The paused payouts.",
+            "introduces": "Their size in euros.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p07",
+          "function": "analysis",
+          "controlling_idea": "Larkfield had treated verification as a form finished at sign-up, so its only response to the change was one batch email to sign-up addresses, and the question Femke takes from the review is what a provider must keep knowing about a business that has already been approved.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "One batch email to each studio's sign-up address, for the 230 an unmonitored mailbox; no named owner for the deadline; Aylin Demir's support team heard first, from studios.",
+              "shows": "The failure was not missing information but an unassigned remainder, which is the part thesis in one incident.",
+              "source": "scenario ledger (with this chapter's addition)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What it cost.",
+            "introduces": "Why it happened and the question it raises.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "duties",
+      "heading": "What a Payment Company Must Know, and Keep Knowing",
+      "controlling_idea": "The law asks a payment company four things about every business it serves (who it is, who owns and controls it, whether any of them is under sanctions, whether its transactions look like money laundering), and each has an event that makes the check run again.",
+      "function": "definition",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "Supplies the vocabulary (KYC, KYB, beneficial owner, sanctions and PEP screening, transaction monitoring, suspicious-activity report) and the legal reason the checks never finish."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "Why the provider is obliged at all, then the three duties in the order a customer meets them (identity and ownership, screening, monitoring), then the provider's own list on top of the law, and last the property all of them share, on which the next section builds."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Femke's question: what must a provider keep knowing about an approved business?",
+        "introduces": "The duties the law puts on the provider.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p08",
+          "function": "explanation",
+          "controlling_idea": "Anti-money-laundering law makes a firm that moves money an 'obliged entity': it must know its customers (KYC), and for a business customer that means knowing the business (KYB), because it is the point at which illicit money could enter the payment system.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "The EU AML Regulation 'shall apply from 10 July 2027'; until then national laws transposing Directive (EU) 2015/849 apply (the second half is the author's reading). Regulation (EU) 2024/1624, http://publications.europa.eu/resource/celex/32024R1624 (published 2024-06-19)",
+              "shows": "The duties are law, with a date, and are about to become one directly applicable EU rulebook."
+            }
+          ]
+        },
+        {
+          "id": "p09",
+          "function": "definition",
+          "controlling_idea": "Verifying a business means identifying the people behind it: a beneficial owner is a natural person who ultimately owns or controls it, in EU and US rules anyone with 25% or more, plus a person who controls it, and the answer changes whenever shares change hands.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Article 52: 'direct or indirect ownership of 25 % or more of the shares or voting rights or other ownership interest in the corporate entity'. Regulation (EU) 2024/1624, http://publications.europa.eu/resource/celex/32024R1624 (published 2024-06-19)",
+              "shows": "The threshold is a rule, not a provider's preference."
+            },
+            {
+              "kind": "quotation",
+              "what": "FinCEN CDD rule: 'identify and verify the identity of any individual who owns 25 percent or more of a legal entity, and an individual who controls the legal entity', https://www.fincen.gov/resources/statutes-and-regulations/cdd-final-rule (n.d., accessed 2026-11; rule of 2016, applicable since May 2018, evidence age 10 years; covered financial institutions are banks, securities brokers, mutual funds and similar firms); FinCEN order FIN-2026-R001 of 2026-02-13 removed the duty to identify owners again at each new account opening, https://www.fincen.gov/system/files/2026-02/FinCEN-Order-CCDExceptiveRelief.pdf.",
+              "shows": "The US rule has the same threshold and a control prong, and its timing changed in 2026."
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'Individuals who directly or indirectly own 25% or more of the total shares, voting rights or other equity in the organization'; if no controller can be identified 'members of senior management must be identified as UBOs through control'. https://docs.adyen.com/platforms/verification-requirements.md (n.d., accessed 2026-11)",
+              "shows": "The legal threshold reappears, unchanged, as an onboarding field."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "Knowing the business.",
+            "introduces": "Who counts as its owner.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "function": "definition",
+          "controlling_idea": "Sanctions screening checks the business and its owners against government lists of persons nobody may deal with, and screening for politically exposed persons (PEPs) finds customers who need closer checks; because the lists change, the check must be repeated whenever they do.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Article 20(1)(d): 'verifying whether the customer or the beneficial owners are subject to targeted financial sanctions'; Article 26(4): for credit and financial institutions the verification 'shall also be carried out upon any new designation'. Regulation (EU) 2024/1624, http://publications.europa.eu/resource/celex/32024R1624 (published 2024-06-19)",
+              "shows": "Screening is tied by law to list changes, not to sign-up."
+            },
+            {
+              "kind": "fact",
+              "what": "OFAC's 50 Percent Rule: an entity owned 50 percent or more in the aggregate by blocked persons is itself blocked; the rule 'speaks only to ownership and not to control'. https://ofac.treasury.gov/faqs/topic/1521 (n.d., accessed 2026-11)",
+              "shows": "Screening needs the ownership data from the previous paragraph, so the two duties share a record."
+            },
+            {
+              "kind": "quotation",
+              "what": "'politically exposed person' means 'a natural person who is or has been entrusted with prominent public functions'. Regulation (EU) 2024/1624, http://publications.europa.eu/resource/celex/32024R1624 (published 2024-06-19)",
+              "shows": "Defines the term from the legal text."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The owners, once identified.",
+            "introduces": "The lists they are checked against.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "function": "definition",
+          "controlling_idea": "Transaction monitoring checks, for as long as the relationship lasts, that what a customer does fits what the firm knows about it, and a suspicion must be reported to the national financial intelligence unit without telling the customer.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Article 26(1): monitoring 'to ensure that those transactions are consistent with the obliged entity's knowledge of the customer, the customer's business activity and risk profile'. Regulation (EU) 2024/1624, http://publications.europa.eu/resource/celex/32024R1624 (published 2024-06-19)",
+              "shows": "Monitoring is defined against the customer record, which is why the record must be kept current."
+            },
+            {
+              "kind": "quotation",
+              "what": "Article 69: 'All suspicious transactions, including attempted transactions' are reported; Article 73: obliged entities 'shall not disclose to the customer concerned or to other third persons' that a report or analysis is under way. Regulation (EU) 2024/1624, http://publications.europa.eu/resource/celex/32024R1624 (published 2024-06-19)",
+              "shows": "The output is a confidential report, which later explains why a provider's hold can come without a reason."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "Who the customer is.",
+            "introduces": "What the customer does.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p12",
+          "function": "explanation",
+          "controlling_idea": "On top of the law each provider keeps its own list of prohibited and restricted businesses, shaped by card-network and bank-partner rules and by its own appetite for risk, so a lawful business can still be refused or asked for more.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen's list (last update 2025-11-13) marks categories 'R' ('We will require additional documentation prior to onboarding') or 'P', based on law, 'Requirements of our payment partners (e.g. card networks)', 'Level of assessed risk (e.g. chargebacks, fraud)' and 'Reputational impact to Adyen'. https://www.adyen.com/legal/list-restricted-prohibited",
+              "shows": "The list is partly not law at all."
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe's list (last updated 2026-09-22; English edition read in the verification pass; paraphrased) has prohibited and restricted categories and jurisdiction-specific additions; the requirement type `restricted_or_prohibited_industry_diligence` appears in https://docs.stripe.com/connect/handling-api-verification.md?accounts-namespace=v1 (n.d., accessed 2026-11). https://stripe.com/legal/restricted-businesses",
+              "shows": "At Stripe a restricted-category review arrives as a requirement on the account, the mechanism of the next section."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Three duties set by law.",
+            "introduces": "What the provider adds to them from its own rules.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p13",
+          "function": "analysis",
+          "controlling_idea": "None of the duties is finished at sign-up, because each has a trigger that runs it again, so onboarding is the first run of a loop.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows: identity and ownership; sanctions and PEP screening; transaction monitoring; periodic review. Columns: the question, what makes it run again, the output.",
+              "shows": "Puts the three duties and the review in one frame and shows a re-run trigger for each."
+            },
+            {
+              "kind": "quotation",
+              "what": "Article 26(2): the period between updates of customer information shall not exceed 'for higher risk customers ... 1 year' and 'for all other customers, 5 years'; Article 26(3): also on 'a change in the relevant circumstances of a customer'. Regulation (EU) 2024/1624, http://publications.europa.eu/resource/celex/32024R1624 (published 2024-06-19)",
+              "shows": "From 10 July 2027 the review interval has a legal ceiling."
+            },
+            {
+              "kind": "figure",
+              "what": "A gate crossed once beside a loop that passes the same checks again on four triggers.",
+              "shows": "Makes 'first run of a loop' visible."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "Three legal duties and the provider's own list.",
+            "introduces": "The property the checks share: each runs again.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "state-model",
+      "heading": "How Verification Becomes Software: Requirements, Deadlines, Capabilities",
+      "controlling_idea": "Both providers turn the verification duties into state on an account, made of requirements with deadlines that switch capabilities on and off and delivered by webhook, and that state can regress without the seller doing anything.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "S2"
+        ],
+        "how": "The central mechanism of the thesis, documented field by field for each provider."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The general shape first, so both vocabularies can be read against it; Stripe's three documented parts (the requirement lists, the deadline, announced changes and reviews); Adyen's two (capability status, triggers and deadlines); then what both imply."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "Duties that run again and again.",
+        "introduces": "The data structure a provider needs to hold their current result.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p14",
+          "function": "explanation",
+          "controlling_idea": "A one-time 'verified' flag cannot represent a loop, so the result of verification is held as three things: capabilities (named permissions such as taking card payments or receiving payouts), requirements (missing facts or documents) and deadlines, where an unmet requirement at its deadline switches a capability off.",
+          "evidence": [
+            {
+              "kind": "figure",
+              "what": "An account's capability moving between pending, active, restricted with a deadline, and disabled, with the events that move it.",
+              "shows": "Gives one state machine against which both providers' vocabularies are read."
+            },
+            {
+              "kind": "reasoning",
+              "what": "Capabilities are a function of the facts held about the business and the rules in force; either input can change after onboarding.",
+              "shows": "Explains why the state can regress with no action by the seller."
+            }
+          ]
+        },
+        {
+          "id": "p15",
+          "function": "description",
+          "controlling_idea": "Stripe publishes the outstanding work as lists on the account: what is currently due, eventually due, past due and pending verification, with one deadline.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Fields of `requirements`: `currently_due` ('requirements that you must resolve by the `current_deadline` for the account to remain `active`'), `eventually_due`, `past_due` ('requirements that have disabled capabilities because they weren't resolved before the `current_deadline`'), `pending_verification`, `current_deadline` ('the earliest deadline across all of the account's requested capabilities and risk requirements'), `disabled_reason`. https://docs.stripe.com/connect/handling-api-verification.md?accounts-namespace=v1 (n.d., accessed 2026-11)",
+              "shows": "The whole contract between Stripe and a platform about a seller's verification is six fields and an `account.updated` webhook."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The general shape.",
+            "introduces": "Stripe's version of it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p16",
+          "function": "cause_effect",
+          "controlling_idea": "At Stripe a missed deadline usually stops payouts first and charges later, and a requirement can become due because time has passed or volume has grown.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Stripe typically disables payouts on the account if we don't receive the information by the `current_deadline`. ... if payouts are already disabled and the account is unresponsive to our inquiries, Stripe might also disable the ability to process charges.' https://docs.stripe.com/connect/handling-api-verification.md?accounts-namespace=v1 (n.d., accessed 2026-11)",
+              "shows": "The enforcement is on the seller's money, in a documented order."
+            },
+            {
+              "kind": "quotation",
+              "what": "'At certain variable thresholds—usually when a specified amount of time has passed or volume of charges have been made—you might need to collect and verify additional information. Stripe temporarily pauses charges or payouts if the information isn't provided or verified'. https://docs.stripe.com/connect/identity-verification.md (n.d., accessed 2026-11)",
+              "shows": "A seller that only keeps trading crosses a threshold and acquires a requirement."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The lists and the deadline.",
+            "introduces": "What happens when the deadline passes, and what can start one.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p17",
+          "function": "explanation",
+          "controlling_idea": "Stripe announces rule changes as data: a second structure, `future_requirements`, lists what will become required and when, and whether Stripe or the platform must act on it depends on which of the two was configured to collect verification information from sellers.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Stripe frequently updates KYC requirements, often due to changes implemented by financial regulators, card networks, and other financial institutions.' 'The `future_requirements.current_deadline` timestamp represents when entries in `future_requirements` will move to `requirements`.' https://docs.stripe.com/connect/handle-verification-updates.md?accounts-namespace=v1 (n.d., accessed 2026-11)",
+              "shows": "A rule change is visible in the API before it bites."
+            },
+            {
+              "kind": "fact",
+              "what": "When `controller.requirement_collection` is `stripe`, 'Stripe handles upcoming requirement changes for your connected accounts automatically'; when it is `application` the platform handles them; API onboarding means 'You must plan on reviewing and updating onboarding requirements at least every 6 months' (https://docs.stripe.com/connect/onboarding.md, n.d., accessed 2026-11). https://docs.stripe.com/connect/handle-verification-updates.md?accounts-namespace=v1 (n.d., accessed 2026-11)",
+              "shows": "The work of a rule change lands on the platform exactly when the platform chose to collect requirements itself."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Thresholds that make a requirement due.",
+            "introduces": "Rule changes, the third way a requirement appears.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p18",
+          "function": "explanation",
+          "controlling_idea": "Compliance reviews reach a Stripe platform through the same structure, as named requirement types and disabled reasons, which is the only place the screening and monitoring behind them become visible.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Requirement types: `sanctions_review` ('We must verify that the business isn't involved with a sanctioned person or jurisdiction'), `pep_review`, `legal_hold` ('Stripe is required to hold funds for a legal reason'), `other_compliance_inquiry`; `disabled_reason` values include `listed` ('The account might be on a prohibited persons or companies list') and `under_review`. https://docs.stripe.com/connect/handling-api-verification.md?accounts-namespace=v1 (n.d., accessed 2026-11)",
+              "shows": "The duties of the previous section map onto enumerated values a platform can store."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Requirements raised by rules and thresholds.",
+            "introduces": "Requirements raised by reviews.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p19",
+          "function": "description",
+          "controlling_idea": "Adyen models the same thing from the capability's side: a legal entity is verified, and each capability of its account holder carries three flags, a verification status and, when something is wrong, a list of problems with the actions that would fix them.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Capabilities have `requested`, `allowed` and `enabled` ('The capability can only be used when it is both allowed and enabled') and a `verificationStatus` of `pending`, `valid`, `invalid` or `rejected`, where rejected 'is final and any errors cannot be resolved by updating data or uploading documents'; problems carry verification errors and remediating actions. https://docs.adyen.com/platforms/verification-overview/capabilities.md (n.d., accessed 2026-11)",
+              "shows": "Adyen states what the seller may do; the outstanding work hangs off each capability as errors."
+            },
+            {
+              "kind": "quotation",
+              "what": "'As required by payment industry regulations, Adyen must verify the users in your platform before you can process payments, pay out their funds, and offer financial products to them.' https://docs.adyen.com/platforms/verification-overview.md (n.d., accessed 2026-11)",
+              "shows": "Adyen frames verification as its own regulatory duty."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Stripe's lists of what is missing.",
+            "introduces": "Adyen's flags for what is allowed.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "function": "cause_effect",
+          "controlling_idea": "At Adyen verification runs again when capabilities are requested, when the seller's data changes and when Adyen requires a periodic data review, and for each it may set a deadline (as a standard, 30 days for payout capabilities and 60 days for receiving payments) during which the capability keeps working; a periodic review arrives as a verification error, and a change to the legal entity's data sends no webhook.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Standard deadlines: a '30-day period' for payout-side capabilities such as `sendToTransferInstrument`, a '60-day period' for `receivePayments` and others; 'a standard deadline could be shortened or removed in specific situations'; 'Users are allowed to continue using the capabilities while the deadline is active.' Deadlines exist only in Legal Entity Management API v3 and v4. https://docs.adyen.com/platforms/verification-overview.md (n.d., accessed 2026-11)",
+              "shows": "Adyen publishes how long a seller has, per capability."
+            },
+            {
+              "kind": "fact",
+              "what": "Periodic review: 'Adyen occasionally requires your users to review and confirm that their data is up-to-date'; the webhook sets `verificationStatus` to `invalid`, `allowed` 'Remains set to `true`', error 3_10 'Review of data is required', a deadline, resolved by `/legalEntities/{id}/confirmDataReview`. https://docs.adyen.com/platforms/verification-overview/data-review-process.md (n.d., accessed 2026-11)",
+              "shows": "Re-verification with no change by the seller is a documented API flow."
+            },
+            {
+              "kind": "fact",
+              "what": "Staggered verification (payment facilitators only): on moving to a higher tier 'their payouts are temporarily disallowed until they complete additional verification checks'; 'There are four tiers'. https://docs.adyen.com/platforms/verification-overview/verification-types.md (n.d., accessed 2026-11)",
+              "shows": "Volume alone can pause payouts on Adyen too, for one kind of platform."
+            },
+            {
+              "kind": "quotation",
+              "what": "`balancePlatform.accountHolder.updated` webhooks 'are only triggered for capability-related changes to the account holder. Data changes to the legal entity of the account holder do not trigger webhooks.' https://docs.adyen.com/platforms/verification-overview.md (n.d., accessed 2026-11)",
+              "shows": "One class of change is documented as silent, which the comparison and the failure section rely on."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Adyen's flags.",
+            "introduces": "The events that change them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p21",
+          "function": "analysis",
+          "controlling_idea": "On both providers an account that was fully enabled can therefore become restricted through five routes, four of which need no action by the seller: a rule change, a threshold of time or volume, a periodic review and a compliance review; the fifth is a change in the seller's own data.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Collects the routes documented in the six preceding paragraphs.",
+              "shows": "States the thesis's 'without the customer doing anything' as a list a reader can reuse for diagnosis."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "Two vocabularies.",
+            "introduces": "What both imply for an approved seller.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "monitoring",
+      "heading": "Watching the Money: What Is Public and What Is Inference",
+      "controlling_idea": "Monitoring transactions for money laundering is a different job from scoring payments for fraud, and how Stripe or Adyen do it is not public, so everything beyond its visible effects is reference-architecture inference.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "S3"
+        ],
+        "how": "Carries the last sentence of the thesis: says what the public record shows, where it stops, and labels the rest."
+      },
+      "flow": {
+        "pattern": "assertion_evidence_reasoning",
+        "rationale": "The distinction first, so the reader knows what kind of system is in question; then the evidence that neither company describes theirs; then a labeled inference from the duties."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "Verification, which both providers document field by field.",
+        "introduces": "Monitoring, which neither documents.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p22",
+          "function": "comparison",
+          "controlling_idea": "Fraud scoring and money-laundering monitoring both run rules and models over transactions, but fraud scoring decides one payment in milliseconds and its output is allow, block or challenge, while monitoring looks at behavior over days or weeks and its output is a case for a person, possibly a confidential report or a freeze.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows: the question, when it runs, what it looks at, the output, whether the customer is told. Columns: fraud scoring, money-laundering monitoring.",
+              "shows": "Separates the two by timing and output, which is what a design that reuses one for the other gets wrong."
+            },
+            {
+              "kind": "figure",
+              "what": "Two lanes: a fast lane inside the payment request ending in allow, block or challenge; a slow lane fed afterwards ending in a case file, a report and a hold.",
+              "shows": "Shows shared data and separate decision paths."
+            }
+          ]
+        },
+        {
+          "id": "p23",
+          "function": "evidence",
+          "controlling_idea": "Neither Stripe nor Adyen publishes its monitoring scenarios, its sanctions-screening logic or its re-verification intervals; what is public is the effect on an account and each company's statement, as policy, that it screens and monitors.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Visible effects: Stripe's `legal_hold` and `other_compliance_inquiry` requirement types (https://docs.stripe.com/connect/handling-api-verification.md?accounts-namespace=v1 (n.d., accessed 2026-11)); Adyen's sentence 'Verification deadlines may be adjusted based on ongoing account monitoring and subsequent verification checks' (https://docs.adyen.com/platforms/verification-overview.md (n.d., accessed 2026-11)); Stripe's 'We calculate account-level risk using KYC information, transactions, geographic risk factors, and behavior patterns' (https://docs.stripe.com/radar/rules.md, n.d., accessed 2026-11).",
+              "shows": "Each company confirms that monitoring exists and feeds account state, and says nothing about how."
+            },
+            {
+              "kind": "fact",
+              "what": "Article 73 forbids disclosing to the customer that an analysis or report is under way. Regulation (EU) 2024/1624, http://publications.europa.eu/resource/celex/32024R1624 (published 2024-06-19)",
+              "shows": "Part of the silence is required by law, not chosen."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What such a system does in general.",
+            "introduces": "What the two companies say about theirs.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p24",
+          "function": "analysis",
+          "controlling_idea": "A system that meets these duties plausibly needs a versioned customer record, a risk rating with a review date, a re-screening job triggered by list changes and by data changes, detection over weeks of behavior, a case queue for analysts and a way to place a hold; this is an inference from the duties, not a description of either company.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Each component is derived from one legal duty in the 'duties' section: Article 26(2) gives the review date, Article 26(4) the list-change trigger, Article 26(1) the behavior baseline, Article 69 the case and report.",
+              "shows": "Lets the reader see the shape of the system while keeping it apart from documented fact (acceptance criterion AC-3)."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "A public record that stops at the effects.",
+            "introduces": "What can be inferred from the duties alone, labeled as such.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "calendar",
+      "heading": "The Regulatory Calendar as of November 2026",
+      "controlling_idea": "The rules behind the requirements change on a calendar, and each item on it has one of three statuses (in application, adopted with a future date, not adopted) that must be stated with its date.",
+      "function": "description",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "Explains where rule changes such as the one behind the Frozen Studios come from, and gives the reader the dated statuses the intent promises."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "The whole calendar in one table, then the items by status: in application (DORA, kept to one paragraph because it concerns resilience and not knowing the customer; instant payments, whose dates depend on the license and whose screening rule is a legislated case of the chapter's claim), then adopted with a future date and not adopted together, because both are things to track and not yet to build."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "Stripe's statement that requirements change because regulators, card networks and other financial institutions change their rules.",
+        "introduces": "The dated list of the regulatory changes, with the status of each.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p25",
+          "function": "description",
+          "controlling_idea": "Sorted by status on 17 November 2026, the calendar has rules already in application (DORA, instant payments and verification of payee for euro-area banks), rules adopted with a future date (the EU AML Regulation, instant payments for payment and e-money institutions) and rules not adopted (PSD3 and the Payment Services Regulation).",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows: DORA; instant payments; verification of payee; EU AML Regulation; AMLA; PSD3 and PSR; US beneficial-ownership relief. Columns: status on 17 November 2026, the date, what it changes for a payment system. Sources: Regulation (EU) 2022/2554, http://publications.europa.eu/resource/celex/32022R2554 (published 2022-12-27); Regulation (EU) 2024/886, http://publications.europa.eu/resource/celex/32024R0886 (published 2024-03-19); Regulation (EU) 2024/1624, http://publications.europa.eu/resource/celex/32024R1624 (published 2024-06-19); Regulation (EU) 2024/1620 and https://www.amla.europa.eu/about-amla_en; https://oeil.europarl.europa.eu/oeil/en/procedure-file?reference=2023/0210(COD) (accessed 2026-11-17); FinCEN FIN-2026-R001 (2026-02-13).",
+              "shows": "One table a reader can re-date later; the status column is the point."
+            }
+          ]
+        },
+        {
+          "id": "p26",
+          "function": "explanation",
+          "controlling_idea": "DORA, the EU's Digital Operational Resilience Act, has applied since 17 January 2025 to banks, payment institutions and e-money institutions; it is on this calendar for its date and status only, because it regulates resilience (incident reporting, a register of technology suppliers) and not knowledge of the customer.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'It shall apply from 17 January 2025'; scope includes 'payment institutions' and 'electronic money institutions'; Article 19 'Financial entities shall report major ICT-related incidents'; 'all financial entities should be required to maintain a register of information'. Regulation (EU) 2022/2554, http://publications.europa.eu/resource/celex/32022R2554 (published 2022-12-27) (evidence age: about 4 years; in application)",
+              "shows": "Resilience practices are now enforceable against both kinds of provider."
+            },
+            {
+              "kind": "fact",
+              "what": "On 18 November 2025 the three European Supervisory Authorities published the list of designated critical ICT third-party providers. https://www.eba.europa.eu/publications-and-media/press-releases/european-supervisory-authorities-designate-critical-ict-third-party-providers-under-digital. No DORA statement by Stripe or Adyen was found (the URLs tried returned 404).",
+              "shows": "The oversight of suppliers has started; nothing is claimed about either company's position."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The calendar.",
+            "introduces": "Its first item in application.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p27",
+          "function": "explanation",
+          "controlling_idea": "The instant-payments rules apply on different dates to different license types, so which license a provider holds decides when it must send and receive euro transfers in ten seconds and check the payee's name first.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Euro-area PSPs: receive by 9 January 2025, send by 9 October 2025; euro-area payment and e-money institutions: 'by 9 April 2027'; verification of payee (Article 5c, 'a service ensuring verification of the payee') for euro-area PSPs by 9 October 2025. Regulation (EU) 2024/886, http://publications.europa.eu/resource/celex/32024R0886 (published 2024-03-19)",
+              "shows": "A bank had to be ready in 2025; a payment or e-money institution has until April 2027."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "DORA.",
+            "introduces": "The second group in application, with dates that depend on the license.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p28",
+          "function": "evidence",
+          "controlling_idea": "In one case the law itself fixes the design: for instant credit transfers, EU rules replace sanctions screening of each transfer with a screen of the whole customer base at least once a day, moving the control from the payment path to account state.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Article 5d: PSPs 'shall carry out such verifications immediately after the entry into force of any new targeted financial restrictive measures ... and at least once every calendar day', and during an instant transfer 'shall not verify' the payer or payee against those lists in addition. Funds must reach the payee 'within 10 seconds'. Regulation (EU) 2024/886, http://publications.europa.eu/resource/celex/32024R0886 (published 2024-03-19)",
+              "shows": "A ten-second payment leaves no room for a manual sanctions review, so the legislator moved the check to the customer record: a documented instance of the chapter's claim."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "Instant-payment dates that depend on the license.",
+            "introduces": "What the same regulation does to sanctions screening: it moves the control from the payment path to account state.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p29",
+          "function": "explanation",
+          "controlling_idea": "The EU AML Regulation is adopted and applies from 10 July 2027, while PSD3 and the Payment Services Regulation were not adopted on 17 November 2026, and I would track both and build to neither until the text and date are final.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "PSR procedure file: 'Council position published' 5 November 2026; second-reading referral 12 November 2026; 'Indicative plenary sitting date, 2nd reading' 14 December 2026; status 'Awaiting Parliament 2nd reading'. https://oeil.europarl.europa.eu/oeil/en/procedure-file?reference=2023/0210(COD) (accessed 2026-11-17)",
+              "shows": "The status is read from the legislature's own file on the research cut-off date."
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen's reading (published 2026-10-12): 'General application is expected 21 months after entry into force (Verification of Payee provisions will apply 27 months after).' https://www.adyen.com/knowledge-hub/psd3",
+              "shows": "A provider's expectation about timing, attributed as such."
+            },
+            {
+              "kind": "fact",
+              "what": "AMLA: Regulation (EU) 2024/1620 applies from 1 July 2025; first selection of directly supervised entities by 1 July 2027; 'During 2028 — Start of direct supervision' (https://www.amla.europa.eu/about-amla_en, n.d., accessed 2026-11). Whether either company's EU entity will be selected is unknown.",
+              "shows": "A new supervisor arrives with the new rulebook."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Rules in application, one of which legislates this chapter's claim.",
+            "introduces": "Rules adopted for later and rules not adopted.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "designs",
+      "heading": "Three Ways a Platform Can Hold Verification State",
+      "controlling_idea": "A platform can treat verification as a form, pass it through to the provider, or mirror it as state with owners (Larkfield's Keel decision K6), and only the mirror lets it answer a seller whose payouts have stopped.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S4"
+        ],
+        "how": "Turns the so-what of the thesis into a design choice with stated conditions."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The three designs, their trade-offs side by side, then the author's choice and when it does not hold."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "State that changes for reasons the seller and the platform do not control, on a calendar.",
+        "introduces": "The ways a platform can respond.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p30",
+          "function": "description",
+          "controlling_idea": "The three designs differ in what the platform stores: nothing after sign-up (the form), a yes-or-no per seller with everything else left to the provider's hosted pages and notices (the pass-through), or each seller's requirements, deadlines and capability status with an owner (the mirror, which is what Larkfield's Keel decision K6, 'verification is state, not a form', prescribes).",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "The form is what Larkfield had in 2026; the pass-through matches the case where the provider collects requirements (Stripe's `requirement_collection` of `stripe`, Adyen's hosted onboarding); the mirror is Keel decision K6.",
+              "shows": "Each design corresponds to a documented provider option or a ledger fact, not an invented one."
+            }
+          ]
+        },
+        {
+          "id": "p31",
+          "function": "comparison",
+          "controlling_idea": "The designs trade build effort against the platform's ability to notice a new requirement and to explain a stopped payout.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows: the form, the pass-through, the mirror. Columns: what the platform stores, who notices a new requirement, what the seller sees when payouts stop, when it is right.",
+              "shows": "Makes the cost of each design the question a seller will actually ask."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Three designs.",
+            "introduces": "Their trade-offs.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p32",
+          "function": "recommendation",
+          "controlling_idea": "I would build the mirror whenever the platform is the seller's only interface or carries the seller's losses, and accept the pass-through only where the seller has the provider's own dashboard and the provider collects requirements.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "The provider enforces a missed requirement on the seller's payouts (the state-model section) and only a platform that stores the state can show the seller why. The platform's detailed practice is in platform-onboarding-and-verification.",
+              "shows": "States the recommendation with its condition and hands the detail to the chapter that owns it."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The trade-offs.",
+            "introduces": "The author's choice and where it does not hold.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "In the public record Stripe documents what is missing and announces rule changes as data, Adyen documents what is allowed until when and the periodic review as an API flow, and neither documents its monitoring.",
+      "function": "comparison",
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The table first, because every cell repeats a fact already cited; then what an integrator does differently on each provider, drawn only from those facts."
+      },
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S3"
+        ],
+        "how": "The required comparison: documented facts per aspect, 'Not public' where they stop, the author's reading marked as inference."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "Each provider's documented model and the designs open to a platform.",
+        "introduces": "The two set side by side.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p33",
+          "function": "comparison",
+          "controlling_idea": "Aspect by aspect, the two providers expose the same duties through different structures: Stripe as lists of requirements with one deadline and a preview of future ones, Adyen as flags and deadlines per capability with a documented periodic review.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows: unit verified and unit switched; what is outstanding; deadline; announced rule changes; periodic re-verification; sanctions and PEP reviews; transaction monitoring. Columns: Stripe, Adyen, what the difference suggests. Sources as cited in the state-model and monitoring sections.",
+              "shows": "Every cell is a fact cited earlier in the chapter or 'Not public'; the last column is inference."
+            }
+          ]
+        },
+        {
+          "id": "p34",
+          "function": "recommendation",
+          "controlling_idea": "On Stripe an integrator should read `future_requirements` on a schedule and treat the single deadline as per-account data, and on Adyen should build reminders on the published 30- and 60-day periods, handle the data-review error as a routine event, and re-read a legal entity after changing it because that change sends no webhook.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Data changes to the legal entity of the account holder do not trigger webhooks.' https://docs.adyen.com/platforms/verification-overview.md (n.d., accessed 2026-11)",
+              "shows": "A documented gap that changes what the integration must do."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The differences in the table.",
+            "introduces": "What to do differently on each provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: The Frozen Studios, Replayed under K6",
+      "controlling_idea": "Replayed against Stripe's documented fields, the Frozen Studios had three points at which stored state and a named owner would have kept payouts running, and K6 is the design that reads them on both providers.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S4"
+        ],
+        "how": "The worked example with ledger numbers: the incident step by step, then the same control on Adyen."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The incident's stages in order, then the record K6 keeps, then who acts on it."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "What an integrator should do on each provider.",
+        "introduces": "Larkfield doing it, starting from the incident it did not catch.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p35",
+          "function": "process",
+          "organization": "process",
+          "controlling_idea": "The incident had four stages, each visible in the provider's API before the studios felt anything: the change announced, the requirement due with a deadline, the deadline passed and payouts paused, the requirement met and payouts resumed.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows: announced (`future_requirements`), due (`currently_due` with `current_deadline`), passed (`past_due`, payouts disabled), resolved. Columns: what the provider's record showed (the documented field), what Larkfield did in May 2026, what K6 does.",
+              "shows": "Maps a ledger incident onto fields cited earlier, so the scene is illustration of documented behavior and not evidence about the provider."
+            },
+            {
+              "kind": "figure",
+              "what": "A timeline of the four stages with two tracks: 2026 (one email, silence, 230 studios paused up to 12 days) and K6 (banner, owner alerted, resolved before the deadline).",
+              "shows": "Shows where the 12 days could have been avoided."
+            }
+          ]
+        },
+        {
+          "id": "p36",
+          "function": "description",
+          "controlling_idea": "Under K6 the payment service keeps one verification record per studio in Larkfield's own vocabulary (requirement, due date, capability at risk, status, owner, when the studio was last told), filled from Stripe's requirement lists for a studio such as Ironworks Climbing and from Adyen's capability problems and deadlines for a studio such as Studio Noord.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "K6: 'Each studio's requirements, deadlines and capability status are mirrored and surfaced in the back office, with an owner for every deadline.' Ironworks Climbing is on Stripe Connect; Studio Noord on Adyen since 2024.",
+              "shows": "One internal vocabulary over two provider vocabularies, the same move the payment record store makes for payments.",
+              "source": "scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "What K6 would have done at each stage.",
+            "introduces": "The record that makes it possible.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p37",
+          "function": "explanation",
+          "controlling_idea": "Every open deadline has a named owner, Jonas Weber, with studio support as the channel to the studio, and the record is swept against the provider's API every day so that a missed webhook cannot hide a deadline.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Jonas Weber owns verification (ledger cast); Aylin Demir's team hears about payout problems first; alert thresholds of 14 and 3 days before a deadline are illustrative assumptions; K2 for the sweep.",
+              "shows": "The owner and the sweep are the two things missing in 2026.",
+              "source": "scenario ledger (with this chapter's addition)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The record.",
+            "introduces": "Who acts on it and how it is kept true.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong",
+      "controlling_idea": "Verification state fails a platform in four ways: a stopped payout nobody can explain, a mirror that has gone stale, a state the platform cannot resolve or may not be told the reason for, and the belief that the provider's checks are the platform's own.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S4"
+        ],
+        "how": "Detection and recovery for each failure, including the diagnosis list the intent promises."
+      },
+      "flow": {
+        "pattern": "order_of_importance",
+        "rationale": "The most frequent first (a seller asks why payouts stopped), then the failure of the platform's own mechanism, then the cases nobody at the platform can fix, then the misunderstanding that outlasts all of them."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The design working.",
+        "introduces": "The ways it still fails.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p38",
+          "function": "analysis",
+          "controlling_idea": "Each of the five routes by which an enabled account becomes restricted leaves a different trace, so a stopped payout is diagnosed by knowing where to look on each provider.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows: a requirement's deadline passed; a time or volume threshold was crossed; a rule change took effect; a periodic review was not confirmed; a sanctions, PEP or legal review opened. Columns: where to look on Stripe, where to look on Adyen.",
+              "shows": "Turns the five routes listed at the end of the state-model section into a diagnosis a support engineer can run (acceptance criterion AC-1)."
+            }
+          ]
+        },
+        {
+          "id": "p39",
+          "function": "explanation",
+          "controlling_idea": "The mirror fails silently when a webhook is missed or was never sent, and a stale record that shows no open requirement is worse than no record.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: `balancePlatform.accountHolder.updated` webhooks 'are only triggered for capability-related changes to the account holder. Data changes to the legal entity of the account holder do not trigger webhooks.' https://docs.adyen.com/platforms/verification-overview.md (n.d., accessed 2026-11)",
+              "shows": "One class of change is documented as silent."
+            },
+            {
+              "kind": "scenario",
+              "what": "The Silent Webhook, 14 September 2026: the Stripe receiver's certificate expired and events failed for 9 hours.",
+              "shows": "Larkfield has already lost webhooks once; the same outage on a deadline day would freeze studios again.",
+              "source": "scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Diagnosing one seller.",
+            "introduces": "The failure of the mechanism that feeds the diagnosis.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p40",
+          "function": "explanation",
+          "controlling_idea": "Some states the platform cannot resolve and may not be able to explain: a rejection that is final, a review the seller must complete in the provider's own interface, or a hold for a legal reason whose cause the law may forbid the provider to disclose.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen `rejected` 'is final' (https://docs.adyen.com/platforms/verification-overview/capabilities.md (n.d., accessed 2026-11)); Stripe expects platforms to handle risk-related requirements 'by notifying connected accounts of identified issues so you can guide them to resolve through Stripe interfaces' (https://docs.stripe.com/connect/handle-verification-updates.md?accounts-namespace=v1 (n.d., accessed 2026-11)); Stripe `legal_hold` (https://docs.stripe.com/connect/handling-api-verification.md?accounts-namespace=v1 (n.d., accessed 2026-11)); Article 73 (Regulation (EU) 2024/1624, http://publications.europa.eu/resource/celex/32024R1624 (published 2024-06-19)).",
+              "shows": "The platform's duty in these cases shrinks to saying what is known and routing the seller, which a support script must reflect."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Failures the platform can fix.",
+            "introduces": "States it cannot.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p41",
+          "function": "refutation",
+          "controlling_idea": "A provider's verification does not discharge whatever legal duties a platform has of its own, and Stripe says so in its documentation.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Even after Stripe verifies a connected account, platforms still must monitor for and prevent fraud. Don't rely on Stripe's verification to meet any independent legal KYC or verification requirements.' https://docs.stripe.com/connect/identity-verification.md (n.d., accessed 2026-11)",
+              "shows": "The disputed view ('the provider takes care of it') is contradicted by the provider."
+            }
+          ],
+          "transition_in": {
+            "relationship": "emphasis",
+            "carries_over": "States the provider controls.",
+            "introduces": "What stays with the platform whatever the provider does.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "The five controls of Part V are one system, not five features. How card numbers are collected decides which signals the fraud model sees; the fraud rate of a provider's whole portfolio decides which authentication exemptions it may request; tokens and authentication together decide network fees and who carries a fraud dispute; and the identity data collected for verification feeds the risk score of the seller's account. A choice made for one control is a choice about the others, and in each something comes back to the business: a page, a threshold, an exemption policy, a deadline.",
+    "so_what": "A team can stop auditing its trust controls one certificate at a time and keep one table instead: per control, what moved, to whom, what stayed, and who at the company owns what stayed. For this chapter's control the row reads: the duty to know the seller moved to the regulated provider; the seller's requirements, deadlines and capability status stayed, and need an owner.",
+    "callback": {
+      "to": "The 230 studios of the opening, set beside the Card-Testing Weekend that opened Part V.",
+      "how": "One studio's online payments paused for 31 hours in the response to a fraud attack and 230 studios without payouts for up to 12 days by a verification control: in both Larkfield held no card data and no member funds, and in both the remainder it had not assigned to anyone is what failed."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "For each trust control in your own integration, write down what moved, to whom, what stayed with you, and a named owner for what stayed; Larkfield's Keel decisions K4 (card numbers never touch Larkfield) and K6 (verification is state, not a form) are two rows of that table."
+    },
+    "hand_off": {
+      "to": "part-6",
+      "relationship": "contrast",
+      "carries_over": "Part V's point that a control moves data, a decision or a loss between parties without removing it, and the stored credentials and merchant-initiated payments that run without the cardholder present.",
+      "introduces": "Payments that no customer starts: a clock starts them, for a billing period, which adds a second state machine above the payment and failures of time (late, twice, wrong period)."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The failure modes.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p42",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Established: the duties are continuous by law, both providers expose verification as requirements, deadlines and capabilities, a missed deadline stops payouts, and the regulatory dates are as stated on 17 November 2026."
+      },
+      {
+        "id": "p43",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Depends on context: whether to mirror or pass through, how much to collect up front, and whether a platform has legal duties of its own.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is settled.",
+          "introduces": "What changes with the situation.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p44",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "The author's synthesis: treat verification as a state machine with an owner per deadline, and treat every statement about a provider's monitoring as inference until the provider documents it.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is established and what depends.",
+          "introduces": "The author's own position.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p45",
+        "function": "synthesis",
+        "controlling_idea": "Across Part V the five controls are one system in which each moves something to another party and returns a remainder, and the Card-Testing Weekend and the Frozen Studios are the same failure: a remainder with no owner.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "The Card-Testing Weekend (8–9 August 2026: 61,000 card numbers, €4,100, one studio paused 31 hours) beside the Frozen Studios (May 2026: 230 studios, up to 12 days); K4 and K6.",
+            "shows": "Two incidents on different controls with the same cause carry the part's closing.",
+            "source": "scenario ledger"
+          }
+        ],
+        "transition_in": {
+          "relationship": "conclusion_summary",
+          "carries_over": "This chapter's take-aways.",
+          "introduces": "The part's closing: five controls as one system, the two incidents, the one table.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p46",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "Eight questions let the reader test how verification state is handled in a platform of their own or in a provider evaluation.",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The closing argument.",
+          "introduces": "Questions that apply it.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p47",
+        "function": "transition",
+        "controlling_idea": "Part V ended with controls that assign data, decisions and losses to named parties for payments somebody starts; Part VI turns to payments that a clock starts.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "Controls on a payment a customer or a seller is party to.",
+          "introduces": "Payments started by a billing period, and their failures of time.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "What the platform does at onboarding: requesting minimal capabilities, hosted versus embedded versus API onboarding, onboarding conversion, the seller's view.",
+      "covered_in": [
+        "platform-onboarding-and-verification"
+      ]
+    },
+    {
+      "topic": "Licenses, safeguarding and who may hold funds; UK safeguarding reform; US money-transmitter law.",
+      "covered_in": [
+        "licences-and-safeguarding"
+      ]
+    },
+    {
+      "topic": "Fraud models, merchant risk scores, reserves and deposits.",
+      "covered_in": [
+        "payment-fraud-and-risk",
+        "balances-and-funds-flows"
+      ]
+    },
+    {
+      "topic": "Strong customer authentication and what PSD3 and the Payment Services Regulation would change for it.",
+      "covered_in": [
+        "three-d-secure-and-sca"
+      ]
+    },
+    {
+      "topic": "Verification of payee in the payout path and payout returns.",
+      "covered_in": [
+        "payouts-and-money-movement"
+      ]
+    },
+    {
+      "topic": "Operational resilience engineering under DORA.",
+      "covered_in": [
+        "payment-reliability-and-availability"
+      ]
+    },
+    {
+      "topic": "Legal advice on whether a given platform is itself an obliged entity."
+    },
+    {
+      "topic": "FATF Recommendation numbers: the FATF text could not be fetched, so the chapter cites EU and US law only."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "Transaction monitoring, sanctions-screening implementation and suspicious-activity reporting at both companies are not public and partly may not be published; the chapter says so and labels its account as inference.",
+    "Re-verification intervals: Stripe's support article 'KYC Refresh: Upcoming periodic confirmation requirements' (last updated October 2026; read in full in the verification pass) announces periodic attestation requirements, first in Europe, with the API in private preview in 2026 and a public preview planned for Q1 2027; it says the frequency depends on risk profile, local rules and the last update. Adyen says 'occasionally'. Neither publishes a schedule. Re-check Stripe's status before print.",
+    "PSD3 and the Payment Services Regulation awaited Parliament's second reading on 17 November 2026 (indicative plenary 14 December 2026); re-check before print.",
+    "Neither company's DORA position was found; whether either will be supervised directly by AMLA from 2028 is unknown.",
+    "Adyen's staggered-verification tier amounts are not in the page text.",
+    "Stripe's restricted-businesses page is paraphrased, not quoted (the English edition was read in the verification pass).",
+    "The Massachusetts settlement involving Stripe could not be read on the official page (HTTP 403) and is not used."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "The Frozen Studios are placed on Stripe Connect, with Larkfield as the party that collects requirements, and the incident is replayed against Stripe's documented fields; the Adyen side of K6 is shown with Studio Noord as a hypothetical periodic review.",
+      "rejected": [
+        "Leaving the provider unnamed, which would make the worked example unable to cite a field.",
+        "Placing it on Adyen: the ledger's 'a verification requirement changed' matches Stripe's documented future-requirements structure, and no equivalent Adyen construct was found."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The calendar section comes before the designs, although the style guide lists designs straight after the mechanism, because rule changes are one cause of the state changes the designs must handle.",
+      "rejected": [
+        "Calendar as the last body section, where it would read as an appendix."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The platform designs are kept to three paragraphs and the detail is left to platform-onboarding-and-verification, under consistency ruling 2.",
+      "rejected": [
+        "A full treatment of hosted, embedded and API onboarding here."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "US rules appear only where they define a term (the 25 percent threshold, OFAC's 50 Percent Rule) or changed in 2026 (FinCEN relief); the CFPB items and the model money-transmission law are left out as unverified or owned elsewhere.",
+      "rejected": [
+        "A US calendar section built on items the research could not confirm."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "_research/brief-fraud-risk-and-compliance.md",
+      "contributed": "Part 2 (legal obligations, how each company exposes compliance, transaction monitoring), Part 3 (the regulation calendar), section 1.8 (account-level risk), the open questions and research limitations."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-platforms-and-embedded-finance.md",
+      "contributed": "Part 2 (capabilities and requirements as state; onboarding options) and its comparison table."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "The Frozen Studios, the Card-Testing Weekend, the Silent Webhook, K2, K4 and K6, the cast, Mila's class pass."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/consistency-issues.md",
+      "contributed": "Ruling 2: this chapter owns verification as continuing account state; chapter 34 owns what the platform does."
+    },
+    {
+      "kind": "internal",
+      "ref": "PLAN.md and journal-spec.json",
+      "contributed": "The chapter contract; intent, thesis, role and transitions, copied unchanged; the part closing this chapter carries."
+    },
+    {
+      "kind": "external",
+      "ref": "Pages fetched by the writer on 17 November 2026: Stripe Connect documentation (identity verification, handling API verification, handle verification updates, onboarding, risk management, Radar rules); Adyen platforms documentation (verification overview, capabilities, data review process, verification requirements, verification types); Adyen's restricted list and PSD3 explainer; Regulations (EU) 2024/1624, 2024/886 and 2022/2554; the European Parliament procedure file 2023/0210(COD); the ESAs' press release of 18 November 2025.",
+      "contributed": "Verification of every quotation used as evidence."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: 8 statements of absence re-tested with a wide search (documentation sitemaps, support and help centers, company sites, policies and legal pages, engineering posts, web search). Narrowed: transaction monitoring and sanctions screening 'not public' (both companies state as policy that they screen and monitor: Stripe's financial-crimes policy statement of November 2023, Adyen's privacy statement and glossary; the method remains unpublished); Stripe deadline 'no standard length published' (support article: typically 14 days for payouts and 28 for payments on Custom accounts); Adyen sanctions and PEP reviews (party screening is defined in the glossary, not named as a verification status). Four sources added; one controlling idea aligned."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 104 claims checked (88 confirmed, 7 corrected, 9 hedged, 0 unsupported and removed or relabeled, 0 unreachable); Stripe's periodic re-verification was 'Not public' and is now cited from Stripe's KYC Refresh support article (announced, API in private preview in 2026), in the text, the comparison table and the failure table. Inline external links reduced to plain attributions (ruling 22); no unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes). Notes acted on: the instant-payments screening paragraph moved from the monitoring section into the calendar; the declared reason for the calendar's position rewritten; K6 bound to the mirror design; Adyen's deadlines, review error and silent legal-entity change established in the state-model section before the comparison uses them; the sweep rule stated once as mechanism (in-practice) and once as failure; the provider's own list moved before the loop paragraph; a flow declared for the comparison section. Notes not acted on: cutting DORA (the journal spec's intent requires its date; it is kept to one paragraph that says it is outside the claim); moving the calendar to directly after the duties."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "First version, written from the PLAN contract, the journal spec entry and the research briefs."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation after verification (17 November 2026): thesis how_why applies ruling 36: Stripe's periodic re-verification is announced and in preview, and Adyen announces rule changes in release notes."
+    }
+  ]
+}

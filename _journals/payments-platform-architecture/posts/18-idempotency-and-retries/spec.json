@@ -1,0 +1,1719 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "idempotency-and-retries",
+  "journal": "payments-platform-architecture",
+  "part": "part-4",
+  "title": "Exactly Once, Over a Network That Does Not Allow It: Idempotency and Retries",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "Why a timeout leaves a payment request in one of three states the client cannot tell apart, and what an idempotency key lets the server do in each.",
+        "The documented terms at each provider as of November 2026: Stripe API v1 (replays the stored first response, errors included; keys kept at least 24 hours; a changed request is rejected), Stripe API v2 (30 days; failed work is retried), Adyen (keys valid 7 to 14 days per company account and region; behavior on a changed request not documented).",
+        "That Stripe has published nothing on how it stores keys and Adyen only one 2021 passage naming a distributed database beside its acceptance layer, and that the widely cited recovery-point design is a reference implementation from a personal article, not a description of Stripe's system."
+      ],
+      "believe": [
+        "No answer is not a failure: after a timeout the only safe moves are the same request with the same key, or a read of the provider's record.",
+        "A key generated per attempt protects nothing; the key must come from the business event."
+      ],
+      "can_do": [
+        "Choose an idempotency key for a given money-moving operation and say where it is stored before the first send.",
+        "Check every retry path in a system (SDK, queue redelivery, scheduled job, a person) against the provider's key retention window.",
+        "Say which duplicates a key does not prevent and which other guard covers them."
+      ]
+    },
+    "audience": {
+      "who": "A software engineer or architect who is new to payments and is integrating, operating or evaluating a payment provider.",
+      "already_knows": [
+        "HTTP, timeouts, retries and status codes",
+        "Queues, workers and at-least-once delivery as general ideas",
+        "The payment object model and identifiers of the previous chapter (payment-api-design)",
+        "Authorization and decline as answers from the cardholder's bank (payment-authorization)"
+      ],
+      "does_not_know": [
+        "What each provider documents about idempotency keys and for how long it keeps them",
+        "Which duplicates a key does not prevent",
+        "How little of either provider's implementation is public"
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a retry that arrives after a delay, the reader says what key it must carry and what each of two differently configured providers does with it.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A nightly job charges 5,000 invoices. On one call the connection drops before any response arrives, and the job's queue redelivers that task 36 hours later. What key should the second attempt carry, and what happens at a provider that keeps keys for at least 24 hours compared with one that keeps them for 7 to 14 days?",
+        "expected": "The same key as the first attempt, derived from the invoice and stored before the first send. The 7-to-14-day provider recognizes it and returns the first result without charging again. The 24-hour provider may have removed the key and would execute a new charge, so after its window the job must not resend at all until it has read the provider's record of the first attempt. A new key is never correct while the first outcome is unknown."
+      },
+      {
+        "id": "AC-2",
+        "statement": "The reader can state a duplicate that an idempotency key does not prevent and the guard that does.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A customer taps 'Pay' twice, and the app generates a fresh random key for each tap. Does the idempotency key prevent two charges? What would?",
+        "expected": "No: two keys are two operations to the provider. A key derived from the business event (the cart, order or billing period) makes the second tap a repeat of the first; so does confirming one payment object whose state machine refuses a second confirmation."
+      },
+      {
+        "id": "AC-3",
+        "statement": "The chapter presents no key-storage, fingerprinting or recovery design as Stripe's or Adyen's implementation; such designs are attributed to their source or labeled as reference-architecture inference, and the 2017 Stripe post carries its evidence age.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      },
+      {
+        "id": "AC-4",
+        "statement": "The Larkfield worked example uses the ledger's figures for the Double Charge (1 November 2026; 1,840 members; €71,300 refunded; 212 disputes) and shows the key Keel decision K1 would have sent.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "major"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "How do you make “charge this card” safe to send twice?",
+    "claim": "“Charge this card” is safe to send twice only when the client sends the same key both times, a key derived from the business event and stored before the first attempt, and the second send arrives while the provider still remembers that key. The key makes the request repeatable; it does not make the outcome known, so after a timeout the client repeats the same request, or first establishes what happened from the provider's own record (the object, its events or its reports), and never starts a new one.",
+    "disputed_by": "The view that retries are a transport concern: the provider's SDK already retries with a generated key, and a queue with exactly-once semantics does the rest, so application code does not need to design keys.",
+    "so_what": "The provider's retention window becomes a design input: every path that can resend a request later than the window (a queue redelivery, a job that runs the next day, a person pressing a button) is a path to a double charge unless it first reads the provider's record. On Stripe's API v1 that window is at least 24 hours; on Adyen it is 7 to 14 days.",
+    "how_why": "A request can fail before the server sees it, while the server is working, or after the work is done and before the answer returns, and the client cannot tell which (Stripe's engineering post of February 2017 sets out the three cases; evidence age nine years, and the current API reference confirms the mechanism). Only the client knows that two sends are one intention, so it must say so with a key, and the server must remember the key and its result. The documented memory is finite and differs: Stripe's API v1 replays the first response, including a 500, for at least 24 hours and rejects a changed request; its API v2 keeps keys 30 days and retries failed work, but payment objects are documented under v1 as of November 2026; Adyen's documentation gives 7 to 14 days per company account and region and does not say what a changed request returns. A key generated by an SDK lives for one call, which is why a retry by a job is outside it. Stripe has published nothing on how keys are stored and Adyen one 2021 passage naming a distributed database; neither has published how a half-finished request is recovered, so the chapter's server-side design is a reference design.",
+    "supporting_claims": [
+      {
+        "id": "C1",
+        "claim": "A timeout or server error leaves a request in one of three states the client cannot tell apart, so no answer is an unknown outcome and not a failure, and only the client knows that a second send is the same intention as the first."
+      },
+      {
+        "id": "C2",
+        "claim": "A server makes a request repeatable by remembering the key, a fingerprint of the request and its result for a limited time; the detailed public design for this is a reference implementation from a personal article, and neither Stripe nor Adyen has published its own beyond a fragment."
+      },
+      {
+        "id": "C3",
+        "claim": "The documented memory is finite and differs: Stripe API v1 replays the first response, errors included, for at least 24 hours and rejects a changed request; API v2 keeps keys 30 days and retries failed work; Adyen keeps keys 7 to 14 days per company account and region and leaves a changed request undocumented."
+      },
+      {
+        "id": "C4",
+        "claim": "The key protects only when it is derived from the business event, stored before the first attempt and resent inside the provider's window, so every retry path in a system is checked against that window and stops at a deadline."
+      },
+      {
+        "id": "C5",
+        "claim": "A key makes a request repeatable and does not make the outcome known or prevent business-level duplicates; those need a guard on the payment itself and, in the end, the provider's own record."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Supplies the unknown outcome and the idempotency key, the mechanism that makes every money-moving call in the rest of the book repeatable.",
+    "supports": [
+      "P4-2"
+    ]
+  },
+  "flow": {
+    "pattern": "problem_solution",
+    "additional_patterns": [
+      {
+        "pattern": "prerequisite_order",
+        "applies_to": "unknown-outcome, server-memory, documented-terms: the problem, the general mechanism, then each provider's documented version of it"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "documented-terms and where-they-differ"
+      },
+      {
+        "pattern": "prerequisite_order",
+        "applies_to": "choosing-the-key before retry-policy: which key and which paths, then how those paths time their repeats and when they stop"
+      }
+    ],
+    "rationale": "The reader meets a retry that used keys and still charged 1,840 members twice before any theory, so the unknown outcome arrives as the explanation of an incident. The server's memory comes before the providers' documented terms because those terms are only readable as positions in the general design (which case, which contract, how long). The client's choices come after the documented windows because the window is their main input: a key design cannot be judged before the reader knows the key is forgotten after 24 hours or 7 days. Limits come after the mechanism is complete, so that 'what a key does not solve' is read against everything it does. The comparison table follows the sections whose facts it repeats, the Larkfield replay applies all of it, and the failures of the mechanism come last because each is one condition of the thesis removed. Moving the client's choices before the documented terms would make the chapter read as generic advice with provider facts appended, which is the view the thesis disputes."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "A renewal job sends a €49 membership charge and no response comes back. If it does nothing, a membership may go unpaid; if it sends again, the member may pay twice. On 1 November 2026 Larkfield's job sent again, each time under a new idempotency key, and 1,840 members paid twice."
+    },
+    "bridge": {
+      "from_reader_world": "An engineer retries a failed call as a matter of routine, and most calls are safe to retry or cheap to repeat.",
+      "to_topic": "A payment call is neither: the failure may be only in the answer, the repeat moves money, and the provider will treat it as the same request only if the client says so in a way the provider still remembers."
+    },
+    "thesis_statement": {
+      "text": "'Charge this card' is safe to send twice only when both sends carry the same key, derived from the business event and stored before the first attempt, and the second arrives while the provider still remembers it; the key makes the request repeatable, not the outcome known.",
+      "placement": "KEY POINTS callout and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p04",
+      "promises": [
+        {
+          "promise": "Start from Larkfield's retries under new keys.",
+          "kept_in": [
+            "scene"
+          ]
+        },
+        {
+          "promise": "Explain why no answer is not a no: the unknown outcome and why only the client can mark a repeat.",
+          "kept_in": [
+            "unknown-outcome"
+          ]
+        },
+        {
+          "promise": "Describe what a server must remember (key, fingerprint, result) and where the public record of the two companies' implementations stops.",
+          "kept_in": [
+            "server-memory"
+          ]
+        },
+        {
+          "promise": "Report what Stripe and Adyen document, with their windows.",
+          "kept_in": [
+            "documented-terms"
+          ]
+        },
+        {
+          "promise": "Show how to choose a key and how to retry: the business event, storage before sending, the window, backoff and a deadline.",
+          "kept_in": [
+            "choosing-the-key",
+            "retry-policy"
+          ]
+        },
+        {
+          "promise": "Say what a key does not solve, at the API and downstream of it.",
+          "kept_in": [
+            "what-a-key-does-not-solve"
+          ]
+        },
+        {
+          "promise": "Compare the two providers.",
+          "kept_in": [
+            "where-they-differ"
+          ]
+        },
+        {
+          "promise": "Replay 1 November under decision K1 and go through the ways the mechanism itself fails.",
+          "kept_in": [
+            "in-practice",
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "A create request whose response never arrives leaves the caller with two choices that can both be wrong, and Larkfield's renewal job chose to send again under a new key and charged 1,840 members twice.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "The Double Charge, 1 November 2026: a provider call timed out during the first-of-month renewals, the renewal job retried with a new idempotency key, 1,840 members were charged twice, €71,300 was refunded and 212 disputes followed (scenario ledger, incidents table).",
+            "shows": "Poses the chapter's question with the cost of answering it wrongly: not sending may leave a membership unpaid, sending may charge twice.",
+            "source": "scenario-ledger.md"
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "'Charge this card' is safe to send twice only when both sends carry the same key, the key was derived from the business event and stored before the first attempt, and the second send arrives while the provider still remembers it; the key makes the request repeatable and does not make the outcome known.",
+        "function": "claim",
+        "evidence": [
+          {
+            "kind": "fact",
+            "what": "Documented retention as of November 2026: Stripe API v1 keeps a key for at least 24 hours (docs.stripe.com/error-low-level); Adyen keys are valid 7 to 14 days after first submission (docs.adyen.com/development-resources/api-idempotency).",
+            "shows": "Gives the thesis its two numbers, so the reader sees from the start that the provider's memory is finite and differs.",
+            "source": "Stripe documentation, 'Advanced error handling', https://docs.stripe.com/error-low-level, n.d., accessed 2026-11; Adyen documentation, 'API idempotency', https://docs.adyen.com/development-resources/api-idempotency, n.d., accessed 2026-11"
+          }
+        ],
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "The two wrong choices after a missing response.",
+          "introduces": "The condition under which sending again is safe, and what the key does not give.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "In the journey of Mila's class pass this chapter covers the seconds between the booking app's request and the provider's answer on Tuesday 9 March 2027 at 19:42, a gap that every later money-moving call for the same payment has too.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's class pass: €120.00 from Studio Noord, Tuesday 9 March 2027 at 19:42, approved at 19:42; the refund of €84.00 on 18 March 2027 is another money-moving call (scenario ledger, recurring worked examples).",
+            "shows": "Locates the chapter on the payment's path: it is about every request, not one step.",
+            "source": "scenario-ledger.md"
+          }
+        ],
+        "transition_in": {
+          "relationship": "example",
+          "carries_over": "The general claim about a request sent twice.",
+          "introduces": "Where that request sits in the book's recurring payment.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "controlling_idea": "The chapter goes from Larkfield's retries, through why no answer is not a no, what a server must remember, what the two providers document, how to choose a key, how to retry, what a key does not solve, how the providers differ and a replay of 1 November, to the ways the mechanism itself fails.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The claim and its place in the journey.",
+          "introduces": "The order of the sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: 1,840 Retries Under New Keys",
+      "controlling_idea": "Larkfield's renewal job did send idempotency keys on 1 November 2026; it generated a new one for every network call, so each retry reached the provider as a request it had never seen.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "C1",
+          "C4"
+        ],
+        "how": "Shows the thesis by its violation: a key that does not come from the business event protects nothing."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The incident, its cause, then the decision taken after it; the cause cannot be read before the facts and the decision answers the cause."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The claim that a second send is safe only under the same, stored key.",
+        "introduces": "The incident in which the second send carried a different one.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p05",
+          "controlling_idea": "On 1 November 2026, in the middle of the first-of-month renewals, a provider's calls timed out and Larkfield's renewal job sent each waiting charge again under a new idempotency key, which charged 1,840 members twice.",
+          "function": "context",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Scenario ledger: 38% of monthly membership volume is attempted in a 6-hour window on the 1st; on 1 November 2026 a provider call timed out and the job retried with a new idempotency key; 1,840 members charged twice; €71,300 refunded; 212 disputes anyway. 71,300 / 1,840 = €38.75 per duplicate on average.",
+              "shows": "Fixes the incident's figures and the one technical fact that matters here: the key changed between the first send and the retry.",
+              "source": "scenario-ledger.md"
+            }
+          ]
+        },
+        {
+          "id": "p06",
+          "controlling_idea": "The provider did what it documents: two keys are two operations, so the fault was the source of the key, which identified a network call and not a renewal.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe's error guide: \"If a `409` indicates that another request with the same key is still executing, wait and retry with that key and the same parameters. A new key can start a second operation.\" (docs.stripe.com/error-low-level, n.d., accessed 2026-11)",
+              "shows": "A provider states in its own words that a new key means a new operation, so the duplicate was the client's instruction.",
+              "source": "Stripe documentation, 'Advanced error handling', https://docs.stripe.com/error-low-level, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The retry under a new key.",
+            "introduces": "Why the provider could not have recognized it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p07",
+          "controlling_idea": "Keel decision K1 states the repair, one writer and one key per business event, and Femke de Graaf reduced it to three things to decide: what identifies one renewal, where that key is stored before the first send, and how long each provider remembers it.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "K1 — One writer, one key: every money-moving call goes through the payment service and its idempotency key is derived from the business event, never generated per network call; for a renewal the key is membership id plus billing period plus the number of the scheduled attempt (scenario ledger, Keel program).",
+              "shows": "Turns the incident into the three design questions the rest of the chapter answers.",
+              "source": "scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "A key that identified the wrong thing.",
+            "introduces": "The decision that fixes it and the questions it raises.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "unknown-outcome",
+      "heading": "Why No Answer Is Not a No: The Unknown Outcome",
+      "controlling_idea": "A request can fail before the server sees it, while the server is working or after the work is done, the client sees the same silence in all three, and only the client knows that a second send is the same intention as the first.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "C1"
+        ],
+        "how": "Establishes the problem the key solves and why the client, not the server, has to supply the identity."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The three failure cases come before the name for the state they produce; the impossibility of exactly-once delivery comes before the key, which is the answer to it. Starting with the key would present a mechanism before the reader knows what it is for."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Larkfield's three questions about the key.",
+        "introduces": "The problem underneath them: what a missing answer does and does not tell the client.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p08",
+          "controlling_idea": "A call between two machines can fail in three places, before the server receives it, while the server is working and after the work is done, and from the client all three look the same.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe's 2017 post: \"The initial connection could fail as the client tries to connect to a server. The call could fail midway while the server is fulfilling the operation, leaving the work in limbo. The call could succeed, but the connection break before the server can tell its client about it.\" (stripe.com/blog/idempotency, 2017-02-22; evidence age 9 years). Current documentation confirms the point: \"When a connection fails, you might not know whether Stripe received or executed the request.\" (docs.stripe.com/error-low-level, n.d., accessed 2026-11)",
+              "shows": "The three cases are the reason a timeout carries no information about the payment; the current page shows the nine-year-old account still holds.",
+              "source": "Stripe engineering blog, Brandur Leach, 'Designing robust and predictable APIs with idempotency', https://stripe.com/blog/idempotency, published 2017-02-22 (evidence age: 9 years); Stripe documentation, 'Advanced error handling', https://docs.stripe.com/error-low-level, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "figure",
+              "what": "Figure 18-three-silences: one request lost in three places between a client and a provider, with the client seeing the same question mark each time.",
+              "shows": "Makes the three cases one picture the later sections refer back to."
+            }
+          ]
+        },
+        {
+          "id": "p09",
+          "controlling_idea": "The state the client is left in is an unknown outcome: it cannot tell whether money moved, and a server error leaves it in the same state as a timeout, which is different from a decline, where the answer is no.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: \"Treat the outcome of a request that returns `500` as indeterminate: the operation might have produced side effects even though you received an error.\" (docs.stripe.com/error-low-level, n.d., accessed 2026-11)",
+              "shows": "A provider itself classes an error response with the timeout: neither is an answer about the payment.",
+              "source": "Stripe documentation, 'Advanced error handling', https://docs.stripe.com/error-low-level, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "Three failures the client cannot tell apart.",
+            "introduces": "The name for the state they leave, and its boundary with a decline.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "controlling_idea": "No protocol between two parties can deliver a message exactly once, so the client chooses between never resending, which leaves the outcome unknown, and resending, which can repeat the work; the usable combination is to resend and have the server apply the effect once.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe's 2017 post defines idempotent endpoints as ones that \"can be called any number of times while guaranteeing that side effects only occur once\", and notes \"Even the Stripe API and just one other server that's making requests to it comprise a distributed system.\" (stripe.com/blog/idempotency, 2017-02-22; evidence age 9 years)",
+              "shows": "Names the property that turns at-least-once delivery into an effect that happens once.",
+              "source": "Stripe engineering blog, Brandur Leach, 'Designing robust and predictable APIs with idempotency', https://stripe.com/blog/idempotency, published 2017-02-22 (evidence age: 9 years)"
+            },
+            {
+              "kind": "reasoning",
+              "what": "The sender cannot distinguish a lost request from a lost acknowledgement, so any rule that stops duplicates by not resending also stops recovery of the lost request.",
+              "shows": "Why 'exactly once' is achieved in processing and not in delivery."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "An outcome the client cannot observe.",
+            "introduces": "Why the network cannot remove it and what combination works.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "controlling_idea": "The server cannot recognize a repeat from the request's content, because two identical charges can both be intended, so the client must mark the repeat with an idempotency key.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe's 2017 post: \"a client generates a unique ID to identify just that operation and sends it up to the server along with the normal payload. The server receives the ID and correlates it with the state of the request on its end.\" (stripe.com/blog/idempotency, 2017-02-22; evidence age 9 years)",
+              "shows": "Defines the idempotency key as the client's statement of intention.",
+              "source": "Stripe engineering blog, Brandur Leach, 'Designing robust and predictable APIs with idempotency', https://stripe.com/blog/idempotency, published 2017-02-22 (evidence age: 9 years)"
+            },
+            {
+              "kind": "example",
+              "what": "Illustration: a member buys two €16.00 drop-ins for the same evening, one for a friend; same card, same amount, same studio, minutes apart, and both are wanted (drop-in price from the scenario ledger).",
+              "shows": "Shows why deduplicating by content would refuse legitimate payments.",
+              "source": "scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The need for the server to apply an effect once.",
+            "introduces": "Why only the client can say which requests are one, and the key as its way of saying it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "server-memory",
+      "heading": "What the Server Must Remember: Key, Fingerprint and Result",
+      "controlling_idea": "A server makes a request repeatable by remembering the key, a fingerprint of the request and its result for a limited time, and the only detailed public design of that memory is a reference implementation from a personal article, not either company's system.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "C2"
+        ],
+        "how": "Explains the server half of the thesis (the provider 'still remembers that key') and marks the line between published design and documented behavior."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The four cases come first because the fingerprint and the half-finished request are each one of the cases examined; the store's requirements and expiry follow because they apply to the whole record; the reference design and the statement of where the companies' own record stops come last, together, so that both can refer to everything above as general design. Putting the evidence limit first would leave the reader without the design it qualifies."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "The key as the client's statement that two sends are one intention.",
+        "introduces": "What the server has to remember to honor that statement.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p12",
+          "controlling_idea": "With a key, the server can sort every incoming request into one of four cases: never seen, finished, still in progress, or seen with a different request.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Table 'What the server does with a key': four rows (key not known; key known and finished; key known and in progress; key known, request differs), with what a typical server does in each. Labeled as a generic design; the providers' documented behavior follows in the next section.",
+              "shows": "Gives the reader the frame into which each provider's documented behavior is later placed."
+            },
+            {
+              "kind": "figure",
+              "what": "Figure 18-key-lookup: a request with a key entering a lookup step that branches four ways (execute, replay, wait, refuse).",
+              "shows": "Shows the four cases as one decision."
+            }
+          ]
+        },
+        {
+          "id": "p13",
+          "controlling_idea": "A request fingerprint is the server's stored record of what the first request asked for, kept so that a key reused for a different request is refused instead of being answered with the old result.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: \"The idempotency layer compares incoming parameters to those of the original request and errors if they're not the same to prevent accidental misuse.\" (docs.stripe.com/api/idempotent_requests, n.d., accessed 2026-11)",
+              "shows": "A documented instance of fingerprinting and its stated purpose: catching client bugs.",
+              "source": "Stripe API reference, 'Idempotent requests', https://docs.stripe.com/api/idempotent_requests, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The fourth case, a known key with a different request.",
+            "introduces": "What the server must store to detect it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p14",
+          "controlling_idea": "For a request that failed halfway, a server can offer one of two contracts: return the stored first answer, even when it is an error, or carry the unfinished work to completion.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe's 2017 post describes the second: \"On a failure midway through an operation, the server picks up the work and carries it through. The exact behavior is heavily dependent on implementation, but if the previous operation was successfully rolled back by way of an ACID database, it'll be safe to retry it wholesale. Otherwise, state is recovered and the call is continued.\" (stripe.com/blog/idempotency, 2017-02-22; evidence age 9 years). The current API reference documents the first for API v1 and the second for API v2 (docs.stripe.com/api/idempotent_requests, n.d., accessed 2026-11).",
+              "shows": "The two contracts both exist at one provider, so the reader must ask which one an endpoint gives.",
+              "source": "Stripe engineering blog, Brandur Leach, 'Designing robust and predictable APIs with idempotency', https://stripe.com/blog/idempotency, published 2017-02-22 (evidence age: 9 years); Stripe API reference, 'Idempotent requests', https://docs.stripe.com/api/idempotent_requests, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The finished request, whose stored result is simply returned.",
+            "introduces": "The half-finished request, for which there are two different promises.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p15",
+          "controlling_idea": "The key store sits on the path of every write, so it has to be consistent, fast and available at once, and because that memory costs storage, keys expire.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Requirements table for a key store (how fast, how consistent, how available, what happens on failure, how long kept), labeled as reference-design requirements with the retention row filled from the documented windows (24 hours, 7 to 14 days, 30 days).",
+              "shows": "States the requirements a builder faces, which explain why the window is finite."
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen's documentation: \"To enable idempotent behavior, Adyen must retain a consistent, stateful data store to compare each request against.\" (docs.adyen.com/development-resources/api-idempotency, n.d., accessed 2026-11). Adyen's 2021 post: \"The information needs to be available locally, so we eventually decided on integrating Cockroach, a distributed database, with our PALs\" (adyen.com/knowledge-hub/design-to-duty-adyen-architecture, 2021-07-28; evidence age 5 years; PAL is its Payments Acceptance Layer). Airbnb's 2019 post chose a library over a separate idempotency service because \"We needed ultra low latency\" (evidence age 7 years).",
+              "shows": "Two companies state the same constraint from the builder's side: the lookup must be local to the request path.",
+              "source": "Adyen documentation, 'API idempotency', https://docs.adyen.com/development-resources/api-idempotency, n.d., accessed 2026-11; Adyen knowledge hub, 'Design to Duty: How we make architecture decisions at Adyen', https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture, published 2021-07-28 (evidence age: 5 years); Airbnb engineering blog, Jon Chew and Ninad Khisti, 'Avoiding Double Payments in a Distributed Payments System', https://medium.com/airbnb-engineering/avoiding-double-payments-in-a-distributed-payments-system-2981f6b070bb, published 2019-04-16 (evidence age: 7 years)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "A record kept per key and a promise about unfinished work.",
+            "introduces": "What that record demands of the store that holds it, and why it is not kept forever.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p16",
+          "controlling_idea": "The most detailed public design for carrying work to completion, a key record with a lock, the request's parameters, the stored response and a recovery point, comes from a 2017 personal article that calls itself a reference implementation, and it is not a description of Stripe's system.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "Brandur Leach, 'Implementing Stripe-like Idempotency Keys in Postgres' (brandur.org/idempotency-keys, 2017-10-27; evidence age 9 years): \"Let's look at how to design idempotency keys for an API by building a reference implementation.\" The design: an `idempotency_keys` table with `locked_at`, `request_params`, `response_code`, `response_body` and `recovery_point`; work split into atomic phases committed before each call to another system (a \"foreign state mutation\"); a completer that pushes abandoned requests through and a reaper that deletes keys, with a suggested threshold of \"about 72 hours\". Built for a demo application, Rocket Rides.",
+              "shows": "Supplies a concrete server design while fixing its status: a design recommended by a then-Stripe engineer, on his own site, for a demo app.",
+              "source": "Brandur Leach, personal site, 'Implementing Stripe-like Idempotency Keys in Postgres', https://brandur.org/idempotency-keys, published 2017-10-27 (evidence age: 9 years)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The contract that completes unfinished work, and a store that must be consistent and local.",
+            "introduces": "The one detailed public design for it and what kind of source it is.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p17",
+          "controlling_idea": "The public record of the two companies' implementations stops early: Stripe has published nothing about where keys are stored or how a request is fingerprinted, and Adyen has published one paragraph from 2021 naming a distributed database, with nothing on the key record, expiry or recovery.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Absence established by the research base: the 2017 Stripe post \"says nothing about how Stripe stores keys, fingerprints requests, or recovers a half-finished request\" (it was re-read for this chapter); Adyen's only implementation statements are the 2021 paragraph and the documentation sentence quoted above; no later Adyen source confirms that the same database is still used.",
+              "shows": "Marks where documented fact ends, so that the four-case table and the requirements table are read as reference design.",
+              "source": "Stripe engineering blog, Brandur Leach, 'Designing robust and predictable APIs with idempotency', https://stripe.com/blog/idempotency, published 2017-02-22 (evidence age: 9 years); Adyen knowledge hub, 'Design to Duty: How we make architecture decisions at Adyen', https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture, published 2021-07-28 (evidence age: 5 years)"
+            },
+            {
+              "kind": "reasoning",
+              "what": "Inference, to be labeled as such: Adyen's statement that keys are not checked across regional endpoints, together with 'available locally', suggests the key store is not shared across regions on the request path.",
+              "shows": "An inference a reader could mistake for fact unless it is labeled."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A reference design that is public in detail.",
+            "introduces": "How little of either company's actual implementation is public.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "documented-terms",
+      "heading": "What Stripe and Adyen Document: 24 Hours, 30 Days, 7 to 14 Days",
+      "controlling_idea": "The documented memory is finite and differs: Stripe's API v1 replays the first response, errors included, for at least 24 hours and rejects a changed request; its API v2 keeps keys 30 days and retries failed work; Adyen keeps keys 7 to 14 days per company account and region and does not say what a changed request returns.",
+      "function": "description",
+      "advances_thesis": {
+        "supports": [
+          "C3"
+        ],
+        "how": "Supplies the provider's side of the thesis: how long 'still remembers' lasts and what a repeat returns within it."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "Stripe v1 first because it governs payment calls and its documentation is the most explicit; v2 next as the contrast within Stripe; Adyen last, read against both, with its undocumented points at the end where the reader can see what they are missing relative to Stripe."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "A general design whose implementation at the two companies is mostly unpublished.",
+        "introduces": "The behavior each company does document, which is what an integrator can build on.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p18",
+          "controlling_idea": "Stripe's API v1 saves the status code and body of the first request once the endpoint has begun to execute and returns them to every repeat, a `500` included, while a repeat that arrives during execution gets a `409` and a repeat with different parameters gets an error.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"For API v1, Stripe saves the status code and body of the first request made with a given idempotency key after endpoint execution begins. Retries with the same key return the saved response, including `500` errors.\"; \"If incoming parameters fail validation, or the request conflicts with another request that's executing concurrently, we don't save the idempotent result\"; header `Idempotent-Replayed: true` on a replay; error type `idempotency_error` when a key \"is re-used on a request that does not match the first request's API endpoint and parameters\"; keys \"up to 255 characters long\"; POST only (docs.stripe.com/api/idempotent_requests, /error-low-level and /api/errors, n.d., accessed 2026-11).",
+              "shows": "Places Stripe v1 in each of the four cases: it is the replay-the-answer contract.",
+              "source": "Stripe API reference, 'Idempotent requests', https://docs.stripe.com/api/idempotent_requests, n.d., accessed 2026-11; Stripe documentation, 'Advanced error handling', https://docs.stripe.com/error-low-level, n.d., accessed 2026-11; Stripe API reference, 'Errors', https://docs.stripe.com/api/errors, n.d., accessed 2026-11"
+            }
+          ]
+        },
+        {
+          "id": "p19",
+          "controlling_idea": "Stripe keeps a v1 key for at least 24 hours and may remove it afterwards, and it tells integrators that once that window has passed with the outcome unknown they should resend under neither the old key nor a new one.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"Stripe retains keys for at least 24 hours and can remove them after that. Reusing a key after it's removed can execute a new request.\" \"If the outcome is still unknown after that window, don't retry with either the old key or a new one. Retrieve the relevant object, inspect the request in the Dashboard, and use webhook events to reconcile the outcome. If you can't establish what happened, contact Stripe support before repeating the operation.\" (docs.stripe.com/error-low-level, n.d., accessed 2026-11). A 2025 Stripe developer post repeats the figure: \"Stripe recognizes the idempotency key for 24 hours\" (stripe.dev, 2025-04-10).",
+              "shows": "The window is a lower bound on memory and an upper bound on safe resending; after it the old key is as dangerous as a new one.",
+              "source": "Stripe documentation, 'Advanced error handling', https://docs.stripe.com/error-low-level, n.d., accessed 2026-11; Stripe developer blog, Ben Smith, 'Because nobody likes being charged twice', https://stripe.dev/blog/because-nobody-likes-being-charged-twice, published 2025-04-10"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "What a repeat returns while the key is remembered.",
+            "introduces": "How long that is, and Stripe's instruction for afterwards.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "controlling_idea": "Because v1 stores the answer and not the outcome, a stored `500` can stand beside a payment that exists: Stripe says it tries to reconcile failed operations after an incident and that the cached response does not change.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"During incident recovery, Stripe attempts to reconcile failed operations and send webhook events for any objects created during reconciliation. The cached response doesn't change, and reconciliation isn't guaranteed to resolve every operation.\" \"When creating a resource, include a local identifier in its metadata so you can match an object received through a webhook to your local records\" (docs.stripe.com/error-low-level, n.d., accessed 2026-11).",
+              "shows": "Shows in the provider's words that the key makes the request repeatable without making the outcome known.",
+              "source": "Stripe documentation, 'Advanced error handling', https://docs.stripe.com/error-low-level, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "A stored response that includes errors.",
+            "introduces": "The case where the stored response and the real outcome differ.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p21",
+          "controlling_idea": "Stripe's API v2 gives the other contract, a 30-day window in which a repeat re-executes failed work and returns an updated response, but payments and refunds are created under `/v1` as of November 2026, so the 24-hour replay governs 'charge this card'.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"If the first request failed (or partially failed), the API re-executes the failed requests and returns the new response.\"; replays are requests with the same key \"for the same API\", \"in the scope of the same account or sandbox\", \"within 30 days of each other\"; \"All `POST` and `DELETE` API v2 requests accept idempotency keys\"; \"The `/v1` namespace includes most of the existing Stripe API today.\" (docs.stripe.com/api-v2-overview, n.d., accessed 2026-11). The API reference shows PaymentIntents and Refunds at `/v1/payment_intents` and `/v1/refunds` (docs.stripe.com/api, accessed 2026-11).",
+              "shows": "Shows Stripe has published a second contract and that it does not yet apply to the payment calls this chapter is about.",
+              "source": "Stripe documentation, 'API v2 overview', https://docs.stripe.com/api-v2-overview, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The v1 contract: a stored answer for at least 24 hours.",
+            "introduces": "The v2 contract and why it does not yet change the answer for payments.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p22",
+          "controlling_idea": "Adyen documents one contract: a key of at most 64 characters, stored per company account, valid 7 to 14 days after first submission and not checked across regional endpoints, for which a repeat returns the response to the first attempt, a header says whether a failure may be retried, and an unavailable key store is answered with a 503.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"If the Adyen payments platform already processed the request, the response to the first attempt will be returned without duplication.\"; \"Keys are stored at a company account level.\"; \"Idempotency keys are valid for a period of 7 to 14 days after first submission.\"; \"If you are targeting multiple regional endpoints simultaneously, idempotency keys will not be checked for duplication in other regions.\"; header `transient-error: true` \"indicates that the request can be retried at a later time using the same idempotency key\"; a duplicate sent before the first completes gets \"HTTP 422 – Unprocessable Entity or HTTP 409 - Conflict status with the error code 704\" (docs.adyen.com/development-resources/api-idempotency, n.d., accessed 2026-11; the page is six years old by its last-modified date and is the live documentation).",
+              "shows": "Places Adyen in the same four cases and gives its window, which is 7 to 14 times Stripe v1's minimum.",
+              "source": "Adyen documentation, 'API idempotency', https://docs.adyen.com/development-resources/api-idempotency, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "quotation",
+              "what": "“In the unlikely event that this data store should become unavailable, the API returns an HTTP 503 – Service Unavailable status with the error code 703” (docs.adyen.com/development-resources/api-idempotency, n.d., accessed 2026-11).",
+              "shows": "Establishes the key-store outage before the comparison table and the failure section rely on it.",
+              "source": "Adyen documentation, 'API idempotency', https://docs.adyen.com/development-resources/api-idempotency, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Stripe's two contracts.",
+            "introduces": "Adyen's single documented contract and its longer window.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p23",
+          "controlling_idea": "Adyen's page leaves three things unsaid that Stripe's states: what a reused key with a different request body returns, whether an error response is stored and replayed, and what decides where in the 7-to-14-day range a key expires.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Checked against Adyen's idempotency page, its HTTP status page and its idempotency error codes (only 703 and 704): none describes a parameter comparison, the storing of error responses, or the cause of the range (docs.adyen.com/development-resources/api-idempotency and /response-handling, accessed 2026-11).",
+              "shows": "Tells the integrator which behaviors must be tested, and that the safe planning figure is 7 days.",
+              "source": "Adyen documentation, 'API idempotency', https://docs.adyen.com/development-resources/api-idempotency, n.d., accessed 2026-11; Adyen documentation, 'HTTP status codes', https://docs.adyen.com/development-resources/response-handling, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What Adyen documents.",
+            "introduces": "What it does not, and what an integrator does about it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "choosing-the-key",
+      "heading": "Choosing the Key: The Business Event, Stored Before the First Send",
+      "controlling_idea": "A key protects only the retries that can find it again, so it must identify the business event, be written down before the first send, and be resent only by paths that fire inside the provider's window.",
+      "function": "recommendation",
+      "advances_thesis": {
+        "supports": [
+          "C4"
+        ],
+        "how": "Argues the client half of the thesis against the view that retries are a transport concern."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "The three sources of a key and the objection that the simplest is enough come first, because the recommendation is an answer to that objection; the two refinements (granularity and form) qualify the recommendation; the window comes last because it applies to whichever key was chosen."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "Windows of 24 hours and 7 to 14 days, and repeats recognized only by key.",
+        "introduces": "What the client must therefore do: choose the key and control who resends it, and when.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p24",
+          "controlling_idea": "There are three places a key can come from, a fresh value per network call, a random value stored once per operation and a value derived from the business event, and they differ in which repeats can find the key again.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Trade-off table 'Where the key comes from': rows per network call; random, stored per operation before the first send; derived from the business event. Columns: survives a timeout retry in the same call, a process restart or queue redelivery, a second trigger for the same event (double tap, two workers), what it requires.",
+              "shows": "The comparison the reader needs to choose a design; only the last two survive a restart and only the last survives a second trigger without a lookup."
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe documents two strategies: \"Use an algorithm that generates a token with enough randomness, like UUID v4.\" and \"Derive the key from a user-attached object, like the ID of a shopping cart. This provides a relatively straightforward way to protect against double submissions.\" (docs.stripe.com/error-low-level, n.d., accessed 2026-11)",
+              "shows": "The provider itself names the derived key as the one that protects against double submission.",
+              "source": "Stripe documentation, 'Advanced error handling', https://docs.stripe.com/error-low-level, n.d., accessed 2026-11"
+            }
+          ]
+        },
+        {
+          "id": "p25",
+          "controlling_idea": "The view that the SDK and a queue with exactly-once semantics make key design unnecessary fails because an SDK-generated key lives for one SDK call and a queue's guarantee covers delivery of the message to the worker, not the worker's call to the provider.",
+          "function": "refutation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: \"Stripe SDKs can generate idempotency keys and retry requests automatically. Retry defaults depend on the SDK, version, and how you construct the client.\" and \"If your application retries across separate SDK calls or process restarts, generate and persist a key for the operation and supply it to every attempt.\" (docs.stripe.com/error-low-level, n.d., accessed 2026-11)",
+              "shows": "The provider states the boundary of its SDK's protection: one call.",
+              "source": "Stripe documentation, 'Advanced error handling', https://docs.stripe.com/error-low-level, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "reasoning",
+              "what": "A worker that crashes after sending and before acknowledging its message receives the message again; the second run is a new SDK call and, without a stored key, a new operation.",
+              "shows": "Shows the exact path by which an 'exactly-once' queue produces a second charge."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Three sources for a key.",
+            "introduces": "The objection that the first source is enough, and why it is not.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p26",
+          "controlling_idea": "I would derive the key from the business event, the thing the customer or the schedule meant to happen once, and write it to my own record, with a fingerprint of the request and the state pending, before the first send.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe on PaymentIntents: \"Remember to provide an idempotency key to prevent the creation of duplicate PaymentIntents for the same purchase. This key is typically based on the ID that you associate with the cart or customer session in your application.\" (docs.stripe.com/payments/payment-intents, n.d., accessed 2026-11)",
+              "shows": "A provider recommends the business identity as the source of the key.",
+              "source": "Stripe documentation, 'The Payment Intents API', https://docs.stripe.com/payments/payment-intents, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "reasoning",
+              "what": "A key written only after the response is lost in exactly the case it exists for; written first, it is what a restarted worker, a sweep or a person finds.",
+              "shows": "Why 'stored before the first attempt' is part of the thesis and not an implementation detail."
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "Retries that cross a process boundary lose a generated key.",
+            "introduces": "Where the key should come from and when it is written.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p27",
+          "controlling_idea": "The business event has to be defined finely enough that a deliberate new attempt is a new event: a key made of membership and billing period alone would return the stored decline when the renewal is tried again days later.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stripe v1 replays the saved response, which for a declined charge is the decline, for at least 24 hours; Adyen returns \"the response to the first attempt\" for 7 to 14 days. A scheduled re-attempt three days after a decline, under the same key, would therefore get the old refusal back on Adyen and an unpredictable result on Stripe (replay if the key is still held, a new charge if it was removed). The scenario ledger's K1 key includes the number of the scheduled attempt for this reason.",
+              "shows": "Shows that a key can be too coarse as well as too fine, and gives the rule for the boundary.",
+              "source": "Stripe API reference, 'Idempotent requests', https://docs.stripe.com/api/idempotent_requests, n.d., accessed 2026-11; Adyen documentation, 'API idempotency', https://docs.adyen.com/development-resources/api-idempotency, n.d., accessed 2026-11; scenario-ledger.md"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe: \"If you need to change the request parameters, first establish that the original operation didn't succeed and isn't still executing. Use a new key for the corrected operation.\" (docs.stripe.com/error-low-level, n.d., accessed 2026-11)",
+              "shows": "The provider's rule for when a new key is right: a different operation, after the first is resolved.",
+              "source": "Stripe documentation, 'Advanced error handling', https://docs.stripe.com/error-low-level, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "One key for one business event.",
+            "introduces": "The opposite error: one key covering two deliberate attempts.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p28",
+          "controlling_idea": "Both providers constrain what a key may contain, 255 characters and no personal data at Stripe, 64 characters and a recommended random UUID at Adyen, and a random key stored against the business event's identity in your own table satisfies both.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: \"Idempotency keys are up to 255 characters long. Avoid using sensitive data (for example, email addresses or personal identifiers) as idempotency keys.\" (docs.stripe.com/api/idempotent_requests). Adyen: \"a maximum of 64 characters. We recommend using a UUID.\" and \"Generate unique idempotency keys per request using the version 4 (random) UUID type to prevent two API credentials under the same account from accessing each others responses.\" (docs.adyen.com/development-resources/api-idempotency). Both accessed 2026-11.",
+              "shows": "The constraints are documented; Adyen's reason is that keys are shared by every credential of a company account, so a guessable key exposes a stored response.",
+              "source": "Stripe API reference, 'Idempotent requests', https://docs.stripe.com/api/idempotent_requests, n.d., accessed 2026-11; Adyen documentation, 'API idempotency', https://docs.adyen.com/development-resources/api-idempotency, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "A key derived from the business event.",
+            "introduces": "The providers' limits on its form, and a design that meets them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p29",
+          "controlling_idea": "The provider's retention window is a design input: every path that can resend, the SDK, the job's loop, a queue redelivery, the next day's batch, a person, has a longest delay, and any path whose delay can exceed the window must read the provider's record before it sends.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Table 'Retry paths against the window': SDK retry (seconds), the job's own retry loop (minutes), queue redelivery (minutes to days, by configuration), next scheduled batch (a day), a person pressing a button (days); columns for inside Stripe v1's at least 24 hours and inside Adyen's 7 days. Delays are typical values labeled as assumptions; the windows are documented.",
+              "shows": "Turns the window into a checklist over a system's retry paths, which is the 'can do' the chapter promises."
+            },
+            {
+              "kind": "figure",
+              "what": "Figure 18-window-timeline: a time axis with three bands (24 hours, 7 to 14 days, 30 days) and five retry paths placed along it.",
+              "shows": "Shows at a glance which paths outlive which window."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "A stored key that any path can find.",
+            "introduces": "The limit on how late a path may use it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "retry-policy",
+      "heading": "Retry Policy: Backoff, Jitter and a Deadline",
+      "controlling_idea": "A retry policy says which failures are retried, how long to wait and when to stop, and for a payment call the stopping point is set by the provider's window, not by patience.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "C4"
+        ],
+        "how": "Completes the client's side: with the key fixed, the timing and the end of retrying are what keep the repeat inside the provider's memory."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The wait, then the decision to retry at all, then the deadline, which depends on both and on the window of the previous section."
+      },
+      "transition_in": {
+        "relationship": "sequence",
+        "carries_over": "Which key to send and which paths may send it.",
+        "introduces": "How those paths should time their repeats and when they must stop.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p30",
+          "controlling_idea": "A retry policy is the rule for which failures are retried, after what wait and how many times, and the wait should grow exponentially with a random element so that many clients failing together do not return together.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe's 2017 post on simultaneous retries: \"This is known as the thundering herd problem. We can address thundering herd by adding some amount of random “jitter” to each client's wait time.\" (stripe.com/blog/idempotency, 2017-02-22; evidence age 9 years). Adyen: \"Use an exponential backoff strategy when retrying transactions to avoid flooding the API and running into rate-limiting.\" (docs.adyen.com/development-resources/api-idempotency) and, for HTTP 429, \"a retry mechanism that uses exponential backoff with jitter\" (docs.adyen.com/development-resources/response-handling, accessed 2026-11). Marc Brooker's 2015 AWS post compares jitter variants and names the fully random one \"Full Jitter\" (updated May 2023).",
+              "shows": "Both providers ask for backoff; the 2017 advice is confirmed by current documentation and by a practitioner source.",
+              "source": "Stripe engineering blog, Brandur Leach, 'Designing robust and predictable APIs with idempotency', https://stripe.com/blog/idempotency, published 2017-02-22 (evidence age: 9 years); Adyen documentation, 'API idempotency', https://docs.adyen.com/development-resources/api-idempotency, n.d., accessed 2026-11; Adyen documentation, 'HTTP status codes', https://docs.adyen.com/development-resources/response-handling, n.d., accessed 2026-11; AWS Architecture Blog, Marc Brooker, 'Exponential Backoff and Jitter', https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/, published 2015-03-04, updated May 2023"
+            }
+          ]
+        },
+        {
+          "id": "p31",
+          "controlling_idea": "Both providers say in a response header whether a failure should be retried, and a decline or a rate limit is not an unknown outcome and follows different rules.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe's `Stripe-Should-Retry` header: \"`true`: Retry the request using exponential backoff\", \"`false`: Don't retry the request.\" (docs.stripe.com/error-low-level, n.d., accessed 2026-11). Adyen: \"If the API does not return a transient error header, or returns a header with a value of false, do not retry the request.\" (docs.adyen.com/development-resources/api-idempotency, accessed 2026-11).",
+              "shows": "The retry decision is partly given by the provider; the client should read it before applying its own rule.",
+              "source": "Stripe documentation, 'Advanced error handling', https://docs.stripe.com/error-low-level, n.d., accessed 2026-11; Adyen documentation, 'API idempotency', https://docs.adyen.com/development-resources/api-idempotency, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "How long to wait between retries.",
+            "introduces": "Which failures to retry at all, as the provider signals it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p32",
+          "controlling_idea": "I would give every money-moving call a retry deadline well inside the provider's window and, when it passes, hand the attempt to a resolution path that reads the provider's record instead of leaving it in a loop.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: \"Limit retries of an unresolved operation to the first 24 hours after the original request, using the same key and parameters.\" (docs.stripe.com/error-low-level, n.d., accessed 2026-11)",
+              "shows": "The provider sets the outer limit; the recommendation is to stop earlier and to have somewhere for the attempt to go.",
+              "source": "Stripe documentation, 'Advanced error handling', https://docs.stripe.com/error-low-level, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "reasoning",
+              "what": "The receiver's contract for confirming a state from the provider's record (persist, deduplicate, confirm, sweep) is owned by the webhooks chapter (consistency ruling 4); this chapter only hands the unresolved attempt to it.",
+              "shows": "Keeps the unknown outcome's resolution with its owning chapter."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "Waits and signals for retrying.",
+            "introduces": "When retrying ends and what takes over.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "what-a-key-does-not-solve",
+      "heading": "What a Key Does Not Solve: Business Duplicates and the Calls Downstream",
+      "controlling_idea": "A key removes repeated requests, not repeated intentions, and it stops at the provider's API: duplicates created by the business flow need a guard on the payment itself, and what happens between the provider and the networks is covered by other identifiers that are only partly public.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "C5"
+        ],
+        "how": "Sets the limit of the thesis: the key is necessary and not sufficient, and names the other guards."
+      },
+      "flow": {
+        "pattern": "small_to_large",
+        "rationale": "From the duplicate nearest the reader (two taps), to the guards on the payment, to their gaps, then outward past the provider to terminals and networks, ending where the public record ends."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "Everything a well-chosen key and a bounded retry achieve.",
+        "introduces": "What they do not: duplicates of intention, and the hops beyond the provider's API.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p33",
+          "controlling_idea": "Two requests with two keys are two operations to the provider even when a person meant one, so a double tap that produces a fresh random key each time is charged twice.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "example",
+              "what": "A member taps 'Pay' twice on a €120.00 pass; the app generates a new random key per tap; the provider sees two valid, distinct requests. With a key derived from the cart or order, the second tap is a repeat of the first.",
+              "shows": "The standard business-level duplicate and the reason the key's source decides whether it is caught.",
+              "source": "scenario-ledger.md"
+            }
+          ]
+        },
+        {
+          "id": "p34",
+          "controlling_idea": "Both providers document a second guard that sits on the payment and needs no key: at Stripe one PaymentIntent per purchase, reused and confirmed once, and at Adyen accounting rules that cap captures at the authorized amount and refunds at the captured amount.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe lists \"No double charges\" and \"No idempotency key issues\" among the benefits of PaymentIntents and advises: \"If the checkout process is interrupted and resumes later, attempt to reuse the same PaymentIntent instead of creating a new one.\" (docs.stripe.com/payments/payment-intents, n.d., accessed 2026-11). Adyen: \"The accounting rules in the Adyen payments platform take care of most potential double-processing issues that can impact payment modifications\": \"it is not possible to capture a higher amount than the authorized one\" and \"by default the total refunded value cannot exceed the captured amount.\" (docs.adyen.com/development-resources/api-idempotency, accessed 2026-11)",
+              "shows": "Each provider backs the key with an invariant on the payment itself.",
+              "source": "Stripe documentation, 'The Payment Intents API', https://docs.stripe.com/payments/payment-intents, n.d., accessed 2026-11; Adyen documentation, 'API idempotency', https://docs.adyen.com/development-resources/api-idempotency, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "A duplicate the key cannot see.",
+            "introduces": "The guards on the payment that can.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p35",
+          "controlling_idea": "Those guards have gaps of their own: an amount cap does not stop a partial operation sent twice, and neither a key nor a cap stops a second system that sends the same business event through its own path.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "example",
+              "what": "Illustration: a €30.00 partial refund on Mila's €120.00 pass sent twice without a key totals €60.00, below the captured amount, so a cap on total refunds does not refuse it; her actual €84.00 refund sent twice would total €168.00 and be refused. (Amounts from the scenario ledger; the €30.00 case is invented for the arithmetic.)",
+              "shows": "Shows with numbers which duplicates the amount rule catches and which it does not.",
+              "source": "scenario-ledger.md"
+            },
+            {
+              "kind": "reasoning",
+              "what": "The mechanism by which a second confirmation of one PaymentIntent is refused is not described by Stripe beyond the stated benefit; that the object's state machine refuses it is the author's reading (see payment-state-machines).",
+              "shows": "Keeps the Stripe guard's mechanism labeled as reading, not fact."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Guards that work without a key.",
+            "introduces": "What they leave open, so that partial operations and second writers still need a key and a single writer.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p36",
+          "controlling_idea": "Downstream of the API the provider is itself a client, and there the request's identity is carried by the protocol: Adyen's Terminal API documents an identifier that must be unique per terminal for 48 hours, and card-network messaging conventionally uses trace identifiers and reversal messages, which this book could not verify against the standard.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen Terminal API, `ServiceID`: \"Your unique ID for this request, consisting of 1-10 alphanumeric characters. Must be unique within the last 48 hours for the terminal (`POIID`) being used.\" (docs.adyen.com/point-of-sale/design-your-integration/terminal-api, n.d., accessed 2026-11). Adyen's cancel by merchant reference is possible \"up to 24 hours after authorization\" (docs.adyen.com/online-payments/cancel, n.d., accessed 2026-11).",
+              "shows": "A documented case of the same idea under another name and another window.",
+              "source": "Adyen documentation, 'Terminal API', https://docs.adyen.com/point-of-sale/design-your-integration/terminal-api, n.d., accessed 2026-11; Adyen documentation, 'Cancel', https://docs.adyen.com/online-payments/cancel, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "reasoning",
+              "what": "ISO 8583 is a paid standard; the convention of a reversal message after a timed-out authorization and of trace and reference numbers in each message is industry knowledge not verified against the standard's text in the research for this book. It is stated as industry practice.",
+              "shows": "Marks the network-level statement as practice, not documented fact."
+            }
+          ],
+          "transition_in": {
+            "relationship": "place",
+            "carries_over": "Duplicates at the provider's API.",
+            "introduces": "The same problem one hop further on, between the provider and terminals or networks.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p37",
+          "controlling_idea": "Neither Stripe nor Adyen has published how its own calls to card networks and banks are made repeatable and the only documented resolution of a network timeout is Adyen's automatic cancellation of an in-person payment the issuer has not processed within 120 seconds (150 through the cloud), so what happens there can otherwise only be inferred.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "No such account was found in either company's engineering posts or documentation in the research for this book; Stripe's and Adyen's pages describe only the merchant-facing key.",
+              "shows": "States where the evidence stops for the 'downstream' part of the chapter's contract."
+            },
+            {
+              "kind": "reasoning",
+              "what": "Inference, to be labeled: a provider plausibly relies on protocol-level reversals for timed-out network calls and on reconciliation against clearing files to catch what those miss (payment-reconciliation-and-reporting).",
+              "shows": "Offers the reader a plausible picture without presenting it as either company's design."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Two documented downstream identifiers at the edges.",
+            "introduces": "The middle, which is not public.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "On idempotency the two companies document the same mechanism with different terms: Stripe's window for payments is short and its behavior is specified in detail, Adyen's window is long and several behaviors are unspecified.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "C3"
+        ],
+        "how": "Condenses the documented terms into the comparison an integrator on both providers needs."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "The mechanism, the documented terms, the client's choices and the limits, each with both providers in it.",
+        "introduces": "The two providers compared on one page.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p38",
+          "controlling_idea": "Seven aspects of the documented record differ, and the last column of the table is the author's reading of each difference.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "'Where They Differ' table, seven rows: retention window; what a repeat returns; same key with a different request; scope of a key; in-flight duplicate and retry signal; key store unavailable; published implementation. Every Stripe and Adyen cell repeats a fact cited in server-memory, documented-terms or when-it-goes-wrong, or says 'Not public' / 'Not documented'.",
+              "shows": "Puts the two sets of terms side by side; the reading column is labeled inference.",
+              "source": "Stripe API reference, 'Idempotent requests', https://docs.stripe.com/api/idempotent_requests, n.d., accessed 2026-11; Stripe documentation, 'Advanced error handling', https://docs.stripe.com/error-low-level, n.d., accessed 2026-11; Stripe documentation, 'API v2 overview', https://docs.stripe.com/api-v2-overview, n.d., accessed 2026-11; Adyen documentation, 'API idempotency', https://docs.adyen.com/development-resources/api-idempotency, n.d., accessed 2026-11; Adyen knowledge hub, 'Design to Duty: How we make architecture decisions at Adyen', https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture, published 2021-07-28 (evidence age: 5 years)"
+            }
+          ]
+        },
+        {
+          "id": "p39",
+          "controlling_idea": "An integrator on Stripe plans every resend against 24 hours and can rely on documented errors for misuse; an integrator on Adyen plans against 7 days, tests what a changed request returns and decides in advance what to do when the key store is unavailable.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Follows from the table: the shorter window makes late retry paths the main risk on Stripe; the undocumented behaviors and the documented 503 fallback make testing and a prior decision the main tasks on Adyen.",
+              "shows": "Turns the comparison into two different to-do lists."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The documented differences.",
+            "introduces": "What an integrator does differently on each provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ],
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The table first, because the recommendation is read off its rows; it stands after the limits section and not directly after the documented terms because two of its rows (the payment-level reading of scope and the key-store outage) and its advice use the client's choices and the limits."
+      }
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: 1 November Replayed Under K1",
+      "controlling_idea": "With a key made of membership, billing period and attempt number, written before the first send, the timeouts of 1 November 2026 produce one charge per member on either provider, and the late and scheduled paths each have a rule.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "C4",
+          "C3"
+        ],
+        "how": "Applies the thesis to the ledger's incident and shows the two providers' windows as two limits in one system."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "Follows one renewal attempt through time: the row written before sending, the resend seconds later on each provider, the resend hours or days later, and the next scheduled attempt. Each step is a later moment at which a different rule applies."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "Two providers' terms compared in a table.",
+        "introduces": "The same terms applied to Larkfield's incident.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p40",
+          "controlling_idea": "Under K1 the payment service is the only writer, and before it sends a renewal it stores a row with the key, built from membership, billing period and attempt number, a fingerprint of the request and the state `pending`.",
+          "function": "context",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "K1 (scenario ledger): key = membership id plus billing period plus the number of the scheduled attempt; the payment service holds the idempotency keys; the payment record store's states include `pending`. Illustrative key for a November renewal: `renewal:M-204817:2026-11:1` (membership id invented for the example).",
+              "shows": "Shows the three decisions from the scene made concrete: identity, storage before sending, one writer.",
+              "source": "scenario-ledger.md"
+            }
+          ]
+        },
+        {
+          "id": "p41",
+          "controlling_idea": "For a studio on Stripe, the same timeout now leads to a resend under the same key, and whichever of the three failures occurred, Stripe's documented behavior yields one charge: it executes a request it never saw, answers `409` while the first is running, or replays the saved response.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Maps the three failure cases onto Stripe v1's documented behavior (first request, 409 during execution, saved response with `Idempotent-Replayed: true`), all cited in documented-terms. With one charge per member, none of the 1,840 duplicates (€71,300, on average €38.75 each) is created.",
+              "shows": "The worked example on the first provider, using the ledger's figures.",
+              "source": "Stripe API reference, 'Idempotent requests', https://docs.stripe.com/api/idempotent_requests, n.d., accessed 2026-11; Stripe documentation, 'Advanced error handling', https://docs.stripe.com/error-low-level, n.d., accessed 2026-11; scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The stored key.",
+            "introduces": "What a resend under it returns at Stripe in each failure case.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p42",
+          "controlling_idea": "For a studio on Adyen the resend returns the response to the first attempt, with the key echoed in the response header and a `transient-error` header saying whether an error may be retried.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Maps the same cases onto Adyen's documented behavior (response to the first attempt; 422 or 409 with code 704 while in progress; `transient-error` header), cited in documented-terms.",
+              "shows": "The same replay on the second provider.",
+              "source": "Adyen documentation, 'API idempotency', https://docs.adyen.com/development-resources/api-idempotency, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "The Stripe studio's resend.",
+            "introduces": "The Adyen studio's resend, which ends the same way by different signals.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p43",
+          "controlling_idea": "A resend that comes late is treated differently on each provider: Larkfield lets a path resend for 20 hours after the first send on Stripe and 6 days on Adyen, and past that limit the attempt goes to the sweep, which reads Stripe's object or waits for Adyen's webhook and settlement report.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "New Larkfield facts (to be appended to the ledger): resend limits of 20 hours (Stripe) and 6 days (Adyen), chosen inside the documented windows of at least 24 hours and 7 days; a queue redelivery 36 hours after the first send is therefore refused on Stripe and allowed on Adyen. K2: the confirming record is the payment object where the API allows it to be read and the settlement report where it does not; Adyen's Checkout API has no call that returns a payment (consistency ruling 12).",
+              "shows": "Answers the acceptance probe: the same late retry is safe on one provider and must become a read on the other.",
+              "source": "scenario-ledger.md"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe: \"When creating a resource, include a local identifier in its metadata so you can match an object received through a webhook to your local records\" (docs.stripe.com/error-low-level, n.d., accessed 2026-11).",
+              "shows": "How the sweep finds a Stripe payment whose identifier never came back.",
+              "source": "Stripe documentation, 'Advanced error handling', https://docs.stripe.com/error-low-level, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Resends within seconds or minutes.",
+            "introduces": "Resends after hours or days, where the two providers' windows part ways.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p44",
+          "controlling_idea": "A scheduled re-attempt is a new business event with a new key: Mila's €49.00 renewal, declined on 1 April 2027 and tried again on 4 April, carries attempt number 2, because under the first key Adyen would have returned the refusal of 1 April.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Mila's membership renewal (scenario ledger): €49.00 at Studio Noord, on Adyen; declined on 1 April 2027 (insufficient funds); retried on 4 April and succeeds. Keys: `renewal:<membership>:2027-04:1` and `renewal:<membership>:2027-04:2`. Three days is inside Adyen's 7-to-14-day validity, so the first key would still return the first response.",
+              "shows": "Shows with the ledger's own example why the attempt number is in the key (consistency ruling 13).",
+              "source": "scenario-ledger.md; Adyen documentation, 'API idempotency', https://docs.adyen.com/development-resources/api-idempotency, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Repeats of one attempt, which must reuse the key.",
+            "introduces": "A deliberate new attempt, which must not.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong: Expired Keys, Cached Errors, Changed Requests and a Store That Is Down",
+      "controlling_idea": "The mechanism has four failures of its own, a key that has expired, a stored error, a request that changed under its key and a key store that is unavailable, and each is detected from the integrator's own record of the attempt.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "C3",
+          "C5"
+        ],
+        "how": "Shows the conditions in the thesis failing one at a time and what the fallback, the provider's record, looks like in each."
+      },
+      "flow": {
+        "pattern": "order_of_importance",
+        "rationale": "From the failure a team meets most often (a late resend) to the rarest (the provider's key store down), which is last because it is the one that needs a decision made before it happens."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "A replay in which every condition of the thesis held.",
+        "introduces": "The cases in which one of them does not.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p45",
+          "controlling_idea": "When a resend would arrive after the key has expired it is a new request, so it is not sent: the stored time of the first send detects the case, and the outcome is established from the provider's record first.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: \"We generate a new request if a key is reused after the original is pruned.\" (docs.stripe.com/api/idempotent_requests) and \"If you can't establish what happened, contact Stripe support before repeating the operation.\" (docs.stripe.com/error-low-level). Both n.d., accessed 2026-11.",
+              "shows": "The provider confirms that an expired key gives no protection and names the last resort.",
+              "source": "Stripe API reference, 'Idempotent requests', https://docs.stripe.com/api/idempotent_requests, n.d., accessed 2026-11; Stripe documentation, 'Advanced error handling', https://docs.stripe.com/error-low-level, n.d., accessed 2026-11"
+            }
+          ]
+        },
+        {
+          "id": "p46",
+          "controlling_idea": "When Stripe's v1 has stored an error for a key, repeating the request returns the same error for as long as the key is held, so the attempt is resolved by reading the object or by its event, and no new key is issued until it is.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: \"For API v1, Stripe caches `500` responses from `POST` requests that use an idempotency key. Retrying with the same key returns the cached response while Stripe retains it.\" and \"Don't retry with a new idempotency key until you've resolved the original outcome.\" (docs.stripe.com/error-low-level, n.d., accessed 2026-11)",
+              "shows": "The documented behavior and instruction for the cached-error case.",
+              "source": "Stripe documentation, 'Advanced error handling', https://docs.stripe.com/error-low-level, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "A key that is gone.",
+            "introduces": "A key that is present and holds an error.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p47",
+          "controlling_idea": "When the request changes between attempts while the key stays the same, usually because an amount was recomputed, Stripe refuses it with a documented error and Adyen's behavior is undocumented, so the client compares its own stored fingerprint before every resend.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: \"Sending the same idempotency key with different parameters produces an error indicating that the request didn't match the original.\" (docs.stripe.com/error-low-level, n.d., accessed 2026-11). Adyen's page does not describe the case (docs.adyen.com/development-resources/api-idempotency, accessed 2026-11).",
+              "shows": "One provider protects the client from this bug and the other may not, so the check belongs on the client.",
+              "source": "Stripe documentation, 'Advanced error handling', https://docs.stripe.com/error-low-level, n.d., accessed 2026-11; Adyen documentation, 'API idempotency', https://docs.adyen.com/development-resources/api-idempotency, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Failures of the stored key and result.",
+            "introduces": "A failure of the stored request.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p48",
+          "controlling_idea": "When Adyen's key store is unavailable the API answers 503 with code 703 and the documentation offers two options, pause or resend without the key; for a money-moving call I would pause, and I would treat a switch between regional endpoints the same way, because keys are not checked across regions.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: \"In the unlikely event that this data store should become unavailable, the API returns an HTTP 503 – Service Unavailable status with the error code 703: \\\"required resource temporarily unavailable\\\". The system marks the request as a transient error\"; \"you can either: Pause processing and retry the requests later (if this is feasible). Fall back to non-idempotent processing by not submitting the `idempotency-key` HTTP header.\" (docs.adyen.com/development-resources/api-idempotency, n.d., accessed 2026-11). Stripe documents no equivalent case.",
+              "shows": "Adyen states the trade between availability and duplicate protection and leaves the choice to the integrator.",
+              "source": "Adyen documentation, 'API idempotency', https://docs.adyen.com/development-resources/api-idempotency, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "reasoning",
+              "what": "Inference, to be labeled: answering 503 instead of processing without the check means the API refuses a keyed request it cannot deduplicate, and hands the decision to accept the risk of a duplicate to the caller.",
+              "shows": "Reads the documented behavior as a design stance without attributing internals."
+            }
+          ],
+          "transition_in": {
+            "relationship": "emphasis",
+            "carries_over": "Failures in which the provider's memory is wrong for the client's purpose.",
+            "introduces": "The failure in which the memory itself is unavailable, where the integrator must decide in advance.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "Each section turned out to be about the same thing seen from one side: a repeat is safe while two memories overlap, the provider's memory of the key and the client's memory of what it meant by it. The provider's memory has a published end; the client's has to outlast it, because after the window the client's own record and the provider's record of the payment are all that is left.",
+    "so_what": "A team reads the retention window before it writes a retry, lists every path that can resend and how late, and gives each attempt a row of its own before anything is sent. On Stripe the list is checked against 24 hours, on Adyen against 7 days.",
+    "callback": {
+      "to": "The renewal job that sent again under a new key and charged 1,840 members twice.",
+      "how": "The job had the mechanism and not the memory: it kept no record of what its first send meant, so its retry could only be a new request."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "For every money-moving call, name the business event, the key derived from it, where the key is written before the first send, the longest delay of each path that can resend it and the provider's window; past the window, read before you send. Nine questions follow."
+    },
+    "hand_off": {
+      "to": "payment-api-versioning",
+      "relationship": "similarity",
+      "carries_over": "The idempotency key as something the provider remembers on the client's behalf, for hours or days, so that one request can be repeated.",
+      "introduces": "The version as a second thing the provider remembers on the client's behalf, for years, and the same question of what happens when that memory ends."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The failures of the mechanism and their fallbacks.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p49",
+        "form": "list",
+        "controlling_idea": "Established: a timeout or server error leaves the outcome unknown; both providers document a same-key resend with stated windows; a new key is a new operation; neither publishes its implementation beyond a fragment.",
+        "function": "synthesis",
+        "evidence": [
+          {
+            "kind": "source",
+            "what": "Stripe 2017 post and current error guide; Adyen idempotency page; windows of at least 24 hours (Stripe v1), 30 days (Stripe v2) and 7 to 14 days (Adyen).",
+            "shows": "The points on which the documented record leaves no room for dispute.",
+            "source": "Stripe engineering blog, Brandur Leach, 'Designing robust and predictable APIs with idempotency', https://stripe.com/blog/idempotency, published 2017-02-22 (evidence age: 9 years); Stripe documentation, 'Advanced error handling', https://docs.stripe.com/error-low-level, n.d., accessed 2026-11; Adyen documentation, 'API idempotency', https://docs.adyen.com/development-resources/api-idempotency, n.d., accessed 2026-11"
+          }
+        ]
+      },
+      {
+        "id": "p50",
+        "form": "list",
+        "controlling_idea": "Depends on context: derived or stored-random keys, how far inside the window to stop resending, whether to pause or drop the key when Adyen's store is down, and how much to rely on the payment-level guards.",
+        "function": "synthesis",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "Each recommendation holds under a stated condition (number of writers, length of the longest retry path, cost of a delayed payment against a duplicate).",
+            "shows": "Separates conditional advice from established fact."
+          }
+        ],
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is settled.",
+          "introduces": "What depends on the system at hand.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p51",
+        "form": "list",
+        "controlling_idea": "The author's synthesis: the key is a claim the client makes about its own intentions, so its design belongs to the application's data model; and the retention window is the number to read before writing code.",
+        "function": "recommendation",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "Only the client knows which sends are one intention, and only its own record survives the provider's window.",
+            "shows": "The author's position, with its reasoning."
+          }
+        ],
+        "transition_in": {
+          "relationship": "emphasis",
+          "carries_over": "Conditional advice.",
+          "introduces": "The author's own position.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p52",
+        "form": "list",
+        "controlling_idea": "Nine questions let the reader check a system's money-moving calls, or a provider's idempotency contract, in a design review.",
+        "function": "recommendation",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "The questions restate the chapter's decisions as checks: key source, storage before sending, window per provider, retry paths, deadline, changed request, payment-level guard, key-store outage, proof by test.",
+            "shows": "Gives the 'can do' outcomes a usable form."
+          }
+        ],
+        "transition_in": {
+          "relationship": "conclusion_summary",
+          "carries_over": "The three tiers of take-away.",
+          "introduces": "The same content as questions to ask.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p53",
+        "controlling_idea": "The idempotency key is something the provider remembers on the client's behalf for hours or days so that one request can be repeated; the next chapter turns to a second thing it remembers, for years: the version of the API each integration was built against.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "similarity",
+          "carries_over": "The key as memory the provider keeps for the client, with an end date.",
+          "introduces": "The API version as a second such memory, on a longer clock.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "The receiver's contract for webhooks (persist, deduplicate, confirm, sweep) and event delivery guarantees.",
+      "covered_in": [
+        "payment-webhooks-and-events"
+      ]
+    },
+    {
+      "topic": "Reattempts after a decline: decline categories, network retry limits and scheduling by decline code.",
+      "covered_in": [
+        "authorization-optimization",
+        "payment-authorization"
+      ]
+    },
+    {
+      "topic": "Rate limits, load shedding and pacing a batch against them.",
+      "covered_in": [
+        "payment-developer-platform",
+        "payment-peak-load"
+      ]
+    },
+    {
+      "topic": "Where payment state lives at each provider and the state machines themselves.",
+      "covered_in": [
+        "payment-state-machines"
+      ]
+    },
+    {
+      "topic": "Stand-in processing and what an authorization promises.",
+      "covered_in": [
+        "payment-authorization"
+      ]
+    },
+    {
+      "topic": "Exactly-once effects inside a provider's data stores, outbox and consistency boundaries.",
+      "covered_in": [
+        "payment-data-stores-and-consistency"
+      ]
+    },
+    {
+      "topic": "Timeouts and unknown outcomes at provider scale, circuit breakers and failover.",
+      "covered_in": [
+        "payment-reliability-and-availability"
+      ]
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "The journal-spec entry says neither company has published how it stores keys. Adyen's 2021 post names a distributed database (CockroachDB) beside its acceptance layer for API idempotency. The chapter states this precisely (one paragraph, five years old, nothing on the key record, expiry or recovery); the author may want the journal-spec wording changed to 'beyond one 2021 paragraph from Adyen'.",
+    "What Adyen returns for a reused key with a different request body, and whether error responses are stored, is not documented and was not tested.",
+    "Whether Stripe will move payment objects to API v2 semantics is not stated anywhere fetched.",
+    "Flow rubric notes not acted on: the double tap stays as the opening of what-a-key-does-not-solve because acceptance criterion AC-2 probes exactly that case; the expired-key failure stays as a full paragraph in when-it-goes-wrong although it restates the window, because the section must be complete as a list of failures; the comparison table stays after the limits section."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "Recovery points, atomic phases and the key-record schema are presented only as Brandur Leach's 2017 reference implementation, with the article's own description of itself quoted.",
+      "rejected": [
+        "Describing the schema as how Stripe implements idempotency.",
+        "Leaving the design out, which would leave the chapter's 'how a server implements it' contract without a concrete design."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Idempotency toward card networks is stated as industry practice in one paragraph, with the documented Terminal API identifier as the only cited downstream case, followed by a paragraph on where the evidence stops.",
+      "rejected": [
+        "Describing ISO 8583 reversal and trace-number mechanics as fact: the standard was not readable in the research for this book."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Retry policy is a short section of three paragraphs; rate limits and decline reattempts are linked, not taught.",
+      "rejected": [
+        "A full treatment of backoff algorithms, which is general engineering the reader is assumed to know."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Larkfield's resend limits (20 hours on Stripe, 6 days on Adyen) are added as new ledger facts so that the replay can answer the acceptance probe with numbers.",
+      "rejected": [
+        "Using the documented windows themselves as the limits, which leaves no margin for clock differences and for 'can remove after 24 hours'."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "PLAN.md, chapter contract 18",
+      "contributed": "Scope, owned terms (idempotency key, request fingerprint, retry policy, unknown outcome), the Larkfield thread."
+    },
+    {
+      "kind": "internal",
+      "ref": "journal-spec.json, part-4, idempotency-and-retries",
+      "contributed": "Intent, acceptance criteria, thesis and role, copied unchanged; the neighbours' transitions."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-stripe-payments-and-api.md, Part 3",
+      "contributed": "Verified quotations for the 2017 post, API v1 and v2 behavior, SDK retries; the list of what Stripe has not published."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-adyen-payments-and-api.md, Part 4 and section 3.5",
+      "contributed": "Verified quotations for Adyen's idempotency page and the Terminal API identifier; the undocumented points."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-reliability-and-scale.md, sections 2.3, 2.4 and 6.1",
+      "contributed": "Adyen's 2021 statement on the idempotency store; the Airbnb contrast."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md and _research/consistency-issues.md (rulings 4, 12, 13)",
+      "contributed": "The Double Charge figures, K1 and K2, Mila's renewal; ownership of 'confirm against the provider's record'; no payment GET on Adyen; attempt number in the key."
+    },
+    {
+      "kind": "external",
+      "ref": "https://stripe.com/blog/idempotency (2017-02-22)",
+      "contributed": "The three failure cases, the definition of the key, backoff and jitter."
+    },
+    {
+      "kind": "external",
+      "ref": "https://docs.stripe.com/api/idempotent_requests, https://docs.stripe.com/error-low-level, https://docs.stripe.com/api-v2-overview, https://docs.stripe.com/api/errors, https://docs.stripe.com/payments/payment-intents (n.d., accessed 2026-11)",
+      "contributed": "Stripe's documented behavior; re-fetched for this chapter."
+    },
+    {
+      "kind": "external",
+      "ref": "https://docs.adyen.com/development-resources/api-idempotency, https://docs.adyen.com/development-resources/response-handling, https://docs.adyen.com/point-of-sale/design-your-integration/terminal-api, https://docs.adyen.com/online-payments/cancel (accessed 2026-11)",
+      "contributed": "Adyen's documented behavior; re-fetched for this chapter."
+    },
+    {
+      "kind": "external",
+      "ref": "https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture (2021-07-28)",
+      "contributed": "The one published statement about Adyen's idempotency store."
+    },
+    {
+      "kind": "external",
+      "ref": "https://brandur.org/idempotency-keys (2017-10-27)",
+      "contributed": "The reference implementation with recovery points."
+    },
+    {
+      "kind": "external",
+      "ref": "https://medium.com/airbnb-engineering/avoiding-double-payments-in-a-distributed-payments-system-2981f6b070bb (2019-04-16); https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/ (2015-03-04)",
+      "contributed": "A contrast on where idempotency logic lives; jitter variants."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: 8 statements of absence re-tested with a wide search (documentation sitemaps, help centers, company sites, engineering posts, web search). Narrowed: 'neither has published how it resolves a timeout from a network' (Adyen documents automatic cancellation of an in-person payment after 120 or 150 seconds); Adyen's key store (a vendor's 2023 customer story, secondary, dates it to 2019). The others hold and the Stripe sentence now says what was searched. Two sources added; one controlling idea aligned."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "First version, written from the chapter contract, the Stripe, Adyen and reliability research briefs and the scenario ledger; intent, thesis and role copied from the journal spec."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "After the flow rubric: the store's requirements moved before the reference design in server-memory; Adyen's 503 for an unavailable key store introduced in documented-terms; the stored fingerprint added to the key recommendation; flow labels corrected."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 98 claims checked (91 confirmed, 1 corrected, 3 hedged, 0 unsupported and removed or relabeled, 1 unreachable at its own URL and confirmed through the publisher's RSS feed, 2 not checked); the most significant fix narrows 'no later source confirms the same database is still used' to Adyen's own publications, because a database vendor's post of February 2023 about Adyen's idempotency store exists but is offline and could not be read."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('That neither company has published how it stores keys, and t' -> 'That Stripe has published nothing on how it stores keys and ')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('Neither company has published how keys are stored or how a h' -> 'Stripe has published nothing on how keys are stored and Adye')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation after verification (17 November 2026): Adyen documentation pages are cited 'n.d., accessed November 2026' in evidence and sources (ruling 30); two source titles corrected to the pages' displayed titles."
+    }
+  ],
+  "length": {
+    "target_words": 5200,
+    "max_words": 6500
+  }
+}

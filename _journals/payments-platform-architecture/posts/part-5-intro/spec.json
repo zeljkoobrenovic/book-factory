@@ -1,0 +1,590 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "part-5",
+  "journal": "payments-platform-architecture",
+  "part": "part-5",
+  "title": "Part V — TRUST: Card Data, Fraud, Authentication and Compliance",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "basis": "Written on 2026-11-17 from the part-5 entry and the part thesis, opening and flow in journal-spec.json, the scenario ledger, and a full reading of the five written chapters of Part V. The page makes no external factual claim of its own: every statement about Stripe, Adyen, a network, a standard or a law repeats one a chapter of the part makes and cites.",
+  "intent": {
+    "outcome": {
+      "know": [
+        "Part V argues that trust controls move card data, decisions and losses between parties instead of removing risk.",
+        "The five chapters in order: card numbers and PCI scope, network tokens, fraud and risk scoring, 3-D Secure and strong customer authentication, compliance."
+      ],
+      "can_do": [
+        "Pick the Part V chapter that answers the question in front of them: where card numbers may go, why a stored card kept working or stopped, why a payment was blocked, who carries a fraud loss, or why a seller's payouts stopped."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "A reader of this page alone can state the part's claim and name the five chapters' subjects in reading order.",
+        "check": "intro_predicts_content",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "After reading only this page: what does Part V argue, and what will each of the next five chapters tell you, in order?",
+        "expected": "Controls move data and liability and do not remove risk; then: keeping card numbers out of your systems (tokens, vaults, PCI scope); network tokens; how fraud is scored during authorization; how the issuer checks the payer and who then carries fraud (3-D Secure, SCA); what a provider must know about the businesses it pays (KYC, monitoring, regulation)."
+      },
+      {
+        "id": "AC-2",
+        "statement": "The page opens with the Card-Testing Weekend as an event with its figures, not with a definition of trust or security.",
+        "check": "no_weak_introduction_pattern",
+        "method": "rubric",
+        "severity": "minor"
+      }
+    ],
+    "audience": {
+      "who": "Engineers and architects new to payments who have read Parts I to IV and are about to start the trust chapters, or who arrive with one question in hand (where card numbers may go, why a stored card kept working, why a payment was blocked, who carries a fraud loss, why a seller's payouts stopped) and want the chapter that answers it.",
+      "already_knows": [
+        "Encryption, access control, audits, rate limits and webhooks as general engineering practice.",
+        "Parts I to IV: the issuer, the acquirer and the card network; authorization and disputes; the provider's API, its events and its limits.",
+        "Larkfield in outline: a fictional studio-software platform on Stripe and Adyen, and its 2027 repair program Keel."
+      ],
+      "does_not_know": [
+        "PCI scope, provider token, vault, network token, risk score, 3-D Secure, exemption, liability shift, capability, requirement: each is owned by a Part V chapter and is glossed in a clause here or only named.",
+        "How Stripe and Adyen differ on each control; the page states one documented fact per chapter and leaves the evidence to the chapter."
+      ]
+    }
+  },
+  "thesis": {
+    "question": "What do the controls over card data, fraud, authentication and compliance actually do for a business that takes payments?",
+    "claim": "Each control relocates something and leaves something behind: tokenization moves card numbers to the provider's vault and leaves the merchant the page around the card fields; a network token moves the stored credential to the card network and leaves the merchant holding a provider token behind which the credential can change without its action; a risk score moves the allow-or-block decision to the provider's model and leaves the merchant the loss on what it accepts; 3-D Secure moves the fraud loss to the issuer when the payer is authenticated and leaves it with the merchant on every payment that is merchant-initiated or exempted at the request of the merchant's side; and verification moves the duty to know a seller to the regulated provider and leaves the platform the deadlines, whose lapse stops that seller's payouts.",
+    "disputed_by": "The view that these are security and compliance features which, once switched on at a certified provider, take card-data, fraud and regulatory risk off the merchant's or platform's hands.",
+    "so_what": "A team that accepts the claim stops asking 'are we compliant?' and asks, for each control, what moved, to whom, and what came back: a script inventory, a stored-card exit plan, a fraud threshold it has priced, an exemption policy, and an owner for every verification deadline.",
+    "how_why": "Each control is defined by a rule that assigns responsibility, not by a technology that destroys risk. PCI DSS scope follows the path the card number takes. EMVCo describes a payment token as constrained to a specific merchant, device or payment scenario, with the network holding the mapping to the card. Stripe's documentation says the merchant is 'ultimately responsible for payments you choose to accept'. PSD2 Article 74(2) puts the loss on whoever avoids strong authentication. Anti-money-laundering law obliges the regulated provider, and both Stripe and Adyen pass that duty on as requirements with deadlines on an account. In every case the rule names a new holder and leaves a remainder with the business.",
+    "supporting_claims": [
+      {
+        "id": "P5-1",
+        "claim": "Hosted card fields, provider tokens and an isolated vault move card numbers and most PCI scope from the merchant to the provider, and leave the merchant the page that hosts the fields and stored cards that exist for it only as that provider's tokens."
+      },
+      {
+        "id": "P5-2",
+        "claim": "A network token moves the stored credential, with its validity and its updates, from the provider's vault to the card network; the card survives a reissue, and the approval and fraud gains reported for tokens are the networks' and providers' own comparisons."
+      },
+      {
+        "id": "P5-3",
+        "claim": "A risk score moves the allow-or-block decision in front of the issuer to a model that learns weeks later whether it was right; the merchant keeps the loss on fraud it accepts and the cost of good customers it refuses."
+      },
+      {
+        "id": "P5-4",
+        "claim": "3-D Secure moves the loss from a fraud dispute to the issuer only when the payer is authenticated; an exemption or a merchant-initiated payment leaves it with the party that asked, so choosing when to authenticate is choosing who carries the loss."
+      },
+      {
+        "id": "P5-5",
+        "claim": "Know-your-customer and monitoring duties sit with the regulated provider, which turns them into requirements with deadlines that switch a seller's capabilities on and off; the platform keeps the work of tracking that state, which can regress without the seller doing anything."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Performs the part's opening: the Card-Testing Weekend, the part thesis and the reading order.",
+    "supports": []
+  },
+  "flow": {
+    "pattern": "small_to_large",
+    "additional_patterns": [
+      {
+        "pattern": "prerequisite_order",
+        "applies_to": "chapters: the five chapter paragraphs, in the part's reading order"
+      }
+    ],
+    "rationale": "The page opens on one weekend at one studio, widens it into the part's claim, and only then lists the chapters. The weekend comes first because it is the case in which the usual view fails in plain sight: Larkfield held no card numbers and still paid. The bridge names that usual view before the claim replaces it. The claim (five controls, each moving something and leaving something) has to precede the reason for it (each control is a rule that assigns responsibility) and the limit of its evidence, because both speak about 'the five controls' as a set. All three precede the chapter list because each chapter paragraph names what its control moves and what it leaves; a reader not yet told that controls relocate would read the list as five unrelated security topics. The chapter paragraphs keep the part's own order, credential, payer, party being paid, which the journal spec justifies as a prerequisite order; reordering them here would contradict the roadmap."
+  },
+  "introduction": {
+    "hook": {
+      "type": "vivid_anecdote",
+      "content": "On the weekend of 8–9 August 2026, bots used one studio's public booking widget to test 61,000 stolen card numbers with €1 drop-in payments. Larkfield stored none of those numbers and nothing was stolen from it. It still paid €4,100 in fees and refunds, and the studio could not sell online for 31 hours."
+    },
+    "bridge": {
+      "from_reader_world": "The engineer's sense of security as something you add and then have: encrypt it, put it behind a provider, pass the audit.",
+      "to_topic": "The payments view, in which every control names who holds the data and who pays when it fails."
+    },
+    "thesis_statement": {
+      "text": "Each trust control relocates something (card numbers, the stored credential, the allow-or-block decision, the fraud loss, the duty to know a seller) to another party and leaves something behind with the business that takes payments; none makes the risk disappear.",
+      "placement": "KEY POINTS bullets 1 and 2, and paragraph p03; bullet 3 (the controls are linked, and what stays needs an owner) is the so-what stated in p04."
+    },
+    "roadmap": {
+      "placement": "paragraph p06",
+      "promises": [
+        {
+          "promise": "Five chapters, each asking what a control moves and what it leaves behind: card numbers into a vault; the stored credential to the card network; the fraud decision to a model; the fraud loss to the issuer when the payer is authenticated; and the duty to know the seller, which returns as account state with deadlines.",
+          "kept_in": [
+            "chapters"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "On the Card-Testing Weekend of 8–9 August 2026 bots tested 61,000 stolen card numbers through one Larkfield studio's public booking widget; Larkfield stored none of them and lost no data, and it still paid €4,100 in provider fees and refunds and the studio could not sell online for 31 hours.",
+        "function": "example",
+        "organization": "narration",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Larkfield (fictional): the Card-Testing Weekend, 8–9 August 2026: 61,000 stolen card numbers tested with €1 drop-in payments through one studio's public booking widget; €4,100 in fees and refunds; the studio's online payments off for 31 hours.",
+            "source": "_research/scenario-ledger.md (Incidents; Additions: 24-fraud-and-risk-systems); payment-fraud-and-risk, 'Setting the Scene'",
+            "shows": "A company that holds no card data and loses none still gets the bill and the outage."
+          },
+          {
+            "kind": "scenario",
+            "what": "As chapter 22 states: not one of the 61,000 numbers reached a Larkfield server, log or database, because a frame served by the provider collected them.",
+            "source": "tokenization-vaulting-and-pci (lead and closing)",
+            "shows": "The control worked exactly as designed, and the attack was not its subject."
+          },
+          {
+            "kind": "figure",
+            "what": "Figure 1: bots send a stream of cards into a booking page; the card numbers pass to a provider and none reach the platform's server; the platform is left with a bill of €4,100 and a studio closed for 31 hours.",
+            "shows": "The hook as a picture: no card data held, and a cost all the same."
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "The weekend contradicts the engineer's sense that security is something you add and then have; in payments every control instead names who holds the data and who pays when it fails, and that assignment is what Part IV's API could not hide.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "The part's bridge and transition_in: from security as a property you add (encrypt it, put it behind a provider, pass the audit) to controls that assign data and losses to named parties; Part IV closed on what an API cannot hide.",
+            "source": "journal-spec.json, part-5 opening.bridge and transition_in; payment-developer-platform (closing)",
+            "shows": "Which belief the reader brings and which question replaces it."
+          }
+        ],
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "The weekend: no card numbers held, and a bill and an outage all the same.",
+          "introduces": "The belief it contradicts, and the payments view that replaces it: a control names a holder and a payer.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "Part V's claim is that each of five controls relocates something and leaves something behind: tokenization moves card numbers to the provider's vault and leaves the page; a network token moves the stored credential to the card network and leaves a provider token behind which the card can change; a risk score moves the allow-or-block decision to the provider's model and leaves the loss; 3-D Secure moves the fraud loss to the issuer only when the payer is authenticated; verification moves the duty to know a seller to the provider and leaves the deadlines.",
+        "function": "claim",
+        "organization": "classification",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "The part thesis: the five relocations and the five remainders, as claimed in journal-spec.json and argued one per chapter (P5-1 to P5-5).",
+            "source": "journal-spec.json, part-5 thesis",
+            "shows": "The five controls share one shape, so they can be read with one question."
+          },
+          {
+            "kind": "figure",
+            "what": "Figure 2: a business at the left; five arrows carry something to five holders (vault, card network, risk model, issuer, provider); five small tiles stay at the business (page, token, threshold, exemptions, deadlines).",
+            "shows": "The part's shape in one picture: five things move, five things stay."
+          }
+        ],
+        "transition_in": {
+          "relationship": "example",
+          "carries_over": "The payments view: a control names who holds what.",
+          "introduces": "The five controls of the part, each stated as what moves, to whom, and what stays.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "controlling_idea": "The controls behave this way because each is defined by a rule that assigns responsibility, not by a technology that destroys risk, and the rules are linked; so the useful question for a team is not 'are we compliant?' but what moved, to whom, what came back, and who owns it.",
+        "function": "analysis",
+        "evidence": [
+          {
+            "kind": "fact",
+            "what": "As the chapters cite: PCI DSS scope follows the path the card number takes (tokenization-vaulting-and-pci); Stripe's documentation says the merchant is 'ultimately responsible for payments you choose to accept' (payment-fraud-and-risk); PSD2 Article 74(2) puts the loss on the side that avoids strong authentication (three-d-secure-and-sca).",
+            "source": "tokenization-vaulting-and-pci; payment-fraud-and-risk; three-d-secure-and-sca",
+            "shows": "In each case a rule names a new holder and leaves a remainder."
+          },
+          {
+            "kind": "fact",
+            "what": "As chapter 22 cites: Stripe's PCI guide says Radar 'is only available when using any of our methods for client-side tokenization', so the way a card is collected decides what the fraud model can see.",
+            "source": "tokenization-vaulting-and-pci; payment-fraud-and-risk",
+            "shows": "One link between controls, enough to show that a choice for one is a choice about another."
+          },
+          {
+            "kind": "reasoning",
+            "what": "The part's so_what: for each control, what moved, to whom, and what came back (a script inventory, a stored-card exit plan, a priced threshold, an exemption policy, an owner for every verification deadline).",
+            "source": "journal-spec.json, part-5 thesis.so_what",
+            "shows": "What the reader does differently if the claim holds."
+          }
+        ],
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The five relocations and their remainders.",
+          "introduces": "Why they have that shape (rules that assign responsibility), that they are linked, and the question that follows for a team.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p05",
+        "controlling_idea": "The part argues from what Stripe and Adyen publish, and the record is uneven: neither publishes a vault design, Adyen has published little about its fraud-risk model, both companies say that they monitor transactions but not how, and the gains reported for tokens are the vendors' own comparisons.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "fact",
+            "what": "As the chapters establish: neither company publishes a vault design (tokenization-vaulting-and-pci); the approval and fraud figures for network tokens are vendors' comparisons that cannot be compared with one another (network-tokens); Adyen has published little about its fraud-risk model: two knowledge-hub articles (16 August 2024, 17 January 2025) name tree-based ensembles, a predicted chargeback probability and a median latency allocation of 20 ms per model endpoint, and nothing on features, training data or performance (payment-fraud-and-risk); both companies state that they monitor transactions and screen against sanctions lists (Stripe's financial crimes policy statement, November 2023; Adyen's compliance-obligations page, n.d.), and neither publishes its monitoring scenarios or sanctions-screening logic (payment-compliance-and-regulation).",
+            "source": "the four chapters named",
+            "shows": "The reader knows before the chapter list that the comparisons are of documented facts and where they stop."
+          }
+        ],
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "The claim and the question that follows from it.",
+          "introduces": "The limit of the evidence behind the claim: what the two companies document and what neither publishes.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p06",
+        "controlling_idea": "The five chapters go from the credential, to the person using it, to the business being paid, each opening on a case at Larkfield and each asking what its control moves and what it leaves behind.",
+        "function": "transition",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "The part's roadmap and flow rationale: two chapters on the credential (vault, network token), two on the payer (fraud score, authentication), one on the party being paid (verification); each needs the one before.",
+            "source": "journal-spec.json, part-5 opening.roadmap and flow",
+            "shows": "The order is a dependency order, so the reader has a reason to read in sequence."
+          }
+        ],
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The claim, its reason and the limits of its evidence.",
+          "introduces": "The five chapters in reading order and their grouping: credential, payer, party being paid.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "chapters",
+      "heading": "Chapters in this part",
+      "controlling_idea": "Each of the five chapters answers one question about one control, opens on one Larkfield case, and says what the control moves and what it leaves with the business.",
+      "function": "description",
+      "advances_thesis": {
+        "supports": [
+          "P5-1",
+          "P5-2",
+          "P5-3",
+          "P5-4",
+          "P5-5"
+        ],
+        "how": "Each paragraph introduces the chapter that argues one of the part's supporting claims, so the list is the part's argument in outline."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "additional_patterns": [
+          {
+            "pattern": "grouping",
+            "applies_to": "p07 and p08: the credential; p09 and p10: the payer; p11: the party being paid"
+          }
+        ],
+        "rationale": "The part's own reading order, as the journal spec declares it. The network token is defined against the provider token and the vault, so the vault chapter comes first. Fraud scoring starts from what a vault and a token cannot do, stop a stolen number being typed in. Authentication is the third action of a risk rule and its exemptions depend on a fraud rate, so it follows fraud. Compliance comes last because it changes the subject from the payer to the seller and from a decision per payment to a state per account. Putting authentication before fraud would ask the reader to weigh an exemption before knowing what a risk score is."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The five chapters in order (p06).",
+        "introduces": "One paragraph per chapter: the question in bold, the Larkfield case it opens on, and what the control moves and leaves.",
+        "form": "sentence",
+        "placement": "end_of_previous"
+      },
+      "paragraphs": [
+        {
+          "id": "p07",
+          "controlling_idea": "The tokenization chapter, which opens on the weekend's 61,000 numbers that never reached a Larkfield system, answers how providers keep card numbers out of everyone's systems, including most of their own: a frame the provider serves, a token and an isolated vault move the numbers and most PCI scope to the provider and leave the merchant its payment page and stored cards held only as tokens, as Larkfield finds when it cannot sign the script line of the shortest PCI form.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P5-1"
+            ],
+            "how": "Introduces the chapter that establishes the first relocation and the vocabulary the next three chapters use."
+          },
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield (fictional): in January 2027 Jonas Weber cannot sign the SAQ A line on script attacks; Tom Hendriks counts 17 third-party scripts from 9 domains on the payment step.",
+              "source": "tokenization-vaulting-and-pci, 'Setting the Scene'; _research/scenario-ledger.md",
+              "shows": "A merchant with no card numbers still owns the page where they are typed."
+            },
+            {
+              "kind": "fact",
+              "what": "As chapter 22 documents: at both Stripe and Adyen a redirect or hosted card fields lead to SAQ A and raw card numbers to the API lead to SAQ D; Stripe documents a vault that shares no credentials with its other services, Adyen names its vault and publishes less, and neither publishes a design.",
+              "source": "tokenization-vaulting-and-pci",
+              "shows": "What moves, on what evidence, and where the record stops."
+            }
+          ]
+        },
+        {
+          "id": "p08",
+          "controlling_idea": "The network-token chapter answers what a network token is and why the card networks push every stored card toward one: it is a substitute card number the network issues and keeps pointing at the customer's current card, which moves the stored credential to the network, as Lotte Smit's renewal on a replaced card shows, and the gains published for it are vendor comparisons.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P5-2"
+            ],
+            "how": "Introduces the chapter that shows the second relocation and what the merchant can no longer assume."
+          },
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield (fictional): Lotte Smit's €49.00 membership renews on 1 March 2027 although her bank replaced the card ending 4417 in February; the app still shows 4417.",
+              "source": "network-tokens, 'Setting the Scene' and 'In Practice at Larkfield'",
+              "shows": "The credential changed behind the merchant's token without the merchant acting, and its own record went stale."
+            },
+            {
+              "kind": "fact",
+              "what": "As chapter 23 documents: Stripe and Adyen each keep the card number and choose token or card number per attempt; Visa says six basis points, Adyen 3% and Stripe 3.8% for a bundle, figures that cannot be compared.",
+              "source": "network-tokens",
+              "shows": "The provider chooses the credential, and the uplift is a vendor's comparison."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The provider token of the previous chapter, which means something only inside one provider's vault.",
+            "introduces": "A token the card network issues, which reaches the bank and stays valid when the card changes.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p09",
+          "controlling_idea": "The fraud chapter answers how a provider decides during an authorization whether a payment is fraud: it cannot know, so it estimates the chance of a later fraud dispute and blocks above a threshold before the bank is asked; the decision moves to the model, the loss and the refused customers stay with the merchant, and the chapter returns to the Card-Testing Weekend to show why card testing has to be stopped before authorization.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P5-3"
+            ],
+            "how": "Introduces the chapter that shows the third relocation: the decision moves and the price of it stays."
+          },
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield (fictional): the Card-Testing Weekend in detail, and Femke de Graaf's two thresholds: break-even 96% for a first membership payment and 52% for a €16 guest drop-in (assumptions).",
+              "source": "payment-fraud-and-risk, 'Setting the Scene' and 'In Practice at Larkfield'; _research/scenario-ledger.md",
+              "shows": "The threshold is a price that differs per product, and the weekend's attack was outside it."
+            },
+            {
+              "kind": "fact",
+              "what": "As chapter 24 documents: Stripe's October 2026 figures show 41% of fraud disputes reported by day 14 and 86% by day 60; Stripe's documentation says the merchant is 'ultimately responsible for payments you choose to accept'.",
+              "source": "payment-fraud-and-risk",
+              "shows": "The evidence arrives late and the loss stays with the merchant."
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "A vault and a token, which protect a stored card.",
+            "introduces": "What they leave open: a number stolen elsewhere and typed into the checkout, which something has to judge per payment.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "controlling_idea": "The authentication chapter answers how the card's bank checks who is paying and how providers decide when to ask: the bank answers through 3-D Secure, and a fraud loss moves to it only when that check happens, so an exemption or a merchant-initiated renewal leaves the loss with the merchant, as Bram de Wit's unchallenged €120.00 pass costs Studio Noord €135.00.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P5-4"
+            ],
+            "how": "Introduces the chapter that shows the one relocation of a loss outright, and the conditions under which it does not happen."
+          },
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield (fictional): on 12 January 2027 Mila Janssen is challenged setting up her €49.00 membership; on 2 February Bram de Wit buys a €120.00 pass unchallenged; the chargeback of 24 February costs Studio Noord €120.00 plus a €15.00 fee, €135.00.",
+              "source": "three-d-secure-and-sca, 'Setting the Scene' and 'In Practice at Larkfield'",
+              "shows": "Nobody at the studio chose, and the studio paid."
+            },
+            {
+              "kind": "fact",
+              "what": "As chapter 25 documents: a requested exemption and a merchant-initiated payment carry no liability shift (Stripe and Adyen documentation); Stripe places the merchant's authentication rules inside Radar, Adyen in a separate list, Dynamic 3D Secure.",
+              "source": "three-d-secure-and-sca",
+              "shows": "When the loss moves, and how the two providers expose the decision."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The risk rule's third action between allow and block, 'request 3-D Secure'.",
+            "introduces": "What that action is: handing the question of who is paying to the issuer, with the loss following the question.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "controlling_idea": "The compliance chapter answers what a payment company must know about the businesses it pays and how that becomes software: the duty sits with the regulated provider and returns to the platform as requirements with deadlines that switch payouts on and off, as 230 Frozen Studios learned in May 2026; the chapter also closes the part.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P5-5"
+            ],
+            "how": "Introduces the chapter that shows the fifth relocation, on the seller's side, and that carries the part's closing."
+          },
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield (fictional): the Frozen Studios, May 2026: a verification requirement changed and 230 studios went without payouts for up to 12 days; Keel decision K6, 'verification is state, not a form'.",
+              "source": "payment-compliance-and-regulation; _research/scenario-ledger.md (Incidents; K6)",
+              "shows": "An approved seller can become restricted without doing anything, and the platform that did not track the state learned from support tickets."
+            },
+            {
+              "kind": "fact",
+              "what": "As chapter 26 documents: Stripe announces rule changes as data in `future_requirements`; Adyen documents its periodic data review as a flow; neither publishes how it monitors transactions or screens against sanctions lists.",
+              "source": "payment-compliance-and-regulation",
+              "shows": "What the two providers document about account state and where both are silent."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Four chapters about the payer and the card, each a decision about one payment.",
+            "introduces": "The other end: the business being paid, held as a standing state on an account.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "Where to Begin",
+    "synthesis": "Read in order, the five chapters turn 'are we compliant?' into five answerable questions of one form: what moved, to whom, and what stayed. Read singly, each answers the question a reader arrives with: where card numbers may go, why a stored card kept working, why a payment was blocked, who carries a fraud loss, why a seller's payouts stopped.",
+    "so_what": "For any control a provider offers, the reader asks what stayed with the business and who owns it before counting the risk as handled.",
+    "callback": {
+      "to": "The Card-Testing Weekend of the opening (p01).",
+      "how": "The reader is told that the weekend returns twice: in the first chapter as the control that worked, and in the third as the attack that control was never about."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Begin with the tokenization chapter: the first and oldest relocation, of the card number itself."
+    },
+    "hand_off": {
+      "to": "tokenization-vaulting-and-pci",
+      "relationship": "example",
+      "carries_over": "The part's claim that a control moves data or liability and leaves a remainder, and the Card-Testing Weekend, in which Larkfield held no card numbers.",
+      "introduces": "The first and oldest case of the claim: moving the card number itself out of the merchant's systems, and what stays behind."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The five chapters and the control each one covers.",
+      "introduces": "How to use them: by the question in hand, and where to begin.",
+      "form": "sentence",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p12",
+        "controlling_idea": "The five chapters each answer one question a reader may arrive with, and the opening weekend returns in two of them, as the control that worked and as the attack it was never about; the first and oldest relocation is the card number itself.",
+        "function": "synthesis"
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "Teaching PCI scope, tokens, risk scoring, 3-D Secure or verification; the page summarizes and does not re-argue the chapters.",
+      "covered_in": [
+        "tokenization-vaulting-and-pci",
+        "network-tokens",
+        "payment-fraud-and-risk",
+        "three-d-secure-and-sca",
+        "payment-compliance-and-regulation"
+      ]
+    },
+    {
+      "topic": "The part's closing (the five controls as one system, the table of what moved, to whom, what stayed and its owner, the weekend set beside the Frozen Studios).",
+      "covered_in": [
+        "payment-compliance-and-regulation"
+      ]
+    },
+    {
+      "topic": "A 'Stripe and Adyen: Where They Differ' table, take-away tiers, failure-pattern callout and Questions to Ask; part intros do not carry them (style guide)."
+    },
+    {
+      "topic": "External factual claims of the page's own; every company, network, standard and regulatory statement repeats a chapter of the part, which cites it."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "The closing sentence 'Begin with …' sits under its own heading, 'Where to Begin', as the conclusion's one paragraph, as in the Part I and II introductions.",
+      "rejected": [
+        "Ending the 'Chapters in this part' section with it: the draft checker reads a conclusion only from a heading of its own."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The links between controls get one example in the lead (card collection decides what the fraud model sees); the full set is left to chapter 26, which carries the part's closing.",
+      "rejected": [
+        "Listing all four links here, which would pre-empt the closing synthesis.",
+        "Leaving the links out, although the third key point and the part's 'believe' outcome name them."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The hook does not name the provider of the attacked studio or split the 61,000 attempts; the ledger leaves the provider unnamed and chapter 24 owns the split.",
+      "rejected": [
+        "Repeating the blocked/declined/approved split, which is an illustrative assumption owned by chapter 24."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "journal-spec.json (part-5: thesis, opening, flow, transition_in; post entry part-5; the five chapter entries)",
+      "contributed": "Intent, thesis, role, hook, bridge, roadmap, the order of chapters and their declared transitions."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "The Card-Testing Weekend, the Frozen Studios, Keel decisions K4 and K6, the additions by chapters 22 to 26."
+    },
+    {
+      "kind": "internal",
+      "ref": "posts/22-tokenization-vaulting-and-pci, 23-network-tokens, 24-fraud-and-risk-systems, 25-3ds-and-sca, 26-kyc-aml-and-regulation (index.md, read in full)",
+      "contributed": "What each chapter argues, its Larkfield case, its numbers and the documented Stripe and Adyen facts repeated here."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Spec created from the journal spec and the five written chapters of Part V."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "After the flow rubric: p01 says what the €4,100 was (provider fees and refunds), and p07 names the tokenization chapter's return to the weekend, so the conclusion's callback (the weekend returns in two chapters) rests on what the chapter list says. Notes not acted on: the roadmap paragraph (p06) is kept although the chapter section repeats the order, because the style guide and AC-1 ask for the reading order in the lead; p03 keeps all five move/leave pairs because it is the thesis statement AC-1 probes, and the chapter paragraphs add the question, the case and the evidence; p08 keeps 'vendor comparisons' although p05 names the limit, because it is that chapter's own finding."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass (part introduction, checked against the corrected chapters 22-26): 21 claims checked (20 agree, 1 corrected to match, 0 removed); the Radar availability rule is attributed to Stripe's PCI guide, as chapter 22 was hedged."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation after verification (17 November 2026): hook says the studio 'could not sell online' for 31 hours, as the ledger and chapter 24 do."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Part thesis claim reworded as approved by the author after verification (clause made too strong by the verified sources)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit (17 November 2026): the three statements of absence in the evidence paragraph re-tested with a wide search. 'Neither publishes a vault design' holds; 'Adyen's fraud-risk model is not public' narrowed to 'has published little' (model family and a latency allocation are on record); the monitoring sentence now says both companies state that they monitor, not how."
+    }
+  ],
+  "length": {
+    "target_words": 1000,
+    "max_words": 1200
+  }
+}

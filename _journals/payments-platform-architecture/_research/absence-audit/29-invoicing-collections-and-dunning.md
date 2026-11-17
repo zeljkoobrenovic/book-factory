@@ -1,0 +1,12 @@
+# Absence audit — 29-invoicing-collections-and-dunning
+
+Audit of 17 November 2026. Corpora fetched in this session with a generic user agent: `docs.adyen.com/llms-full.txt` (68 MB, full text), `docs.adyen.com/sitemap.xml`, `docs.adyen.com/llms.txt`, `www.adyen.com/sitemap-en.xml`, `help.adyen.com/sitemap.xml`, `docs.stripe.com/sitemap.xml`, `docs.stripe.com/llms.txt`, `support.stripe.com/sitemap.xml`; web searches restricted to the providers' domains (stripe.com, docs.stripe.com, support.stripe.com, stripe.dev; adyen.com, docs.adyen.com, help.adyen.com, medium.com); pages named below read directly.
+
+| Statement | Where searched | Result | Change |
+| --- | --- | --- | --- |
+| Key point, logic paragraph, inference block, table row: "Neither documents its retry model"; "apart from calling the model AI, that is the whole published description"; "Neither company describes its model that way" | adyen.com sitemap (knowledge hub); stripe.com blog; web search | overturned | Stripe blog "How we built it: Smart Retries" (23 January 2024): a model that "predicts the optimal time to retry a failed payment", "more than 500 attributes". Adyen "Rescuing failed subscription payments using contextual multi-armed bandits" (3 December 2020): contextual bandit on a random forest; one experiment converted "about 6% more orders than the baseline" (retry every four days). Key point, paragraph, inference block, table row, take-away, Sources and spec updated |
+| "Neither documents ... a recovery rate with a stated basis"; "Adyen publishes no average" | same | narrowed | Adyen's 2020 experiment figure has a stated baseline but is six years old; no current rate with a basis. Text now says so |
+| "The product page does not say its 55% is that measure" | Stripe Billing product page (verification row 26) | already wide | none |
+| "On Adyen I found nothing equivalent ... no invoice object, no customer balance for receivables and no cash-application feature"; table "No invoice object found" | Adyen docs full text (cash application 0, customer balance 0, dunning 0; "accounts receivable" is the merchant's receivable from Adyen), help-center sitemap, adyen.com sitemap | holds | Search scope stated |
+| "I found no Adyen documentation of an integrated billing product" | as chapter 27 | holds | none |
+| "No independent measurement of involuntary churn was found" | not about a company; verifier's web search | already wide | none (the Stripe 2024 post gives a vendor figure, "Twenty-five percent of lapsed subscriptions"; not independent, not added) |

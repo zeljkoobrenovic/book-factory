@@ -1,0 +1,1683 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "payment-state-machines",
+  "journal": "payments-platform-architecture",
+  "part": "part-2",
+  "title": "One Object, Many Outcomes: The Payment State Machine",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "Why a single charge request with a yes-or-no answer could not represent payments that need a customer action or are confirmed later, as Stripe described it in 2020.",
+        "The states of Stripe's PaymentIntent (introduced 2018) and how a failed attempt returns it to an earlier state; Adyen's result codes, action objects (since Checkout API v49, May 2019) and modifications as separate asynchronous requests.",
+        "What a payment state machine must guarantee: one terminal outcome, only legal transitions, and transitions that are safe to apply twice."
+      ],
+      "believe": [
+        "Waiting for the customer and waiting for the network are different states, and the synchronous API response is one transition, not the outcome.",
+        "A consumer should keep the provider's status as received and derive its own smaller vocabulary from it."
+      ],
+      "can_do": [
+        "Design a payment record that mirrors two providers with different models: one that offers an object to re-read and one that reports results per request and by webhook.",
+        "Given an event that arrives late, twice or out of order, say which transition is legal and which must be ignored."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a payment flow the chapter does not contain, the reader places each moment in a state and says which system's message moves it on.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A customer pays by scanning a QR code with their banking app. The API call returns at once with the code to display; the customer scans it four minutes later; the bank confirms a few seconds after that; the customer has already closed the browser tab. Using only this chapter: which states does your payment record pass through, and what triggers the last transition?",
+        "expected": "A state for waiting on the customer's action after the first response, then a state for waiting on the bank or network, then a terminal success; the last transition is triggered by the provider's server-side notification (or by fetching the provider's record), never by the browser returning, because the customer may not come back."
+      },
+      {
+        "id": "AC-2",
+        "statement": "Given a late contradictory event, the reader applies the guarantees: one terminal outcome, legal transitions only, repeated events harmless.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "Your record shows a payment as captured. Two days later the provider sends an event saying the capture failed. A minute later the same event arrives again. What should your state machine do with each, according to this chapter?",
+        "expected": "Accept the first as a legal transition out of a state that was never final (a successful capture response is itself a promise), move the payment to the failed-capture state and trigger whatever depends on it; treat the second as a repeat that changes nothing. The reader does not discard the event as impossible."
+      },
+      {
+        "id": "AC-3",
+        "statement": "The chapter's account of Stripe's redesign is dated to its 2020 source with its age stated, Adyen's model is described from its documentation and API specification, and the absence of a comparable Adyen design history is said outright.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "How do you model a payment that can be pending, need a customer action, succeed later, be partly captured and partly refunded?",
+    "claim": "Such a payment has to be modeled as one long-lived record that moves through explicit states, with waiting for the customer and waiting for the network as separate states and the synchronous response as one transition among several; captures and refunds are separate operations recorded against that record, each for its own amount and with its own outcome. Stripe and Adyen both arrived at this model and expose it differently: Stripe as a PaymentIntent that can be retrieved and retried (2018), Adyen as a result code per request, follow-up operations as separate asynchronous requests and outcomes by webhook, with no endpoint in its Checkout API that returns a payment by its identifier.",
+    "disputed_by": "The view that a payment is a request with a yes-or-no answer, and that pending, action-required and partial outcomes are exceptions to cover with a few extra status values on the charge record.",
+    "so_what": "The integrator's own payment record is designed, not copied: it stores each provider's status as received, maps it to a small vocabulary of its own (Larkfield's five states), accepts a state change only from the provider's confirmed record, and tolerates late and repeated events. With two providers, one side is read from an object and the other is assembled from results and events.",
+    "how_why": "Stripe's own account (December 2020, six years old) is that its Charge was built for US cards, which finalize at once with no customer action; a pending state was added in 2015 for bank debits, a client-driven object followed, and payments went uncompleted and were refunded when the browser lost its connection, so in 2018 it introduced an intent with states for customer action and for processing and with no failed state, since a failed attempt returns the intent to where a new attempt can be made. Adyen's documentation shows the same shape reached by another route: an action object in responses since May 2019, a recommendation not to update order systems from the result code, and captures and refunds that are answered 'received' and can still fail days after a webhook reported success. Adyen has published no design history comparable to Stripe's: a knowledge-hub post of 5 October 2021 gives the reason for `/sessions` (API calls 'reduced from three to only one'), an engineering post of July 2021 gives the reason for asynchronous modifications (it keeps the edge layer stateless), and its reasons for result codes are not on record; the difference in what the integrator must store is the author's inference from the two documented contracts.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "A charge request with a yes-or-no answer cannot represent a payment whose outcome needs a customer action or arrives later, and adding status values to it does not repair that, as Stripe's dated account of its own API shows."
+      },
+      {
+        "id": "S2",
+        "claim": "The model that works is one server-side record with explicit states, in which waiting for the customer and waiting for the network are different states, the synchronous response is one transition, and captures and refunds are separate operations with their own amounts and outcomes."
+      },
+      {
+        "id": "S3",
+        "claim": "Stripe and Adyen both document this model and expose it differently: Stripe as a PaymentIntent that can be retrieved and retried, Adyen as result codes, modifications and webhooks with no payment read endpoint in its Checkout API."
+      },
+      {
+        "id": "S4",
+        "claim": "A payment state machine is useful only if it guarantees one terminal outcome, legal transitions only and transitions safe to apply twice, and success states are not terminal."
+      },
+      {
+        "id": "S5",
+        "claim": "The integrator's payment record is designed, not copied: it keeps each provider's status as received, maps it to a small vocabulary of its own, and changes state only on the provider's confirmed record."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Supplies the model (attempt, state, transition, terminal outcome) that the optimization and routing chapters count in and that Parts III and IV record and expose.",
+    "supports": [
+      "P2-3"
+    ]
+  },
+  "flow": {
+    "pattern": "problem_solution",
+    "additional_patterns": [
+      {
+        "pattern": "chronological",
+        "applies_to": "why-charge-broke: Stripe's API history from 2011 to 2018"
+      },
+      {
+        "pattern": "prerequisite_order",
+        "applies_to": "the-model, stripe-paymentintent, adyen-results-and-modifications: the neutral model, then each provider read against it"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "guarantees-and-mirrors and where-they-differ"
+      }
+    ],
+    "rationale": "The reader meets a record that fails (Larkfield's five words) and a model that failed (the charge request) before the model that works, so the states arrive as answers to problems already felt. The neutral model comes before either provider so that Stripe's statuses and Adyen's result codes can each be read as a version of it, and Stripe comes first because it is the only one with a published history and its object is the simpler case. The guarantees follow the two exposures because their hard part, that success is not terminal, rests on behavior documented in those sections; the provider comparison follows the guarantees so the table can be read as a summary. Larkfield's redesigned record comes after the comparison because it has to absorb exactly those differences, and the failure cases close the body because each applies a guarantee to that record. Putting the providers before the neutral model would teach two vocabularies with nothing to map them to; putting the guarantees before the providers would assert that success can be undone before the reader has seen either provider say so."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "On 12 January 2027 Mila Janssen types her Visa debit card into the member app to start a €49 membership. Larkfield's server calls the provider and has an answer in under a second. The answer is neither 'approved' nor 'declined': her bank wants her to confirm in its app. What should Larkfield's payment record say while she reaches for her phone?"
+    },
+    "bridge": {
+      "from_reader_world": "An engineer expects a request to return a result, and a payment call looks like a request.",
+      "to_topic": "The first response of an ordinary European card payment can be 'the customer must act', and for other methods 'ask again in three days'; a record built for yes or no has to guess, which turns the question into how to model the payment."
+    },
+    "thesis_statement": {
+      "text": "A payment is one long-lived record that moves through explicit states; waiting for the customer and waiting for the network are different states, the API response is one transition, and captures and refunds are separate operations with their own amounts. Stripe exposes the record as an object you can read again; Adyen as results, modifications and webhooks.",
+      "placement": "KEY POINTS callout, first and second bullets, and paragraph p03"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p05",
+      "promises": [
+        {
+          "promise": "Start from Larkfield's five-state record and what it could not express, and return to it redesigned.",
+          "kept_in": [
+            "scene",
+            "in-practice"
+          ]
+        },
+        {
+          "promise": "Explain why a yes-or-no charge request stopped working.",
+          "kept_in": [
+            "why-charge-broke"
+          ]
+        },
+        {
+          "promise": "Set out the model: one record, explicit states, separate operations.",
+          "kept_in": [
+            "the-model"
+          ]
+        },
+        {
+          "promise": "Show how Stripe and then Adyen expose the model, and compare them.",
+          "kept_in": [
+            "stripe-paymentintent",
+            "adyen-results-and-modifications",
+            "where-they-differ"
+          ]
+        },
+        {
+          "promise": "State what a state machine must guarantee and compare four ways to mirror one.",
+          "kept_in": [
+            "guarantees-and-mirrors"
+          ]
+        },
+        {
+          "promise": "Say what to do with events that arrive late, twice or in contradiction.",
+          "kept_in": [
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "When Mila types her card in to start a membership, the provider answers Larkfield within a second, and the answer is neither approved nor declined: her bank wants her to confirm in its app.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's membership set-up on 12 January 2027: a €49.00 monthly membership at Studio Noord, a Dutch Visa debit card typed in, a 3-D Secure challenge passed in her banking app.",
+            "source": "Larkfield scenario ledger (fictional)",
+            "shows": "The first answer of an ordinary card payment can be a request for a customer action, which a yes-or-no record cannot hold."
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "A payment record that can say only paid or not paid has to guess during that wait, and each wrong guess costs someone: a charged member shown as unpaid, or access granted for money that never arrives.",
+        "function": "cause_effect",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The answer that is neither yes nor no.",
+          "introduces": "What a two-valued record does with it, and who pays for the guess.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "A payment has to be modeled as one long-lived record that moves through explicit states, with captures and refunds recorded against it as separate operations; Stripe and Adyen both arrived there and expose the record in different ways.",
+        "function": "claim",
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "The record that has to guess.",
+          "introduces": "The model that removes the guess, and the two forms in which the anchor providers present it.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "controlling_idea": "In the journey of Mila's class pass, this chapter covers the record that exists from the moment she taps pay at 19:42 until the provider confirms the outcome, and that every later step writes to.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's class pass: €120.00 at Studio Noord on Tuesday 9 March 2027 at 19:42, Dutch Visa debit card in a phone wallet, Studio Noord on Adyen, captured automatically, payout on Thursday 11 March.",
+            "source": "Larkfield scenario ledger (fictional)",
+            "shows": "Places the chapter on the recurring payment."
+          }
+        ],
+        "transition_in": {
+          "relationship": "place",
+          "carries_over": "The model just stated.",
+          "introduces": "Where it sits on the recurring payment of the book.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p05",
+        "controlling_idea": "The chapter starts at Larkfield's five-state record, explains why a charge request stopped working, sets out the model, shows how Stripe and then Adyen expose it, states what a state machine must guarantee and how to mirror one, compares the two providers, works Mila's payments through, and ends with events that arrive late, twice or in contradiction.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The chapter's place on the payment's journey.",
+          "introduces": "The order of the sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: Five Words, Two Providers",
+      "controlling_idea": "Larkfield's five-state payment record cannot place several ordinary payments, and an outage showed that the record was a copy of state held at the provider.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "Poses the consumer's design question on a concrete record before the model is introduced."
+      },
+      "flow": {
+        "pattern": "small_to_large",
+        "rationale": "From the record as it is, to the payments it cannot place, to the incident that showed where the state really lived, to the question the rest of the chapter answers; the question only makes sense once the reader has seen the record fail."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The claim that a payment needs a record with explicit states.",
+        "introduces": "One company's record, with five states, and what it could not express.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p06",
+          "controlling_idea": "In late March 2027 Femke de Graaf reviews the payment record store with Tom Hendriks: one row per payment, one of five states, and both providers' references.",
+          "function": "context",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "The payment record store: PostgreSQL, five-state vocabulary (pending, authorized, paid, refunded, disputed), both providers' raw references, fed by webhooks through an inbox table; built in 2024 by Tom Hendriks. Larkfield is fictional.",
+              "source": "Larkfield scenario ledger (fictional)",
+              "shows": "Gives the reader the concrete record the chapter redesigns."
+            }
+          ]
+        },
+        {
+          "id": "p07",
+          "controlling_idea": "Three ordinary payments have no clear place in the five words: a wait for the customer, a wait for the bank and a partial refund.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Mila's 12 January set-up waiting on her banking app; a SEPA Direct Debit membership payment that the provider reports as still processing for days; the €84.00 refund on 18 March 2027 of the unused part of the €120.00 pass.",
+              "source": "Larkfield scenario ledger (fictional)",
+              "shows": "'pending' hides who the payment is waiting for, and 'refunded' hides how much."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The five words.",
+            "introduces": "Payments the five words cannot describe.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p08",
+          "controlling_idea": "The Silent Webhook showed that Larkfield's record was a copy: for nine hours it said 3,200 memberships were unpaid while Stripe's own objects said they were paid.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "The Silent Webhook, 14 September 2026: the Stripe webhook receiver's certificate expired, events failed for 9 hours, 3,200 memberships were shown as unpaid and members were turned away at check-in; no money was lost.",
+              "source": "Larkfield scenario ledger (fictional)",
+              "shows": "The payment's state lived at the provider; the local record changed only when an event arrived."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "A record that cannot describe some payments.",
+            "introduces": "A record that was wrong about payments it could describe.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p09",
+          "controlling_idea": "Femke's question is the chapter's: for each of the five words, which message from which provider may move a record into it and out of it?",
+          "function": "claim",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "A record that is both too coarse and only a copy.",
+            "introduces": "The design question that follows.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "why-charge-broke",
+      "heading": "Why a Yes-or-No Charge Stopped Working",
+      "controlling_idea": "A charge request with a synchronous yes-or-no answer assumes the outcome is known at once and needs no customer; Stripe's own dated account shows each step at which that assumption failed and why extra status values did not repair it.",
+      "function": "cause_effect",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "Supplies the dated evidence that the request model failed for structural reasons."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "Stripe's account is a history (2011, 2015, 2015 to 2017, 2018), and each step is a response to the failure before it; the classification table and the diagnosis come last because they are what the history adds up to."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Larkfield's question about which message may move a record.",
+        "introduces": "Why a payment needs a record with states at all, from the history of the provider that documented it.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p10",
+          "controlling_idea": "In the charge-request model a payment is one server call that carries the card details and returns the outcome, and the merchant's record is that answer.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "The model holds only if the outcome is known within the call and nobody but the merchant's server has to act.",
+              "shows": "Names the two assumptions the rest of the section breaks."
+            }
+          ]
+        },
+        {
+          "id": "p11",
+          "controlling_idea": "Stripe's own account, published in 2020, is that its first API was a charge request because US card payments allowed it.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "Token created in the browser plus Charge created on the server, 2011 to 2015; card payments 'can be immediately finalized'; payments are 'finalized' 'when a user has sufficient confidence the funds are guaranteed'.",
+              "source": "Michelle Bu, 'Stripe's payments APIs: The first 10 years', Stripe, 2020-12-15, https://stripe.dev/blog/payment-api-design (evidence age: 6 years)",
+              "shows": "The model fitted the one method it was built for; the source is six years old and current documentation confirms the end state it describes."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The charge-request model.",
+            "introduces": "The best documented instance of it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p12",
+          "controlling_idea": "In 2015 two methods broke the assumption: a bank debit that is finalized days later and a method the customer has to start.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "A pending state was added to the Charge for ACH debit; with Bitcoin the integration 'involved managing two state machines to complete payment: BitcoinReceiver on the client and Charge on the server'.",
+              "source": "Michelle Bu, 'Stripe's payments APIs: The first 10 years', Stripe, 2020-12-15, https://stripe.dev/blog/payment-api-design (evidence age: 6 years)",
+              "shows": "The first repair was an extra status value and a second object, which is the approach the thesis disputes."
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "The model while it fitted.",
+            "introduces": "The first payments it did not fit.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p13",
+          "controlling_idea": "The next design moved the state to the browser, and payments were lost when the browser did not come back.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Sources (2015 to 2017), 'a client-driven state machine'; with iDEAL, if the browser lost its connection 'the next request to create a Charge wouldn't make it through, even though the customer believes they paid', and 'we'd refund the money associated with the Source after a few hours. This is a conversion nightmare.'",
+              "source": "Michelle Bu, 'Stripe's payments APIs: The first 10 years', Stripe, 2020-12-15, https://stripe.dev/blog/payment-api-design (evidence age: 6 years)",
+              "shows": "A customer paid and the merchant never recorded it, because completing the payment depended on a second call from a client that had gone."
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "Two state machines for one payment.",
+            "introduces": "A single client-driven one, and its failure.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p14",
+          "controlling_idea": "Stripe's own classification sorts payment methods on two questions, and cards without authentication are the only ones that answer no to both.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Two-by-two table from the 2020 post: finalized immediately or later, against customer action required or not; cards alone in the first cell; bank debits finalize later; iDEAL, Bancontact and cards with 3-D Secure need an action; vouchers need both.",
+              "source": "Michelle Bu, 'Stripe's payments APIs: The first 10 years', Stripe, 2020-12-15, https://stripe.dev/blog/payment-api-design (evidence age: 6 years)",
+              "shows": "The model was built for the exceptional cell."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "Three failures in sequence.",
+            "introduces": "The two properties that explain all three.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p15",
+          "controlling_idea": "More status values could not repair the charge, because the fault was where the state lived and who had to make the next call.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Charges and Tokens were foundational in the API because they were the first APIs we had, not because they were the right abstraction for global payments'; the Charge grew 'from having 11 properties to 36 properties' between 2011 and 2018.",
+              "source": "Michelle Bu, 'Stripe's payments APIs: The first 10 years', Stripe, 2020-12-15, https://stripe.dev/blog/payment-api-design (evidence age: 6 years)",
+              "shows": "The provider itself concluded the abstraction, not the status list, was wrong."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The two properties.",
+            "introduces": "Why they require a different kind of record.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "the-model",
+      "heading": "One Record, Explicit States, Separate Operations",
+      "controlling_idea": "The model that replaces the charge request is a record created before any money moves, with a state for each kind of waiting, transitions that different parties trigger, and captures and refunds held as separate operations with their own amounts.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S2"
+        ],
+        "how": "Defines the model in provider-neutral terms so the two providers' versions can be read against it."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "Record and attempt first, because the states are states of the record; the states before the difference between the two waits; the next action before the synchronous response, since the response is what carries it; operations last, because they act on a payment that has already reached a state."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "The diagnosis: the state lived in the wrong place.",
+        "introduces": "The model in which the state lives in one server-side record.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p16",
+          "controlling_idea": "A payment state machine is a record created on the server before any money moves, which holds a state, the transitions allowed from it and every attempt made to pay.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "A payment is the customer's purchase; an attempt is one try to collect it with one payment method. One payment can hold several attempts.",
+              "shows": "Separates the two things the charge request treated as one."
+            }
+          ]
+        },
+        {
+          "id": "p17",
+          "controlling_idea": "Six states are enough to describe the model, and each is left by a different party.",
+          "function": "description",
+          "organization": "classification",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "State, what it means, who moves it on: needs payment details (customer, through the client); needs customer action (customer); processing (bank or network, reported by the provider); authorized (merchant's server, by capture or cancel, or the expiry of the hold); succeeded (nobody; later operations are separate records); canceled (nobody).",
+              "shows": "The states differ by who can end them, which is what the consumer has to wait for."
+            },
+            {
+              "kind": "figure",
+              "what": "State machine figure: the six states and the party behind each arrow.",
+              "shows": "Shows the failed attempt returning to the first state."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The record and its attempts.",
+            "introduces": "The states the record passes through.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p18",
+          "controlling_idea": "Waiting for the customer and waiting for the network are different states because a different party ends each, on a different clock.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "A customer action takes seconds or minutes and may never happen; a bank debit takes days and almost always resolves. The first needs a reminder and an expiry, the second needs patience and no reminder.",
+              "shows": "One word for both waits forces the wrong follow-up on one of them."
+            }
+          ],
+          "transition_in": {
+            "relationship": "emphasis",
+            "carries_over": "The six states.",
+            "introduces": "The two that are most often merged.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p19",
+          "controlling_idea": "A next action is the provider's instruction to the client about what the customer must do before the payment can go on.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "example",
+              "what": "A redirect to the customer's bank; a 3-D Secure challenge (the card networks' protocol by which the customer's bank authenticates her, used to meet the European rule of strong customer authentication); a voucher or QR code to display.",
+              "shows": "The three kinds the reader will meet, each performed by the client and not by the merchant's server."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The state of waiting for the customer.",
+            "introduces": "What the provider returns in that state.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "controlling_idea": "The synchronous API response reports the state reached so far and is one transition; the last transition comes from the provider's server-side notification, because the customer may never return.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Requirements table: how fast (the response within seconds; the outcome in seconds to days), how consistent (the provider's record wins), how available (the record must accept events when the customer's client is gone), what happens on failure (the payment stays in its state until the provider reports).",
+              "shows": "States what the consumer may and may not expect from each message."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "A next action performed by a client the server does not control.",
+            "introduces": "Why the response cannot be the outcome.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20b",
+          "controlling_idea": "That notification is delivered at least once and in no guaranteed order, and each provider documents the identity by which a repeat can be recognized.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'Webhook endpoints might occasionally receive the same event more than once' and 'Stripe doesn't guarantee the delivery of events in the order that they're generated'; the guard is the event ID. Adyen: duplicates 'have the same values in the eventCode and pspReference fields'; 'always check the timestamp'.",
+              "source": "Stripe documentation, 'Receive Stripe events in your webhook endpoint'; Adyen documentation, 'Handle webhook events'; both n.d., accessed 2026-11",
+              "shows": "The message that carries the last transition can repeat and arrive out of order, which the record has to be built for."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The server-side notification as the carrier of the outcome.",
+            "introduces": "What may be assumed about its delivery.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p21",
+          "controlling_idea": "Captures, cancellations, refunds and disputes are separate records against the payment, each with its own amount and its own outcome, so 'partly captured and partly refunded' is two amounts and not a state.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Mila's €120.00 pass with €84.00 refunded: authorized 120.00, captured 120.00, refunded 84.00.",
+              "source": "Larkfield scenario ledger (fictional)",
+              "shows": "The amounts carry what no status word can."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The states of the payment up to success.",
+            "introduces": "What happens to a payment after it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "stripe-paymentintent",
+      "heading": "Stripe: A PaymentIntent You Can Read Again",
+      "controlling_idea": "Stripe exposes the model as a PaymentIntent, an object with a status field that the integrator creates on the server, lets the client confirm, and can retrieve by its identifier at any time.",
+      "function": "description",
+      "advances_thesis": {
+        "supports": [
+          "S3"
+        ],
+        "how": "Documents the first of the two exposures."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The object first, then its statuses, then the rule that makes it retriable, then how its two waiting states are reported, then the operations after success, then the sibling object that shares its states; each paragraph uses the fields the one before introduced."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The provider-neutral model.",
+        "introduces": "The first provider's version of it, with dated sources.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p22",
+          "controlling_idea": "A PaymentIntent, introduced by Stripe in 2018, is the server-created record of one purchase, which the customer's client confirms using a secret that belongs to that one intent.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "'Each PaymentIntent typically correlates with a single shopping cart or customer session'; create and confirm are two actions; the client secret 'lets the client access important fields from the PaymentIntent (status, amount, currency) while hiding sensitive ones'; each intent 'has a unique ID that you can use to retrieve it'.",
+              "source": "Stripe documentation, 'The Payment Intents API', n.d., accessed 2026-11, https://docs.stripe.com/payments/payment-intents",
+              "shows": "The record exists on the server before the customer acts, which is what Sources lacked."
+            },
+            {
+              "kind": "source",
+              "what": "Introduced 2018; rollout 'took almost two years'.",
+              "source": "Michelle Bu, 'Stripe's payments APIs: The first 10 years', Stripe, 2020-12-15, https://stripe.dev/blog/payment-api-design (evidence age: 6 years)",
+              "shows": "Dates the object."
+            }
+          ]
+        },
+        {
+          "id": "p23",
+          "controlling_idea": "The PaymentIntent has seven statuses, and Stripe's documentation says what each one waits for.",
+          "function": "description",
+          "organization": "classification",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "requires_payment_method, requires_confirmation, requires_action, processing, requires_capture, succeeded, canceled, each with Stripe's own description.",
+              "source": "Stripe documentation, 'How Payment Intents and Setup Intents work', n.d., accessed 2026-11, https://docs.stripe.com/payments/paymentintents/lifecycle",
+              "shows": "Maps one to one onto the model's states, with waiting for the customer and waiting for the network kept apart."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The object.",
+            "introduces": "Its status field.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p24",
+          "controlling_idea": "There is no failed status: a failed attempt returns the intent to requires_payment_method, and the attempt itself is kept as a Charge.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'There's no failed state because if a single payment attempt fails, the PaymentIntent goes back to the requires_payment_method state so that the customer can try again with a different payment method.'",
+              "source": "Michelle Bu, 'Stripe's payments APIs: The first 10 years', Stripe, 2020-12-15, https://stripe.dev/blog/payment-api-design (evidence age: 6 years)",
+              "shows": "Failure belongs to the attempt, not the payment."
+            },
+            {
+              "kind": "source",
+              "what": "latest_charge: 'ID of the latest Charge object created by this PaymentIntent'; the lifecycle page advises creating the intent early 'so Stripe can record all attempted payments'.",
+              "source": "Stripe API reference, 'The PaymentIntent object', n.d., accessed 2026-11, https://docs.stripe.com/api/payment_intents/object",
+              "shows": "The current reference confirms the 2020 account."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Seven statuses.",
+            "introduces": "The status a reader expects and does not find.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p25",
+          "controlling_idea": "Stripe reports the two waits as requires_action, with a next_action field for the client, and processing, and tells integrators to act on the server-side event in both cases.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Don't attempt to handle order fulfillment on the client side because customers can leave the page after payment is complete but before the fulfillment process initiates'; polling the intent is possible 'but it's much less reliable and might trigger rate limits'.",
+              "source": "Stripe documentation, 'Payment status updates', n.d., accessed 2026-11, https://docs.stripe.com/payments/payment-intents/verifying-status",
+              "shows": "The provider itself says the response and the browser are not the outcome."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "A failed attempt.",
+            "introduces": "An attempt that is still in progress.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p26",
+          "controlling_idea": "After authorization the operations hang off the same record: capture is a call on the intent, and a refund or a dispute is its own object that changes the payment's outcome while the intent's status field still reads succeeded.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Subsequent refunds, disputes, and outcomes are reflected on the Charge. These might change what you see in the Dashboard, even though the PaymentIntent remains succeeded.'",
+              "source": "Stripe documentation, 'Payment status updates', n.d., accessed 2026-11, https://docs.stripe.com/payments/payment-intents/verifying-status",
+              "shows": "succeeded is the end of the intent's own machine, not the end of the payment's story."
+            },
+            {
+              "kind": "source",
+              "what": "Capture when status is requires_capture, with amount_to_capture at most the original amount; uncaptured intents are canceled after 7 days by default; a Refund has status pending, requires_action, succeeded, failed or canceled.",
+              "source": "Stripe API reference, 'Capture a PaymentIntent' and 'The Refund object', n.d., accessed 2026-11",
+              "shows": "Each operation has its own amount and outcome."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The states before success.",
+            "introduces": "What Stripe records after it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p27",
+          "controlling_idea": "A SetupIntent runs through the same statuses to save a payment method for later use without charging it.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Both Payment Intents and Setup Intents go through the same set of states'; Setup Intents 'set up payment credentials but don't process payments'.",
+              "source": "Stripe documentation, 'How Payment Intents and Setup Intents work', n.d., accessed 2026-11, https://docs.stripe.com/payments/paymentintents/lifecycle",
+              "shows": "The state model is shared by set-up and payment."
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "The PaymentIntent's machine.",
+            "introduces": "The sibling object that reuses it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "adyen-results-and-modifications",
+      "heading": "Adyen: Result Codes, Modifications and Webhooks",
+      "controlling_idea": "Adyen exposes the same model as a result code on each response, an action object for the client, modifications as separate asynchronous requests and outcomes by webhook, with no endpoint in its Checkout API that returns a payment by its identifier.",
+      "function": "description",
+      "advances_thesis": {
+        "supports": [
+          "S3"
+        ],
+        "how": "Documents the second exposure and says where the evidence for its reasons stops."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The limits of the evidence first, so the reader knows the section describes a contract and not a design history; then the session, the result code, the action and the warning about the result code, in the order a payment meets them; then modifications and their two-stage outcome; the missing read endpoint last, because it is what turns the earlier facts into a storage requirement."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "An object the integrator can read again.",
+        "introduces": "A provider that reports results per request and by event.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p28",
+          "controlling_idea": "Adyen has published no design history comparable to Stripe's, so its model is described here from its documentation, its API specification and the dates in its release notes.",
+          "function": "context",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "Release notes: resultCode presentToShopper in Checkout API v41 (14 February 2019); 'The response now contains an action object that indicates the action to be taken for completing the payment' in v49 (14 May 2019); captures, refunds, cancellations and reversals in the Checkout API on 3 June 2021; POST /sessions in v68 (6 October 2021).",
+              "source": "Adyen documentation, 'Release notes' for online payments, dated entries, https://docs.adyen.com/online-payments/release-notes",
+              "shows": "The dates show the same shape arriving in the same years as Stripe's redesign; the reasons for result codes are not on record; Adyen gave one for /sessions (2021) and one for asynchronous modifications (a stateless edge layer, engineering post, July 2021)."
+            }
+          ]
+        },
+        {
+          "id": "p29",
+          "controlling_idea": "A payment session is a short-lived server-created object that Adyen's client library uses to run the whole checkout, and its status is not the payment's record.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Session expiry 'is set to 1 hour after session creation' by default and at most 24 hours; of the session result: 'The status included in the response doesn't get updated. Do not make the request again to check for payment status updates.'",
+              "source": "Adyen documentation, 'Sessions flow integration guide', n.d., accessed 2026-11, https://docs.adyen.com/online-payments/build-your-integration/sessions-flow",
+              "shows": "The session starts a payment; it does not hold its state afterwards."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "Where the evidence comes from.",
+            "introduces": "The first object an integrator meets.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p30",
+          "controlling_idea": "Each response from the payment endpoints carries a result code, and Adyen's documentation sorts the codes into authentication steps, intermediate results and final results.",
+          "function": "description",
+          "organization": "classification",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Result codes by group: IdentifyShopper, ChallengeShopper, RedirectShopper (3-D Secure 2); Received, Pending, PresentToShopper (intermediate); PartiallyAuthorised; Authorised, Refused, Cancelled, Error (final). Received 'is the initial state for all payments'.",
+              "source": "Adyen documentation, 'Result codes', n.d., accessed 2026-11, https://docs.adyen.com/online-payments/build-your-integration/payment-result-codes",
+              "shows": "The same distinctions as the model, carried on a response and not on an object."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The session.",
+            "introduces": "What a response says about the payment's state.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p31",
+          "controlling_idea": "When the customer has to act, the response carries an action object that the client library performs, and if the customer never returns Adyen tells the integrator to wait for the webhook.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "Action types redirect, threeDS2, qrCode, sdk, voucher, await; 'If the response has no action object, get the payment outcome. If the response contains an action object, handle the additional action.'",
+              "source": "Adyen documentation, 'Advanced flow integration guide', n.d., accessed 2026-11, https://docs.adyen.com/online-payments/build-your-integration/advanced-flow",
+              "shows": "Adyen's next action, in the response of a command."
+            },
+            {
+              "kind": "quotation",
+              "what": "'If the shopper doesn't return to you website, you do not get a redirectResult. You do not need to do anything to handle the redirect in this case. Instead, wait for the webhook'.",
+              "source": "Adyen documentation, 'Sessions flow integration guide', n.d., accessed 2026-11, https://docs.adyen.com/online-payments/build-your-integration/sessions-flow",
+              "shows": "The outcome does not depend on the browser."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The authentication and intermediate codes.",
+            "introduces": "How the client is told what to do.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p32",
+          "controlling_idea": "Adyen tells integrators not to treat the result code as the record.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'The status of a payment can sometimes change after you get the result code, so we recommend that you do not use the result code to update your order management system.'",
+              "source": "Adyen documentation, 'Result codes', n.d., accessed 2026-11, https://docs.adyen.com/online-payments/build-your-integration/payment-result-codes",
+              "shows": "The synchronous response is one transition, in the provider's own words."
+            },
+            {
+              "kind": "quotation",
+              "what": "'Although you can use the payment result from the API, we recommend that you rely on the webhook to trigger any business logic'.",
+              "source": "Adyen documentation, 'Webhook structure and types', n.d., accessed 2026-11, https://docs.adyen.com/development-resources/webhooks/webhook-types",
+              "shows": "The AUTHORISATION webhook is the outcome."
+            }
+          ],
+          "transition_in": {
+            "relationship": "emphasis",
+            "carries_over": "Result codes and actions.",
+            "introduces": "What they must not be used for.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p33",
+          "controlling_idea": "A modification is Adyen's name for any operation on an existing payment, and each one is a separate request with its own reference, answered 'received' and resolved by webhook.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Capture response: 'status: received. Your capture request will be processed asynchronously. You will receive the result in a webhook'; an HTTP 200 means 'We still do not know if the capture operation will be successful or not.'",
+              "source": "Adyen documentation, 'Capture', n.d., accessed 2026-11, https://docs.adyen.com/online-payments/capture; 'Response handling', https://docs.adyen.com/development-resources/response-handling",
+              "shows": "The operation has its own identity and its own pending state."
+            },
+            {
+              "kind": "source",
+              "what": "'Every payment or modification request ... has a globally unique 16-character string called the PSP reference'.",
+              "source": "Adyen glossary, n.d., accessed 2026-11",
+              "shows": "Each operation is separately identified."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The payment up to authorization.",
+            "introduces": "The operations after it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p34",
+          "controlling_idea": "Even a modification's success is a promise: a capture or refund reported successful can fail days later.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "CAPTURE success true: 'In rare cases the card scheme can still reject the capture, and you will receive a CAPTURE_FAILED webhook'; 'This can even happen a few days after you submitted the capture request'; refunds likewise (REFUND_FAILED, REFUNDED_REVERSED).",
+              "source": "Adyen documentation, 'Capture', n.d., accessed 2026-11, https://docs.adyen.com/online-payments/capture; Adyen documentation, 'Refund', n.d., accessed 2026-11, https://docs.adyen.com/online-payments/refund",
+              "shows": "A success state that a later event can legally leave."
+            },
+            {
+              "kind": "quotation",
+              "what": "'Adyen does not send a webhook message when a payment settles successfully.'",
+              "source": "Adyen documentation, 'Webhook structure and types', n.d., accessed 2026-11, https://docs.adyen.com/development-resources/webhooks/webhook-types",
+              "shows": "Settlement is not a state the event stream reports."
+            }
+          ],
+          "transition_in": {
+            "relationship": "emphasis",
+            "carries_over": "A modification's asynchronous result.",
+            "introduces": "A second stage after that result.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p35",
+          "controlling_idea": "Adyen's Checkout API has no endpoint that returns a payment by its identifier; outside the integrator's own record, a payment can be looked up only in Adyen's Customer Area and reports.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "The Checkout API v72 specification has three GET operations: /paymentLinks/{linkId}, /sessions/{sessionId} and /storedPaymentMethods; none returns a payment.",
+              "source": "Adyen, Checkout API OpenAPI definition, version 72, github.com/Adyen/adyen-openapi, accessed 2026-11",
+              "shows": "There is nothing to re-read after a missed event."
+            },
+            {
+              "kind": "reasoning",
+              "what": "INFERENCE block: the difference in what the integrator must store is the author's reading of the two documented contracts; Adyen's reasons are not published.",
+              "shows": "Keeps the inference apart from the documented fact."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Results that arrive only by request response and by event.",
+            "introduces": "What is absent, and what follows for the integrator.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "guarantees-and-mirrors",
+      "heading": "What a State Machine Must Guarantee, and Four Ways to Mirror One",
+      "controlling_idea": "A payment state machine is worth having only if it guarantees one terminal outcome, legal transitions only and transitions safe to apply twice, and the consumer's choice among four ways of mirroring it decides whether those guarantees survive in its own record.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S4",
+          "S5"
+        ],
+        "how": "States the guarantees and compares the consumer's designs against them."
+      },
+      "flow": {
+        "pattern": "assertion_evidence_reasoning",
+        "rationale": "The three guarantees are asserted, then the two that readers misapply are explained with the providers' documented behavior, and only then are the consumer designs compared, since the comparison's criteria are the guarantees."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "Two exposures of one model.",
+        "introduces": "What any version of the model has to guarantee, the consumer's copy included.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p36",
+          "form": "list",
+          "controlling_idea": "A payment state machine owes its users three guarantees: one terminal outcome, legal transitions only, and transitions that are safe to apply twice.",
+          "function": "claim"
+        },
+        {
+          "id": "p37",
+          "controlling_idea": "A state is terminal only if no later message from the provider can change what it promised, and by that test 'succeeded' and 'captured' are not terminal for the payment, whatever the provider's status field goes on saying.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stripe keeps the intent succeeded while refunds and disputes land on the Charge; Adyen sends CAPTURE_FAILED after a successful CAPTURE. Canceled, expired and refused attempts are terminal; success is a state with exits.",
+              "source": "Stripe documentation, 'Payment status updates', n.d., accessed 2026-11, https://docs.stripe.com/payments/payment-intents/verifying-status; Adyen documentation, 'Capture', n.d., accessed 2026-11, https://docs.adyen.com/online-payments/capture",
+              "shows": "Shows why a late contradicting event is legal and must be applied."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The first guarantee.",
+            "introduces": "What 'terminal' may be claimed of.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p38",
+          "controlling_idea": "Legal transitions are a table of from-state, message and to-state, and a message is made safe to apply twice by the identity the provider documents for it.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "Stripe: 'Webhook endpoints might occasionally receive the same event more than once'; guard by logging event IDs. Adyen: duplicates 'have the same values in the eventCode and pspReference fields'.",
+              "source": "Stripe documentation, 'Receive Stripe events in your webhook endpoint'; Adyen documentation, 'Handle webhook events'; both n.d., accessed 2026-11",
+              "shows": "Both providers document duplicates and the key to detect them."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The first guarantee.",
+            "introduces": "The second and third.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p39",
+          "controlling_idea": "A consumer can mirror the provider's machine in four ways: a flag set from the API response, a copy of the provider's status, its own small vocabulary beside the provider's status as received, or an event log from which the state is derived.",
+          "function": "comparison",
+          "organization": "classification",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Design, what it stores, what it gets right, where it fails, when it fits: flag; copied status; own vocabulary plus verbatim status and child records; event log with derived state.",
+              "shows": "Sets the four against the guarantees."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The guarantees.",
+            "introduces": "The designs that keep or lose them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p40",
+          "controlling_idea": "I would keep a small vocabulary of my own beside each provider's status as received, built from the provider messages stored as received, unless there is one provider and its object can be re-read.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Providers add and rename states (Stripe renamed two PaymentIntent statuses in API version 2019-02-11); two providers never share a vocabulary; a stored raw event lets a mapping mistake be replayed.",
+              "source": "Stripe documentation, 'How Payment Intents and Setup Intents work', n.d., accessed 2026-11, https://docs.stripe.com/payments/paymentintents/lifecycle",
+              "shows": "Gives the conditions under which the recommendation holds and the one under which the simpler design is enough."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The four designs.",
+            "introduces": "The author's choice among them and its condition.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "Across seven aspects of the public record, Stripe and Adyen agree on the model, on the advice about the synchronous response and on a session as the recommended entry point, and differ in where the state can be read, how a failed attempt and the two waits are represented, how operations report and whether the reasons are published.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S3"
+        ],
+        "how": "Sets the two documented contracts side by side and separates the facts from the author's reading."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "Designs a consumer chooses.",
+        "introduces": "The differences between providers that the consumer does not choose.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p41",
+          "controlling_idea": "Seven aspects separate what each company documents from what the difference suggests.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Aspect, Stripe, Adyen, what the difference suggests: where the state can be read; a failed attempt; the two waits; operations after authorization; advice on the synchronous result; recommended entry point; published design history.",
+              "source": "Sources cited in the two provider sections",
+              "shows": "Every Stripe and Adyen cell is a documented fact from earlier in the chapter; the last column is the author's inference."
+            }
+          ]
+        },
+        {
+          "id": "p42",
+          "controlling_idea": "On Stripe the integrator confirms an event by reading the object; on Adyen it must store every result and event itself and close the gap with reports.",
+          "function": "recommendation",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The table of differences.",
+            "introduces": "What an integrator does differently on each provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: Mila's Payments in Five States",
+      "controlling_idea": "Under Keel, Larkfield keeps its five words as a summary, stores each provider's status as received with who the payment is waiting on, holds attempts, captures, refunds and disputes as child records, and lets only the provider's confirmed record move a state.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "Shows the designed record at work on the recurring payments, on both providers."
+      },
+      "flow": {
+        "pattern": "large_to_small",
+        "additional_patterns": [
+          {
+            "pattern": "comparison",
+            "applies_to": "p44 and p45: the same payment on Adyen and on Stripe"
+          }
+        ],
+        "rationale": "The mapping for all payments first, then single payments read through it: the class pass on each provider, then the two cases the old record could not place, and finally the limit of the vocabulary, which only makes sense once 'paid' has been used."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The differences between the two providers.",
+        "introduces": "One record that absorbs them, at the fictional platform.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p43",
+          "controlling_idea": "The redesigned record keeps the five words and adds what they could not say.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Larkfield state, what it promises, Stripe evidence that moves a record into it, Adyen evidence that moves a record into it; beside the state: provider status as received, waiting_on, closed_reason, and child records with amounts.",
+              "source": "Larkfield scenario ledger (fictional); provider behavior as cited in the provider sections",
+              "shows": "Answers Femke's question state by state."
+            }
+          ]
+        },
+        {
+          "id": "p44",
+          "controlling_idea": "Mila's class pass, on Adyen, becomes 'paid' when the AUTHORISATION webhook arrives, not when the app shows the result code.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "9 March 2027, 19:42, €120.00, Studio Noord on Adyen, wallet authentication with no challenge, automatic capture; Larkfield's fee €2.53, the studio receives €117.47.",
+              "source": "Larkfield scenario ledger (fictional)",
+              "shows": "The synchronous result is shown to the member; the record moves on the server-side message."
+            },
+            {
+              "kind": "source",
+              "what": "'A payment that is automatically captured does not trigger a separate CAPTURE webhook.'",
+              "source": "Adyen documentation, 'Capture', n.d., accessed 2026-11, https://docs.adyen.com/online-payments/capture",
+              "shows": "Why 'paid' is set from the authorization event on this account."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The mapping.",
+            "introduces": "One payment read through it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p45",
+          "controlling_idea": "Had Studio Noord been on Stripe, the same pass would become 'paid' when the payment service re-reads the PaymentIntent after the event and finds it succeeded.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "The same €120.00 pass as a PaymentIntent created by the payment service, confirmed in the app, with Keel decision K2: the provider's record is the truth and the webhook is the doorbell.",
+              "source": "Larkfield scenario ledger (fictional)",
+              "shows": "On the provider with a readable object, the event prompts a read."
+            },
+            {
+              "kind": "source",
+              "what": "A PaymentIntent can be retrieved by its ID; the payment_intent.succeeded event signals success.",
+              "source": "Stripe documentation, 'Payment status updates', n.d., accessed 2026-11, https://docs.stripe.com/payments/payment-intents/verifying-status",
+              "shows": "The documented behavior the scene relies on."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The pass on Adyen.",
+            "introduces": "The same pass on the other provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p46",
+          "controlling_idea": "Mila's membership set-up on 12 January sits in 'pending' with waiting_on set to the customer, which tells the booking app to prompt her and a timeout job to expire the attempt, not to wait for a bank.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "12 January 2027: card typed in, 3-D Secure challenge in the banking app, first €49.00 payment.",
+              "source": "Larkfield scenario ledger (fictional)",
+              "shows": "The first of the three payments the old record could not place."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "A payment with no customer action.",
+            "introduces": "One with a customer action.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p47",
+          "controlling_idea": "The €84.00 refund on 18 March is a child record with its own status, and the payment's summary becomes 'refunded' with two amounts beside it.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "18 March 2027: refund of €84.00 of the €120.00 pass, after the payout of 11 March.",
+              "source": "Larkfield scenario ledger (fictional)",
+              "shows": "The partial refund the old record could not express."
+            },
+            {
+              "kind": "source",
+              "what": "REFUND with success true can be followed by REFUND_FAILED.",
+              "source": "Adyen documentation, 'Refund', n.d., accessed 2026-11, https://docs.adyen.com/online-payments/refund",
+              "shows": "Why the refund needs a status of its own."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "A payment before success.",
+            "introduces": "An operation after it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p48",
+          "controlling_idea": "None of the five words means settled: 'paid' promises that the provider has confirmed the capture, and whether the money arrived is established by the ledger and the reconciliation job.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "'Adyen does not send a webhook message when a payment settles successfully.'",
+              "source": "Adyen documentation, 'Webhook structure and types', n.d., accessed 2026-11, https://docs.adyen.com/development-resources/webhooks/webhook-types",
+              "shows": "The event stream cannot carry the settlement fact."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What the five words now say.",
+            "introduces": "What they still do not say.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong: Late, Repeated and Contradictory Events",
+      "controlling_idea": "Each way an event can misbehave has a rule in the state machine: a repeat changes nothing, an event that would move a state backward is recorded and not applied, a late contradiction of a non-terminal success is applied, a missing event is found by a sweep, and an unknown status is stored and held for review.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "S4",
+          "S5"
+        ],
+        "how": "Applies the three guarantees to the failures a consumer actually meets."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "Five failure cases in dependency order: the repeat rule first, then the transition table for events out of order, then the late contradiction, which uses both; the missing event follows because it is the absence of all three, and the unknown status comes last because it is the only case the table cannot decide. Moving the late contradiction first would ask the reader to accept a backward step before seeing why most backward steps are refused."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The record working as designed.",
+        "introduces": "The record under events that arrive wrong.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p49",
+          "controlling_idea": "A repeated event is detected by the provider's documented identity for it and changes nothing.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "Stripe event ID; Adyen eventCode plus pspReference, with 'Your server should use the details from the latest webhook event'.",
+              "source": "Stripe and Adyen webhook documentation, n.d., accessed 2026-11",
+              "shows": "The idempotent-transition guarantee in practice."
+            }
+          ]
+        },
+        {
+          "id": "p50",
+          "controlling_idea": "An event that arrives out of order is stored, and applied only if the transition table allows it from the current state.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Stripe doesn't guarantee the delivery of events in the order that they're generated.' Adyen: 'To ensure you are processing events in the correct chronological order, always check the timestamp.'",
+              "source": "Stripe and Adyen webhook documentation, n.d., accessed 2026-11",
+              "shows": "Order is the receiver's problem at both providers."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The same event twice.",
+            "introduces": "Different events in the wrong order.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p51",
+          "controlling_idea": "A failed capture reported two days after 'paid' is a legal transition and is applied: the capture record becomes failed, the payment returns to 'authorized', and whatever depended on 'paid' is told.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "CAPTURE_FAILED can arrive 'a few days after you submitted the capture request'; 'Technical failures are automatically re-captured by Adyen within 10 business days.'",
+              "source": "Adyen documentation, 'Capture', n.d., accessed 2026-11, https://docs.adyen.com/online-payments/capture; Adyen documentation, 'Webhook structure and types', n.d., accessed 2026-11, https://docs.adyen.com/development-resources/webhooks/webhook-types",
+              "shows": "The documented event behind the rule, and why the payment may return to paid without action."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Events the table refuses.",
+            "introduces": "A contradiction the table must accept.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p52",
+          "controlling_idea": "An event that never arrives is found by a sweep of records still pending past the expected time, and what the sweep can do depends on the provider.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "Stripe: retrieve the PaymentIntent. Adyen: no payment read endpoint; the Customer Area transaction list and the settlement reports; card offers 'expire after 12 hours by default'.",
+              "source": "Stripe documentation, 'The Payment Intents API', n.d., accessed 2026-11, https://docs.stripe.com/payments/payment-intents; Adyen documentation, 'Webhook structure and types', n.d., accessed 2026-11, https://docs.adyen.com/development-resources/webhooks/webhook-types",
+              "shows": "The recovery differs exactly where the two exposures differ."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Events that arrive wrong.",
+            "introduces": "Events that do not arrive.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p53",
+          "controlling_idea": "A status value the mapping has never seen is stored as received and held for review, never mapped to a default.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "'Versions of the API before 2019-02-11 show requires_source instead of requires_payment_method and requires_source_action instead of requires_action.'",
+              "source": "Stripe documentation, 'How Payment Intents and Setup Intents work', n.d., accessed 2026-11, https://docs.stripe.com/payments/paymentintents/lifecycle",
+              "shows": "Providers do rename and add statuses."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Known events at the wrong time.",
+            "introduces": "An unknown value.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "The history, the two providers' contracts and the failure cases say one thing together that none says alone: every message about a payment, including the API response and including 'success', is a transition in someone else's record, so the consumer's job is to decide in advance which transitions it will accept from which message.",
+    "so_what": "A team that has written that table can add a provider or a payment method without redesigning its record, and can say what its 'paid' promises; a team that has not finds out during the next missed webhook or failed capture.",
+    "callback": {
+      "to": "Mila confirming her membership payment in her banking app on 12 January 2027.",
+      "how": "The reader can now name that moment as a state (waiting for the customer, with a next action), say which message ends it, and say what the record does if she never taps."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "For each provider, write the transition table of your own payment record: each state, what it promises, and the one provider message or read that may move a record into it. Eight questions to ask follow."
+    },
+    "hand_off": {
+      "to": "authorization-optimization",
+      "relationship": "elaboration",
+      "carries_over": "The distinction between a payment and its attempts: a failed attempt returns the payment to a state from which another can be made.",
+      "introduces": "Why attempts fail at the issuer, who makes the next one and with what changes, and how an approval rate is counted once one payment can hold several attempts."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The failure cases and their rules.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p54",
+        "form": "list",
+        "controlling_idea": "Established: the response is not the outcome, operations after authorization are asynchronous and can fail after reporting success, and both providers document duplicate and unordered events.",
+        "function": "synthesis"
+      },
+      {
+        "id": "p55",
+        "form": "list",
+        "controlling_idea": "Depends on context: whether to copy the provider's statuses or keep your own, how much to rely on re-reading an object, and how long a payment may wait before a sweep closes it.",
+        "function": "synthesis",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is settled.",
+          "introduces": "What depends on the integrator's situation.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p56",
+        "form": "list",
+        "controlling_idea": "The author's synthesis: treat every message as a transition in someone else's record, write the table of the ones you accept, and count 'succeeded' as a state with exits.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "Conditional recommendations.",
+          "introduces": "The author's own position.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p57",
+        "form": "list",
+        "controlling_idea": "Eight questions let the reader test a payment record or a provider's state model in a design review.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The author's position.",
+          "introduces": "Questions that apply it.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p58",
+        "controlling_idea": "Mila's moment in the banking app is now a named state with a known exit, and the next chapter takes the attempt that fails at the issuer and asks why it failed and who tries again.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The state model.",
+          "introduces": "The next chapter's question about attempts.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "What an authorization promises, holds and their expiry, customer-initiated and merchant-initiated transactions.",
+      "covered_in": [
+        "payment-authorization"
+      ]
+    },
+    {
+      "topic": "How payment methods differ in finality, refund and dispute rules.",
+      "covered_in": [
+        "local-payment-methods"
+      ]
+    },
+    {
+      "topic": "The dispute lifecycle and refund mechanics beyond their place as child records.",
+      "covered_in": [
+        "refunds-reversals-and-disputes"
+      ]
+    },
+    {
+      "topic": "Idempotency keys and retries of requests whose outcome is unknown.",
+      "covered_in": [
+        "idempotency-and-retries"
+      ]
+    },
+    {
+      "topic": "The webhook delivery contract and the receiver's obligations (persist, deduplicate, confirm, sweep) in full.",
+      "covered_in": [
+        "payment-webhooks-and-events"
+      ]
+    },
+    {
+      "topic": "Object-model conventions, identifiers and error models of the two APIs.",
+      "covered_in": [
+        "payment-api-design"
+      ]
+    },
+    {
+      "topic": "3-D Secure and strong customer authentication beyond their role as a next action.",
+      "covered_in": [
+        "three-d-secure-and-sca"
+      ]
+    },
+    {
+      "topic": "Settlement, balances and reconciliation of what 'paid' does not establish.",
+      "covered_in": [
+        "clearing-and-settlement",
+        "payment-ledgers",
+        "payment-reconciliation-and-reporting"
+      ]
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "Adyen has published no account of why its Checkout API reports results per request and by webhook and offers no payment read endpoint; the chapter says so and does not supply a reason.",
+    "Whether a retried payment within one Adyen session keeps any documented link between attempts beyond the merchant reference was not verified; the chapter states only that each request has its own PSP reference.",
+    "The launch dates of Adyen's Checkout API before v37 (February 2018) and of Drop-in were not found.",
+    "The shutdown date of Stripe's Sources API is not public; the chapter mentions Sources only as history."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "Present a provider-neutral six-state model before either provider, so both vocabularies map to something.",
+      "rejected": [
+        "Teach Stripe's seven statuses as the model and present Adyen as a deviation from it."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Keep Larkfield's five-state vocabulary as canon and add fields beside it (provider status as received, waiting_on, closed_reason, child records) to carry what the five words cannot.",
+      "rejected": [
+        "Replace the five states with a longer list, which would contradict the ledger and other chapters."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Treat the webhook contract briefly (duplicates, order) and link to the chapter that owns it, per consistency ruling 8.",
+      "rejected": [
+        "Explain delivery, signing and retries here."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "State the absence of an Adyen design history in the section's first paragraph and the storage consequence as a labeled inference, per acceptance criterion AC-3 and consistency rulings 1 and 12.",
+      "rejected": [
+        "Infer Adyen's reasons from its architecture."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "PLAN.md, contract 08-payment-state-machines",
+      "contributed": "Scope, owned terms, the Larkfield thread."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-stripe-payments-and-api.md, part 1",
+      "contributed": "The dated history from Charges to PaymentIntents, the status table, confirmation, capture, refunds as objects."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-adyen-payments-and-api.md, parts 1 and 2",
+      "contributed": "Sessions and Advanced flow, result codes and actions, modifications, the two-stage outcome, the absence of a payment read endpoint, dated release notes."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "The five-state vocabulary, Mila's payments, the Silent Webhook, Keel decision K2."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/consistency-issues.md, rulings 1, 8, 12 and 14",
+      "contributed": "Ownership of where payment state lives; webhook as known vocabulary; no payment GET on Adyen; the 3-D Secure example is the membership set-up."
+    },
+    {
+      "kind": "external",
+      "ref": "Michelle Bu, 'Stripe's payments APIs: The first 10 years', Stripe, 2020-12-15",
+      "contributed": "The primary account of why the charge request failed and how the PaymentIntent was designed."
+    },
+    {
+      "kind": "external",
+      "ref": "Stripe documentation and API reference on PaymentIntents, n.d., accessed 2026-11",
+      "contributed": "Current statuses, fields and advice; re-fetched in this session."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen documentation, release notes and Checkout API OpenAPI definition v72, accessed 2026-11",
+      "contributed": "Result codes, actions, modifications, webhooks, dated versions; re-fetched in this session."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 94 claims checked (89 confirmed, 2 corrected, 3 hedged, 0 unsupported and removed or relabeled, 0 unreachable); the most significant fix: Adyen's design history is no longer called wholly 'not public', because a 2021 Adyen developer-advocate post gives the reason for /sessions. Wording only; no unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "After the flow rubric: added p20b on event delivery so the guarantees rest on something shown; narrowed p27 to SetupIntents; aligned p26 and p37 on what 'succeeded' ends; section 9 declared as dependency order; section 7 reconciled with its seven aspects."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "First draft of the spec from the PLAN contract, the journal spec entry and the two API briefs."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation after verification: journal-spec entry and spec body brought into line with the verified page and consistency rulings (journal entry thesis.how_why (ruling 29) re-synced; ruling 29). No unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: 3 statements of absence re-tested with a wide search (1 overturned in part, 0 narrowed, 2 hold; table in _research/absence-audit/08-payment-state-machines.md). Overturned in part: Adyen's 2021 engineering post gives its reason for asynchronous modifications (a stateless edge layer); only the reason for result codes and no retrievable payment remains unpublished. Consistency ruling 29's last clause needs the same correction."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced (', and its reasons for result codes and asynchronous modifica' -> ', an engineering post of July 2021 gives the reason for asyn')."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Sweep of rulings 46-48: thesis how_why now gives Adyen's published reason for asynchronous modifications (July 2021 post) and keeps 'not on record' for result codes only (rulings 47b, 48a). Prose unchanged."
+    }
+  ],
+  "length": {
+    "target_words": 5200,
+    "max_words": 6500
+  }
+}

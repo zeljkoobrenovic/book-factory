@@ -1,0 +1,622 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "part-2",
+  "journal": "payments-platform-architecture",
+  "part": "part-2",
+  "title": "Part II — ACCEPTANCE: Getting to Yes",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "basis": "Written on 2026-11-17 from the part-2 entry and the part thesis, opening and flow in journal-spec.json, the scenario ledger, and a full reading of the six written chapters of Part II. The page makes no external factual claim of its own: every statement about Stripe, Adyen, a network or a regulation repeats one a chapter of the part makes and cites.",
+  "intent": {
+    "outcome": {
+      "know": [
+        "Part II answers six questions in order: who acquires the payment, what 'yes' means per payment method, how a payment is modeled as states, why issuers decline and what providers do about it, when to use more than one provider, and what changes at a terminal."
+      ],
+      "believe": [
+        "An approval is produced in layers around the issuer's decision, and each layer has a different owner."
+      ],
+      "can_do": [
+        "Pick the Part II chapter that addresses a decline, a late outcome or a provider question in front of them."
+      ]
+    },
+    "audience": {
+      "who": "Engineers and architects new to payments who have read Part I and are about to start the acceptance chapters, or who arrive with one decline, late outcome or provider question in hand and want the chapter that addresses it.",
+      "already_knows": [
+        "What an API, a webhook, a retry and a state machine are.",
+        "Part I: the issuer, the acquirer and the card network; the authorization as the issuer's promise and the first of several; refunds and disputes; who earns what on a payment.",
+        "Larkfield in outline: a fictional studio-software platform that uses Stripe and Adyen, and its 2027 repair program Keel."
+      ],
+      "does_not_know": [
+        "Acquirer of record, sponsor bank, scheme, mandate, next action, soft decline, orchestration, store-and-forward: each is owned by a Part II chapter and is glossed in a clause here or only named.",
+        "How Stripe and Adyen differ at each layer; the page states the difference in one clause per chapter and leaves the evidence to the chapter."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "A reader of this page alone can state the part's claim and name the six chapters' subjects in reading order.",
+        "check": "intro_predicts_content",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "After reading only this page: what does Part II claim about approvals, and what will each of the next six chapters tell you, in order?",
+        "expected": "That a 'yes' is shaped by layers around the issuer's decision and is not a verdict handed back by the network; then acquiring and licenses, payment methods other than cards, the payment state machine, declines and optimization, routing across providers, in-person payments."
+      },
+      {
+        "id": "AC-2",
+        "statement": "The page opens with the 1,140 Larkfield studios charged through Stripe online and through Adyen at the front desk, with the figures as the scenario ledger gives them.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "minor"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "What decides whether a payment gets to 'yes', and what can a provider or a merchant do about it?",
+    "claim": "A 'yes' is produced in layers that sit around the issuer's decision: the licensed entity that acquires the payment, the payment method and what its scheme lets 'yes' mean, the provider's model of the payment between request and outcome, the changes and retries the provider makes inside the authorization call, the choice among providers, and, when the card is in the room, the terminal. Each layer changes how often the answer is yes or whether that yes can later be taken back. The provider holds the license and makes the changes inside the call; the merchant chooses the methods it offers, the providers it uses and the devices it deploys; so an approval is an outcome both help produce.",
+    "disputed_by": "The view that approval is the issuer's verdict on the cardholder and the provider is a neutral pipe to the network, so that the approval rate would be the same on any provider and a 'yes' means the same thing for every payment method.",
+    "so_what": "A team that accepts the claim stops reading its approval rate as a fact about its customers. It asks which layer produced a decline before changing anything, and it does not compare two providers' rates or published uplift figures without first lining up the acquirer, the method mix and the metric.",
+    "how_why": "The issuer decides on what reaches it: a payment that arrives as domestic or cross-border, on one network or another, with a card number or a network token, formatted one way or another, once or after a retry. Every one of those inputs is set before the issuer sees the message, by the license the provider holds or borrows, by the method chosen at checkout, and by code the provider runs inside the call. For methods that are not cards there may be no issuer answer at all, only a scheme rule about when the money is final. Stripe and Adyen document different arrangements at most of these layers, and neither publishes a list of its network memberships by network and country, volume per acquirer or an audited approval lift; the part's argument rests on what they do publish.",
+    "supporting_claims": [
+      {
+        "id": "P2-1",
+        "claim": "Reaching a card network takes a membership held by a licensed entity, so the acquirer of record is a legal fact that differs by country and decides how a payment arrives at the issuer and how many parties stand between the merchant and the network."
+      },
+      {
+        "id": "P2-2",
+        "claim": "What 'yes' promises is fixed by each payment method's scheme, so one API can unify how a payment is started and reported and cannot unify what its success means."
+      },
+      {
+        "id": "P2-3",
+        "claim": "The outcome of a payment is a state reached over time, so a payment must be modeled as a record with explicit states in which the synchronous response is one transition and not the result."
+      },
+      {
+        "id": "P2-4",
+        "claim": "Providers now reformat, retry, reroute and block inside the authorization call, so the approval rate is partly the provider's product, and the uplift figures published for it cannot be compared or verified from public data."
+      },
+      {
+        "id": "P2-5",
+        "claim": "Routing across providers unifies the authorization request and nothing after it, so a second provider is paid for in per-provider disputes, settlement, records and stored cards."
+      },
+      {
+        "id": "P2-6",
+        "claim": "When the card is present, approval and fraud liability depend on a managed device and the chip data it passes on, and treating store and online payments as one has to be built from shared identifiers, refunds and reports."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Performs the part's opening: states the part thesis, links it to the authorization of Part I and gives the reading order.",
+    "supports": []
+  },
+  "flow": {
+    "pattern": "large_to_small",
+    "additional_patterns": [
+      {
+        "pattern": "prerequisite_order",
+        "applies_to": "chapters: the six chapter paragraphs, in the part's reading order"
+      }
+    ],
+    "rationale": "The page opens on one card at one studio that reaches its bank through two providers, widens that case into the part's claim, and then narrows: from the claim (a 'yes' is produced in layers), to who holds each layer and what follows for an approval rate, to how far the public evidence carries the claim, to the six questions in order, to one paragraph per chapter. The claim has to precede the chapter list because each chapter paragraph names its layer, and a reader who has not been told there are layers reads the list as six unrelated topics. The evidence paragraph has to precede the list because the chapter paragraphs state what Stripe and Adyen document, and the reader should know first that these are documented arrangements with stated gaps. The chapter paragraphs keep the part's own reading order, which the journal spec justifies as the order in which a 'yes' is constrained; reordering them here would contradict the roadmap."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "At 1,140 Larkfield studios in the Netherlands and Germany, a member who renews her membership online is charged through Stripe, and the same member tapping the same card at the front desk is charged through Adyen. One card, one studio, one bank deciding; two providers, two routes to that bank, and two records of what 'approved' meant."
+    },
+    "bridge": {
+      "from_reader_world": "Part I's view of the authorization as a message that goes to the issuer and comes back with an answer.",
+      "to_topic": "The provider's side of that message: who is allowed to send it, in what form, how many times, and what the answer is recorded as."
+    },
+    "thesis_statement": {
+      "text": "A 'yes' is produced in layers around the issuer's decision (the acquirer and its license, the payment method, the provider's model of the payment, the provider's actions inside the authorization call, the choice among providers and, at a counter, the terminal), and both the provider and the merchant help produce it.",
+      "placement": "KEY POINTS bullets 1 and 2, and paragraphs p03 and p04; bullet 3 (an approval rate belongs to a setup and cannot be compared until the setup is held equal) is the so-what stated in p04 and qualified by p05."
+    },
+    "roadmap": {
+      "placement": "paragraph p06",
+      "promises": [
+        {
+          "promise": "Six chapters in the order a 'yes' is constrained: who acquires the payment and under which license; what 'yes' means for methods that are not cards; how a payment is modeled as states; why issuers decline and what providers do inside the call; when a second provider helps and what it costs; and what changes when the card is in the room.",
+          "kept_in": [
+            "chapters"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "At 1,140 Larkfield studios one member's card reaches the same bank through two providers, Stripe online and Adyen at the front desk, so one card produces two routes and two records of what 'approved' meant.",
+        "function": "example",
+        "organization": "illustration",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Larkfield (fictional): 1,140 studios in the Netherlands and Germany, onboarded before 2024, are on Stripe for online payments and use Adyen terminals at the front desk.",
+            "source": "_research/scenario-ledger.md (Systems; Additions: 06-acquiring-and-network-connectivity, 11-in-person-payments)",
+            "shows": "The same card and the same deciding bank meet two different stacks, so the route to the issuer is not a constant of the card."
+          },
+          {
+            "kind": "scenario",
+            "what": "Per Larkfield's acquirer inventory in chapter 6: online at these studios the acquirer is Stripe Technology Europe, an Irish e-money institution; at the front desk it is Adyen N.V., a Dutch bank (both as the providers' public pages name them, November 2026).",
+            "source": "acquiring-and-network-connectivity, 'In Practice at Larkfield: The Acquirer Inventory'",
+            "shows": "Even the legal entity that sends the request differs between the two channels of one studio."
+          },
+          {
+            "kind": "figure",
+            "what": "Figure 1: one member and one card; two paths to one issuing bank, one from a phone through 'Provider A', one from a counter terminal through 'Provider B'; each path ends in its own record.",
+            "shows": "The hook as a picture: one card, one bank, two stacks, two records."
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "Part I took the authorization as a message that goes to the issuer and returns with an answer; Part II looks at the provider's side of that message: who may send it, in what form, how many times, and what the answer is recorded as.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "Part I's account: the authorization is the issuer's promise, the first of several, and an approved payment is worth more to every party than a declined one (payment-authorization, payment-economics).",
+            "source": "journal-spec.json, part-2 transition_in",
+            "shows": "What the reader already holds, and which part of it Part II reopens: the path to the first promise, which Part I took as given."
+          }
+        ],
+        "transition_in": {
+          "relationship": "elaboration",
+          "carries_over": "The two routes to one bank in the opening case, and Part I's authorization as the issuer's promise.",
+          "introduces": "The path to that promise as the subject of Part II: who sends the message, in what form, how often, and how the answer is recorded.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "Part II's claim is that a 'yes' is produced in six layers that sit around the issuer's decision (the acquirer and its license, the payment method, the provider's model of the payment, the provider's actions inside the authorization call, the choice among providers, and the terminal), and each layer changes how often the answer is yes or whether that yes can later be taken back.",
+        "function": "claim",
+        "organization": "classification",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "The six layers of the part thesis: the licensed entity that acquires the payment; the payment method and what its scheme lets 'yes' mean; the provider's model of the payment between request and outcome; the changes and retries the provider makes inside the authorization call; the choice among providers; and, when the card is in the room, the terminal.",
+            "source": "journal-spec.json, part-2 thesis",
+            "shows": "The issuer decides on what reaches it, and each of these is set before the issuer sees the message or fixes what its answer is worth afterwards."
+          },
+          {
+            "kind": "figure",
+            "what": "Figure 2: the issuer's decision at the center with six layers around it, labeled 'Acquirer', 'Method', 'State model', 'Optimization', 'Providers', 'Device'.",
+            "shows": "The part's shape in one picture: six layers, one decision inside them, one chapter per layer."
+          }
+        ],
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The provider's side of the authorization message.",
+          "introduces": "What that side amounts to: six layers around the issuer's decision, each changing the rate of 'yes' or its permanence.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "controlling_idea": "The layers have two holders, the provider (the license, the model of the payment and the changes inside the call) and the merchant (the methods, the providers and the devices), so an approval is an outcome both help produce and an approval rate describes a setup, not the customers.",
+        "function": "analysis",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "The part thesis: the provider holds the license and makes the changes inside the call; the merchant chooses the methods it offers, the providers it uses and the devices it deploys. Its so-what: a team does not compare two providers' rates without first lining up the acquirer, the method mix and the metric.",
+            "source": "journal-spec.json, part-2 thesis (claim, so_what)",
+            "shows": "Why the claim matters in practice: a rate produced by a stack cannot be read as a fact about cardholders or moved to another stack."
+          }
+        ],
+        "transition_in": {
+          "relationship": "additional_support",
+          "carries_over": "The six layers.",
+          "introduces": "Who holds each of them, and what that does to the meaning of an approval rate.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p05",
+        "controlling_idea": "The part argues from what Stripe and Adyen publish, which differs at most layers and stops short of network membership per country, volume per acquirer and any audited approval lift.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "fact",
+            "what": "As the chapters establish and cite: neither company lists its network memberships by network and country (each states membership in general terms) or publishes volume per acquirer (acquiring-and-network-connectivity); the uplift figures each publishes for its optimization product are its own claims, on different metrics, and none was audited by a third party (authorization-optimization).",
+            "source": "acquiring-and-network-connectivity; authorization-optimization",
+            "shows": "The reader knows before the chapter list that the comparisons that follow are of documented arrangements, and where they cannot be completed."
+          }
+        ],
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "The claim and its consequence for approval rates.",
+          "introduces": "The limit of the evidence behind it: what the two companies document and what neither publishes.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p06",
+        "controlling_idea": "The six chapters take the layers in the order a 'yes' is constrained, each opening on a case at Larkfield: who acquires, what 'yes' means per method, how a payment is modeled as states, why issuers decline and what providers do, when a second provider helps, and what changes at a terminal.",
+        "function": "transition",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "The part's roadmap and flow rationale: connectivity decides which networks can be reached at all; methods are what those connections carry; the state machine holds both instant and late answers; only then can optimization, routing and the terminal be explained.",
+            "source": "journal-spec.json, part-2 opening.roadmap and flow.rationale",
+            "shows": "The order is a dependency order, so the reader has a reason to read the chapters in sequence."
+          }
+        ],
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The claim, its holders and the limits of its evidence.",
+          "introduces": "The six questions in reading order, and that each chapter opens on a Larkfield case.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "chapters",
+      "heading": "Chapters in this part",
+      "controlling_idea": "Each of the six chapters answers one question about one layer of a 'yes' and opens on one Larkfield case, and each relies on the chapters before it.",
+      "function": "description",
+      "advances_thesis": {
+        "supports": [
+          "P2-1",
+          "P2-2",
+          "P2-3",
+          "P2-4",
+          "P2-5",
+          "P2-6"
+        ],
+        "how": "Each paragraph introduces the chapter that argues one of the part's supporting claims, so the list is the part's argument in outline."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "additional_patterns": [
+          {
+            "pattern": "large_to_small",
+            "applies_to": "p07 to p09: from the legal entity and its networks, to the payment method, to the single payment record"
+          },
+          {
+            "pattern": "problem_solution",
+            "applies_to": "p10 to p11: declines and what one provider does about them, then the proposal to add a second provider"
+          }
+        ],
+        "rationale": "The part's own reading order, as the journal spec declares it. The acquirer decides which networks and schemes can be reached, so it comes first; methods are what those connections carry and show that 'yes' has more than one meaning; the state machine is the model that holds both the card's instant answer and the other methods' late ones. Optimization needs the 'attempt' the state machine defines, routing needs one provider's levers to weigh a second against, and the terminal chapter reuses every earlier term with a device added. Moving optimization ahead of the state machine would ask the reader to follow a retry before knowing what an attempt is."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The six questions in order (p06).",
+        "introduces": "One paragraph per chapter: the question in bold, the Larkfield case it opens on and the difference between Stripe and Adyen it documents.",
+        "form": "sentence",
+        "placement": "end_of_previous"
+      },
+      "paragraphs": [
+        {
+          "id": "p07",
+          "controlling_idea": "The acquiring chapter answers who acquires the payment and under which license: reaching a card network takes a membership only a licensed entity can hold, so every payment has an acquirer of record that differs by country, and Larkfield finds four acquiring arrangements behind its two providers.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P2-1"
+            ],
+            "how": "Introduces the chapter that establishes the first layer: the legal entity that sends the payment to the network."
+          },
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Femke de Graaf's acquirer inventory of February 2027 (fictional): four acquiring arrangements behind two providers; the United States, with 700 studios, is the only market with a bank between the studio and the network.",
+              "source": "acquiring-and-network-connectivity; _research/scenario-ledger.md",
+              "shows": "'Which provider' does not answer 'who acquires'; the answer differs per country."
+            },
+            {
+              "kind": "fact",
+              "what": "As chapter 6 documents: Adyen holds one banking license (2017) extended by branches; Stripe names its own e-money institutions as acquirer in the EEA and the UK and named banks in the United States.",
+              "source": "acquiring-and-network-connectivity",
+              "shows": "The two companies hold the membership by different routes."
+            }
+          ]
+        },
+        {
+          "id": "p08",
+          "controlling_idea": "The methods chapter answers what 'yes' means when the method is not a card: one API unifies how a payment is started and reported and cannot unify what success promises, as Larkfield learned by treating direct debits, 21% of its online volume, like cards.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P2-2"
+            ],
+            "how": "Introduces the chapter that shows the meaning of 'yes' is fixed by each method's scheme."
+          },
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield (fictional): SEPA Direct Debit carries 21% of online volume and one rule, 'paid grants access and counts toward payout', was applied to every method.",
+              "source": "local-payment-methods; _research/scenario-ledger.md",
+              "shows": "A status read as a card status granted access and paid out on money that could still leave."
+            },
+            {
+              "kind": "fact",
+              "what": "As chapter 7 documents: an iDEAL payment cannot be disputed through the payer's bank; a SEPA direct debit can be refunded without a reason for eight weeks (PSD2).",
+              "source": "local-payment-methods",
+              "shows": "Two 'succeeded' payments promise different things."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Card networks, which hand back an issuer's answer in seconds.",
+            "introduces": "Methods with no issuer answer, no hold or no chargeback, where 'yes' means something else.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p09",
+          "controlling_idea": "The state-machine chapter answers how to model a payment whose outcome arrives over time: as one long-lived record with explicit states in which the API response is one transition, which Stripe exposes as a retrievable object and Adyen as result codes and webhooks.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P2-3"
+            ],
+            "how": "Introduces the chapter that supplies the payment model the later chapters and Parts III and IV build on."
+          },
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Mila Janssen's membership set-up of 12 January 2027 (fictional): the provider's answer is neither approved nor declined, because her bank wants her to confirm in its app; Larkfield's five-state record has no clear place for the wait.",
+              "source": "payment-state-machines; _research/scenario-ledger.md",
+              "shows": "A record that can say only paid or not paid has to guess during the wait."
+            },
+            {
+              "kind": "fact",
+              "what": "As chapter 8 documents: Stripe's PaymentIntent (2018) can be retrieved by its ID; Adyen's Checkout API has no endpoint that returns a payment by its identifier.",
+              "source": "payment-state-machines; consistency-issues ruling 12",
+              "shows": "The same model is exposed in two ways, which changes what the integrator must store."
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "Methods that answer at different times and may need the customer to act.",
+            "introduces": "The one model that holds all of them: a record with explicit states.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "controlling_idea": "The optimization chapter answers why issuers decline genuine payments and what providers do about it: they reformat, retry and block inside the authorization call, so the approval rate is partly their product, and Larkfield's two December rates, 82.0% and 95.5%, turn out to differ mostly in how they were counted.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P2-4"
+            ],
+            "how": "Introduces the chapter that shows the provider acting inside the call and what an approval rate counts."
+          },
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield (fictional, illustrative figures): December card renewals read 82.0% on Stripe and 95.5% on Adyen; counted on one basis the 13.5-point gap becomes 0.8 points at the first attempt and 0.4 points per renewal.",
+              "source": "authorization-optimization, 'In Practice at Larkfield: One Basis, Then One Test'",
+              "shows": "An approval rate is a counting rule before it is a result."
+            },
+            {
+              "kind": "fact",
+              "what": "As chapter 9 documents: Stripe states an acceptance rate 3.8% higher on average (2025) and Adyen payment conversion up to 6% higher in a pilot (January 2025), on different metrics.",
+              "source": "authorization-optimization",
+              "shows": "The published figures cannot be compared with each other."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The state machine's 'attempt': a failed one returns the payment to a state from which another can be made.",
+            "introduces": "Several network attempts behind one API call, and how to count a rate over them.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "controlling_idea": "The routing chapter answers when a second provider helps and what it costs: a routing layer unifies the authorization request and nothing after it, so Larkfield keeps its rule 'the studio's provider' with a rehearsed switch instead of buying orchestration.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P2-5"
+            ],
+            "how": "Introduces the chapter that weighs a second provider against the per-provider work it adds."
+          },
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield (fictional): CTO Daniel Osei proposes an orchestration product in February 2027; Keel decision K8 keeps two providers and one rehearsed switch, rehearsed quarterly for the 50 largest studios.",
+              "source": "payment-routing-and-orchestration; _research/scenario-ledger.md (K8)",
+              "shows": "The claim applied: the effort goes into the switch, not the routing rule."
+            },
+            {
+              "kind": "fact",
+              "what": "As chapter 10 documents: disputes, settlement, balances and stored cards stay one set per provider; telling two routes apart by half a percentage point takes about 115,000 payments in one segment (the chapter's arithmetic under a stated assumption).",
+              "source": "payment-routing-and-orchestration",
+              "shows": "What a second provider costs and when per-payment routing can be justified."
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "One provider's levers, which the merchant cannot inspect.",
+            "introduces": "The usual proposal, a second provider with a layer that routes between them, and its cost.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p12",
+          "controlling_idea": "The in-person chapter answers what changes when the card is in the room: a terminal joins the payment path, a payment stored offline is credit the merchant extends, and treating store and online payments as one takes three properties that are checked separately, as a refund request at one of the 1,140 split studios shows.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P2-6"
+            ],
+            "how": "Introduces the chapter that adds the device layer and tests the claim of unified commerce."
+          },
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield (fictional): in February 2027 a studio owner in Cologne asks for the terminal to keep working without Wi-Fi, and a member at one of the 1,140 split studios asks at the counter for a refund of a pass bought in the app.",
+              "source": "in-person-payments; _research/scenario-ledger.md",
+              "shows": "The first request is about the device and its connection, the second about joining two channels."
+            },
+            {
+              "kind": "fact",
+              "what": "As chapter 11 documents: in store-and-forward the terminal stores the payment and asks the issuer later, and Stripe and Adyen both document that the loss is the merchant's.",
+              "source": "in-person-payments",
+              "shows": "At the counter the merchant holds risk that online it had handed to the provider."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Five chapters that assumed a payment made at a distance.",
+            "introduces": "The same card tapped at a counter, with a device in the path.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "Where to Begin",
+    "synthesis": "Read in order, the six chapters turn any decline, late outcome or provider question into a question about one layer, so the reader can enter at the layer in front of them; read from the start, each chapter's terms are in place before the next one uses them.",
+    "so_what": "When a payment is declined, delayed or approved and later taken back, the reader asks which layer decided it before changing anything.",
+    "callback": {
+      "to": "The opening's member at one of the 1,140 studios whose card reaches one bank through two providers (p01).",
+      "how": "The reader is told that by the end of the part the two routes will read as two stacks of the same six layers."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Begin with the acquiring chapter, the first layer: who is allowed to send the payment to the network."
+    },
+    "hand_off": {
+      "to": "acquiring-and-network-connectivity",
+      "relationship": "elaboration",
+      "carries_over": "The part intro's claim that a 'yes' is shaped in layers before the issuer decides, and Part I's acquirer as one box in the four-party model.",
+      "introduces": "What is inside that box: a network membership, the license that permits it, and the different ways Stripe and Adyen hold both."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The six chapters and the layer each one covers.",
+      "introduces": "How to use them: as a way to locate a problem in one layer, and where to begin.",
+      "form": "sentence",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p13",
+        "controlling_idea": "The six chapters let a reader place a decline, a late outcome or a provider question in one layer, and by the end of the part the opening card's two routes read as two stacks of the same six layers; the first layer is the acquirer.",
+        "function": "synthesis"
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "Teaching acquiring, method semantics, the state model, optimization, routing or terminals; the page summarizes and does not re-argue the chapters.",
+      "covered_in": [
+        "acquiring-and-network-connectivity",
+        "local-payment-methods",
+        "payment-state-machines",
+        "authorization-optimization",
+        "payment-routing-and-orchestration",
+        "in-person-payments"
+      ]
+    },
+    {
+      "topic": "The part's closing (the six layers side by side, each with its owner, and what follows for Keel decision K8).",
+      "covered_in": [
+        "in-person-payments"
+      ]
+    },
+    {
+      "topic": "A 'Stripe and Adyen: Where They Differ' table, take-away tiers, failure-pattern callout and Questions to Ask; part intros do not carry them (style guide)."
+    },
+    {
+      "topic": "External factual claims of the page's own; every company, network and regulatory statement repeats a chapter of the part, which cites it."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "The closing sentence 'Begin with …' sits under its own heading, 'Where to Begin', as the conclusion's one paragraph.",
+      "rejected": [
+        "Ending the 'Chapters in this part' section with it, as the intro brief words it: the draft checker reads a conclusion only from a heading of its own, and the sibling book's part intros use the same heading."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The hook names the two acquiring entities of the split studios from chapter 6's inventory.",
+      "rejected": [
+        "Leaving the two 'routes' abstract: the entities make the puzzle concrete and are already in the part."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The six-layers table with owners is left to chapter 11, which carries the part's closing; the intro names the layers and the two holders only.",
+      "rejected": [
+        "A layer-by-owner table here, which would pre-empt the closing synthesis."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "journal-spec.json (part-2: thesis, opening, flow, transition_in; post entry part-2)",
+      "contributed": "Intent, thesis, role, hook, bridge, roadmap and the order of chapters."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "The 1,140 split studios, Keel decision K8, Mila's membership set-up, the additions by chapters 6 to 11."
+    },
+    {
+      "kind": "internal",
+      "ref": "posts/06-acquiring-and-network-connectivity, 07-local-payment-methods, 08-payment-state-machines, 09-authorization-optimization, 10-routing-and-orchestration, 11-in-person-payments (index.md, read in full)",
+      "contributed": "What each chapter argues, its Larkfield case, its numbers and the documented Stripe and Adyen facts repeated here."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/consistency-issues.md (rulings 11, 12)",
+      "contributed": "The qualified wording of Stripe's and Adyen's acquiring routes and of where Adyen's payment state can be read."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Spec created from the journal spec and the six written chapters of Part II."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "After the flow rubric: p03 now names the six layers in its controlling idea and p04 assigns the payment model to the provider, so p04 and p05 rest on named terms. Notes not acted on: the roadmap paragraph (p06) is kept although the chapter list repeats its six questions, because the style guide and AC-1 ask for the reading order in the lead; the chapter paragraphs for routing and in-person payments name Larkfield's rule and the three properties without explaining them, which is the chapters' job."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass (part introduction, checked against the corrected chapters 6-11): 22 claims checked (20 agree, 2 corrected to match, 0 removed); Stripe's US acquirers are five banks plus its own limited-purpose bank (rulings 27, 33), and Adyen N.V. as the counter acquirer is labeled as the author's reading."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation after verification: journal-spec entry and spec body brought into line with the verified page and consistency rulings (part thesis.how_why (Stripe's disclosure names the acquirer per country; what is unpublished is the membership class, as chapter 6 says) copy re-synced). No unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Sweep of rulings 46-48: 'membership class per country' replaced by 'a list of network memberships by network and country' (ruling 46j/47j; owner chapter 6) in the prose, the evidence and the copied part thesis how_why."
+    }
+  ],
+  "length": {
+    "target_words": 1000,
+    "max_words": 1200
+  }
+}

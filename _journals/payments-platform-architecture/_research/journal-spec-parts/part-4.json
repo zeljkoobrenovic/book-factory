@@ -1,0 +1,566 @@
+{
+  "id": "part-4",
+  "title": "Part IV — INTERFACE: The API as the Product",
+  "detail": "full",
+  "intent": {
+    "outcome": {
+      "know": [
+        "The four contracts a payment API offers besides its endpoints: what can be read back by identifier, how long a retry is recognized, how long a version is served, and how long an undelivered event is retried.",
+        "What Stripe and Adyen each document for those contracts as of November 2026, with the dates of the engineering posts behind them, and which parts of either company's implementation have never been published.",
+        "Why a test environment, a credential and a rate limit are part of the interface and not tooling beside it."
+      ],
+      "believe": [
+        "A successful API response is one message in a longer exchange; the integration is correct only if it also handles the lost response, the changed version, the late event and the refused request.",
+        "Each of the API's protections holds for a stated time or volume, and the integrator's own record of each payment covers what lies beyond it."
+      ],
+      "can_do": [
+        "Read a payment provider's API documentation and extract the terms an integration depends on: readable state, key retention, version pinning and notice, webhook acknowledgement and retry rules, limits.",
+        "Design the provider-facing side of a payment service: a key per business event, a pinned and scheduled version, a receiver that verifies, stores, acknowledges and then fetches, and a client that paces itself.",
+        "Trace an integration incident to the contract that was assumed to be wider than the provider documents."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Every supporting claim of the part thesis is argued by at least one chapter, and every chapter supports at least one.",
+        "check": "children_cover_parent_thesis",
+        "method": "deterministic",
+        "severity": "blocker"
+      },
+      {
+        "id": "AC-2",
+        "statement": "Each chapter's closing hand-off expresses the relationship its successor declares in transition_in.",
+        "check": "transition_expresses_declared_relationship",
+        "method": "rubric",
+        "severity": "major"
+      },
+      {
+        "id": "AC-3",
+        "statement": "A reader who has read only Part IV can list the questions to put to an unfamiliar payment provider's API documentation before writing code, and say what a weak answer to each would cost.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "You are handed the API documentation of a payment provider you have never used. Using only Part IV: which five things do you look up before writing any code, and for each, what goes wrong in production if you guess instead?",
+        "expected": "Whether a payment can be read back by its identifier (otherwise a lost response cannot be resolved by a read); how long an idempotency key is remembered and what happens on a changed request (otherwise a late retry charges twice); where the API version is pinned and how much notice a removal gets (otherwise an upgrade is forced all at once); the webhook acknowledgement deadline, retry window, ordering and signature rules (otherwise events are lost, duplicated or applied out of order); the request limits and what the test environment does not simulate (otherwise a batch is throttled in production only)."
+      },
+      {
+        "id": "AC-4",
+        "statement": "Given an integration incident the part does not contain, the reader names the contract that was assumed to be wider than documented and the change that closes it.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A food-delivery app charges when an order is placed. On Saturday a provider call times out, the app marks the order 'unpaid' and lets the customer order again with a freshly generated request key. On Monday support finds two charges, and the first order still says 'unpaid' in the app although the provider shows it paid. Which two contracts from Part IV were misread, and what is the fix for each?",
+        "expected": "Idempotency: a timeout is an unknown outcome, not a failure; the retry needed the same key, derived from the order, or a read of the provider's record first. Events: the app took its state from the missing response and never from the provider's record; a receiver that stores each event and fetches the payment, plus a sweep of orders still pending, would have corrected 'unpaid'."
+      }
+    ]
+  },
+  "thesis": {
+    "question": "How can an API make a payment that takes days and several parties look like one call without misleading the developer who calls it?",
+    "claim": "It can do so only by giving the developer a contract for each case the single call hides (a stable identity and state for each payment, a key that lets a request with an unknown outcome be repeated, a pinned version that lets the provider change the interface underneath, and events for outcomes that arrive after the response) and by stating the limits of time, volume and permission within which each contract holds, so that those limits are part of the interface the developer builds against.",
+    "disputed_by": "The view that a payment API is a product surface whose quality is its simplicity: the endpoints are the interface, and idempotency keys, version pins, webhooks and limits are advanced features that a team adds when it grows.",
+    "so_what": "A team that accepts the claim reads four numbers before it writes code (how long keys are kept, how long events are retried, how long a version is served, how many requests are allowed) and keeps its own record of every payment for whatever falls outside them.",
+    "how_why": "The call returns in seconds, while the response can be lost, the outcome can arrive hours later, and the integration outlives many API releases. The provider can cover each case only by remembering something for the developer: the object, the key, the version, the undelivered event. Remembering costs storage and compatibility work, and a shared API must be protected from any one caller, so each contract has a limit. The documented limits differ between the two companies, which is why an integration is built to its provider's terms and not to the idea: Stripe's API v1 keeps a key for at least 24 hours and retries a webhook for up to three days; Adyen keeps a key for 7 to 14 days and retries for up to 30 days (both from documentation accessed in November 2026). How either company implements these mechanisms is published only in part, much of it in Stripe engineering posts from 2017.",
+    "supporting_claims": [
+      {
+        "id": "P4-1",
+        "claim": "An integration survives years of new payment methods when it depends on a stable identifier, a normalized vocabulary of states and refusals, and an explicit line between what the response answers and what arrives later; where the current state can be read back differs between Stripe and Adyen."
+      },
+      {
+        "id": "P4-2",
+        "claim": "A timeout leaves the outcome of a payment request unknown, and a retry is safe only with the same key, derived from the business event, sent while the provider still remembers it."
+      },
+      {
+        "id": "P4-3",
+        "claim": "Pinning each integration to the version it was built against lets a provider change its API, and moves the cost of change onto the provider's code and the integrator's eventual upgrade without removing it."
+      },
+      {
+        "id": "P4-4",
+        "claim": "Outcomes that arrive after the response are delivered as events at least once, for a limited time and in no guaranteed order, so an event is a notice to store and then confirm against the provider's record (the object where it can be read back, the report where it cannot), not the final word."
+      },
+      {
+        "id": "P4-5",
+        "claim": "Credentials, test environments and request limits are the limits of permission and volume on the other four contracts: they decide who may call, what a passing test run has shown (shapes and states, not production volume or issuer behavior) and how much may be sent."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Shows how the slow, multi-party process of Parts I to III is exposed to a developer, and gives the integration mechanisms (key, version, event, limit) that the controls of Part V, the billing engine of Part VI and the journeys of Part IX rely on.",
+    "supports": [
+      "J4"
+    ]
+  },
+  "flow": {
+    "pattern": "prerequisite_order",
+    "additional_patterns": [
+      {
+        "pattern": "problem_solution",
+        "applies_to": "payment-api-design to idempotency-and-retries: the object model leaves the lost response open, and the idempotency key resolves it"
+      },
+      {
+        "pattern": "small_to_large",
+        "applies_to": "idempotency-and-retries to payment-developer-platform: one request, one integration over years, every event the provider sends, all callers of the API at once"
+      }
+    ],
+    "rationale": "The object model comes first because the other four chapters speak about its objects, identifiers and errors. Idempotency and versioning follow as the two things the provider remembers about the integrator's own requests, for hours and for years. Webhooks come after versioning because the main documented choice in event design, a versioned snapshot or an unversioned notice that is fetched back, cannot be explained before the reader knows what a pinned version is; they come after idempotency because the unknown outcome defined there is what events and a read of the record resolve. The developer platform is last because its limits are met by the traffic the earlier chapters create: retries, fetches after every event, upgrade rehearsals. Moving webhooks before idempotency would separate the unknown outcome from its definition, and moving the developer platform first would present keys and limits before the reader knows which calls must never be refused. The order is not a list of features: three of the four transitions are a problem resolved, a contrast and a consequence."
+  },
+  "opening": {
+    "carried_by": "part-4",
+    "hook": {
+      "type": "intriguing_example",
+      "content": "Four of Larkfield's eight incidents happened in 2026 at the provider's API and not in the money. In March a forced SDK upgrade moved the billing integration across a breaking release, and subscription revenue reports were wrong for 6 days. On 14 September a webhook receiver's certificate expired, events failed for 9 hours, and 3,200 memberships were shown as unpaid. On 1 October the renewal job hit the provider's rate limit, and 7,900 renewals were delayed to the next day. On 1 November a provider call timed out, the job retried with a new idempotency key, and 1,840 members were charged twice."
+    },
+    "bridge": "From the reader's experience of a payment API as a request and a response, to the four cases in which the response was not the whole exchange: it never arrived, its shape changed, the outcome came later by another channel, or the request was refused for volume.",
+    "roadmap": "Five chapters: what the API exposes (objects, identifiers, errors); how a request is made safe to repeat; how the API changes without breaking integrations; how the provider reports what happens after the response; and the keys, test environments and limits around all of it. Each chapter sets Stripe's and Adyen's documented terms side by side and says where the public record of their implementation stops."
+  },
+  "closing": {
+    "carried_by": "payment-developer-platform",
+    "synthesis": "Read together, the five chapters show that every protection the API offers has an edge: a key is remembered for a day or for one to two weeks, an event is retried for three days or thirty, a version is served until its notice runs out, a request is accepted up to a rate. Inside those edges the API can stand in for the slow process; outside them the integrator is back in the gap between the instant answer and the slow truth, and only its own record of each payment, checked against the provider's, covers it.",
+    "so_what": "The integrator's design question changes from 'which endpoint do I call' to 'what do I do when the provider has stopped remembering for me', which is why the payment service holds the keys, the receivers store before they acknowledge, and reconciliation against the provider's reports runs however reliable the webhooks have been.",
+    "callback": "The four Larkfield incidents of the part opening: in each one the integration assumed a contract wider than the provider documents (a retry recognized without the same key, a version that would never move, an event that always arrives, a limit that a predictable peak would not reach), and Keel decisions K1, K2, K5 and K7 each restate one contract in Larkfield's own terms.",
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "For each provider, write down five terms from its documentation (what can be read back by identifier, key retention, version pin and notice period, webhook retry window and acknowledgement deadline, request limits) and, next to each, what your own system does once that term runs out."
+    }
+  },
+  "transition_in": {
+    "relationship": "contrast",
+    "carries_over": "Part III's provider seen from inside: every movement recorded twice, proven against networks and banks over days, with the payment state machine of Part II as the thing the records describe.",
+    "introduces": "The same provider seen from outside, by a developer who gets an answer in seconds: what of that slow record the API shows, and what it must add so that the fast answer is not mistaken for it.",
+    "form": "paragraph",
+    "placement": "end_of_previous"
+  },
+  "posts": [
+    {
+      "id": "part-4",
+      "folder": "part-4-intro",
+      "title": "Part IV — INTERFACE: The API as the Product",
+      "kind": "part_intro",
+      "detail": "full",
+      "question": "What does Part IV argue, and in what order should its chapters be read?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "Part IV answers five questions in order: what the API exposes, how a request is made safe to repeat, how the API changes, how the provider reports later outcomes, and what surrounds the API.",
+            "Which of Larkfield's 2026 incidents each chapter explains."
+          ],
+          "can_do": [
+            "Pick the Part IV chapter that answers the integration decision or incident in front of them."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "A reader of this page alone can name the five chapters' subjects in reading order and state the part's claim in one sentence.",
+            "check": "intro_predicts_content",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "After reading only this page: what does Part IV argue, and what will each of the next five chapters tell you, in order?",
+            "expected": "An API can hide a slow, multi-party payment only if it also gives contracts for the cases one call hides; then: the object model and errors; idempotency keys and retries; versioning; webhooks and events; keys, test environments and limits."
+          },
+          {
+            "id": "AC-2",
+            "statement": "The page opens with the four Larkfield incidents with their ledger figures and does not explain their mechanisms, which belong to the chapters.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "minor"
+          }
+        ]
+      },
+      "role": {
+        "contribution": "Performs the part's opening: the four incidents at the API boundary, the part thesis and the reading order.",
+        "supports": []
+      },
+      "post_spec": "posts/part-4-intro/spec.json"
+    },
+    {
+      "id": "payment-api-design",
+      "folder": "17-api-design-and-object-models",
+      "title": "Objects, Commands and Events: How Payment APIs Are Designed",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "What makes a payment API usable for ten years, and how do Stripe's and Adyen's object models differ?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "The elements of a payment API's object model: identifiers, states, related objects, metadata, an error model that separates a refused payment from a failed request, and the split between synchronous answers and later results.",
+            "That Stripe documents one resource model with typed, fetchable objects in two namespaces, and that Adyen documents several API families with their own version counters and, in most cases, their own hosts, pagination and error formats, whose Checkout API identifies a payment by a reference and has no call to read it back.",
+            "What each company has published about how it designs APIs, with dates, and that neither has published its design guide."
+          ],
+          "believe": [
+            "What ages well in a payment API is what the integrator's code depends on (identity, vocabulary, the line between now and later), not the uniformity of its REST style."
+          ],
+          "can_do": [
+            "Given a provider's API reference, say what their own system must store because the provider will not return it later.",
+            "Design the internal interface of an adapter that hides two providers' object models without hiding where each one's state can be read."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given the shape of an unfamiliar provider's create-payment response, the reader says what must be stored locally and how later states will be learned.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A provider's create-payment call returns an identifier and a result code, and the API has no call that returns a payment by that identifier. Using only this chapter: what must your own system store, when, and how will it learn that the payment was later captured, refunded or disputed?",
+            "expected": "Its own record of the attempt, with its own reference and the provider's identifier, written before or with the request; later states arrive by webhook and in reports keyed by those references; a lost response cannot be resolved by reading the payment back, so the own reference sent with the request is what ties the later events to the attempt. The reader recognizes this as the shape of Adyen's Checkout API and contrasts it with a fetchable object."
+          },
+          {
+            "id": "AC-2",
+            "statement": "Given an HTTP 200 response whose body says the payment was refused, and an HTTP 402 response from another provider for the same event, the reader explains both as the same business outcome and says which of them a retry policy may act on.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "One provider answers a declined card with HTTP 200 and a result code 'Refused'; another answers with HTTP 402 and an error object carrying a decline code. Your adapter must present one outcome to the rest of your system. What is it, and what would be wrong with treating either response as 'the request failed'?",
+            "expected": "Both mean the request was processed and the issuer (the customer's bank) said no: a completed payment attempt with a refusal reason, not a transport or server failure. Treating it as a failed request invites a blind retry of a payment that was answered; the adapter maps both to one refused state with a normalized reason."
+          },
+          {
+            "id": "AC-3",
+            "statement": "Every statement about Stripe's or Adyen's API design practice carries its year, and the chapter says that neither company has published its design guide or review criteria.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "What makes a payment API usable for ten years, and how do Stripe's and Adyen's object models differ?",
+        "claim": "A payment API stays usable for ten years when the integrator's code depends only on things that do not change when payment methods and network rules do: a stable identifier for each payment, a normalized vocabulary of states and refusal reasons, and an explicit line between what the response answers and what arrives later. Stripe and Adyen both supply these and differ in where the current state lives: Stripe returns typed objects that can be fetched again by identifier, while Adyen's Checkout API returns a reference and a result code and reports later states through webhooks and reports.",
+        "disputed_by": "The view that an API ages well because it is uniformly resource-oriented, one model applied everywhere, so that an API made of several families with different conventions, such as Adyen's, is a design debt its integrators will pay for.",
+        "so_what": "An evaluator stops scoring an API on consistency of style and asks what its own system must remember: with a fetchable object the provider's record can be read after a lost response, and with a reference only, the integrator's own record and its webhook receiver carry that job. An adapter over both providers must hide the two vocabularies without hiding that difference.",
+        "how_why": "Card networks and local methods answer at different speeds and with different codes, and new ones keep arriving; an integration breaks when one of those differences reaches its code. Stripe's 2020 account of its payments APIs reports that the Charge resource grew from 11 to 36 properties between 2011 and 2018 before the model was redesigned around a payment with states. Adyen's 2022 engineering post describes families of APIs over one platform, and its published specification of Checkout API v72 (2026) contains three read operations out of 31 and none that returns a payment. Both have lasted for years on those models, which is why style alone cannot be the explanation. The public record stops at the design process: Stripe has published one paragraph on API review (2017) and a list of automated checks (2026), Adyen one post naming an API Review group (2022), and neither its design guide."
+      },
+      "role": {
+        "contribution": "Defines what the API exposes (objects or references, identifiers, states, errors) so that the next four chapters can say what is repeated, versioned, reported and limited.",
+        "supports": [
+          "P4-1"
+        ]
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The part intro's claim that an API must give contracts for the cases one call hides, the first being a stable identity and state for each payment.",
+        "introduces": "What that identity and state look like in the two providers' APIs, and what an integrator must store when the provider does not return it later.",
+        "form": "sentence",
+        "placement": "end_of_previous"
+      },
+      "post_spec": "posts/17-api-design-and-object-models/spec.json"
+    },
+    {
+      "id": "idempotency-and-retries",
+      "folder": "18-idempotency-and-retries",
+      "title": "Exactly Once, Over a Network That Does Not Allow It: Idempotency and Retries",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "How do you make “charge this card” safe to send twice?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "Why a timeout leaves a payment request in one of three states the client cannot tell apart, and what an idempotency key lets the server do in each.",
+            "The documented terms at each provider as of November 2026: Stripe API v1 (replays the stored first response, errors included; keys kept at least 24 hours; a changed request is rejected), Stripe API v2 (30 days; failed work is retried), Adyen (keys valid 7 to 14 days per company account and region; behavior on a changed request not documented).",
+            "That Stripe has published nothing on how it stores keys and Adyen only one 2021 passage naming a distributed database beside its acceptance layer, and that the widely cited recovery-point design is a reference implementation from a personal article, not a description of Stripe's system."
+          ],
+          "believe": [
+            "No answer is not a failure: after a timeout the only safe moves are the same request with the same key, or a read of the provider's record.",
+            "A key generated per attempt protects nothing; the key must come from the business event."
+          ],
+          "can_do": [
+            "Choose an idempotency key for a given money-moving operation and say where it is stored before the first send.",
+            "Check every retry path in a system (SDK, queue redelivery, scheduled job, a person) against the provider's key retention window.",
+            "Say which duplicates a key does not prevent and which other guard covers them."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a retry that arrives after a delay, the reader says what key it must carry and what each of two differently configured providers does with it.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A nightly job charges 5,000 invoices. On one call the connection drops before any response arrives, and the job's queue redelivers that task 36 hours later. What key should the second attempt carry, and what happens at a provider that keeps keys for at least 24 hours compared with one that keeps them for 7 to 14 days?",
+            "expected": "The same key as the first attempt, derived from the invoice and stored before the first send. The 7-to-14-day provider recognizes it and returns the first result without charging again. The 24-hour provider may have removed the key and would execute a new charge, so after its window the job must not resend at all until it has read the provider's record of the first attempt. A new key is never correct while the first outcome is unknown."
+          },
+          {
+            "id": "AC-2",
+            "statement": "The reader can state a duplicate that an idempotency key does not prevent and the guard that does.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A customer taps 'Pay' twice, and the app generates a fresh random key for each tap. Does the idempotency key prevent two charges? What would?",
+            "expected": "No: two keys are two operations to the provider. A key derived from the business event (the cart, order or billing period) makes the second tap a repeat of the first; so does confirming one payment object whose state machine refuses a second confirmation."
+          },
+          {
+            "id": "AC-3",
+            "statement": "The chapter presents no key-storage, fingerprinting or recovery design as Stripe's or Adyen's implementation; such designs are attributed to their source or labeled as reference-architecture inference, and the 2017 Stripe post carries its evidence age.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          },
+          {
+            "id": "AC-4",
+            "statement": "The Larkfield worked example uses the ledger's figures for the Double Charge (1 November 2026; 1,840 members; €71,300 refunded; 212 disputes) and shows the key Keel decision K1 would have sent.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "major"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "How do you make “charge this card” safe to send twice?",
+        "claim": "“Charge this card” is safe to send twice only when the client sends the same key both times, a key derived from the business event and stored before the first attempt, and the second send arrives while the provider still remembers that key. The key makes the request repeatable; it does not make the outcome known, so after a timeout the client repeats the same request, or first establishes what happened from the provider's own record (the object, its events or its reports), and never starts a new one.",
+        "disputed_by": "The view that retries are a transport concern: the provider's SDK already retries with a generated key, and a queue with exactly-once semantics does the rest, so application code does not need to design keys.",
+        "so_what": "The provider's retention window becomes a design input: every path that can resend a request later than the window (a queue redelivery, a job that runs the next day, a person pressing a button) is a path to a double charge unless it first reads the provider's record. On Stripe's API v1 that window is at least 24 hours; on Adyen it is 7 to 14 days.",
+        "how_why": "A request can fail before the server sees it, while the server is working, or after the work is done and before the answer returns, and the client cannot tell which (Stripe's engineering post of February 2017 sets out the three cases; evidence age nine years, and the current API reference confirms the mechanism). Only the client knows that two sends are one intention, so it must say so with a key, and the server must remember the key and its result. The documented memory is finite and differs: Stripe's API v1 replays the first response, including a 500, for at least 24 hours and rejects a changed request; its API v2 keeps keys 30 days and retries failed work, but payment objects are documented under v1 as of November 2026; Adyen's documentation gives 7 to 14 days per company account and region and does not say what a changed request returns. A key generated by an SDK lives for one call, which is why a retry by a job is outside it. Stripe has published nothing on how keys are stored and Adyen one 2021 passage naming a distributed database; neither has published how a half-finished request is recovered, so the chapter's server-side design is a reference design."
+      },
+      "role": {
+        "contribution": "Supplies the unknown outcome and the idempotency key, the mechanism that makes every money-moving call in the rest of the book repeatable.",
+        "supports": [
+          "P4-2"
+        ]
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "The object model of the previous chapter, in which a create request returns an identifier, and the question it left open: what the integrator holds when that response never arrives.",
+        "introduces": "The unknown outcome, and the idempotency key as the client's way of telling the provider that a second send is the same intention as the first.",
+        "form": "paragraph",
+        "placement": "end_of_previous"
+      },
+      "post_spec": "posts/18-idempotency-and-retries/spec.json"
+    },
+    {
+      "id": "payment-api-versioning",
+      "folder": "19-api-versioning",
+      "title": "Changing the API Without Breaking a Million Integrations: Versioning",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "How do you evolve an API that customers integrated years ago and never want to touch?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "What counts as a breaking change, and why a provider that moves money cannot simply ship one.",
+            "Stripe's documented model: dated versions pinned by account, by header and, since 2023, by SDK release; the 2017 description of version-change modules; twice-yearly named major releases with monthly additive releases since 2024.",
+            "Adyen's documented model: an integer version in the URL of each API, non-breaking changes applied to every version, and a published lifecycle for Checkout API versions with two years between 'Deprecated' and end-of-life.",
+            "That webhook payloads carry a version of their own at both providers, and what is not public: whether Stripe's 2017 mechanism still serves its v1 API, whether Stripe has retired any version, and how Adyen serves many Checkout versions from one platform."
+          ],
+          "believe": [
+            "A pin is a loan: it buys the integrator time and adds to the distance of the eventual upgrade.",
+            "Upgrading on a calendar costs less than upgrading when another change forces it."
+          ],
+          "can_do": [
+            "Find every place where an integration's API version is set (account default, request header or URL, SDK release, webhook endpoint) and say which of them moves when a dependency is upgraded.",
+            "Plan an upgrade across a breaking release: read the changes between the two versions, rehearse in a test environment, cut webhooks over separately."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a proposed dependency upgrade, the reader says what else it may change and what to check first.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "Your integration sends no version header and uses a provider SDK from three years ago. A colleague proposes upgrading the SDK to get one new feature. Using only this chapter: what else might that upgrade change, and what do you check before merging it?",
+            "expected": "A newer SDK may carry its own API version (Stripe's SDKs since 2023 use the version current at the SDK's release), so the upgrade can move every request across several breaking releases at once. Check which version requests use today and which the webhook endpoint uses, since the two are set separately; read the breaking changes between the old and new versions for fields the code or its exports read; rehearse against a test environment before production."
+          },
+          {
+            "id": "AC-2",
+            "statement": "Given a provider's stated versioning rules, the reader derives the integrator's obligations.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A provider puts an integer version in the URL of each of its APIs, adds new response fields to every existing version without notice, and gives two years' notice before a deprecated version stops working. What three things must an integrator do because of these rules?",
+            "expected": "Parse responses leniently, because fields can appear without a version change; track the lifecycle state of each version it calls and schedule the upgrade inside the notice period; upgrade and test each API separately, since each has its own counter."
+          },
+          {
+            "id": "AC-3",
+            "statement": "The 2017 Stripe versioning post carries its evidence age wherever it is used, and the chapter states which of its claims current documentation confirms, which were replaced in 2023 and 2024, and which nobody has re-described since.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "How do you evolve an API that customers integrated years ago and never want to touch?",
+        "claim": "A provider evolves such an API by letting each integration keep seeing the version it was built against while the provider's own code moves on, and this moves the cost of change without removing it: the provider maintains every version it still serves, and the integrator who never upgrades accumulates a gap that some later change forces it to cross in one step.",
+        "disputed_by": "The view that versions are avoidable or free for the integrator: either a disciplined provider only ever adds to its API and so never needs versions, or, where versions exist, a pinned integration is finished and can be left alone indefinitely.",
+        "so_what": "An integrator treats the API version as a dependency with an owner and a date, upgrades on a schedule of its own choosing, and knows every place the version is set, including the webhook endpoint, before something else moves it.",
+        "how_why": "Additive change alone does not suffice, because removing or reshaping a field is sometimes necessary and both companies document doing it. Stripe's engineering post of August 2017 describes responses built at the current version and transformed backward through version-change modules to the caller's pinned version, and states the price: every version is more code to maintain (evidence age nine years; current documentation confirms the pinning, and no later source says whether the mechanism still serves the v1 API or whether any version has been retired). Stripe pins an integration to one dated version of its whole API by account, by header or by SDK release; since October 2024 it concentrates breaking changes in two named releases a year, and its documentation says SDKs since 2023 use the version current at their release, so an SDK upgrade is an API upgrade. Adyen puts an integer version in the URL of each API; its documentation applies non-breaking changes to all versions, reserves a new number for breaking ones, and gives a deprecated Checkout API version two years before end-of-life, after which processing can be suspended; how one platform serves its many Checkout versions is not published. In both models the old shape is kept alive by the provider and the gap grows on the integrator's side, which is what Larkfield met in March 2026."
+      },
+      "role": {
+        "contribution": "Explains how the interface of the previous two chapters changes over years without breaking integrations, and what that obliges the integrator to schedule.",
+        "supports": [
+          "P4-3"
+        ]
+      },
+      "transition_in": {
+        "relationship": "similarity",
+        "carries_over": "The idempotency key as something the provider remembers on the client's behalf, for hours or days, so that one request can be repeated.",
+        "introduces": "The version as a second thing the provider remembers on the client's behalf, for years, so that one integration can keep working while the API changes; and the same question of what happens when that memory ends.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "post_spec": "posts/19-api-versioning/spec.json"
+    },
+    {
+      "id": "payment-webhooks-and-events",
+      "folder": "20-webhooks-and-events",
+      "title": "The Provider Calls You: Webhooks and Events",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "How does a provider tell millions of endpoints what happened, and what may a receiver assume?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "Why a provider can only promise at-least-once delivery, and what follows: duplicates, no guaranteed order, a retry window.",
+            "The two documented delivery contracts side by side as of November 2026. Stripe: any 2xx returned quickly, retries for up to three days, order not guaranteed, events readable through the API for 30 days, a signature over timestamp and body, snapshot and thin events. Adyen: a 2xx within 10 seconds, a per-endpoint retry queue for up to 30 days, a timestamp or sequence number to restore order, a signature over eight fields for the Standard webhook, and, in its Checkout API for online payments, no call to read a payment back.",
+            "That neither company has published how its webhook sender is built."
+          ],
+          "believe": [
+            "The webhook is the doorbell and the provider's record is the truth: an event says that something changed, and the state is read from the provider.",
+            "The absence of an event is not evidence that nothing happened."
+          ],
+          "can_do": [
+            "Build a receiver that verifies, stores, acknowledges and only then processes, removes duplicates, and does not depend on arrival order.",
+            "Write the recovery plan for an endpoint outage of a given length at each provider.",
+            "Add a sweep that resolves every payment still pending after a set time by reading the provider's record or report."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given an endpoint outage longer than one provider's retry window and shorter than the other's, the reader writes the recovery steps for each.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "Your webhook endpoint was down from Friday 18:00 to Wednesday 09:00. One provider retries each event for up to three days and keeps events readable through its API for 30 days. The other queues all events for your endpoint for up to 30 days and has no call that returns a payment by its identifier. For each provider, what do you do on Wednesday morning?",
+            "expected": "First provider: events from the early part of the outage are past their retries and will not come again, so list the events for the outage period from the API, feed them through the same handler, and then read every payment still pending. Second provider: the queued events arrive in a burst once the endpoint acknowledges, so the receiver must store and acknowledge quickly and process afterwards; because an online payment cannot be read back through the Checkout API, the settlement report is the check. Both: remove duplicates and do not trust arrival order."
+          },
+          {
+            "id": "AC-2",
+            "statement": "Given two events for one payment in an implausible order, the reader says what may be concluded and what the handler does.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "Your receiver gets a 'refunded' event for a payment and, one second later, a 'captured' event for the same payment. What can you conclude about the order in which the two things happened, and what should the handler do with each?",
+            "expected": "Nothing can be concluded from arrival order. The handler reads the current state from the provider where it can, or orders by the provider's own sequence number or event time where one is given, applies only transitions its own state machine allows, and ignores an event it has already processed."
+          },
+          {
+            "id": "AC-3",
+            "statement": "The chapter's account of what building a webhook sender involves is labeled as reference-architecture inference and states that neither Stripe nor Adyen has published its sender design.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          },
+          {
+            "id": "AC-4",
+            "statement": "The Larkfield worked example uses the ledger's figures for the Silent Webhook (14 September 2026; 9 hours; 3,200 memberships; 460 support tickets) and shows which part of the harm retries repaired and which part Keel decision K2 addresses.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "major"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "How does a provider tell millions of endpoints what happened, and what may a receiver assume?",
+        "claim": "A provider tells its endpoints by sending each event again until the endpoint acknowledges it or a retry window closes, and the only delivery guarantee a receiver gets from that is that an event it has not acknowledged will be sent again while the window is open. It may not assume that an event arrives once, in order, with current data, or at all after the window, so a webhook is a notice to store and then confirm against the provider's own record (the object read back by identifier where the API allows it, the settlement report where it does not), and is not the final word on a payment.",
+        "disputed_by": "The view that a signed webhook is the provider's authoritative statement of what happened, so a handler can update its state directly from the payload and treat the order of arrival as the order of events.",
+        "so_what": "The receiver is designed around what it cannot assume: it stores and acknowledges before any business logic, removes duplicates, reads state back where the provider allows it, and runs a sweep for everything still pending. The recovery plan differs by provider: at Stripe an outage longer than three days is repaired by reading events back from the API within 30 days; at Adyen the queue holds events for up to 30 days and releases them together, and since its Checkout API has no call that returns a payment, the stored events are the integrator's working record until the settlement report confirms them, which makes storing before acknowledging carry more weight.",
+        "how_why": "The sender cannot know that a receiver has processed an event, only that it answered, so it repeats until it gets an answer; repetition produces duplicates and, with retries at different times, disorder; and no sender retries forever. The documented terms (accessed November 2026): Stripe retries for up to three days with exponential backoff, says it does not guarantee order, and recommends fetching the object because a snapshot can be stale; Adyen requires a 2xx within 10 seconds, moves all events for a failing endpoint to a retry queue for up to 30 days, and tells receivers to check the timestamp or a sequence number. Larkfield's Silent Webhook lasted 9 hours at its Stripe receiver, well inside the three-day window, so the documented retries cover every event it missed; the harm was that 3,200 memberships read as unpaid in the meantime, because the absence of an event was taken as a fact. How either sender is built (fan-out, isolating slow endpoints, storing the backlog) is not public, and the chapter marks that section as inference."
+      },
+      "role": {
+        "contribution": "Covers the outcomes that arrive after the response, which the three request-side chapters cannot, and states what the integrator must build because delivery is at-least-once and time-limited.",
+        "supports": [
+          "P4-4"
+        ]
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "Three chapters in which the integrator calls and the provider answers, the unknown outcome of chapter 18 that an answer alone cannot resolve, and the pinned version that also fixes the shape of what the provider sends.",
+        "introduces": "The reversed direction: the provider calls the integrator, with its own rules for acknowledgement, retry, order and authenticity, and the integrator becomes the server whose reliability matters.",
+        "form": "paragraph",
+        "placement": "both"
+      },
+      "post_spec": "posts/20-webhooks-and-events/spec.json"
+    },
+    {
+      "id": "payment-developer-platform",
+      "folder": "21-developer-platform",
+      "title": "Keys, Sandboxes and Limits: The Developer Platform Around the API",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "What else has to exist around an API before developers can safely build on it?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "The kinds of credential each provider documents (Stripe's publishable, secret and restricted keys; Adyen's API credentials with roles, scoped to company or merchant accounts) and what least privilege means for a key that can move money.",
+            "How the two test environments are separated (Stripe: sandboxes inside one account, told apart by key; Adyen: a separate test platform with its own hosts, portal and credentials) and what Stripe's documentation says a sandbox does not simulate.",
+            "The difference between a rate limit and load shedding; Stripe's 2017 description of four limiters and its current published limits; and that Adyen publishes no general rate limit for its payments APIs.",
+            "The logs and tools each provider gives an integrator to see its own requests and events."
+          ],
+          "believe": [
+            "A limit the provider enforces is a term of the API, to be designed against like any field.",
+            "A passing test run is evidence about the integration's handling of shapes and states, and about nothing else."
+          ],
+          "can_do": [
+            "Assign each calling system a credential with only the permissions it needs.",
+            "Compute the request rate of a planned batch, compare it with a documented limit or agree one where none is published, and pace the batch on the client side.",
+            "List what must be verified in production, under observation, because the test environment cannot show it."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a planned batch and a passing test run, the reader says what the run showed, what it did not, and what to settle with each provider.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A team wants to run a monthly batch of 350,000 card charges in a two-hour window instead of across the day. The batch passed in the provider's test environment. Using only this chapter: what did that run show, what did it not show, and what do you find out from the provider before the first production run?",
+            "expected": "It showed that the code handles the API's request and response shapes and states. It did not show the live request limits (test limits can differ), production latency, or how issuers (the cardholders' banks) will respond. The batch needs about 49 requests a second; compare that with the provider's published per-account and per-endpoint limits where it publishes them, and agree a throughput in advance where it does not; pace the batch on the client side and back off on HTTP 429 in either case."
+          },
+          {
+            "id": "AC-2",
+            "statement": "Given a calling system and its task, the reader chooses a credential and justifies it by what a leak would allow.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A reporting job only reads payouts. Which kind of credential do you give it, and why not the key the payment service uses?",
+            "expected": "A credential restricted to reading that resource (a restricted key, or a credential whose roles allow only that read): if it leaks or the job misbehaves, it cannot create payments, refunds or payouts. The payment service's key can move money and should exist in one place."
+          },
+          {
+            "id": "AC-3",
+            "statement": "The chapter says where the evidence stops: Stripe's limiter design is from 2017 and carries its evidence age, with a statement of which parts current documentation confirms; no published payment rate limits and no limiter design were found for Adyen; Adyen publishes no list of what its test environment cannot simulate.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          },
+          {
+            "id": "AC-4",
+            "statement": "The chapter's conclusion performs the part's closing: it relates the retention window, the retry window, the version lifecycle and the request limit as edges of one contract and returns to the four Larkfield incidents of the part opening before handing off to Part V.",
+            "check": "conclusion_synthesizes_and_answers_so_what",
+            "method": "rubric",
+            "severity": "major"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "What else has to exist around an API before developers can safely build on it?",
+        "claim": "Three things must exist around a payment API before developers can safely build on it: credentials that limit what each caller can do, a test environment whose gaps are stated, and request limits an integrator can plan for. Each is a term of the API's contract and not tooling beside it, because each decides something the endpoints do not: what a leaked or misused key can do, what a passing test run has and has not shown, and whether a payment request sent at a peak is accepted.",
+        "disputed_by": "The view that keys, sandboxes and rate limits are developer-experience features, separate from the API's design, which a team can learn about when it first runs into them.",
+        "so_what": "A predictable peak is planned against the limit before it happens: the integrator paces its own batch, gives each system the narrowest credential that does its job, and lists what it will verify in production under observation because test could not show it. Against Stripe the plan starts from published figures; against Adyen's payments APIs, for which no general limit is published, it starts from a throughput agreed with the provider in advance.",
+        "how_why": "A key to a payment API can move money, so what one key may do bounds the damage of its leak; Stripe's documentation (accessed November 2026) now advises restricted keys over unrestricted secret keys, and Adyen's credentials carry roles and an account scope. A test environment answers from a simulation, so it can show that code handles the API's shapes and states and cannot show how card issuers, production latency or live limits behave; Stripe's documentation says sandbox payments are not processed by card networks and that sandbox limits are lower, while Adyen, which runs test and live as separate environments with separate hosts and credentials, publishes no list of what test cannot simulate. A payment API is shared by every customer, so the provider must be able to refuse one caller's excess to protect the others, and a refusal the caller did not plan for delays payments. Stripe's engineering post of March 2017 describes four limiters, two per user and two that shed lower-priority traffic so that creating charges keeps working (evidence age nine years; current documentation confirms rate and concurrency limits and no source confirms the two load shedders still exist), and its documentation (accessed November 2026) publishes 100 requests a second per account in live mode and 25 in a sandbox. Adyen's documentation index has no rate-limit page for its payments APIs and publishes figures only for its Legal Entity Management API and parts of its Management API. Larkfield's renewal job met the provider's rate limit on 1 October 2026, and 7,900 renewals were delayed to the next day."
+      },
+      "role": {
+        "contribution": "Adds the terms that surround the four earlier contracts (who may call, what test proves, how much may be sent) and carries the part's closing synthesis.",
+        "supports": [
+          "P4-5"
+        ]
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "The integrator the previous chapters produced: a payment service that retries with stored keys, receivers that read the provider's record after every event, a sweep over pending payments and a rehearsal before each version upgrade.",
+        "introduces": "The consequence: all of that is traffic on a shared API, sent with credentials, rehearsed in a test environment and subject to limits, and these surrounding terms decide whether the earlier mechanisms work on the first of the month.",
+        "form": "paragraph",
+        "placement": "end_of_previous"
+      },
+      "post_spec": "posts/21-developer-platform/spec.json"
+    }
+  ]
+}

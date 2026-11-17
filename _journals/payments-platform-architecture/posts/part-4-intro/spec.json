@@ -1,0 +1,528 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "part-4",
+  "journal": "payments-platform-architecture",
+  "part": "part-4",
+  "title": "Part IV — INTERFACE: The API as the Product",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "Part IV answers five questions in order: what the API exposes, how a request is made safe to repeat, how the API changes, how the provider reports later outcomes, and what surrounds the API.",
+        "Which of Larkfield's 2026 incidents each chapter explains."
+      ],
+      "can_do": [
+        "Pick the Part IV chapter that answers the integration decision or incident in front of them."
+      ]
+    },
+    "audience": {
+      "who": "Engineers and architects new to payments who have read Parts I to III and are about to start the interface chapters, or who arrive with one integration decision or incident (a timeout, a forced upgrade, a missing event, a refused batch) and want the chapter that addresses it.",
+      "already_knows": [
+        "APIs, HTTP, webhooks as a mechanism, retries, rate limits and version numbers as general engineering.",
+        "Parts I to III: a payment is a chain of promises settled over days, modeled by the provider as states and recorded in a ledger that is proven against networks and banks.",
+        "Larkfield in outline: a fictional studio-software platform that uses Stripe and Adyen, and its 2027 repair program Keel."
+      ],
+      "does_not_know": [
+        "Idempotency key, version pinning, at-least-once delivery, retry window, restricted key, load shedding: each is owned by a Part IV chapter and is only named or glossed in a clause here.",
+        "What Stripe and Adyen each document for these contracts; the page gives one or two figures per chapter and leaves the evidence to the chapter."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "A reader of this page alone can name the five chapters' subjects in reading order and state the part's claim in one sentence.",
+        "check": "intro_predicts_content",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "After reading only this page: what does Part IV argue, and what will each of the next five chapters tell you, in order?",
+        "expected": "An API can hide a slow, multi-party payment only if it also gives contracts for the cases one call hides; then: the object model and errors; idempotency keys and retries; versioning; webhooks and events; keys, test environments and limits."
+      },
+      {
+        "id": "AC-2",
+        "statement": "The page opens with the four Larkfield incidents with their ledger figures and does not explain their mechanisms, which belong to the chapters.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "minor"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "How can an API make a payment that takes days and several parties look like one call without misleading the developer who calls it?",
+    "claim": "It can do so only by giving the developer a contract for each case the single call hides (a stable identity and state for each payment, a key that lets a request with an unknown outcome be repeated, a pinned version that lets the provider change the interface underneath, and events for outcomes that arrive after the response) and by stating the limits of time, volume and permission within which each contract holds, so that those limits are part of the interface the developer builds against.",
+    "disputed_by": "The view that a payment API is a product surface whose quality is its simplicity: the endpoints are the interface, and idempotency keys, version pins, webhooks and limits are advanced features that a team adds when it grows.",
+    "so_what": "A team that accepts the claim reads four numbers before it writes code (how long keys are kept, how long events are retried, how long a version is served, how many requests are allowed) and keeps its own record of every payment for whatever falls outside them.",
+    "how_why": "The call returns in seconds, while the response can be lost, the outcome can arrive hours later, and the integration outlives many API releases. The provider can cover each case only by remembering something for the developer: the object, the key, the version, the undelivered event. Remembering costs storage and compatibility work, and a shared API must be protected from any one caller, so each contract has a limit. The documented limits differ between the two companies, which is why an integration is built to its provider's terms and not to the idea: Stripe's API v1 keeps a key for at least 24 hours and retries a webhook for up to three days; Adyen keeps a key for 7 to 14 days and retries for up to 30 days (both from documentation accessed in November 2026). How either company implements these mechanisms is published only in part, much of it in Stripe engineering posts from 2017.",
+    "supporting_claims": [
+      {
+        "id": "P4-1",
+        "claim": "An integration survives years of new payment methods when it depends on a stable identifier, a normalized vocabulary of states and refusals, and an explicit line between what the response answers and what arrives later; where the current state can be read back differs between Stripe and Adyen."
+      },
+      {
+        "id": "P4-2",
+        "claim": "A timeout leaves the outcome of a payment request unknown, and a retry is safe only with the same key, derived from the business event, sent while the provider still remembers it."
+      },
+      {
+        "id": "P4-3",
+        "claim": "Pinning each integration to the version it was built against lets a provider change its API, and moves the cost of change onto the provider's code and the integrator's eventual upgrade without removing it."
+      },
+      {
+        "id": "P4-4",
+        "claim": "Outcomes that arrive after the response are delivered as events at least once, for a limited time and in no guaranteed order, so an event is a notice to store and then confirm against the provider's record (the object where it can be read back, the report where it cannot), not the final word."
+      },
+      {
+        "id": "P4-5",
+        "claim": "Credentials, test environments and request limits are the limits of permission and volume on the other four contracts: they decide who may call, what a passing test run has shown (shapes and states, not production volume or issuer behavior) and how much may be sent."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Performs the part's opening: the four incidents at the API boundary, the part thesis and the reading order.",
+    "supports": []
+  },
+  "flow": {
+    "pattern": "large_to_small",
+    "additional_patterns": [
+      {
+        "pattern": "prerequisite_order",
+        "applies_to": "chapters: the five chapter paragraphs, in the part's reading order"
+      }
+    ],
+    "rationale": "The page opens on four dated incidents at one company, widens them into what they share (in each the response was not the whole exchange) and then into the part's claim (a contract for each case one call hides, each with a stated limit), and narrows again: to the five questions in order, then to one paragraph per chapter. The incidents come first because the claim is an abstraction that the reader accepts only after seeing four concrete ways a response fell short. The claim has to precede the chapter list because each chapter paragraph names its contract and its limit, and a reader who has not been told that there are contracts with limits reads the list as five API features. The chapter paragraphs keep the part's reading order, which the journal spec justifies as prerequisite order (objects before the mechanisms that speak about them, the key before the version, both before events, limits last because the earlier chapters create the traffic that meets them); reordering them here would contradict the roadmap. The closing comes last because it maps the opening's incidents onto chapters the reader has by then been shown."
+  },
+  "introduction": {
+    "hook": {
+      "type": "intriguing_example",
+      "content": "Four of Larkfield's eight incidents happened in 2026 at the provider's API and not in the money. In March a forced SDK upgrade moved the billing integration across a breaking release, and subscription revenue reports were wrong for 6 days. On 14 September a webhook receiver's certificate expired, events failed for 9 hours, and 3,200 memberships were shown as unpaid. On 1 October the renewal job hit the provider's rate limit, and 7,900 renewals were delayed to the next day. On 1 November a provider call timed out, the job retried with a new idempotency key, and 1,840 members were charged twice."
+    },
+    "bridge": {
+      "from_reader_world": "The reader's experience of a payment API as a request and a response, and Part III's provider seen from inside, where every movement is recorded twice and proven over days.",
+      "to_topic": "The same provider seen from outside by a developer who gets an answer in seconds, and the four cases in which that answer was not the whole exchange: it never arrived, its shape changed, the outcome came later by another channel, or the request was refused for volume."
+    },
+    "thesis_statement": {
+      "text": "An API can make a payment that takes days and several parties look like one call only by giving the developer a contract for each case the call hides (an identity and state for each payment, a key that makes a request repeatable, a pinned version, events for later outcomes) and by stating the limits of time, volume and permission within which each contract holds.",
+      "placement": "KEY POINTS bullets 1 and 2 and paragraph p03"
+    },
+    "roadmap": {
+      "placement": "paragraph p04",
+      "promises": [
+        {
+          "promise": "Five chapters in order: what the API exposes (objects, identifiers, errors); how a request is made safe to repeat; how the API changes without breaking integrations; how the provider reports what happens after the response; and the keys, test environments and limits around all of it. Each sets Stripe's and Adyen's documented terms side by side and says where the public record stops.",
+          "kept_in": [
+            "chapters"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "Four of Larkfield's incidents in 2026 happened at the provider's API and not in the money: a forced upgrade that left revenue reports wrong for 6 days, an expired certificate that showed 3,200 memberships as unpaid, a rate limit that delayed 7,900 renewals and a retry under a new key that charged 1,840 members twice.",
+        "function": "example",
+        "organization": "narration",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "The Version Cliff (March 2026, subscription revenue reports wrong for 6 days); the Silent Webhook (Monday 14 September 2026, certificate expired shortly after midnight, events failed for 9 hours, 3,200 memberships shown as unpaid, members turned away that morning); the Renewal Wave (1 October 2026, 7,900 renewals delayed to the next day); the Double Charge (1 November 2026, 1,840 members charged twice). Larkfield is named as fictional here.",
+            "shows": "Four different failures in which no money was miscounted by the provider and the integration still went wrong at the API boundary.",
+            "source": "_research/scenario-ledger.md (The 2026 incidents); _research/consistency-issues.md ruling 20"
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "In each of the four incidents the code treated the API as a request and a response, and the response was not the whole exchange, in the incidents' own order: its shape had changed (the upgrade), the outcome was waiting in another channel (the events behind the expired certificate), the request was refused for volume (the rate limit), or it never arrived (the timeout).",
+        "function": "analysis",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "The four incidents matched one to one, in the order of p01, with the four ways a response falls short; set against Part III, where the provider proves each movement over days while the developer gets an answer in seconds.",
+            "shows": "The incidents are one kind of fault, an exchange assumed to be shorter than it is, not four unrelated bugs."
+          }
+        ],
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The four incidents and their figures.",
+          "introduces": "What they have in common: the response was not the whole exchange, in four different ways.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "The part's claim is that an API can make a slow, multi-party payment look like one call only by giving a contract for each case the call hides (identity and state, a repeatable request, a pinned version, events for later outcomes) and by stating the limit within which each holds, and the documented limits differ between Stripe and Adyen.",
+        "function": "claim",
+        "evidence": [
+          {
+            "kind": "fact",
+            "what": "Stripe's API v1 keeps an idempotency key for at least 24 hours and retries an undelivered webhook for up to three days; Adyen keeps a key for 7 to 14 days and retries for up to 30 days (documentation accessed November 2026, as cited in idempotency-and-retries and payment-webhooks-and-events).",
+            "shows": "The limits are concrete, published and different per provider, so an integration is built to its provider's terms.",
+            "source": "posts/18-idempotency-and-retries and posts/20-webhooks-and-events (their Sources and Evidence)"
+          },
+          {
+            "kind": "figure",
+            "what": "Figure: one call on the surface and, behind it, four contracts (state, key, version, events), each with a boundary, with the integrator's own record beyond the boundaries.",
+            "shows": "The part's shape: what one call hides and where each protection ends."
+          }
+        ],
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "The four ways a response was not the whole exchange.",
+          "introduces": "The part's answer: a contract for each hidden case, each with a stated limit, and the two providers' different limits.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "controlling_idea": "The five chapters take the contracts in the order each depends on the last (what the API exposes, how a request is made safe to repeat, how the API changes, how later outcomes are reported, and the keys, test environments and limits around all of it), and each says where the public record of Stripe's and Adyen's implementation stops.",
+        "function": "transition",
+        "evidence": [
+          {
+            "kind": "fact",
+            "what": "How either company implements these mechanisms is published only in part, much of it in Stripe engineering posts from 2017 (idempotency, rate limiters, versioning), as the chapters report with evidence-age marks.",
+            "shows": "The chapters compare documented terms, not internals, and the reader should expect stated gaps.",
+            "source": "posts/18, 19 and 21 (their Sources and Evidence)"
+          },
+          {
+            "kind": "figure",
+            "what": "Figure: the five chapters as a widening scope: the objects, one request, one integration over years, every event the provider sends, all callers at once.",
+            "shows": "The reading order as a progression from small to large."
+          }
+        ],
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The contracts and their limits.",
+          "introduces": "The order in which five chapters take them, and the edge of the public record.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "chapters",
+      "heading": "Chapters in this part",
+      "controlling_idea": "Each of the five chapters answers one question about a contract the single call hides, states the two providers' documented terms for it, and explains one Larkfield case.",
+      "function": "description",
+      "advances_thesis": {
+        "supports": [
+          "P4-1",
+          "P4-2",
+          "P4-3",
+          "P4-4",
+          "P4-5"
+        ],
+        "how": "Each paragraph introduces the chapter that argues one of the part's supporting claims, so the list is the part's argument in outline."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The object model comes first because the other four chapters speak about its objects, identifiers and errors. Idempotency follows because it resolves the question the object model leaves open, the response that never arrives. Versioning follows as the second thing a provider remembers for the integrator, for years instead of hours. Webhooks come after both: the unknown outcome defined under idempotency is what events resolve, and the pinned version fixes the shape of what the provider sends. The developer platform is last because its limits are met by the traffic the earlier chapters create. Putting webhooks before idempotency would separate the unknown outcome from its definition; putting the developer platform first would present limits before the reader knows which calls must never be refused."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The roadmap's five questions in order.",
+        "introduces": "One paragraph per chapter: the question in bold, the two providers' terms and the Larkfield case.",
+        "form": "sentence",
+        "placement": "end_of_previous"
+      },
+      "paragraphs": [
+        {
+          "id": "p05",
+          "controlling_idea": "The API-design chapter answers what makes a payment API usable for ten years: an integration should depend on a stable identifier, a normalized vocabulary of states and refusals, and an explicit line between what the response answers and what arrives later, and Stripe and Adyen differ in where the current state can be read.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P4-1"
+            ],
+            "how": "Introduces the chapter on identity and state, the first contract."
+          },
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe returns objects that can be fetched again by identifier; Adyen's Checkout API returns a reference and a result code and has no call that returns a payment (specification v72, 2026).",
+              "shows": "Where the state lives differs, which decides what the integrator must store.",
+              "source": "posts/17-api-design-and-object-models; consistency ruling 12"
+            },
+            {
+              "kind": "scenario",
+              "what": "Larkfield's payment service has a call named get payment that reads Larkfield's own table and has never asked either provider (fictional).",
+              "shows": "One name covered a provider's record and Larkfield's memory of it.",
+              "source": "_research/scenario-ledger.md (17-api-design-and-object-models line)"
+            }
+          ]
+        },
+        {
+          "id": "p06",
+          "controlling_idea": "The idempotency chapter takes the question the object model leaves open, the response that never arrives, and answers how to make 'charge this card' safe to send twice: the same key, derived from the business event and stored before the first send, while the provider still remembers it.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P4-2"
+            ],
+            "how": "Introduces the chapter on the unknown outcome and the key."
+          },
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "At least 24 hours on Stripe's API v1, 7 to 14 days on Adyen (documentation accessed November 2026).",
+              "shows": "The provider's memory of a key has an end date that differs by provider.",
+              "source": "posts/18-idempotency-and-retries"
+            },
+            {
+              "kind": "scenario",
+              "what": "The Double Charge: the renewal job generated a key per network call, so each retry was a new payment; 1,840 members, €71,300 refunded (fictional).",
+              "shows": "A key that identifies a network call protects nothing.",
+              "source": "_research/scenario-ledger.md (The Double Charge; 18-idempotency-and-retries line)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The object model, in which a create request returns an identifier.",
+            "introduces": "What the integrator holds when that response never arrives, and the key that makes a second send the same intention.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p07",
+          "controlling_idea": "The versioning chapter turns to a second thing the provider remembers for the integrator, for years, and answers how an API integrated long ago can change: each integration keeps the version it was built against, which moves the cost of change without removing it.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P4-3"
+            ],
+            "how": "Introduces the chapter on the pinned version and the gap it accumulates."
+          },
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe pins one dated version by account default, header or SDK release and has shipped breaking changes in two named major releases a year since October 2024; Adyen puts a number in each API's URL and gives a deprecated Checkout API version two years before end-of-life (documentation accessed November 2026).",
+              "shows": "Only one of the two publishes a due date for an old version.",
+              "source": "posts/19-api-versioning"
+            },
+            {
+              "kind": "scenario",
+              "what": "The Version Cliff: one library upgrade moved the billing integration across three years of changes in one step; reports wrong for 6 days (fictional).",
+              "shows": "An integrator who never upgrades crosses the whole gap at once.",
+              "source": "_research/scenario-ledger.md (The Version Cliff; 19-api-versioning line)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "The idempotency key as something the provider remembers for hours or days.",
+            "introduces": "The version as something it remembers for years, with the same question of what happens when the memory ends.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p08",
+          "controlling_idea": "The webhooks chapter reverses the direction, the provider calls the integrator, in a shape the pinned version fixes and with a twin of the lost response, the event that never arrives; it answers what a receiver may assume: only that an unacknowledged event is sent again while a retry window is open, so an event is a notice to store and then confirm against the provider's record.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P4-4"
+            ],
+            "how": "Introduces the chapter on at-least-once delivery inside a window and the receiver's contract."
+          },
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe retries for up to three days and disclaims order; Adyen asks for a 2xx within 10 seconds and queues a failing endpoint's events for up to 30 days; the confirming record is the object at Stripe and the settlement report at Adyen (documentation accessed November 2026).",
+              "shows": "The two delivery contracts differ on every term.",
+              "source": "posts/20-webhooks-and-events; consistency rulings 4 and 12"
+            },
+            {
+              "kind": "scenario",
+              "what": "The Silent Webhook of Monday 14 September 2026: nine hours inside a three-day window, so every event came again, but for those hours Larkfield read a missing event as 'unpaid' (fictional).",
+              "shows": "Retries repaired the data and could not repair the reading of silence.",
+              "source": "_research/scenario-ledger.md (The Silent Webhook); consistency ruling 20"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Three chapters in which the integrator calls and the provider answers; the lost response of the idempotency chapter and the pinned version of the versioning chapter.",
+            "introduces": "The reversed direction, with the provider's rules for acknowledgement, retry, order and authenticity.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p09",
+          "controlling_idea": "The developer-platform chapter follows from the traffic the earlier chapters create and answers what else must exist around an API: credentials that limit what each caller can do, a test environment whose gaps are stated and request limits an integrator can plan for, each a term of the contract.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P4-5"
+            ],
+            "how": "Introduces the chapter on the limits of permission and volume on the other contracts."
+          },
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe documents 100 requests a second per account in live mode and 25 per endpoint; Adyen publishes no rate limit for its payments APIs (documentation accessed November 2026).",
+              "shows": "One provider's limits can be read and the other's have to be asked for.",
+              "source": "posts/21-developer-platform"
+            },
+            {
+              "kind": "scenario",
+              "what": "The Renewal Wave of 1 October 2026: refusals for volume were recorded as failed payments, and 7,900 members got an email about a payment no bank had declined (fictional).",
+              "shows": "A limit nobody had read turned a refusal into a false failure.",
+              "source": "_research/scenario-ledger.md (The Renewal Wave; 21-developer-platform line)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Stored keys, reads after every event, sweeps and upgrade rehearsals.",
+            "introduces": "All of that as traffic on a shared API, sent with credentials, rehearsed in test and subject to limits.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "Where to Begin",
+    "synthesis": "Read in order, the chapters widen from one payment's identity to every caller of the API at once; read by need, each of the opening's four ways a response falls short has its own chapter, and the first chapter says what can be read back in every one of them.",
+    "so_what": "A reader with an incident in front of them can name the contract that was assumed to be wider than documented and open that chapter first.",
+    "callback": {
+      "to": "The four incidents of p01 and the four ways a response was not the whole exchange (p02).",
+      "how": "Each way is matched to the chapter that covers it: a lost response, a changed shape, a missing event, a refused request."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Begin with payment-api-design, the first contract: a stable identity and state for each payment; or open the chapter that matches the incident in front of you."
+    },
+    "hand_off": {
+      "to": "payment-api-design",
+      "relationship": "elaboration",
+      "carries_over": "The part intro's claim that an API must give contracts for the cases one call hides, the first being a stable identity and state for each payment.",
+      "introduces": "What that identity and state look like in the two providers' APIs, and what an integrator must store when the provider does not return it later."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The five chapters and the contract each covers.",
+      "introduces": "How to use them: by incident, and where to begin.",
+      "form": "sentence",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p10",
+        "controlling_idea": "Each of the opening's four ways a response falls short has its chapter (a lost response, a changed shape, a missing event, a refused request), and all four rest on the first contract, a stable identity and state for each payment, which is where to begin.",
+        "function": "synthesis"
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "Teaching object models, idempotency, versioning, webhook delivery or keys and limits; the page summarizes and does not explain the incidents' mechanisms (AC-2).",
+      "covered_in": [
+        "payment-api-design",
+        "idempotency-and-retries",
+        "payment-api-versioning",
+        "payment-webhooks-and-events",
+        "payment-developer-platform"
+      ]
+    },
+    {
+      "topic": "The part's closing (every protection has an edge; the five terms to write down per provider; Keel decisions K1, K2, K5 and K7 as restated contracts).",
+      "covered_in": [
+        "payment-developer-platform"
+      ]
+    },
+    {
+      "topic": "A 'Stripe and Adyen: Where They Differ' table, take-away tiers, failure-pattern callout and Questions to Ask; part intros do not carry them (style guide)."
+    },
+    {
+      "topic": "External factual claims of the page's own; every company statement repeats a chapter of the part, which cites it."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "The post entry in the journal spec has a question and no thesis. A part intro performs the part's opening, so this spec uses the part's thesis and its supporting claims P4-1 to P4-5 unchanged; intent outcome, AC-1, AC-2 and role are copied from the post entry; hook, bridge and roadmap from the part's opening.",
+      "rejected": [
+        "Writing a separate thesis for the page: it would restate the part's claim."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The closing sits under its own short heading, 'Where to Begin', after 'Chapters in this part' and ends on 'Begin with [[payment-api-design]].', as the Part II introduction does; the structure check needs a headed region for the conclusion (coordinator's instruction of 17 November 2026).",
+      "rejected": [
+        "Ending the chapter list itself with the 'Begin with' sentence: the conclusion would have no units."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The hook says 'four of the eight incidents this book keeps returning to', not 'four of Larkfield's eight incidents in 2026', because the ledger dates the Unexplained €0.4 Million to year-end 2025. The Silent Webhook is dated Monday 14 September 2026 and no weekend day is named (ruling 20).",
+      "rejected": [
+        "Copying the journal spec's wording 'eight incidents in 2026'."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "journal-spec.json (part-4: thesis, opening, flow, transition_in; post entry part-4; payment-api-design's transition_in)",
+      "contributed": "Intent, thesis, role, hook, bridge, roadmap, the order of chapters and the hand-off."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "The four incidents and their figures; the additions by chapters 17 to 21."
+    },
+    {
+      "kind": "internal",
+      "ref": "posts/17-api-design-and-object-models, 18-idempotency-and-retries, 19-api-versioning, 20-webhooks-and-events, 21-developer-platform (index.md, read in full)",
+      "contributed": "What each chapter argues, its Larkfield case, its numbers and the documented Stripe and Adyen facts repeated here."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/consistency-issues.md (rulings 4, 5, 12, 13, 20, 22)",
+      "contributed": "Ownership of 'confirm against the provider's record' and of request limits; where Adyen's payment state can be read; the date of the Silent Webhook; no external URLs in running text."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/INTRO-BRIEF.md and posts/part-2-intro",
+      "contributed": "Shape and length of a part introduction."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "After the flow rubric (sound with notes): p02 now lists the four shortfalls in the incidents' order and ties each to its incident, including the expired certificate to the outcome waiting in another channel; p08 names its dependence on the lost response and the pinned version. Notes not acted on: the 'large_to_small' label for a page that first widens from four incidents to the claim (kept, as in the Part II introduction; the rationale describes the widening); the Stripe and Adyen figures stay in p03 because the part thesis rests on the limits being concrete and different; the rationale gives a link, not a breakage, for idempotency before versioning, which is the journal spec's declared 'similarity' transition; the first chapter's Larkfield case is the 'get payment' call, not one of the four incidents."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Spec created from the journal spec and the five written chapters of Part IV."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass (part introduction, checked against the corrected chapters 17-21): 22 claims checked (20 agree, 2 corrected to match, 0 removed); the Renewal Wave emails now link the chapter that owns the second step (ruling 37a), and the 2017 evidence claim is weakened from most to much."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation after verification (17 November 2026): hook no longer says 'eight incidents in 2026' (ruling 24); part thesis how_why says 'much of it' for the 2017 Stripe posts, as the verified page does."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: the two statements of absence on this page (Adyen's Checkout API has no call that returns a payment; Adyen publishes no rate limit for its payments APIs) were re-tested with the owning chapters (17 and 21) against the Checkout API v72 definition, the documentation sitemap, the help center and web searches; both hold. No change to the page."
+    }
+  ],
+  "length": {
+    "target_words": 1000,
+    "max_words": 1200
+  }
+}

@@ -1,0 +1,14 @@
+# Absence audit — 09 authorization-optimization
+
+Audit of 17 November 2026. Earlier search (verification pass): narrow (pages read and `llms.txt`). "Wide" below means: the provider's documentation (`.md` pages), help or support center, company site (legal, pricing, newsroom, knowledge hub or engineering blog) and web searches restricted to the provider's domains, all on 17 November 2026. Result: **holds**, **narrowed**, **overturned** or **already wide**.
+
+Counts: 4 hold, 2 overturned, 0 narrowed, 0 already wide.
+
+| Statement | Where searched | Result | Change |
+| --- | --- | --- | --- |
+| No public Adyen formula for 'authorization rate' and 'payment conversion' (prose, table, limits paragraph) | docs.adyen.com, help.adyen.com, adyen.com (pricing, legal terms, licenses, knowledge hub, press), medium.com/adyen; domain-restricted web searches | overturned | Adyen glossary: 'The payment conversion rate is calculated by taking the number of authorized transactions, divided by the number of initiated transactions, shown as a percentage.' Knowledge-hub article (July 2026): Adyen 'reports payment acceptance rate on a gross basis as standard'. No formula for authorization rate; 'initiated' undefined. Text, table and three spec fields rewritten; sources added |
+| Adyen has published no figure across merchants | docs.adyen.com, help.adyen.com, adyen.com (pricing, legal terms, licenses, knowledge hub, press), medium.com/adyen; domain-restricted web searches | overturned | Press release of 11 Feb 2026: '6,500+ businesses ... an average increase of 1.19% in payment conversion rates above standard industry baselines' (no baseline). Sentence rewritten; source added |
+| Adyen has published no price for Uplift | docs.adyen.com, help.adyen.com, adyen.com (pricing, legal terms, licenses, knowledge hub, press), medium.com/adyen; domain-restricted web searches; adyen.com/uplift (a pricing FAQ heading exists; its answer is not in the served page) | holds | scope words added |
+| No source gives model features or labels, results by issuer, share of blocked payments that would have been approved, a cross-merchant recovery rate, or an audited lift | docs.stripe.com, support.stripe.com, stripe.com/legal (services agreement, services terms, pricing policy), stripe.com newsroom and guides, stripe.dev; domain-restricted web searches; docs.adyen.com, help.adyen.com, adyen.com (pricing, legal terms, licenses, knowledge hub, press), medium.com/adyen; domain-restricted web searches | holds | none (the Feb 2026 release claims false positives down 42% on average, which is not a share) |
+| Neither company states its reason for small models in the payment path (INFERENCE) | as above | holds | none |
+| Whether a retry through a second provider counts against the same limit is not stated; Mastercard thresholds not confirmed | Visa rules; Mastercard 403 | holds | none |

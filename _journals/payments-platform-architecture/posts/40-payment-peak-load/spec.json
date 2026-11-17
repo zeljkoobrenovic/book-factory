@@ -1,0 +1,1359 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "payment-peak-load",
+  "journal": "payments-platform-architecture",
+  "part": "part-8",
+  "title": "The Biggest Day: Peak Load and Capacity",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "The peak profiles of payments (the four retail days from Black Friday to Cyber Monday, a ticket sale, the first of the month for subscriptions) and the peak figures each provider has published, with what they leave undefined.",
+        "The terms peak profile, load test, rate limit, load shedding, backpressure and fairness.",
+        "Stripe's 2017 account of its four limiters and its documented limits (accessed November 2026), and the fact that Adyen publishes no rate limit for payments.",
+        "How capacity is obtained on each side as published: split and merged shards on rented cloud capacity (Stripe, 2024); hardware bought ahead and a design rule of twenty times current load (Adyen, 2020 to 2026)."
+      ],
+      "believe": [
+        "The peak that hurts a merchant is its own predictable one, and the limit it meets is the one the provider sets per customer.",
+        "A rate-limited request is a late payment, not a failed one, and must not start the process for chasing a failed payment."
+      ],
+      "can_do": [
+        "Size and pace a batch of payments against a documented or agreed limit, with backoff and a stable idempotency key.",
+        "Tell from a peak figure what it counts and refuse to rank two providers by figures defined differently."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a planned burst of payments on a case the chapter does not contain, the reader predicts where it fails and redesigns the job.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A ticket seller using Stripe plans to charge 200,000 customers who registered in advance, all at 10:00 when the sale opens, as fast as its workers can send requests. Using this chapter: what will happen, and how should the job be built?",
+        "expected": "The job meets the account's rate and concurrency limits (documented as 100 requests per second in live mode, lower per endpoint, with a cap on requests in progress) and receives 'too many requests' responses long before the provider's capacity matters. Pace the job under the limit, back off with random delay on a rate-limit response, reuse the same idempotency key on every retry of the same charge, and do not tell a customer the payment failed because it was rate limited."
+      },
+      {
+        "id": "AC-2",
+        "statement": "Given two published peak figures, the reader says why they cannot be ranked.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "For the 2025 Black Friday weekend one provider reported 'more than 152,000 transactions per minute at peak' and another 'up to 199,000 transactions per minute'. Does the second have more capacity?",
+        "expected": "The figures do not show that: neither company defines 'transaction', one figure includes payments at in-store terminals, and both are reported load, not capacity. The reader declines to rank them."
+      },
+      {
+        "id": "AC-3",
+        "statement": "The Larkfield worked example uses the ledger's Renewal Wave figures (38% of monthly renewals in six hours, about 357,000 renewals, 7,900 delayed on 1 October 2026) and shows the job paced over 18 hours under K5.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "major"
+      },
+      {
+        "id": "AC-4",
+        "statement": "The chapter states what Adyen documents about peak (periodic load tests with merchants, a deployment freeze around named peak days, utilization generally under 30%) and that no Adyen payment rate limit or capacity figure was found, and makes no inference about Adyen from that absence.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "How do payment systems, and the merchants that call them, prepare for the day everything arrives at once?",
+    "claim": "A merchant's own predictable peak meets the provider's per-customer limit (published by Stripe at 100 requests per second, not published by Adyen for payments) before it meets the provider's capacity, so preparing for it means spreading and pacing the load on the merchant's side, not trusting the provider's Black Friday figures.",
+    "disputed_by": "The view that peak is the provider's problem: a provider that carried a Black Friday weekend at well over 100,000 transactions per minute will absorb one merchant's renewal run, so the merchant can send it at full speed and retry whatever fails.",
+    "so_what": "The reader designs a batch against the documented limit where there is one and an agreed limit where there is not, treats a rate-limit response as lateness and not as a declined payment, and accepts a longer run (Larkfield's 18 hours under K5) as the price of not sending reminders to members who did nothing wrong.",
+    "how_why": "Stripe's 2017 post describes four limiters: a per-user request rate, a per-user cap on requests in progress, and two load shedders, one of which keeps a share of the fleet for critical methods such as creating charges. Its documentation (n.d., accessed November 2026) gives the limits: 100 requests per second in live mode, 25 per endpoint unless stated otherwise, and 50 requests in progress. Adyen publishes no rate limit for its payment APIs, so there the figure has to be agreed in advance; that is the documented difference, and it is a difference in what is published, not evidence about Adyen's capacity. On capacity itself, Stripe wrote in 2024 that it splits shards in surges and tests load in production; Adyen wrote in 2020 and 2021 of designing for twenty times current load and in 2026 of buying compute and storage ahead. The published peak figures (Stripe 2023 to 2025, Adyen 2024 and 2025) leave 'transaction' undefined and cannot be ranked. Adyen's peak-season documentation describes periodic load tests with merchants and a deployment freeze around named peak days, but gives no capacity figure and no payment rate limit, and the chapter draws nothing from that absence.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "Payment peaks come in three profiles (the shared retail days, one merchant's interactive sale, one merchant's first-of-month batch), and who creates the peak and whether a customer is waiting decide who can pace it and what may be late."
+      },
+      {
+        "id": "S2",
+        "claim": "The peak figures Stripe (2023 to 2025) and Adyen (2024, 2025) publish are reported load in undefined units, not capacity, so they cannot be ranked and say nothing about what one customer may send."
+      },
+      {
+        "id": "S3",
+        "claim": "As published, Stripe rents capacity, reshapes its data tier and load tests in production (2023, 2024), and Adyen owns its hardware, designs for twenty times growth and buys ahead (2020 to 2026); neither publishes capacity, and no Adyen account of load testing, a peak freeze or payment rate limits was found."
+      },
+      {
+        "id": "S4",
+        "claim": "A shared API is kept fair by a bounded share per customer, so a merchant's own peak meets that share (100 requests a second at Stripe, unpublished at Adyen) before the provider's capacity, and slowness past the limit returns to the caller as backpressure: refusals, slower answers and issuer-unavailable declines."
+      },
+      {
+        "id": "S5",
+        "claim": "The party that creates a predictable peak prepares for it by moving and pacing its own load, treating a refusal or a timeout as lateness and not failure, and sizing its own systems for what comes back."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Moves the peak problem from the provider's side, where the reader can do nothing, to the caller's side, where the limit is documented or negotiable and the pacing is the reader's own design.",
+    "supports": [
+      "P8-4"
+    ]
+  },
+  "flow": {
+    "pattern": "prerequisite_order",
+    "additional_patterns": [
+      {
+        "pattern": "problem_solution",
+        "applies_to": "scene to in-practice: Daniel's objection is posed in the first section and answered with Larkfield's numbers in the ninth"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "capacity (Stripe then Adyen) and where-they-differ"
+      }
+    ],
+    "rationale": "The objection comes first because it is the disputed view in the reader's own words. Peak profiles follow because the rest of the chapter depends on separating the provider's shared peak from the merchant's own. The published figures are examined next, since they are the evidence the objection rests on, and the capacity behind them after that, which uses chapter 39's hosting difference. Only then does the chapter turn to the share one customer is given, which needs the reader to have accepted that capacity is not the question; backpressure and downstream limits extend that share to a system that slows. Designs come after the mechanism they respond to, the comparison after all the facts it tabulates, and Larkfield's run after the designs it chooses among. Putting the limits first would repeat chapter 21 and leave the Black Friday figures standing as an unanswered objection; putting Larkfield's run before the designs would present one choice as the only one. Figures come before capacity because the figures are what the reader has seen and capacity is what they wrongly take the figures to measure; reversing them would describe capacity before showing that no published number states it. Downstream limits come before the designs because two of the designs (pacing, and sizing one's own receivers) answer limits that only that section introduces. The comparison precedes Larkfield's run because the run's length depends on the comparison's central row, a limit published by one provider and not the other."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "In the 2025 Black Friday weekend Stripe reported more than 152,000 transactions a minute at peak and Adyen up to 199,000. On 1 October 2026 Larkfield sent its renewals at about a thousand a minute, and 7,900 of them were refused."
+    },
+    "bridge": {
+      "from_reader_world": "An engineer sizing a batch job looks up the capacity of the system it calls, finds that the provider carried a Black Friday weekend at well over 100,000 transactions a minute, and concludes that a few hundred thousand renewals are noise.",
+      "to_topic": "A payment provider does not offer its capacity to a customer; it offers a share, and a merchant's own peak arrives alone against that share."
+    },
+    "thesis_statement": {
+      "text": "A merchant's own predictable peak meets the provider's per-customer limit (published by Stripe at 100 requests per second, not published by Adyen for payments) before it meets the provider's capacity, so preparing for it means spreading and pacing the load on the merchant's side, not trusting the provider's Black Friday figures.",
+      "placement": "KEY POINTS bullet 1 and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p04",
+      "promises": [
+        {
+          "promise": "Start from an objection at Larkfield: the provider handled Black Friday, so why pace?",
+          "kept_in": [
+            "scene"
+          ]
+        },
+        {
+          "promise": "Sort payment peaks into three profiles.",
+          "kept_in": [
+            "peak-profiles"
+          ]
+        },
+        {
+          "promise": "Read the published peak figures for what they count.",
+          "kept_in": [
+            "peak-figures"
+          ]
+        },
+        {
+          "promise": "Say how each provider gets capacity and where that record stops.",
+          "kept_in": [
+            "capacity"
+          ]
+        },
+        {
+          "promise": "Explain the share one customer is given, fairness, backpressure and the limits downstream.",
+          "kept_in": [
+            "fairness-backpressure",
+            "downstream"
+          ]
+        },
+        {
+          "promise": "Compare the designs for a predictable peak and set the two providers side by side.",
+          "kept_in": [
+            "designs",
+            "where-they-differ"
+          ]
+        },
+        {
+          "promise": "Run Larkfield's wave over eighteen hours and list how a paced peak still fails.",
+          "kept_in": [
+            "in-practice",
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "function": "context",
+        "controlling_idea": "In the 2025 Black Friday weekend Stripe reported more than 152,000 transactions a minute at peak and Adyen up to 199,000, yet on 1 October 2026 Larkfield's renewal run, about a thousand payments a minute, had 7,900 renewals refused: the refusal came from the share one customer is given, not from the provider's capacity.",
+        "organization": "narration",
+        "evidence": [
+          {
+            "kind": "statistic",
+            "what": "Stripe press release, 2025-12-02: 'More than 152,000 transactions per minute at peak volume'. Adyen knowledge hub, 2025-12-09: 'handling up to 199,000 transactions per minute without disruption'.",
+            "shows": "The size of the provider-side figures the merchant's run is compared with.",
+            "source": "https://stripe.com/us/newsroom/news/bfcm2025; https://www.adyen.com/knowledge-hub/bfcm"
+          },
+          {
+            "kind": "scenario",
+            "what": "Ledger: the Renewal Wave is about 357,000 renewals in six hours (357,000 / 360 minutes = about 990 a minute); on 1 October 2026 the job hit the provider's rate limit and 7,900 renewals were delayed to the next day.",
+            "shows": "A run more than a hundred times smaller than the published peaks was still refused.",
+            "source": "scenario ledger"
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "function": "claim",
+        "controlling_idea": "Chapter 39 left a documented hosting difference (Stripe on rented cloud capacity, Adyen on infrastructure it owns) that decides how each gets capacity, but a merchant's own predictable peak meets the per-customer limit before it meets that capacity, so preparing for it means spreading and pacing the load on the merchant's side.",
+        "evidence": [
+          {
+            "kind": "fact",
+            "what": "Stripe documentation (n.d., accessed 2026-11): 'Live mode: 100 requests per second' per account; Adyen's documentation index lists no rate-limit page for payments (chapter 21 owns both facts).",
+            "shows": "The limit a merchant meets is published by one provider and not by the other.",
+            "source": "https://docs.stripe.com/rate-limits.md; payment-developer-platform"
+          }
+        ],
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "Chapter 39's hosting difference and the hook's refused run.",
+          "introduces": "What follows when load arrives at once: capacity scaled on demand or bought ahead, and on both a per-customer share that a merchant reaches first; the thesis.",
+          "form": "paragraph",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "function": "context",
+        "controlling_idea": "This chapter is off the path of Mila's class pass and on the path of her membership: her €49.00 renewal on the 1st of each month is one of the roughly 357,000 payments in the wave, and the wave's design decides at what hour of that day her card is charged.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Ledger: Mila Janssen's €49.00 monthly membership at Studio Noord, renewed on the 1st of each month as a merchant-initiated card payment; her €120.00 pass of Tuesday 9 March 2027 at 19:42 is an interactive payment.",
+            "shows": "Ties the chapter to the book's recurring payments: one waits for an answer, the other does not.",
+            "source": "scenario ledger"
+          }
+        ],
+        "transition_in": {
+          "relationship": "place",
+          "carries_over": "The chapter's claim.",
+          "introduces": "Its position relative to the recurring payments.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "function": "transition",
+        "controlling_idea": "The chapter goes from an objection raised at Larkfield through peak profiles, the published figures, how each provider gets capacity, fairness and backpressure, downstream limits and the designs for a predictable peak, to the comparison of the two providers, the paced wave and its failure modes.",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "Where the chapter sits.",
+          "introduces": "The order of its sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: The Black Friday Objection",
+      "controlling_idea": "In April 2027 Larkfield's CTO objects that a provider which carried 152,000 transactions a minute cannot need eighteen hours for a thousand a minute, and the answer is that the published figure describes the provider's whole load while Larkfield is given a share.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S4"
+        ],
+        "how": "Poses the disputed view (peak is the provider's problem) in the reader's own words, with ledger numbers, before any mechanism."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The introduction's contrast between the published peaks and the refused run.",
+        "introduces": "The objection as someone at Larkfield actually raises it.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p05",
+          "function": "context",
+          "controlling_idea": "In April 2027 Daniel Osei objects to K5, the Keel decision that Larkfield paces its own renewals over eighteen hours: Stripe reported more than 152,000 transactions a minute on Black Friday, the wave is about a thousand a minute, so the provider should absorb it at full speed.",
+          "organization": "narration",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger: K5 paces the renewal job over 18 hours; the wave is about 357,000 renewals (38% of the month's, €17.5 million) formerly attempted in six hours; Daniel Osei is CTO and wrote the 2017 Stripe integration. The April 2027 review meeting is a local detail.",
+              "shows": "States the view the chapter disputes, with the numbers that make it plausible.",
+              "source": "scenario ledger"
+            }
+          ]
+        },
+        {
+          "id": "p06",
+          "function": "analysis",
+          "controlling_idea": "Femke de Graaf's answer separates two things the objection merges: what the provider carried for all its customers together, and what one customer may send, which chapter 21 gave as 100 requests a second per Stripe account and 25 per endpoint, with no published figure at Adyen; it leaves two questions the chapter answers (what the published figures count, and where a merchant's own peak fails).",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "A reported peak is the sum of every customer's traffic on the provider's busiest minute; an account's limit is set so that no single customer can take a large part of it. The first says nothing about the second.",
+              "shows": "Turns the objection into the chapter's two questions."
+            },
+            {
+              "kind": "fact",
+              "what": "docs.stripe.com/rate-limits.md (n.d., accessed 2026-11): 'Live mode: 100 requests per second'; 'Individual API endpoints (unless otherwise noted) 25 requests per second'. Adyen's documentation index lists no rate-limit page. Established in chapter 21 and cited from it.",
+              "shows": "Names the share early, with a pointer to the chapter that owns it, so later sections can use the number.",
+              "source": "payment-developer-platform; Stripe documentation"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Daniel's objection.",
+            "introduces": "Femke's distinction between the provider's load and one customer's share, and the two questions it leaves.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "peak-profiles",
+      "heading": "Peak Profiles: Who Creates the Peak and Who Is Waiting",
+      "controlling_idea": "A peak profile describes a peak by its shape, by who creates it and by whether a customer is waiting for the answer, and those three properties decide who can pace the load and what is allowed to give way.",
+      "function": "definition",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "Defines the chapter's first owned term and sorts the three peaks of payments so that the merchant's own peak is seen as a different problem from Black Friday."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Femke's distinction between the provider's load and one customer's share.",
+        "introduces": "A vocabulary for kinds of peak: the peak profile.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p07",
+          "function": "definition",
+          "controlling_idea": "Payments have three recurring peak profiles: the four retail days from Black Friday to Cyber Monday, shared by every merchant; a ticket or flash sale, created by one merchant in minutes with customers waiting; and the first of the month, created by one merchant's batch with nobody waiting.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows: Black Friday to Cyber Monday; ticket or flash sale; first of the month. Columns: shape, who creates it, who is waiting, where it is felt first.",
+              "shows": "Sorts the three profiles by the properties that decide what can be done about them."
+            },
+            {
+              "kind": "fact",
+              "what": "Both providers report Black Friday through Cyber Monday as a four-day period (Stripe press 2023 to 2025; Adyen 2024, 2025). Stripe's rate-limit page (n.d., accessed 2026-11) names 'a flash sale' as a cause of rate limiting. Ledger: 38% of Larkfield's monthly renewals in the first six hours of the 1st.",
+              "shows": "Each profile is attested: two by the providers, one by the ledger.",
+              "source": "Stripe and Adyen sources; scenario ledger"
+            }
+          ]
+        },
+        {
+          "id": "p08",
+          "function": "analysis",
+          "controlling_idea": "A shared peak is carried by the provider, and the merchant can only prepare its own systems; a merchant's own peak arrives alone, against that merchant's share, and whether anyone is waiting decides whether the load can be delayed.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "On Black Friday each merchant's traffic rises by its own factor and the provider plans for the sum; on the first of the month one merchant's traffic rises many times over while the provider's total barely moves, so the only limit in play is the per-customer one. A renewal can be charged at 14:00 instead of 02:00 with no one noticing; a ticket buyer cannot be asked to come back in the afternoon.",
+              "shows": "Moves the reader's attention from the provider's peak to their own, and separates the batch from the interactive peak."
+            },
+            {
+              "kind": "figure",
+              "what": "Structural figure: three load shapes over time (a four-day plateau made of many merchants, one narrow spike, one block at the start of a month), each under the line it meets.",
+              "shows": "Makes the three profiles and the two different lines (capacity, one customer's share) visible."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The three profiles and their properties.",
+            "introduces": "What the properties decide: who can pace, and what may be late.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ],
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The profiles are named and tabulated before the paragraph that draws the distinction between shared and own peaks, which needs all three as cases."
+      }
+    },
+    {
+      "id": "peak-figures",
+      "heading": "What the Published Peak Figures Count",
+      "controlling_idea": "The peak figures Stripe and Adyen publish are reported load in units neither defines, so they cannot be ranked against each other or used as a statement of capacity, and the one thing they show a merchant is how small one account's share is.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "S2"
+        ],
+        "how": "Removes the evidence the disputed view rests on: the Black Friday figures say what was carried, not what is available to one customer."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The shared retail peak, the only profile for which the providers publish numbers.",
+        "introduces": "Those numbers and what they do and do not count.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p09",
+          "function": "evidence",
+          "controlling_idea": "Stripe has published Black Friday to Cyber Monday figures each year from 2023 to 2025 and Adyen for 2024 and 2025, each with volume and transaction counts and, in most years, a peak rate and an uptime figure.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Stripe 2023 (press, 2023-11-28): more than $18.6 billion, more than 300 million transactions, 93,304 transactions per minute, 27,395 requests per second, uptime greater than 99.999%. Stripe 2024 (2024-12-03): more than $31 billion, 465 million, 137,000 per minute, greater than 99.9999%. Stripe 2025 (2025-12-02): more than $40 billion, more than 578 million, more than 152,000 per minute, more than 99.9999%. Adyen 2024 (2024-12-09): $34 billion, 670 million transactions, no rate, no uptime found. Adyen 2025 (2025-12-09 and H2 2025 results, 2026-02-12): $43 billion, 837 million, up to 199,000 per minute, 99.9999% uptime.",
+              "shows": "Every published figure with its source date, in one place, in the publisher's own words.",
+              "source": "stripe.com/us/newsroom/news/bfcm2023, bfcm2024, bfcm2025; adyen.com/knowledge-hub/black-friday-cyber-monday-payment-insights and /bfcm; Adyen H2 2025 results release"
+            }
+          ]
+        },
+        {
+          "id": "p10",
+          "function": "analysis",
+          "controlling_idea": "The figures cannot be ranked: neither company defines 'transaction' or 'uptime', neither says how in-person payments enter the rate, and all of them report the load that arrived, not the capacity that was available.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "None of the six documents defines 'transaction'; Adyen's 2024 article has a methodology note that fixes the period and says only 'transactions processed on the Adyen platform'. Adyen's articles separately report 'nearly 100 million in-person payments' (2024) and 'over 127M in-person payment transactions' (2025) for the weekend; Stripe's releases do not say what share of its count is in person.",
+              "shows": "The two totals are likely built from different mixes of traffic, and the sources do not let a reader correct for it.",
+              "source": "adyen.com/knowledge-hub/bfcm (2025-12-09)"
+            },
+            {
+              "kind": "reasoning",
+              "what": "A peak of 199,000 a minute against 152,000 shows that more arrived at one provider than at the other on its busiest minute. It would show more capacity only if both had been driven to their limit, and both report that they were not.",
+              "shows": "Separates reported load from capacity."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The figures as published.",
+            "introduces": "What they leave undefined and why they support no ranking.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "function": "analysis",
+          "controlling_idea": "What the figures do support is an order of magnitude: both providers peak at a few thousand transactions a second, and Stripe's 2023 release, the only one with a request rate, puts one account's documented 100 requests a second at well under one percent of the requests it reported at peak.",
+          "evidence": [
+            {
+              "kind": "statistic",
+              "what": "Author's arithmetic: 152,000 per minute is about 2,500 a second; 199,000 is about 3,300. Stripe 2023: 27,395 requests per second at peak; the account limit documented in November 2026 is 100 requests per second, about 0.4% of that figure. The two numbers are three years apart, and the 2023 peaks of requests and of transactions need not have coincided.",
+              "shows": "Shows, with the caveats stated, that a per-account limit is set far below the provider's reported load, which is the point of the Larkfield scene.",
+              "source": "Stripe press 2023-11-28; docs.stripe.com/rate-limits.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "What the figures cannot show.",
+            "introduces": "The one reading they do support: scale, and the smallness of one account's share.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ],
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The figures are laid out before they are criticized so that the reader can check the criticism against them; the positive reading comes last because it is only safe once the ranking has been set aside, and it uses the limit Femke named in the scene."
+      }
+    },
+    {
+      "id": "capacity",
+      "heading": "How Each Provider Gets Its Capacity",
+      "controlling_idea": "As published, Stripe gets peak capacity by renting it and reshaping its data tier and tests the result under synthetic load in production, while Adyen buys hardware ahead, designs for a multiple of current load, and documents low utilization, periodic load tests and a code freeze around peak days; neither publishes its capacity as a figure.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S3"
+        ],
+        "how": "Gives the provider side of capacity with dates, defines the load test, and marks where the record stops (no capacity figure at either; no Stripe statement on changes during Black Friday)."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "Figures that report load carried.",
+        "introduces": "How the capacity behind them is obtained, which is what chapter 39's hosting difference decides.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p12",
+          "function": "evidence",
+          "controlling_idea": "Stripe has described renting its compute from Amazon Web Services (2023), splitting and merging database shards as traffic rises and falls (2024), and load testing in production with synthetic traffic at twenty times its worst case (2024); a load test is the deliberate sending of artificial traffic to find the weakest part before real customers do.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe newsroom, 2023-01-23: 'Stripe will expand its use of Amazon Web Services, Stripe's long-standing cloud infrastructure provider'. Stripe engineering, 2024-06-06: 'DocDB can split database shards during traffic surges and consolidate thousands of databases through bin packing when traffic is low'; in 2024 it was 'prototyping a heat management system' and 'investing in shard autoscaling'.",
+              "shows": "Capacity on Stripe's side is rented and reshaped; in 2024 part of that was still being built.",
+              "source": "stripe.com/us/newsroom/news/amazon-and-stripe; stripe.dev DocDB post"
+            },
+            {
+              "kind": "quotation",
+              "what": "Rahul Patil, Stripe Sessions, 2024-04-25: 'We use massive synthetic traffic to punish our systems at 20x the worst-case scenario … We simulate this and then we repeat this in production, load testing our systems farther and farther'. Stripe engineering, 2026-08-26: balancing across Ruby backends 'gives us 15–20% more headroom before traffic bursts overwhelm the machines'.",
+              "shows": "The one first-party description of provider-side load testing, and one dated statement about headroom.",
+              "source": "stripe.com/us/sessions/2024/building-a-culture-of-system-reliability; stripe.dev proxy post"
+            }
+          ]
+        },
+        {
+          "id": "p13",
+          "function": "evidence",
+          "controlling_idea": "Adyen has described running its own hardware in its own data centers (2021), a rule of thumb of designing for twenty times growth (2020, 2021), a move toward an internal cloud because it needed dynamic scaling (2021), and, in 2026, buying compute and storage a year early.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen engineering, 2021-07-28: 'We manage our own infrastructure in several data centers around the world and have bare metal available'; 'In part, because we now need dynamic scaling, we are moving towards running our system on an internal cloud.' 2021-08-23: 'The 20x scaling factor is a rule of thumb we often use internally when designing a solution or determining whether we are still satisfied with it.' 2020-10-22 (Adyen for Platforms): 'What if it becomes 10 times greater? 20 times?'",
+              "shows": "Adyen's stated approach is headroom designed in and hardware owned. Evidence age: 5 to 6 years.",
+              "source": "adyen.com/knowledge-hub design-to-duty parts 1 and 2; we-design-for-20x"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen H1 2026 results, 2026-08-13: 'We are proactively pulling investment from 2027 into H2 2026 to secure compute and storage availability, and lock in pricing amid ongoing supply chain challenges. We now expect CapEx to be approximately 7% of net revenue this year.'",
+              "shows": "A current, first-party statement that capacity is bought ahead of need.",
+              "source": "Adyen H1 2026 results release"
+            },
+            {
+              "kind": "reasoning",
+              "what": "Labeled inference: an owner of hardware has to plan peak capacity in purchase lead times, a renter in provisioning time; neither company says how far ahead it plans for a peak.",
+              "shows": "States the consequence of the hosting difference as inference, not fact."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Stripe's rented and reshaped capacity.",
+            "introduces": "Adyen's owned capacity, designed with a multiple and bought ahead.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p14",
+          "function": "example",
+          "controlling_idea": "The one peak-season near miss either company has published was set off by a change, not by load: Adyen's 2025 account of a database whose CPU spiked while the team prepared for December, because adding one more partition to a table would have overloaded it.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen engineering, 2025-09-17: 'I still have nightmares about incident number 2016. We were preparing for one of the most critical seasons for our merchants – December shopping – when the CPU unexpectedly spiked. We realized that automatically adding one more partition to an already partitioned table would bring one of our most critical databases to its knees'. (2016 is an incident number.)",
+              "shows": "At a peak the risk on record came from routine change meeting a busy system; capacity alone would not have removed it.",
+              "source": "adyen.com/knowledge-hub/partitioning-an-environment-not-individual-tables"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Capacity as each company obtains it.",
+            "introduces": "A documented case in which capacity was not the weak point before a peak.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p15",
+          "function": "analysis",
+          "controlling_idea": "The record stops short of a figure and is uneven: Adyen's documentation describes periodic load tests with merchants and a code freeze around named peak days, Stripe's one remark about not freezing code concerned a conference day, and neither company publishes its capacity as a figure a customer could plan with.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "docs.adyen.com/industries/peak-season.md (n.d., accessed 2026-11): 'We periodically load test this system with merchants who hold transactions and then release the transactions in bulk'; 'We therefore freeze our code deployment around the following peak season days' (list includes Black Friday and Cyber Monday; critical bug fixes excepted); 'The utilization rate of those resources is low, generally less than 30%'; the question 'How many transactions per second (TPS) can your system handle?' is answered without a number. Stripe Sessions 2024: 'today's Sessions, there's no code freeze', said of the conference day, not of Black Friday.",
+              "shows": "Fixes the boundary of the evidence: what Adyen documents, what Stripe has not said, and that no capacity figure exists at either.",
+              "source": "docs.adyen.com/industries/peak-season.md; stripe.com/us/sessions/2024/building-a-culture-of-system-reliability"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What each company has published about capacity.",
+            "introduces": "What Adyen's documentation adds on testing and freezes, and what neither company has: a capacity figure.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ],
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "Stripe then Adyen on the same question, then the near miss that qualifies both accounts, then the boundary of the evidence, which can only be drawn after the evidence is on the table."
+      }
+    },
+    {
+      "id": "fairness-backpressure",
+      "heading": "The Share You Are Given: Fairness and Backpressure",
+      "controlling_idea": "A shared payment API is kept fair by giving each customer a bounded share, so one merchant's peak meets that share long before the provider's capacity, and when something past the limit slows down, backpressure reaches the caller as refusals and slower answers that a waiting customer and a batch must be allowed to absorb differently.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S4"
+        ],
+        "how": "The mechanism of the thesis: why the limit a merchant meets is per customer, how the system signals it, and what may queue."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "Capacity that exists but is not published.",
+        "introduces": "How that capacity is divided among customers, which is the part a merchant actually meets.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p16",
+          "function": "definition",
+          "controlling_idea": "Fairness in a shared API means that no customer's traffic can take capacity another customer needs, and the per-customer rate limit is how it is enforced: Stripe's 2017 post gives every user a bucket, and its current documentation says the rates are set high enough that legitimate payment traffic should not reach them.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe engineering, 2017-03-30: 'every Stripe user has a bucket, and every time they make a request we remove a token from that bucket'; 'we added the ability to briefly burst above the cap for sudden spikes in usage during real-time events (e.g. a flash sale.)' Evidence age: 9 years. Stripe documentation (n.d., accessed 2026-11): 'We try to set our rates high enough that legitimate payment traffic never exceeds the limits'.",
+              "shows": "Fairness is implemented as a per-customer allowance, with some tolerance for interactive bursts in the 2017 design; the limits themselves are in chapter 21.",
+              "source": "stripe.com/blog/rate-limiters; docs.stripe.com/rate-limits.md"
+            }
+          ]
+        },
+        {
+          "id": "p17",
+          "function": "claim",
+          "controlling_idea": "Because the share is per customer, a merchant's own peak fails at the share and not at the provider's capacity: at Stripe the documented share is 100 requests a second per account, 25 per endpoint and 50 in progress, and at Adyen no description of payment rate limits was found, which is a difference in what is published and not evidence about Adyen's capacity or practice.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "docs.stripe.com/rate-limits.md (n.d., accessed 2026-11): 'Live mode: 100 requests per second'; 'Individual API endpoints (unless otherwise noted) 25 requests per second'; 'The default global concurrency limit for standard API traffic in live mode is 50 in-progress requests'. Adyen: documentation index lists no rate-limit page; HTTP 429 is documented on the response-handling page. Both established in chapter 21.",
+              "shows": "The thesis in numbers on one side and their absence on the other.",
+              "source": "Stripe and Adyen documentation; payment-developer-platform"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Fairness as a per-customer allowance.",
+            "introduces": "Where a merchant's own peak therefore fails, at each provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p18",
+          "function": "definition",
+          "controlling_idea": "Backpressure is a slow part of a system making the faster part upstream slow down, and over an HTTP API it reaches the caller as a refusal (429), a shed request (503) or slower answers; a refusal means the provider did not attempt the payment, so it is lateness and never a decline, and a cap on requests in progress turns slower answers into a lower rate.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "docs.stripe.com/error-low-level.md (n.d., accessed 2026-11): 'Errors that occur before execution begins, such as invalid parameters, an invalid API key, or rate limiting, don’t cache a result.' Chapter 21 owns the point that a 429 is not a decline.",
+              "shows": "A rate-limited request was not executed: no bank was asked, so nothing was declined.",
+              "source": "Stripe documentation; payment-developer-platform"
+            },
+            {
+              "kind": "statistic",
+              "what": "Author's arithmetic on Stripe's documented default of 50 requests in progress: at half a second per call 50 slots carry 100 requests a second; if calls slow to two seconds the same 50 slots carry 25 a second (latencies are assumptions).",
+              "shows": "A concurrency cap makes the provider's slowness, whatever its cause, into a limit on the caller without any rate being changed."
+            },
+            {
+              "kind": "figure",
+              "what": "Structural figure: a batch queue and a checkout lane feed a pacing valve, then the provider's gate, then the card network and the issuer; signals travel back as 'refused', 'slower' and 'issuer unavailable'.",
+              "shows": "Shows the forward path of a payment and the three ways slowness comes back to the caller."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The share as a rate.",
+            "introduces": "What happens when the system past the limit slows: backpressure and its signals.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p19",
+          "function": "comparison",
+          "controlling_idea": "Where the customer is waiting, a queue can absorb only seconds before a late answer becomes an abandoned or repeated payment, and where nobody is waiting, hours; so the requirement on each path is written separately, and in every row the record of the payment is the thing that may not give way.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows: interactive checkout; batch renewal; processing of provider events. Columns: who waits, how long an answer may take, what happens at the limit, what must not happen. (Latency budgets are labeled assumptions.)",
+              "shows": "A requirements table for the three paths a peak touches, each with what gives way."
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen engineering, 2020-10-22, on an Adyen for Platforms API moved from synchronous to asynchronous processing: 'we have better control over how and when the requests are executed'. Evidence age: 6 years; about a platform API, not card authorization.",
+              "shows": "A documented provider-side case of a queue used as control on a path where nobody waits for the result.",
+              "source": "adyen.com/knowledge-hub/the-adyen-way-of-engineering--we-design-for-20x"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Backpressure as signals.",
+            "introduces": "What each path may do with them: wait for seconds, or wait for hours.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ],
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "Fairness explains why the limit is per customer; the claim about where a peak fails needs that; backpressure extends the limit from a fixed rate to a slowing system; the table of paths needs both terms."
+      }
+    },
+    {
+      "id": "downstream",
+      "heading": "Downstream Limits: Issuers and Networks",
+      "controlling_idea": "The provider is not the last system in the path: a card payment is answered by the cardholder's bank through the card network, their limits reach the merchant as declines, and the events of every payment sent come back to the merchant's own systems; how either provider paces traffic toward banks and networks at peak is not public.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S4",
+          "S5"
+        ],
+        "how": "Extends backpressure past the provider in both directions and marks a second place where the evidence stops."
+      },
+      "transition_in": {
+        "relationship": "additional_support",
+        "carries_over": "Backpressure from the provider.",
+        "introduces": "The systems behind the provider, and the merchant's own systems behind the answer.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p20",
+          "function": "explanation",
+          "controlling_idea": "When a cardholder's bank (the issuer) is slow or unreachable, Visa may answer in its place under stand-in processing, and otherwise the merchant receives a decline that both providers name as the issuer being unavailable, which Visa's rules class as retryable later.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa's rules (Glossary, edition of 24 October 2026): Stand-In Processing is 'The component … that provides Authorization services on behalf of an Issuer when the Issuer, its VisaNet Processor, or a Visa Scheme Processor is unavailable, when Issuer responses exceed the maximum response time, or when the Issuer has instructed Visa to process a Transaction on behalf of the Issuer.' Table 7-2 puts response code 91 in the category where a reattempt is permitted, up to 20 attempts in 30 days.",
+              "shows": "The network has a defined mechanism for a slow issuer and a rule for retrying what it could not answer.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, 24 October 2026"
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe decline code `issuer_not_available`: 'The card issuer couldn’t be reached, so the payment couldn’t be authorized.' Adyen refusal reason 9, 'Issuer Unavailable': 'It is not possible to contact the shopper's bank to authorize the transaction.' (documentation n.d., accessed 2026-11).",
+              "shows": "What a downstream limit looks like in each provider's response.",
+              "source": "docs.stripe.com/declines/codes.md; docs.adyen.com/development-resources/refusal-reasons.md"
+            }
+          ]
+        },
+        {
+          "id": "p21",
+          "function": "analysis",
+          "controlling_idea": "Neither Stripe nor Adyen documents how it paces or queues traffic toward networks and issuers at a peak, whether an approval came from stand-in, or issuer response times; a merchant can only count these declines per hour of its own run.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "The provider documentation read for the card-lifecycle chapters (accessed 2026-11) contains no provider-side stand-in for online payments and no flag for a stand-in approval; no engineering post of either company describes pacing toward issuers.",
+              "shows": "A second boundary of the public record, stated instead of filled.",
+              "source": "Stripe and Adyen documentation; chapter payment-authorization"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What the network and the providers document about an unavailable issuer.",
+            "introduces": "What they do not: pacing toward issuers, and stand-in visibility.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p22",
+          "function": "cause_effect",
+          "controlling_idea": "Every payment a merchant sends comes back as events and state changes, so the merchant's own receivers and stores see the same peak, and after a failure they see it compressed: Adyen documents that queued webhooks are sent in a short time once a failing endpoint recovers.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen documentation, webhook troubleshooting (n.d., accessed 2026-11), on a 429 returned by the merchant's server: 'This can happen after you fix a failing endpoint, as the queued webhooks are sent in a short timeframe. Ensure your server can handle the load.'",
+              "shows": "A documented case in which the merchant is the one whose capacity is exceeded.",
+              "source": "docs.adyen.com/development-resources/webhooks/troubleshoot.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "Limits downstream of the provider.",
+            "introduces": "The limit downstream of the answer: the merchant's own systems.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ],
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "Three limits past the provider's gate, ordered from the one farthest from the merchant (network and issuer) through the provider's silence about them to the merchant's own systems; the last comes last because it is the only one the merchant can size, and section 7 starts from what the merchant can do."
+      }
+    },
+    {
+      "id": "designs",
+      "heading": "Four Ways to Meet a Predictable Peak",
+      "controlling_idea": "A merchant can meet its own predictable peak by moving it across the calendar, pacing it within the day, agreeing a higher ceiling or admitting customers at its own door, and each design names something that gives way; none of them can be tested against the provider, only against a mock and then in a watched production run.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "The designs and their trade-offs, each stated as what gives way, which is the part's question."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "A share per customer, backpressure and downstream limits.",
+        "introduces": "The designs available to the party that creates the load.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p23",
+          "function": "comparison",
+          "controlling_idea": "The four designs differ in what gives way: the billing date, the hour of the charge, lead time and a dependency on the provider's answer, or the customer's wait at the merchant's own door.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows: spread across the calendar (bill on each customer's anniversary); pace within the day (a token bucket below the limit, chapter 21); agree a higher ceiling (Stripe asks for large increases 'at least 6 weeks in advance'); admit at the door (a waiting room in front of checkout for an interactive peak). Columns: what gives way, what it costs, when it is right.",
+              "shows": "The trade-off table the style guide requires, in the part's own terms."
+            },
+            {
+              "kind": "fact",
+              "what": "Ledger: 62% of Larkfield's renewals already fall on each member's own anniversary day and 38% on the 1st. Stripe documentation (n.d., accessed 2026-11): 'If you request a large increase, contact Stripe Support at least 6 weeks in advance.'",
+              "shows": "Two of the four designs are attested, one in the ledger and one in documentation.",
+              "source": "scenario ledger; docs.stripe.com/rate-limits.md"
+            }
+          ]
+        },
+        {
+          "id": "p24",
+          "function": "recommendation",
+          "controlling_idea": "For a batch nobody is waiting on, the author's order is calendar first, pacing second and a higher ceiling last, because the first two are the merchant's own to change; for an interactive peak the order reverses, since the load cannot be moved and only the ceiling and the door are left.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Moving renewal dates removes the peak but changes what customers were promised; pacing keeps the date and costs hours nobody notices; a raised limit removes neither the burst nor the downstream limits and adds lead time. A ticket sale has a fixed start, so the merchant asks the provider ahead and meters entry to checkout so that each admitted buyer gets an answer in seconds.",
+              "shows": "Gives the conditions under which each design is right, as judgement."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The four designs and what each gives up.",
+            "introduces": "Which to choose first, by profile.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p25",
+          "function": "process",
+          "controlling_idea": "The merchant's own side of a peak can be load tested against a mock of the provider that sleeps for sampled real latencies, which is what Stripe's documentation recommends in place of a sandbox, and the provider's side can only be learned by running the first paced peak in production with people watching.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "docs.stripe.com/rate-limits.md, 'Load testing' (n.d., accessed 2026-11): 'We generally discourage this practice because API limits are lower in a sandbox'; 'we recommend building integrations so that they have a configurable system for mocking out requests to the Stripe API … they should simulate latency by sleeping for a time that you determine by sampling the durations of real live mode Stripe API calls'. Adyen's peak season pages advise testing an integration well before a peak; no Adyen advice on load testing an integration was found. Adyen's batch processing page describes bulk requests by uploaded file, with no rate.",
+              "shows": "What a merchant's load test can and cannot cover, in the provider's words.",
+              "source": "Stripe documentation"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The choice of design.",
+            "introduces": "How the chosen design is tested: a mock for your side, a watched run for the provider's.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ],
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The options must be on the table before they can be ordered, and testing comes last because it applies to whichever design was chosen; recommending before listing would hide the alternatives."
+      }
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "In the public record the two providers differ in how they obtain capacity and in whether a per-customer limit for payments is published, publish comparable peak figures that cannot be ranked, and leave equally unpublished their capacity and their practice on changes at peak.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S3",
+          "S4"
+        ],
+        "how": "The required comparison: documented facts per aspect, 'Not public' where they stop, the reading marked as inference."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "The figures, the capacity accounts, the limits and the designs.",
+        "introduces": "The two providers set side by side.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p26",
+          "function": "comparison",
+          "controlling_idea": "Aspect by aspect, the documented differences are in hosting and in what is published about limits and about changes at a peak; on peak figures the two are alike, and neither gives a capacity figure.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows: published peak figures; how capacity is obtained; per-customer limit for payment requests; load testing; changes during a peak; guidance for a customer's own peak. Columns: Stripe, Adyen, what the difference suggests (inference).",
+              "shows": "Every Stripe and Adyen cell is a fact cited earlier in the chapter or 'Not public'."
+            }
+          ]
+        },
+        {
+          "id": "p27",
+          "function": "recommendation",
+          "controlling_idea": "On Stripe an integrator sizes a batch from the published page and asks six weeks ahead only when its computed rate exceeds it; on Adyen it asks for a figure in writing before the first large run; on both it plans against the limit and never against the Black Friday figure.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "The published limit can be designed against; an unpublished one must be agreed; neither provider's peak figure is a commitment to any one customer.",
+              "shows": "Turns the table into two different first steps."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The table.",
+            "introduces": "What an integrator does differently on each provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: Eighteen Hours on Purpose",
+      "controlling_idea": "Under K5 Larkfield runs the wave of about 357,000 renewals over eighteen hours instead of six, and the length is set by the provider whose limit it does not know, by the members who are waiting at checkout and by what its own receivers can take, not by either provider's capacity.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S5",
+          "S4"
+        ],
+        "how": "Works the thesis with ledger numbers: where the eighteen hours come from, who is served first, what the long run costs and how it is rehearsed."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The comparison and the designs.",
+        "introduces": "Larkfield's wave under K5, with its numbers.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p28",
+          "function": "context",
+          "controlling_idea": "The wave is 38% of the month's renewals, about 357,000 payments worth €17.5 million, formerly attempted in the first six hours of the 1st at an average far below every limit; on 1 October 2026 its bursts, from 48 workers sending as fast as answers returned, crossed Stripe's limit of 25 requests a second per endpoint, 7,900 renewals were delayed a day, and K5 now paces the run over eighteen hours through one bucket per provider (10 requests a second on Stripe, 5 on Adyen).",
+          "organization": "narration",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger: the Renewal Wave figures; K5; additions by chapter 21: the wave met Stripe's rate limit; about 157,000 renewals on Stripe and 200,000 on Adyen (assumption: like volume); token buckets of 10 requests a second on Stripe and 5 on Adyen for creating payments (Larkfield's settings, assumptions).",
+              "shows": "The ledger facts the worked example rests on (journal AC-3), with chapter 21 owning the mechanism.",
+              "source": "scenario ledger and additions"
+            }
+          ]
+        },
+        {
+          "id": "p29",
+          "function": "analysis",
+          "controlling_idea": "The eighteen hours come from the Adyen side: at the 5 requests a second Larkfield allows itself there until Adyen confirms a figure, 200,000 renewals need at least 11.1 hours with no refusal, slowdown or checkout traffic ahead of them, and eighteen hours leaves about a third of the window as slack for those, while the Stripe side at its bucket of 10 could finish in 4.4 hours; the unpublished limit, not the published one, sets the length of the run.",
+          "evidence": [
+            {
+              "kind": "statistic",
+              "what": "Author's arithmetic on ledger figures: 200,000 / 5 per second = 40,000 seconds = 11.1 hours; 157,000 / 10 per second = 15,700 seconds = 4.4 hours; over 18 hours (64,800 seconds) the averages are 3.1 and 2.4 a second. Before Keel the job sent about 9 a second to Adyen without a refusal, which shows that 9 was under the limit on those days, not what the limit is. 11.1 / 18 = 62% of the window at the full Adyen rate, 38% slack.",
+              "shows": "Shows the reader how to size a run against a documented limit and against an agreed or assumed one, and what the missing figure costs in hours.",
+              "source": "scenario ledger; chapter 21 additions"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The paced run.",
+            "introduces": "Where its length comes from, by provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p30",
+          "function": "process",
+          "controlling_idea": "Within the run Larkfield decides who is served first: members at checkout before anything else, then confirmations and retries of requests whose outcome is unknown, then the batch, whose order is shuffled each month so that no studio's members are always charged last, and whose rate is halved when the provider signals backpressure.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "New local design under K5 (to be appended to the ledger): three lanes in the payment service with strict priority; the batch ordered by a hash of membership id and billing period; the batch bucket halved on a 429 or when the 95th-percentile call latency doubles, and restored in steps.",
+              "shows": "Fairness and backpressure applied inside the merchant's own system, where the merchant is the one dividing a share.",
+              "source": "scenario ledger (new addition)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The run's length.",
+            "introduces": "Its internal order: fairness among Larkfield's own callers and its response to backpressure.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p31",
+          "function": "analysis",
+          "controlling_idea": "The long run costs a later charge and nothing else: a member charged at 17:00 instead of 02:00 keeps access all day because the period record is open, no message is sent for a renewal not yet attempted, and the slower pace also lowers the rate of events Larkfield's own receivers must absorb, which is rehearsed against a mock before the first watched wave.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger additions (chapters 27 and 29): a membership whose period record is open keeps access; a failure message is sent only for a declined attempt. Author's arithmetic with an assumed three provider events per renewal: 16.5 renewals a second in the six-hour wave is about 50 events a second, 5.5 a second over eighteen hours is about 17.",
+              "shows": "What gives way is the hour of the charge; access, messages and the record do not.",
+              "source": "scenario ledger and additions"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What the run does.",
+            "introduces": "What it costs and what it protects, including Larkfield's own capacity.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ],
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "The incident and K5 restate the problem and its answer in ledger figures; the length, the internal order and the cost then answer the three questions Daniel's objection raises: why so long, who goes first, what is lost."
+      }
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong",
+      "controlling_idea": "A paced peak still fails in three ways: the provider slows and requests time out, the run does not finish in its window, or everything that was held back returns at once; in each the recovery keeps the payment late and not wrong.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "Detection and recovery for the peak-day failures, tied to the part's rule that late is repairable and wrong is not."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The wave as planned.",
+        "introduces": "The ways it still fails.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p32",
+          "function": "analysis",
+          "controlling_idea": "When the provider slows during the run, a timed-out request is an unknown outcome and not a failure, and the Double Charge of 1 November 2026 was exactly this on a peak day; the recovery is to slow the run, resend under the same key and confirm against the provider's record.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger: on 1 November 2026 a provider call timed out during the first-of-month renewals, the job retried with a new idempotency key, 1,840 members were charged twice, €71,300 was refunded and 212 disputes followed. K1 derives the key from membership, billing period and attempt number.",
+              "shows": "The costliest peak-day failure in the ledger came from treating slowness as failure.",
+              "source": "scenario ledger"
+            }
+          ]
+        },
+        {
+          "id": "p33",
+          "function": "analysis",
+          "controlling_idea": "When the run does not finish by its deadline, the unattempted renewals are carried to the next morning in a state that says not attempted, with no message to the member, which is what 1 October 2026 lacked.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger: 7,900 renewals delayed to the next day on 1 October 2026 and dunning emails sent to members who had done nothing wrong; chapter 29's addition: the old job could not tell a declined card from one not yet charged.",
+              "shows": "The same delay is harmless or harmful depending on whether the record can say 'not attempted'.",
+              "source": "scenario ledger and additions"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "A run that slows.",
+            "introduces": "A run that does not finish.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p34",
+          "function": "analysis",
+          "controlling_idea": "After any pause the held-back work returns together (the batch's retries, every other customer's retries at the provider, and the provider's queued events to the merchant), so retries are spread with random delay and the receivers are sized for the burst.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe documentation (n.d., accessed 2026-11): 'add randomness to the backoff schedule to avoid a thundering herd effect'. Adyen documentation: queued webhooks 'are sent in a short timeframe' after an endpoint recovers.",
+              "shows": "Both directions of the recovery burst are documented.",
+              "source": "docs.stripe.com/rate-limits.md; docs.adyen.com/development-resources/webhooks/troubleshoot.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "A run that slows or stops.",
+            "introduces": "What happens when it resumes.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ],
+      "flow": {
+        "pattern": "order_of_importance",
+        "rationale": "The timeout first because it is the one that produces wrong payments; the unfinished run next because it produces only late ones; the recovery burst last because it follows either."
+      }
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "Taken together the sections show that the question 'can the provider handle it' has no answer a merchant can use: the capacity is real and unpublished, the peak figures describe someone else's traffic, and the only quantities a merchant can plan with are its own request rate, its share and the hours it is willing to let a charge be late.",
+    "so_what": "The reader designs a batch against the documented limit where there is one and an agreed limit where there is not, treats a rate-limit response or a timeout as lateness, and accepts a longer run as the price of not sending reminders to members who did nothing wrong.",
+    "callback": {
+      "to": "Daniel Osei's objection in the scene and the 7,900 refused renewals of the hook.",
+      "how": "The answer to 'they handled Black Friday' is that Black Friday was everyone's traffic and the first of the month is yours; the 7,900 were late once and, a month later, 1,840 were wrong."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "For each predictable peak of your own, write down the requests per second it needs, the limit it meets first at each provider (documented or agreed in writing), what gives way when the limit or a slowdown is reached, and the state your record uses for 'not attempted yet'."
+    },
+    "hand_off": {
+      "to": "payment-safe-change",
+      "relationship": "problem_solution",
+      "carries_over": "The open problem: a payment system cannot be stopped for its peaks, and the peak near miss on record (Adyen's partition change before a December season) was set off by a change, not by load.",
+      "introduces": "How a system that cannot stop is changed: bounded exposure, automatic withdrawal, reversible steps, and reconciliation as the test that a change is done."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The failure modes.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p35",
+        "function": "synthesis",
+        "controlling_idea": "Established: published peak figures report load in undefined units; Stripe documents per-account limits and Adyen publishes none for payments; a refusal for volume is not a decline; Stripe rents and reshapes capacity and Adyen owns and buys ahead.",
+        "form": "list"
+      },
+      {
+        "id": "p36",
+        "function": "synthesis",
+        "controlling_idea": "Depends on context: whether to move, pace, raise or admit depends on whether anyone is waiting, whether a limit is published and how much of the peak is the merchant's own.",
+        "form": "list",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is settled.",
+          "introduces": "What changes with the situation.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p37",
+        "function": "recommendation",
+        "controlling_idea": "The author's synthesis: plan against your share and never against the provider's Black Friday figure, accept a longer run as the price of sending no wrong message, and treat every peak as finished only when the records agree.",
+        "form": "list",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is established and what depends.",
+          "introduces": "The author's position, returning to Daniel's objection and the 7,900 renewals.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p38",
+        "function": "recommendation",
+        "controlling_idea": "Eight questions let the reader test a provider's peak claims and their own peak plan.",
+        "form": "list",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The take-aways.",
+          "introduces": "Questions that apply them.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p39",
+        "function": "transition",
+        "controlling_idea": "Pacing leaves one problem open: a payment system cannot be stopped for its peaks, and the one peak-season near miss on record, Adyen's partition change before a December season, was set off by a change and not by load, so the next chapter asks how a system that cannot stop is changed.",
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "The paced peak and the near miss that capacity did not explain.",
+          "introduces": "Safe change as the answer the next chapter gives.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "The limits themselves, Stripe's four limiters, load shedding as a design, and the token bucket.",
+      "covered_in": [
+        "payment-developer-platform"
+      ]
+    },
+    {
+      "topic": "Idempotency keys and what to do after a timeout.",
+      "covered_in": [
+        "idempotency-and-retries"
+      ]
+    },
+    {
+      "topic": "Retry schedules for declined renewals, decline categories and dunning messages.",
+      "covered_in": [
+        "authorization-optimization",
+        "invoicing-collections-and-dunning"
+      ]
+    },
+    {
+      "topic": "Availability figures, outages and graceful degradation.",
+      "covered_in": [
+        "payment-reliability-and-availability"
+      ]
+    },
+    {
+      "topic": "Shards, online migrations and the data tier in detail.",
+      "covered_in": [
+        "payment-data-stores-and-consistency"
+      ]
+    },
+    {
+      "topic": "Hosting, regions and data residency.",
+      "covered_in": [
+        "payment-multi-region-and-data-residency"
+      ]
+    },
+    {
+      "topic": "Progressive rollout, change freezes as a practice and postmortems.",
+      "covered_in": [
+        "payment-safe-change"
+      ]
+    },
+    {
+      "topic": "Card-testing attacks, which look like a peak and are a fraud problem.",
+      "covered_in": [
+        "payment-fraud-and-risk"
+      ]
+    },
+    {
+      "topic": "Webhook receivers and their delivery contract.",
+      "covered_in": [
+        "payment-webhooks-and-events"
+      ]
+    },
+    {
+      "topic": "Retail peak preparation on the merchant's storefront side.",
+      "covered_in": [
+        "peak-load-and-reliability"
+      ]
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "Neither company defines 'transaction' or 'uptime' in its peak figures; whether the per-minute peaks include in-person payments is not stated.",
+    "Adyen's payment-request limits are not public (its load testing, peak code freeze and utilization are documented on docs.adyen.com/industries/peak-season, found in the verification pass); Stripe's practice on changes during Black Friday is not public (the 2024 remark concerned a conference day). The journal spec's AC-4 and the last sentence of the thesis how_why still say no Adyen account of load testing or a peak freeze was found: the author must correct them in journal-spec.json and here.",
+    "How either provider paces traffic toward networks and issuers, and whether stand-in approvals are visible to a merchant, is not documented.",
+    "How a Stripe Connect platform's requests on behalf of connected accounts count against its limit is not stated on the rate-limits page (carried over from chapter 21).",
+    "New peak figures are due in early December 2026 and will date the table."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "The chapter is planned at 39 units and about 5,300 words by the checker's count, which includes five tables of documented figures (about 900 words) and the source list (about 550); the prose is about 4,100 words. It is kept below a typical chapter because the limits and the Renewal Wave's mechanism are owned by chapter 21 (ruling 5) and the public record on provider capacity is thin.",
+      "rejected": [
+        "Re-deriving the rate arithmetic and the limiter design here.",
+        "A 2,500-word page, which could not carry the figures table, the capacity comparison and the worked example the journal entry's criteria require."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The scene is a new 2027 objection by Daniel Osei that states the disputed view, not a retelling of 1 October 2026, which chapter 21 narrates.",
+      "rejected": [
+        "Opening on the October morning again."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The designs are framed as where the peak is put (calendar, day, ceiling, door) and each is stated as what gives way; chapter 21's react, pace and agree table is cited, not repeated.",
+      "rejected": [
+        "Repeating the three-design table of chapter 21."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Shopify's remarks in the 2024 Sessions talk and all non-Stripe, non-Adyen peak accounts are left out; ticket sales appear as a profile with Stripe's 'flash sale' wording as the only provider evidence.",
+      "rejected": [
+        "A contrast case on ticketing queues, for which no first-party source was read."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The consequence of owning versus renting hardware for peak planning is given as a labeled inference.",
+      "rejected": [
+        "Stating it as fact."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "_research/brief-reliability-and-scale.md",
+      "contributed": "Part 4 (peak figures, preparation), sections 2.2, 3.1, 6.3, the blunt table, open questions 14."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-adyen-payments-and-api.md",
+      "contributed": "Section 7.3 (no payment rate limit; 429) and the webhook retry queue."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-card-lifecycle-and-networks.md",
+      "contributed": "Section 2.6 (stand-in processing; issuer-unavailable codes) and Table 7-2."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "The Renewal Wave, the first of the month, the Double Charge, K1, K5, the cast, and the additions of chapters 21, 27 and 29."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/consistency-issues.md",
+      "contributed": "Rulings 5 and 19."
+    },
+    {
+      "kind": "internal",
+      "ref": "posts/21-developer-platform/index.md",
+      "contributed": "The limits, the limiter design and the wave's rate arithmetic this chapter builds on."
+    },
+    {
+      "kind": "external",
+      "ref": "Pages fetched by the writer on 2026-11-17: docs.stripe.com/rate-limits.md, error-low-level.md, declines/codes.md; stripe.com/blog/rate-limiters; Stripe BFCM press releases 2023 to 2025; Stripe Sessions 2024 talk; stripe.dev DocDB and proxy posts; Stripe–Amazon release; Adyen BFCM articles 2024 and 2025; Adyen H2 2025 and H1 2026 releases; Adyen design-to-duty parts 1 and 2, design-for-20x, partitioning-an-environment; Adyen refusal reasons and webhook troubleshooting; Visa Core Rules and Visa Product and Service Rules of 24 October 2026.",
+      "contributed": "Verification of every quotation and figure used."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation pass (parts 6-8): fields copied from the journal spec and unit-level controlling ideas and evidence brought into line with the verified page and the consistency rulings; no unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 51 claims checked (40 confirmed, 7 corrected, 4 hedged, 0 unsupported and removed or relabeled, 0 unreachable); the statement that no Adyen account of load testing or of a peak change freeze exists was wrong: Adyen's peak season readiness documentation describes both, and a utilization rate under 30%. Section 3, p15, the Differ table and the take-aways were corrected; AC-4 and the thesis how_why, copied from the journal spec, still carry the old statement and need the author's correction."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Length limits restated in the checker's unit (tables and source list included): target 5,300, maximum 5,700. No unit added, dropped or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes). Notes acted on: the scene now names the per-account and per-endpoint limits with a pointer to chapter 21 and glosses K5; the Adyen rate-limit absence moved from the capacity section to the paragraph on the share; 'a refusal is not a decline' is established in the backpressure paragraph; the worked example says which limit the October run crossed and derives eighteen hours from the 11.1-hour floor; section patterns relabeled and the flow rationale extended. Not acted on: slimming the required 'Where They Differ' section and trimming the capacity section, which the journal entry's outcomes require."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "First version, written from the PLAN contract, the journal spec entry, the research briefs and chapter 21."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('The chapter states that no Adyen description of load testing' -> 'The chapter states what Adyen documents about peak (periodic')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('No Adyen account of load testing or of a peak freeze was fou' -> 'Adyen's peak-season documentation describes periodic load te')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: statements of absence re-tested with a wide search (docs.adyen.com sitemap of 2,619 pages, help.adyen.com sitemap, adyen.com, docs.stripe.com and support.stripe.com sitemaps, stripe.com newsroom and Sessions pages, web searches restricted to the providers' domains). Holds: Adyen publishes no rate limit for payment requests (error 705 'Rate limited' and HTTP 429 are documented without a figure; the batch page gives no rate); no Stripe statement on changes during Black Friday (table cell now says what was searched). Sources note widened; two connective sentences trimmed; units unchanged."
+    }
+  ],
+  "length": {
+    "target_words": 5300,
+    "max_words": 5700
+  }
+}

@@ -1,0 +1,2458 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "where-payment-systems-go-wrong",
+  "journal": "payments-platform-architecture",
+  "part": "preface",
+  "title": "Paid Twice, Paid Never: Sixteen Ways Payment Systems Go Wrong",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "The sixteen pattern names, each with its warning sign and its family.",
+        "What each family points to: money truth, a record of money that nothing outside the system has confirmed; integration, an assumption about the provider's interface that was never tested; trust, a control over card data, fraud or verification handed to the provider and then not watched; platform and scale, a dependency, a peak or a regulated role nobody rehearsed or named.",
+        "How the patterns chain, and that a chain is usually noticed at a money-truth pattern and started elsewhere."
+      ],
+      "believe": [
+        "A pattern accumulates from decisions that were each reasonable when they were made, so finding it is not finding someone to blame.",
+        "Repairing the money at the end of a chain (refunding, re-sending a payout) does not hold; changing the assumption at its start does, and that change is rarely a new provider."
+      ],
+      "can_do": [
+        "Name the pattern and family behind a described incident, the upstream pattern to check for, and the chapter that addresses it.",
+        "Ask for the number or record that would confirm a warning sign.",
+        "Use the patterns as questions in a design review, an incident review and a provider evaluation."
+      ]
+    },
+    "audience": {
+      "who": "A software engineer or architect who is new to payments, has just read the introduction and has not yet met Larkfield as a company or read any chapter.",
+      "already_knows": [
+        "APIs, webhooks, retries, queues, databases, TLS certificates and rate limiting.",
+        "From the introduction: that the answer a payment API returns is the first of several promises, that Larkfield is fictional and never evidence about a provider, and the sixteen pattern names as a list."
+      ],
+      "does_not_know": [
+        "Payments terms: idempotency key, dispute, chargeback, payout, settlement report, direct debit and mandate, reserve, acquirer, token and network token, PCI DSS and SAQ A, card testing, capability, dunning. Each is glossed in a clause where it first appears.",
+        "Larkfield's systems, people, incidents and Keel decisions: each is named by role with a one-clause explanation at first use."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a described incident the page does not contain, the reader names the pattern, its family, the upstream pattern to check first and the remedy direction.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A tutoring marketplace marks a lesson as paid when the checkout page redirects back to it with a success parameter. A month later finance finds 300 delivered lessons whose bank-transfer payments never arrived. Using only this page: which pattern is this, which family is it in, which upstream pattern would you check for, and what is the remedy direction?",
+        "expected": "The Phantom Payment, money truth family: the system believed a payment succeeded without the provider's confirmed record saying so. Upstream, check for A Card by Any Other Name (integration family): a bank transfer was assumed to be final at the redirect, as a card approval appears to be. Remedy direction: take the payment's state from the provider's record, not from the browser, and model when each payment method becomes final."
+      },
+      {
+        "id": "AC-2",
+        "statement": "The reader can say, for each of the four families, where it tells them to look.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "Using only this page: name the four families of patterns and say in one clause each what kind of thing has gone wrong.",
+        "expected": "Money truth: a record of money that nothing outside the system has confirmed. Integration: an assumption about the provider's interface (delivery, versions, payment-method behavior) that was never tested. Trust: a control over card data, fraud or verification handed to the provider and then not watched. Platform and scale: a dependency, a peak or a regulated role that nobody rehearsed or named."
+      },
+      {
+        "id": "AC-3",
+        "statement": "Given a warning sign, the reader names a number or record to ask for before concluding the pattern is present.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "minor",
+        "probe": "A colleague says 'we have a Black-Box Balance'. Using only this page: what would you ask to see before agreeing?",
+        "expected": "A breakdown of the provider balance on one date into payments, fees, refunds, disputes and reserves, set against the company's own ledger for the same date, with the size and age of the difference nobody can explain."
+      },
+      {
+        "id": "AC-4",
+        "statement": "Every Larkfield example can be followed without the Larkfield page and is not mistaken for evidence: each is labeled fictional, names its systems by role with a one-clause explanation, and attributes no undocumented behavior to Stripe or Adyen.",
+        "check": "known_before_new",
+        "method": "rubric",
+        "severity": "major"
+      },
+      {
+        "id": "AC-5",
+        "statement": "A reader of the opening alone (the callouts and the paragraphs before the first heading) can predict the page's sections.",
+        "check": "intro_predicts_content",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "After reading only the callouts and the paragraphs before the first heading: what will this page discuss, in what order, and with what kind of evidence?",
+        "expected": "Sixteen named patterns in four families (money truth, integration, trust, platform and scale), each with a typical quote, what it looks like, why it happens, what it costs, a Larkfield illustration, a remedy direction and the chapters that address it; then how the patterns chain and how to use them in a review. Evidence: invented examples from a fictional platform, and dated provider documentation where a provider's behavior is stated."
+      },
+      {
+        "id": "AC-6",
+        "statement": "A reverse outline of the page, written without the spec, lists the same controlling ideas in the same order as the post spec's sections and paragraphs.",
+        "check": "reverse_outline_matches_spec",
+        "method": "reverse_outline",
+        "severity": "blocker"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "In which recurring ways do payment systems fail, and what do the failures have in common?",
+    "claim": "Payment systems fail in sixteen recurring patterns in four families: a record of money that nothing outside the system has confirmed; an assumption about the provider's interface that was never tested; a control over card data, fraud or verification handed to the provider and then not watched; a dependency, a peak or a regulated role nobody rehearsed or named. Each began as a shortcut that matched how the provider's API behaved on the first day, and they chain: the money-truth patterns are where a failure is noticed, and one of the other eleven is usually where it started.",
+    "disputed_by": "The view that each payment incident is a separate bug in the service that showed the symptom or an outage at the provider, to be fixed in that service, compensated with refunds, or avoided by moving to a different provider.",
+    "so_what": "Faced with a double charge, a missing payout or an unexplained balance, the reader names the pattern, follows its chain upstream to the retry rule, webhook assumption, unwatched deadline or untested peak that started it, and assigns an owner there; a correction made only to the money will have to be made again next month.",
+    "how_why": "Every shortcut matches how the provider's API looks on the first day: a call returns success, a webhook arrives once and in order, a card behaves like every other method, verification is a form filled in at sign-up. The slow parts of a payment contradict each of these only later and only sometimes, so the shortcut survives testing and fails under a timeout, a peak or a rule change. At Larkfield the first-of-month renewal peak met a timed-out call and a retry that generated a new key, and 1,840 members paid twice; an expired certificate on a webhook receiver stopped events for nine hours, and 3,200 memberships were shown as unpaid. In both, the money error was the last link.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "Payment systems fail in sixteen recurring patterns, each recognizable by a warning sign that a number or a record can confirm."
+      },
+      {
+        "id": "S2",
+        "claim": "The sixteen fall into four families that say where to look: an unconfirmed record of money, an untested assumption about the provider's interface, an unwatched control handed to the provider, and an unrehearsed or unnamed dependency, peak or regulated role."
+      },
+      {
+        "id": "S3",
+        "claim": "Each pattern began as a shortcut that matched how the provider's API behaved on the first day and that the slow parts of a payment contradict only later, so it accumulates from decisions that were reasonable when made."
+      },
+      {
+        "id": "S4",
+        "claim": "The patterns chain: a failure is usually noticed at a money-truth pattern and started at one of the other eleven, so a repair holds at the start of the chain and is rarely a new provider."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Gives the book its shared names for failure: without it Larkfield's incidents are eight anecdotes and no chapter can open by naming the patterns it works on.",
+    "supports": [
+      "PF-3"
+    ]
+  },
+  "flow": {
+    "pattern": "prerequisite_order",
+    "additional_patterns": [
+      {
+        "pattern": "grouping",
+        "applies_to": "sixteen-patterns: the patterns by family, in the table's order; how-the-patterns-chain: one chain per paragraph"
+      },
+      {
+        "pattern": "small_to_large",
+        "applies_to": "sixteen-patterns to how-the-patterns-chain to the conclusion: single patterns, then the chains that join them, then their use in a review"
+      }
+    ],
+    "rationale": "The catalog comes first because the chains and the review questions are written in pattern names and mean nothing to a reader who has not met them. The chains follow because they need every pattern's mechanism and Larkfield case, which the entries supply, and because they add the one thing no entry says: the direction from the other eleven patterns into money truth. The uses come last because 'name the upstream pattern' is an instruction only a reader who knows the chains can follow. Put the chains first and the reader meets arrows between sixteen undefined names; put the uses before the chains and the incident-review advice has no upstream to point to."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "A customer is charged twice for one month of a membership. Another has paid and is turned away at the door, because the system says she has not. In both cases the provider was up and answered every call the way its documentation says it does."
+    },
+    "bridge": {
+      "from_reader_world": "An engineer who has integrated a payment API knows it as calls that return success and webhooks that arrive, and has seen a duplicate charge or a 'paid' customer shown as unpaid filed as a bug in one service.",
+      "to_topic": "Seen from the introduction's claim, each is a promise or a silence that a system recorded as the truth, and the ways that happens recur often enough to be named."
+    },
+    "thesis_statement": {
+      "text": "Each pattern records a promise as the truth or leaves a dependency untested, and each began as a shortcut that matched how the provider's API behaved on the first day. The sixteen fall into four families that say where to look, and they chain: a failure is usually noticed at a money-truth pattern and started at one of the other eleven, so the repair that holds is at the start.",
+      "placement": "KEY POINTS callout (bullets 1 to 3) and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "Paragraph p03, with the IN THIS SECTION and KEY POINTS callouts",
+      "promises": [
+        {
+          "promise": "Sixteen named patterns in four families, each with a typical quote, what it looks like, why it happens, what it costs, a Larkfield illustration, a remedy direction and the chapters that address it.",
+          "kept_in": [
+            "sixteen-patterns"
+          ]
+        },
+        {
+          "promise": "The chains the patterns form (and, in the closing section, three uses: a design review, an incident review and a provider evaluation).",
+          "kept_in": [
+            "how-the-patterns-chain"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "A customer can be charged twice, and a paying customer turned away, while the provider answers every call as documented, because a system on the integrator's side recorded a promise or a silence as the truth.",
+        "function": "context",
+        "organization": "illustration",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Two unnamed customers: one charged twice for one month of a membership, one who has paid and is turned away at the door because the system says she has not; the provider was available throughout.",
+            "shows": "The reader sees two money failures in which the provider did nothing wrong, so the fault has to be looked for in what the integrator's systems assumed."
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "Each pattern began as a shortcut that matched the provider's API on the first day and was reasonable when made, the slow parts of a payment contradict it only later, and the patterns chain so that the money error is usually the last link.",
+        "function": "claim",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "Two failures in which a promise or a silence was recorded as the truth.",
+          "introduces": "Where such failures come from (a first-day shortcut), why that is nobody's fault, and that they chain.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "The page gives sixteen entries of one shape in four families, illustrated by invented incidents at Larkfield (a fictional software platform through which members pay fitness studios, on Stripe or Adyen, with a 2027 repair program called Keel whose decisions are numbered K1 to K8) and by provider behavior only as the linked chapters document it, and then the chains and three uses.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The patterns, their first-day origin and their chains.",
+          "introduces": "The shape of each entry, the two kinds of evidence the page uses, Larkfield in two sentences, and what follows the sixteen entries.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "sixteen-patterns",
+      "heading": "Sixteen Patterns to Recognize",
+      "controlling_idea": "Payment systems fail in sixteen recognizable patterns in four families, each with a warning sign a number or record can confirm, a mechanism that began as a first-day shortcut, a cost, and a remedy on the integrator's own side of the provider's API.",
+      "function": "description",
+      "advances_thesis": {
+        "supports": [
+          "S1",
+          "S2",
+          "S3"
+        ],
+        "how": "Names and sorts the sixteen, and shows for each the first-day shortcut, the cost, one Larkfield case and the remedy direction."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "additional_patterns": [
+          {
+            "pattern": "problem_solution",
+            "applies_to": "Each pattern's seven units: quote, what it looks like, why it happens, what it costs, the Larkfield case, the remedy direction, the chapters."
+          },
+          {
+            "pattern": "large_to_small",
+            "applies_to": "p04 to p05 before the patterns: the four families and the table first, then the rule for reading a warning sign, then the single patterns."
+          }
+        ],
+        "rationale": "The table comes first so the reader has all sixteen names, signs and families before reading any one entry. The entries then follow the table's order, family by family (five money truth, three integration, four trust, four platform and scale): money truth first because its symptoms are the ones a customer or an accountant sees and a newcomer already recognizes, then the three families in which those symptoms usually start. Every entry has the same seven units in the same order, so the reader learns the shape once and can look any pattern up later; within an entry the problem (sign, mechanism, cost, case) comes before the remedy and the chapters, because a remedy read before its mechanism looks like a generic rule."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The introduction's promise of sixteen named patterns in four families and the shape of each entry.",
+        "introduces": "The four families defined, the table of names and warning signs, and then each pattern in turn.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p04",
+          "controlling_idea": "A table gives all sixteen names, warning signs and families, and the four families say where to look (an unconfirmed record of money, an untested assumption about the provider's interface, an unwatched control handed to the provider, an unrehearsed or unnamed dependency, peak or regulated role), and money truth comes first because its symptoms are the ones customers and finance see.",
+          "function": "definition",
+          "organization": "classification",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Sixteen rows: pattern name, warning sign and family (five money truth, three integration, four trust, four platform and scale), in the style guide's exact wording.",
+              "shows": "Gives every pattern a name and an observable sign before any is explained, and sorts them by where to look.",
+              "source": "Style guide's pattern table (_research/style-guide.md)"
+            }
+          ],
+          "advances_thesis": {
+            "supports": [
+              "S1",
+              "S2"
+            ],
+            "how": "Names the sixteen and sorts them into the four families the thesis defines."
+          }
+        },
+        {
+          "id": "p05",
+          "controlling_idea": "A warning sign is a prompt to look and not a verdict, so the reader should ask for the number or record that would confirm it, as the breakdown of a provider balance against the ledger does for a Black-Box Balance.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "example",
+              "what": "For a Black-Box Balance: the provider balance on one date broken down into payments, fees, refunds, disputes and reserves, set against the company's own ledger for the same date, with the size and age of the unexplained difference.",
+              "shows": "Shows what 'the number that would confirm it' looks like for one pattern, so the reader can form the question for the others."
+            }
+          ],
+          "advances_thesis": {
+            "supports": [
+              "S1"
+            ],
+            "how": "Makes each warning sign checkable against a number or a record."
+          },
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The warning signs in the table.",
+            "introduces": "Their limit: a sign needs a number or a record before it counts as a finding, with one worked example.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p06",
+          "controlling_idea": "The Double Charge sounds like a team that resent a timed-out payment and saw both requests succeed.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Invented quote: “It timed out, so we sent it again. Both went through.”",
+              "shows": "Puts the warning sign in the words a colleague would use."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The table's first row, and the rule that a warning sign has to be confirmed by a number or a record.",
+            "introduces": "The first money-truth pattern, The Double Charge, announced by its sub-heading and opened by its quote; the sub-heading is the transition.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p07",
+          "controlling_idea": "A Double Charge shows as two approved payments for one purchase, clustered on the days when timeouts are frequent.",
+          "function": "description",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The Double Charge: the quoted symptom.",
+            "introduces": "The signs by which the pattern shows in general.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p08",
+          "controlling_idea": "A timeout is an unknown outcome that the first-day shortcut codes as a failure, and a resend is safe only under the same idempotency key while the provider still remembers it.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe's API v1 replays the stored first response for at least 24 hours; Adyen keeps a key for 7 to 14 days (provider documentation, n.d., accessed November 2026).",
+              "shows": "The protection against a repeat exists, has an end date, and depends on the client sending the same key.",
+              "source": "Documented and cited in idempotency-and-retries (key points); consistency ruling 13"
+            }
+          ],
+          "advances_thesis": {
+            "supports": [
+              "S3"
+            ],
+            "how": "Shows the pattern as a shortcut that matched the provider's API on the first day."
+          },
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What the pattern looks like.",
+            "introduces": "The first-day shortcut behind it and what later contradicts the shortcut.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p09",
+          "controlling_idea": "A Double Charge costs refunds and support time, and disputes from customers who saw the second debit before the refund.",
+          "function": "cause_effect",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The mechanism of the pattern.",
+            "introduces": "What the mechanism costs in money, customers and trust.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "controlling_idea": "At Larkfield a renewal retried under a new key charged 1,840 members twice on 1 November 2026, and the €71,300 of refunds did not prevent 212 disputes.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "The Double Charge (ledger): 1 November 2026, first-of-month renewals, a provider call timed out, the renewal job retried with a new idempotency key generated at each network call; 1,840 members charged twice; €71,300 refunded; 212 disputes anyway.",
+              "shows": "The timeout did not charge anyone twice; the retry under a new key did, and refunding did not undo the harm.",
+              "source": "Scenario ledger (_research/scenario-ledger.md)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The pattern's mechanism and cost in general.",
+            "introduces": "One case at the fictional Larkfield, labeled as fiction, with its ledger figures.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "controlling_idea": "The remedy is one writer of money-moving calls and a key derived from the business event (for a renewal: membership, billing period and scheduled attempt), with a timeout recorded as unknown.",
+          "function": "recommendation",
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The pattern as lived at Larkfield.",
+            "introduces": "The direction of the repair, and the Keel decision that takes it where there is one.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p12",
+          "controlling_idea": "Three chapters address the Double Charge (idempotency and retries, authorization, and reliability), and the failed-renewal journey also names it.",
+          "function": "transition",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The remedy direction in two or three clauses.",
+            "introduces": "The chapters that work the remedy out, each with what it owns.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p13",
+          "controlling_idea": "The Phantom Payment sounds like a record that says paid while the provider still says pending.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Invented quote: “Our system says paid. The provider says pending. The member is already in class.”",
+              "shows": "Puts the warning sign in the words a colleague would use."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The Double Charge, closed by its chapter links.",
+            "introduces": "The Phantom Payment, the next row of the table, announced by its sub-heading and opened by its quote; the sub-heading is the transition.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p14",
+          "controlling_idea": "A Phantom Payment shows as a local status of paid or failed that the provider's record does not confirm.",
+          "function": "description",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The Phantom Payment: the quoted symptom.",
+            "introduces": "The signs by which the pattern shows in general.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p15",
+          "controlling_idea": "The status is written from the response, the browser or a silence because on the first day these coincide with the outcome, and where the confirming record lives differs between Stripe and Adyen.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe's PaymentIntent is an object that can be retrieved by its identifier; Adyen's Checkout API has no endpoint that returns a payment, and reports outcomes by webhook and settlement report (documentation accessed November 2026).",
+              "shows": "'Confirm against the provider's record' means a read of the object on Stripe and the webhook plus the report on Adyen.",
+              "source": "Documented and cited in payment-state-machines and payment-webhooks-and-events; consistency ruling 12"
+            }
+          ],
+          "advances_thesis": {
+            "supports": [
+              "S3"
+            ],
+            "how": "Shows the pattern as a shortcut that matched the provider's API on the first day."
+          },
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What the pattern looks like.",
+            "introduces": "The first-day shortcut behind it and what later contradicts the shortcut.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p16",
+          "controlling_idea": "A Phantom Payment costs unpaid services and refused customers, and it corrupts every figure built on the status.",
+          "function": "cause_effect",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The mechanism of the pattern.",
+            "introduces": "What the mechanism costs in money, customers and trust.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p17",
+          "controlling_idea": "Before Keel, Larkfield marked a direct debit paid when the provider accepted it, days before collection could be confirmed, so on an assumed 1.5% return rate about 4,900 debits a month were recorded as paid and were not.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger addition of chapter 7: before Keel a direct debit was marked `paid` when the provider accepted it; about 325,000 SEPA debits a month; return rate 1.5% (about 4,900 a month) is an illustrative assumption.",
+              "shows": "A status set at submission is a belief about money that the provider has not confirmed.",
+              "source": "Scenario ledger (_research/scenario-ledger.md)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The pattern's mechanism and cost in general.",
+            "introduces": "One case at the fictional Larkfield, labeled as fiction, with its ledger figures.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p18",
+          "controlling_idea": "The remedy is to set paid only on the provider's confirmation, to keep 'sent, no answer yet' as a state, and to sweep what stays pending.",
+          "function": "recommendation",
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The pattern as lived at Larkfield.",
+            "introduces": "The direction of the repair, and the Keel decision that takes it where there is one.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p19",
+          "controlling_idea": "Three chapters address the Phantom Payment (state machines, webhooks and events, and local payment methods); the card-payment and failed-renewal journeys and the closing chapter on what is moving also name it.",
+          "function": "transition",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The remedy direction in two or three clauses.",
+            "introduces": "The chapters that work the remedy out, each with what it owns.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "controlling_idea": "The Orphaned Refund sounds like a debit on a seller's balance that nobody can tie to a sale.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Invented quote: “There is an €84 debit on the studio's balance. Which sale was that?”",
+              "shows": "Puts the warning sign in the words a colleague would use."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The Phantom Payment, closed by its chapter links.",
+            "introduces": "The Orphaned Refund, the next row of the table, announced by its sub-heading and opened by its quote; the sub-heading is the transition.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p21",
+          "controlling_idea": "An Orphaned Refund shows as a backward movement with its own date and reference, stored as a flag that cannot say whose money funded it.",
+          "function": "description",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The Orphaned Refund: the quoted symptom.",
+            "introduces": "The signs by which the pattern shows in general.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p22",
+          "controlling_idea": "A refund or chargeback is a new transaction that arrives after the payout, up to about 120 days after a card sale, which the first-day refund button never showed.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Visa's public rules (edition of 24 October 2026) give the issuer 120 calendar days for most kinds of dispute.",
+              "shows": "The window in which money can flow backward is months longer than the time a seller waits for a payout.",
+              "source": "Documented and cited in journey-of-a-payment and refunds-reversals-and-disputes"
+            }
+          ],
+          "advances_thesis": {
+            "supports": [
+              "S3"
+            ],
+            "how": "Shows the pattern as a shortcut that matched the provider's API on the first day."
+          },
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What the pattern looks like.",
+            "introduces": "The first-day shortcut behind it and what later contradicts the shortcut.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p23",
+          "controlling_idea": "An Orphaned Refund costs unexplained balances, sellers debited without a stated reason, and refunds the platform funds and cannot recover.",
+          "function": "cause_effect",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The mechanism of the pattern.",
+            "introduces": "What the mechanism costs in money, customers and trust.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p24",
+          "controlling_idea": "At Larkfield a refund requested a week after the studio's payout had no ledger entry until Keel, and by year-end 2025 such refunds added up to €317,200.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger: the refund after payout (Mila's €84.00 on 18 March 2027, studio paid 11 March); Aylin Demir's question 'whose money pays this?' (chapter 33 addition); year-end 2025 refunds after payout €317,200 and chargeback fees €73,500 with no entries of their own (chapter 12 addition).",
+              "shows": "A backward movement with no record of its own becomes a difference in the books.",
+              "source": "Scenario ledger (_research/scenario-ledger.md)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The pattern's mechanism and cost in general.",
+            "introduces": "One case at the fictional Larkfield, labeled as fiction, with its ledger figures.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p25",
+          "controlling_idea": "The remedy is to keep each refund and dispute as its own record linked to the original payment, with a ledger entry per movement and a rule for who funds a refund after payout.",
+          "function": "recommendation",
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The pattern as lived at Larkfield.",
+            "introduces": "The direction of the repair, and the Keel decision that takes it where there is one.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p26",
+          "controlling_idea": "Three chapters address the Orphaned Refund (refunds and disputes, ledgers, and platform splits and payouts), and the platform-payment and dispute journeys also name it.",
+          "function": "transition",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The remedy direction in two or three clauses.",
+            "introduces": "The chapters that work the remedy out, each with what it owns.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p27",
+          "controlling_idea": "The Black-Box Balance sounds like a difference between the provider's balance and the books that nobody can explain.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Invented quote: “The providers' balances and our books differ by €412,000. Nobody can say which is right.”",
+              "shows": "Puts the warning sign in the words a colleague would use."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The Orphaned Refund, closed by its chapter links.",
+            "introduces": "The Black-Box Balance, the next row of the table, announced by its sub-heading and opened by its quote; the sub-heading is the transition.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p28",
+          "controlling_idea": "A Black-Box Balance shows as a provider total or a net payout that nobody can split into sales, fees, refunds, disputes and reserves.",
+          "function": "description",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The Black-Box Balance: the quoted symptom.",
+            "introduces": "The signs by which the pattern shows in general.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p29",
+          "controlling_idea": "A balance computed as a sum over payments stops being right when refunds, chargebacks, fees and holds leave the balance on their own dates.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "A provider balance changes through movements that are not payments or payouts (refunds, chargebacks, fees, holds), each booked when it occurs.",
+              "shows": "No query over the payments table can reproduce the balance, so the difference grows unnoticed.",
+              "source": "Argued, with both providers' documentation, in balances-and-funds-flows"
+            }
+          ],
+          "advances_thesis": {
+            "supports": [
+              "S3"
+            ],
+            "how": "Shows the pattern as a shortcut that matched the provider's API on the first day."
+          },
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What the pattern looks like.",
+            "introduces": "The first-day shortcut behind it and what later contradicts the shortcut.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p30",
+          "controlling_idea": "A Black-Box Balance costs audit findings, weeks of tracing and sellers who get no explanation.",
+          "function": "cause_effect",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The mechanism of the pattern.",
+            "introduces": "What the mechanism costs in money, customers and trust.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p31",
+          "controlling_idea": "At Larkfield the ledger's 'owed to studios' balance was €412,000 above the providers' balances at year-end 2025, and three weeks of tracing found three kinds of movement that had no entries.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "The Unexplained €0.4 Million (ledger): year-end 2025, 'owed to studios' €412,000 higher than the two providers' balances; three weeks of work traced it to refunds after payout, chargeback fees and a currency-conversion rounding rule; audit finding; origin of the reconciliation job.",
+              "shows": "A balance that cannot be broken down costs weeks before anyone can say what it is made of.",
+              "source": "Scenario ledger (_research/scenario-ledger.md)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The pattern's mechanism and cost in general.",
+            "introduces": "One case at the fictional Larkfield, labeled as fiction, with its ledger figures.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p32",
+          "controlling_idea": "The remedy is an entry per movement, a reconciliation against each provider's itemized report, run when that provider's reports are ready, and an owner for every unmatched amount.",
+          "function": "recommendation",
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The pattern as lived at Larkfield.",
+            "introduces": "The direction of the repair, and the Keel decision that takes it where there is one.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p33",
+          "controlling_idea": "Three chapters address the Black-Box Balance (balances and funds flows, reconciliation and reporting, and ledgers); the card-payment and platform-payment journeys and the Stripe case also name it.",
+          "function": "transition",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The remedy direction in two or three clauses.",
+            "introduces": "The chapters that work the remedy out, each with what it owns.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p34",
+          "controlling_idea": "The Stranded Payout sounds like a payout that the screen calls paid and the seller never received.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Invented quote: “We paid them on the 3rd. They say nothing arrived. Our screen says “paid”.”",
+              "shows": "Puts the warning sign in the words a colleague would use."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The Black-Box Balance, closed by its chapter links.",
+            "introduces": "The Stranded Payout, the next row of the table, announced by its sub-heading and opened by its quote; the sub-heading is the transition.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p35",
+          "controlling_idea": "A Stranded Payout shows as a payout marked paid that the seller's bank does not show, followed by a credit that matches no open payout.",
+          "function": "description",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The Stranded Payout: the quoted symptom.",
+            "introduces": "The signs by which the pattern shows in general.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p36",
+          "controlling_idea": "A provider's 'paid' on a payout means sent, both providers document that the money can still come back, and a record closed at 'paid' has no place for the return.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe's documentation (n.d., accessed November 2026): a failed payout \"might initially show as `paid`\"; Adyen's: a non-instant payout \"cannot fail\" but can be returned.",
+              "shows": "Both providers say in their own words that 'paid' is not 'arrived'.",
+              "source": "Quoted and cited in payouts-and-money-movement (key points)"
+            }
+          ],
+          "advances_thesis": {
+            "supports": [
+              "S3"
+            ],
+            "how": "Shows the pattern as a shortcut that matched the provider's API on the first day."
+          },
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What the pattern looks like.",
+            "introduces": "The first-day shortcut behind it and what later contradicts the shortcut.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p37",
+          "controlling_idea": "A Stranded Payout costs sellers weeks without their money and leaves returned money that no record owns.",
+          "function": "cause_effect",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The mechanism of the pattern.",
+            "introduces": "What the mechanism costs in money, customers and trust.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p38",
+          "controlling_idea": "At Larkfield 412 payouts worth €386,000 were returned over three weeks in June 2026 after an unchecked change of bank details, and sat unreconciled.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "The Payout That Bounced (ledger): June 2026, a studio-facing form let owners change bank details without verification of the account holder; 412 payouts worth €386,000 returned over three weeks and unreconciled; 19 days to pay every studio; two studios left.",
+              "shows": "The returns were visible at the provider; nothing on Larkfield's side was open to receive them.",
+              "source": "Scenario ledger (_research/scenario-ledger.md)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The pattern's mechanism and cost in general.",
+            "introduces": "One case at the fictional Larkfield, labeled as fiction, with its ledger figures.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p39",
+          "controlling_idea": "The remedy is a payout record with four states that stays open through the return window, a ledger entry for each return, and a name check when bank details change.",
+          "function": "recommendation",
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The pattern as lived at Larkfield.",
+            "introduces": "The direction of the repair, and the Keel decision that takes it where there is one.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p40",
+          "controlling_idea": "One chapter addresses the Stranded Payout, payouts and money movement, and the card-payment journey also names it.",
+          "function": "transition",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The remedy direction in two or three clauses.",
+            "introduces": "The chapters that work the remedy out, each with what it owns.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p41",
+          "controlling_idea": "The Trusted Doorbell sounds like a system that reads a missing webhook as the fact 'unpaid'.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Invented quote: “No webhook came in, so the membership is unpaid.”",
+              "shows": "Puts the warning sign in the words a colleague would use."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The Stranded Payout, closed by its chapter links.",
+            "introduces": "The Trusted Doorbell, the first pattern of the integration family, announced by its sub-heading and opened by its quote; the sub-heading is the transition.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p42",
+          "controlling_idea": "A Trusted Doorbell shows as handlers that update state from the payload, apply duplicates, let late events overwrite newer state and read silence as a fact.",
+          "function": "description",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The Trusted Doorbell: the quoted symptom.",
+            "introduces": "The signs by which the pattern shows in general.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p43",
+          "controlling_idea": "The test environment delivers each webhook once and in order, while both providers document only repetition inside a retry window.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe's documentation: delivery attempts for up to three days, no guaranteed order. Adyen's: a 2xx within 10 seconds, a failing endpoint's events queued for up to 30 days (n.d., accessed November 2026).",
+              "shows": "The documented contract is at-least-once inside a window, which is less than the integration assumed.",
+              "source": "Documented and cited in payment-webhooks-and-events (key points)"
+            }
+          ],
+          "advances_thesis": {
+            "supports": [
+              "S3"
+            ],
+            "how": "Shows the pattern as a shortcut that matched the provider's API on the first day."
+          },
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What the pattern looks like.",
+            "introduces": "The first-day shortcut behind it and what later contradicts the shortcut.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p44",
+          "controlling_idea": "A Trusted Doorbell costs wrongly unpaid customers, duplicated fulfillment and missed deadlines that started with one event.",
+          "function": "cause_effect",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The mechanism of the pattern.",
+            "introduces": "What the mechanism costs in money, customers and trust.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p45",
+          "controlling_idea": "At Larkfield an expired certificate on the Stripe webhook receiver stopped events for 9 hours on Monday 14 September 2026, and 3,200 paid memberships were shown as unpaid.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "The Silent Webhook (ledger; consistency ruling 20): Monday 14 September 2026, the Stripe webhook receiver's TLS certificate expired shortly after midnight; events failed for 9 hours; 3,200 memberships shown as unpaid; members turned away at check-in on Monday morning; no money lost; 460 support tickets.",
+              "shows": "Stripe had recorded every payment; what failed was Larkfield's reading of silence as 'unpaid'.",
+              "source": "Scenario ledger (_research/scenario-ledger.md)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The pattern's mechanism and cost in general.",
+            "introduces": "One case at the fictional Larkfield, labeled as fiction, with its ledger figures.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p46",
+          "controlling_idea": "The remedy is to treat the webhook as a notice: store and acknowledge it, confirm the change against the provider's record, sweep what stays pending and read silence as unknown.",
+          "function": "recommendation",
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The pattern as lived at Larkfield.",
+            "introduces": "The direction of the repair, and the Keel decision that takes it where there is one.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p47",
+          "controlling_idea": "Three chapters address the Trusted Doorbell (webhooks and events, state machines, and reconciliation and reporting), and the dispute journey follows it.",
+          "function": "transition",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The remedy direction in two or three clauses.",
+            "introduces": "The chapters that work the remedy out, each with what it owns.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p48",
+          "controlling_idea": "The Version Cliff sounds like a library upgrade for one feature that silently broke a report.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Invented quote: “We only upgraded the library for one new feature. Why is the revenue report wrong?”",
+              "shows": "Puts the warning sign in the words a colleague would use."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The Trusted Doorbell, closed by its chapter links.",
+            "introduces": "The Version Cliff, the next row of the table, announced by its sub-heading and opened by its quote; the sub-heading is the transition.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p49",
+          "controlling_idea": "A Version Cliff shows as API versions nobody can list and an upgrade that crosses years of changes in one deploy.",
+          "function": "description",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The Version Cliff: the quoted symptom.",
+            "introduces": "The signs by which the pattern shows in general.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p50",
+          "controlling_idea": "Pinning hides change on the first day, the version is set in several unowned places, and each skipped release lengthens the jump that is eventually forced.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe uses one dated version for its whole API, set by account default, by header or, since 2023, by SDK release; Adyen puts a version number in the URL of each API (documentation accessed November 2026).",
+              "shows": "There is no single place where 'our version' lives, so nobody notices that it has not moved.",
+              "source": "Documented and cited in payment-api-versioning (key points)"
+            }
+          ],
+          "advances_thesis": {
+            "supports": [
+              "S3"
+            ],
+            "how": "Shows the pattern as a shortcut that matched the provider's API on the first day."
+          },
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What the pattern looks like.",
+            "introduces": "The first-day shortcut behind it and what later contradicts the shortcut.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p51",
+          "controlling_idea": "A Version Cliff usually costs silently wrong data, because a removed field raises no error.",
+          "function": "cause_effect",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The mechanism of the pattern.",
+            "introduces": "What the mechanism costs in money, customers and trust.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p52",
+          "controlling_idea": "At Larkfield a library upgrade in March 2026 moved the billing integration across three years of versions, a removed field broke the finance export without an error, and revenue reports were wrong for 6 days.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "The Version Cliff (ledger and chapter 19 addition): March 2026, the billing integration was pinned to a three-year-old API version (the account default); a forced SDK upgrade for another feature moved it across a breaking release that removed a field the finance export read; no error raised; subscription revenue reports wrong for 6 days.",
+              "shows": "The cost was wrong numbers found by finance, not an outage found by monitoring.",
+              "source": "Scenario ledger (_research/scenario-ledger.md)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The pattern's mechanism and cost in general.",
+            "introduces": "One case at the fictional Larkfield, labeled as fiction, with its ledger figures.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p53",
+          "controlling_idea": "The remedy is a version register with owners and upgrades made on a calendar, one release at a time, tested and staged.",
+          "function": "recommendation",
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The pattern as lived at Larkfield.",
+            "introduces": "The direction of the repair, and the Keel decision that takes it where there is one.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p54",
+          "controlling_idea": "Three chapters address the Version Cliff: API versioning, safe change, and revenue recognition.",
+          "function": "transition",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The remedy direction in two or three clauses.",
+            "introduces": "The chapters that work the remedy out, each with what it owns.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p55",
+          "controlling_idea": "A Card by Any Other Name sounds like the belief that 'paid' means the same for every payment method.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Invented quote: “Paid is paid. Why would a direct debit be any different?”",
+              "shows": "Puts the warning sign in the words a colleague would use."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The Version Cliff, closed by its chapter links.",
+            "introduces": "A Card by Any Other Name, the next row of the table, announced by its sub-heading and opened by its quote; the sub-heading is the transition.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p56",
+          "controlling_idea": "A Card by Any Other Name shows as one rule for every method and a dispute report that counts things that are not disputes.",
+          "function": "description",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "A Card by Any Other Name: the quoted symptom.",
+            "introduces": "The signs by which the pattern shows in general.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p57",
+          "controlling_idea": "One API unifies how a payment starts and how its status is reported but not what the status means, which each payment scheme fixes for itself.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Under EU law a SEPA direct debit can be refunded without a reason for eight weeks and contested as unauthorized for thirteen months; an iDEAL payment cannot be disputed through the payer's bank.",
+              "shows": "'Succeeded' is a different promise per method, so a card rule applied to all of them is wrong for most.",
+              "source": "Documented and cited in local-payment-methods (key points)"
+            }
+          ],
+          "advances_thesis": {
+            "supports": [
+              "S3"
+            ],
+            "how": "Shows the pattern as a shortcut that matched the provider's API on the first day."
+          },
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What the pattern looks like.",
+            "introduces": "The first-day shortcut behind it and what later contradicts the shortcut.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p58",
+          "controlling_idea": "A Card by Any Other Name costs access given for uncollected money, wrong retry schedules and reports that cannot be compared.",
+          "function": "cause_effect",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The mechanism of the pattern.",
+            "introduces": "What the mechanism costs in money, customers and trust.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p59",
+          "controlling_idea": "Before Keel, Larkfield applied one rule to every method and recorded a returned debit as a dispute, although a €49.00 debit of 1 April 2027 stays refundable until 27 May 2027 and contestable until 1 May 2028.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger addition of chapter 7: before Keel one rule covered every method; on the Adyen side a returned debit was recorded as `disputed`; Daan Peters, €49.00 membership by SEPA Direct Debit collected 1 April 2027, refundable without reason until 27 May 2027, contestable as unauthorized until 1 May 2028.",
+              "shows": "The dates on one ordinary debit show how far a direct debit is from a card.",
+              "source": "Scenario ledger (_research/scenario-ledger.md)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The pattern's mechanism and cost in general.",
+            "introduces": "One case at the fictional Larkfield, labeled as fiction, with its ledger figures.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p60",
+          "controlling_idea": "The remedy is a method family on every payment with its own rules for paid, access and reversal, and neutral names for reversals.",
+          "function": "recommendation",
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The pattern as lived at Larkfield.",
+            "introduces": "The direction of the repair, and the Keel decision that takes it where there is one.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p61",
+          "controlling_idea": "Three chapters address A Card by Any Other Name (local payment methods, state machines, and refunds and disputes), and the closing chapter on what is moving applies it to new rails.",
+          "function": "transition",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The remedy direction in two or three clauses.",
+            "introduces": "The chapters that work the remedy out, each with what it owns.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p62",
+          "controlling_idea": "The Vault Hostage sounds like a business that would change provider if its stored cards could come along.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Invented quote: “We would switch tomorrow. Except every stored card lives with them.”",
+              "shows": "Puts the warning sign in the words a colleague would use."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "A Card by Any Other Name, closed by its chapter links.",
+            "introduces": "The Vault Hostage, the first pattern of the trust family, announced by its sub-heading and opened by its quote; the sub-heading is the transition.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p63",
+          "controlling_idea": "A Vault Hostage shows as a database of one provider's tokens, which a second provider cannot charge.",
+          "function": "description",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The Vault Hostage: the quoted symptom.",
+            "introduces": "The signs by which the pattern shows in general.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p64",
+          "controlling_idea": "Storing cards with the provider is right on the first day, and it returns a token that works only there, so leaving is a transfer between vaults that the merchant cannot perform.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "A provider token works only with that provider; moving stored cards is a transfer between providers that takes weeks (provider documentation, accessed November 2026).",
+              "shows": "The convenience of the first day is also the cost of leaving.",
+              "source": "Documented and cited in tokenization-vaulting-and-pci (key points)"
+            }
+          ],
+          "advances_thesis": {
+            "supports": [
+              "S3"
+            ],
+            "how": "Shows the pattern as a shortcut that matched the provider's API on the first day."
+          },
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What the pattern looks like.",
+            "introduces": "The first-day shortcut behind it and what later contradicts the shortcut.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p65",
+          "controlling_idea": "A Vault Hostage costs negotiating position, a failover without renewals and cards lost in migration.",
+          "function": "cause_effect",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The mechanism of the pattern.",
+            "introduces": "What the mechanism costs in money, customers and trust.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p66",
+          "controlling_idea": "At Larkfield stored cards exist only as each provider's tokens, so the rehearsed switch of K8 cannot move stored-card renewals, and an exit sheet per provider records how the cards would leave.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger additions of chapters 10 and 22: under K8 the switch covers payments that bring their own credential; stored-card renewals stay with, or wait for, the provider that holds the card; Femke de Graaf owns one exit sheet per provider (how stored cards leave, in how many weeks, what does not travel).",
+              "shows": "Even a platform with two providers is tied, card by card, to the one that holds each number.",
+              "source": "Scenario ledger (_research/scenario-ledger.md)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The pattern's mechanism and cost in general.",
+            "introduces": "One case at the fictional Larkfield, labeled as fiction, with its ledger figures.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p67",
+          "controlling_idea": "The remedy is to decide who holds the vault before adding a provider, write the exit down in advance, and ask what happens to network tokens.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Neither Stripe nor Adyen documents whether network tokens survive a move between providers (documentation accessed November 2026).",
+              "shows": "One part of the exit cannot be planned from the public record and has to be asked.",
+              "source": "Stated in payment-routing-and-orchestration (key points)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The pattern as lived at Larkfield.",
+            "introduces": "The direction of the repair, and the Keel decision that takes it where there is one.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p68",
+          "controlling_idea": "Three chapters address the Vault Hostage: tokenization and vaulting, network tokens, and routing and orchestration.",
+          "function": "transition",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The remedy direction in two or three clauses.",
+            "introduces": "The chapters that work the remedy out, each with what it owns.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p69",
+          "controlling_idea": "The Card in the Log sounds like a company that stores no card numbers except where customers paste them.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Invented quote: “We never store card numbers. Well, the support chat does, when members paste them in.”",
+              "shows": "Puts the warning sign in the words a colleague would use."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The Vault Hostage, closed by its chapter links.",
+            "introduces": "The Card in the Log, the next row of the table, announced by its sub-heading and opened by its quote; the sub-heading is the transition.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p70",
+          "controlling_idea": "A Card in the Log shows as a card number in a log, a ticket or an analytics event, or as unowned scripts on the payment page.",
+          "function": "description",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The Card in the Log: the quoted symptom.",
+            "introduces": "The signs by which the pattern shows in general.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p71",
+          "controlling_idea": "Hosted card fields keep the number away on the first day, but the security standard binds every system that can affect it, and the page around the fields stays the merchant's.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "PCI DSS binds every system a card number passes through or can affect; hosted fields lead to SAQ A at both providers; since 31 March 2025 a merchant filing SAQ A must confirm that scripts on the payment page cannot attack the form.",
+              "shows": "The provider's fields reduce the obligation; they do not remove the merchant's page from it.",
+              "source": "Documented and cited in tokenization-vaulting-and-pci (key points)"
+            }
+          ],
+          "advances_thesis": {
+            "supports": [
+              "S3"
+            ],
+            "how": "Shows the pattern as a shortcut that matched the provider's API on the first day."
+          },
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What the pattern looks like.",
+            "introduces": "The first-day shortcut behind it and what later contradicts the shortcut.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p72",
+          "controlling_idea": "A Card in the Log costs a growing assessment, a questionnaire signed on trust and, at worst, stolen cards.",
+          "function": "cause_effect",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The mechanism of the pattern.",
+            "introduces": "What the mechanism costs in money, customers and trust.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p73",
+          "controlling_idea": "In January 2027 the payment step of Larkfield's booking widget loaded 17 third-party scripts from 9 domains, four of them unowned, and K4 cuts that to 3 scripts from 2 domains.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger addition of chapter 22: in January 2027 the payment step of the booking widget loaded 17 third-party scripts from 9 domains, 4 with no known owner; under K4 the payment step moves to its own page with 3 scripts from 2 domains.",
+              "shows": "No card number had leaked, and nobody could have said that it could not.",
+              "source": "Scenario ledger (_research/scenario-ledger.md)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The pattern's mechanism and cost in general.",
+            "introduces": "One case at the fictional Larkfield, labeled as fiction, with its ledger figures.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p74",
+          "controlling_idea": "The remedy is hosted fields and tokens only, an owned script inventory, a content security policy and a rule for card numbers that arrive by chat.",
+          "function": "recommendation",
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The pattern as lived at Larkfield.",
+            "introduces": "The direction of the repair, and the Keel decision that takes it where there is one.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p75",
+          "controlling_idea": "One chapter addresses the Card in the Log: tokenization, vaulting and PCI.",
+          "function": "transition",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The remedy direction in two or three clauses.",
+            "introduces": "The chapters that work the remedy out, each with what it owns.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p76",
+          "controlling_idea": "The Open Till sounds like a team that cannot imagine anyone attacking a €1 sale.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Invented quote: “It is a €1 trial class. Who would attack that?”",
+              "shows": "Puts the warning sign in the words a colleague would use."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The Card in the Log, closed by its chapter links.",
+            "introduces": "The Open Till, the next row of the table, announced by its sub-heading and opened by its quote; the sub-heading is the transition.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p77",
+          "controlling_idea": "An Open Till shows as a public page that starts payments without login or limit and receives thousands of small, mostly declined attempts.",
+          "function": "description",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The Open Till: the quoted symptom.",
+            "introduces": "The signs by which the pattern shows in general.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p78",
+          "controlling_idea": "A frictionless guest checkout is also a tool for testing stolen cards, and because card testing leaves no dispute to learn from it has to be stopped by limits on the endpoint.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Card testing leaves no dispute to learn from and has to be stopped before authorization, by limits on the endpoint.",
+              "shows": "The provider's fraud scoring, tuned on disputes, is not the control for this attack; the merchant's own endpoint is.",
+              "source": "Argued in payment-fraud-and-risk (key points)"
+            }
+          ],
+          "advances_thesis": {
+            "supports": [
+              "S3"
+            ],
+            "how": "Shows the pattern as a shortcut that matched the provider's API on the first day."
+          },
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What the pattern looks like.",
+            "introduces": "The first-day shortcut behind it and what later contradicts the shortcut.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p79",
+          "controlling_idea": "An Open Till costs fees per attempt, refunds of approved tests and lost sales while the seller is switched off.",
+          "function": "cause_effect",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The mechanism of the pattern.",
+            "introduces": "What the mechanism costs in money, customers and trust.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p80",
+          "controlling_idea": "At Larkfield bots tested 61,000 stolen card numbers through one studio's booking widget on 8–9 August 2026, at a cost of €4,100 and 31 hours without online payments for the studio.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "The Card-Testing Weekend (ledger and chapter 24 addition): 8–9 August 2026, bots used one studio's public booking widget to test 61,000 stolen card numbers with €1 drop-in payments; €4,100 in fees and refunds; the studio's online payments off for 31 hours.",
+              "shows": "The widget did what it was built to do; it had no limit.",
+              "source": "Scenario ledger (_research/scenario-ledger.md)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The pattern's mechanism and cost in general.",
+            "introduces": "One case at the fictional Larkfield, labeled as fiction, with its ledger figures.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p81",
+          "controlling_idea": "The remedy is a limit on every endpoint that can start a payment: a guest check, a cap per seller and an alert on declines.",
+          "function": "recommendation",
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The pattern as lived at Larkfield.",
+            "introduces": "The direction of the repair, and the Keel decision that takes it where there is one.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p82",
+          "controlling_idea": "One chapter addresses the Open Till: fraud and risk.",
+          "function": "transition",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The remedy direction in two or three clauses.",
+            "introduces": "The chapters that work the remedy out, each with what it owns.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p83",
+          "controlling_idea": "The Frozen Seller sounds like a seller verified years ago whose payouts have stopped.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Invented quote: “They verified us two years ago. Why have our payouts stopped?”",
+              "shows": "Puts the warning sign in the words a colleague would use."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The Open Till, closed by its chapter links.",
+            "introduces": "The Frozen Seller, the next row of the table, announced by its sub-heading and opened by its quote; the sub-heading is the transition.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p84",
+          "controlling_idea": "A Frozen Seller shows as an approved seller restricted without having done anything, discovered through a support ticket.",
+          "function": "description",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The Frozen Seller: the quoted symptom.",
+            "introduces": "The signs by which the pattern shows in general.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p85",
+          "controlling_idea": "Verification looks like a form on the first day but both providers hold it as requirements with deadlines that switch capabilities, and the law lets a requirement reopen at any time.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe and Adyen both hold verification as requirements with deadlines that switch capabilities such as payouts on and off, and deliver changes by webhook (documentation accessed November 2026).",
+              "shows": "An approved seller can become restricted without doing anything, so someone has to watch the deadlines.",
+              "source": "Documented and cited in payment-compliance-and-regulation (key points)"
+            }
+          ],
+          "advances_thesis": {
+            "supports": [
+              "S3"
+            ],
+            "how": "Shows the pattern as a shortcut that matched the provider's API on the first day."
+          },
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What the pattern looks like.",
+            "introduces": "The first-day shortcut behind it and what later contradicts the shortcut.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p86",
+          "controlling_idea": "A Frozen Seller costs sellers days of income and the platform tickets and departures.",
+          "function": "cause_effect",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The mechanism of the pattern.",
+            "introduces": "What the mechanism costs in money, customers and trust.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p87",
+          "controlling_idea": "At Larkfield 230 studios missed a changed verification requirement in May 2026 because the only reminder went to an unread address, and their payouts were paused for up to 12 days.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "The Frozen Studios (ledger, chapter 26 and 34 additions; consistency ruling 23): May 2026, a verification requirement changed, announced in advance with a deadline; one batch email to each studio's sign-up address; 230 studios missed the deadline; payouts paused up to 12 days; the studios were legacy Custom connected accounts on Stripe, with verification data collected through Larkfield's own API forms since 2017.",
+              "shows": "The provider announced the change; nobody at Larkfield owned the deadline.",
+              "source": "Scenario ledger (_research/scenario-ledger.md)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The pattern's mechanism and cost in general.",
+            "introduces": "One case at the fictional Larkfield, labeled as fiction, with its ledger figures.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p88",
+          "controlling_idea": "The remedy is to mirror each seller's requirements and deadlines as state, give every deadline an owner and show the seller the reason and the date.",
+          "function": "recommendation",
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The pattern as lived at Larkfield.",
+            "introduces": "The direction of the repair, and the Keel decision that takes it where there is one.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p89",
+          "controlling_idea": "Three chapters address the Frozen Seller: compliance and regulation, platform onboarding, and embedded finance.",
+          "function": "transition",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The remedy direction in two or three clauses.",
+            "introduces": "The chapters that work the remedy out, each with what it owns.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p90",
+          "controlling_idea": "The Single Rail sounds like a company with two providers that has never moved a payment between them.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Invented quote: “We have two providers. We have never moved a payment from one to the other.”",
+              "shows": "Puts the warning sign in the words a colleague would use."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The Frozen Seller, closed by its chapter links.",
+            "introduces": "The Single Rail, the first pattern of the platform and scale family, announced by its sub-heading and opened by its quote; the sub-heading is the transition.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p91",
+          "controlling_idea": "A Single Rail shows as payments that depend on one provider, acquirer or region, with a second route that has never carried traffic.",
+          "function": "description",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The Single Rail: the quoted symptom.",
+            "introduces": "The signs by which the pattern shows in general.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p92",
+          "controlling_idea": "One provider is right on the first day and a second costs a second set of everything after the authorization request, so the switch goes unrehearsed.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "A routing layer unifies the authorization request and nothing after it: disputes, settlement, balances, payment-method coverage and stored cards stay one set per provider.",
+              "shows": "The cost of a second rail explains why most second providers have never carried traffic.",
+              "source": "Argued in payment-routing-and-orchestration (key points)"
+            }
+          ],
+          "advances_thesis": {
+            "supports": [
+              "S3"
+            ],
+            "how": "Shows the pattern as a shortcut that matched the provider's API on the first day."
+          },
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What the pattern looks like.",
+            "introduces": "The first-day shortcut behind it and what later contradicts the shortcut.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p93",
+          "controlling_idea": "A Single Rail makes the provider's outage the merchant's in full, and an improvised switch during it produces double charges.",
+          "function": "cause_effect",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The mechanism of the pattern.",
+            "introduces": "What the mechanism costs in money, customers and trust.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p94",
+          "controlling_idea": "Before Keel Larkfield had two providers and no way to move a studio between them; K8 adds one switch, rehearsed each quarter with real payments for the 50 largest studios.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger (systems landscape, K8) and chapter 10 and 11 additions: the routing rule is 'the studio's provider'; under K8 each of the 50 largest studios keeps a verified account at both providers and the quarterly rehearsal sends real payments through the second provider and follows them to payout, a refund and reconciliation; the front desk has no second provider.",
+              "shows": "Two providers were two single rails until a switch was built and rehearsed.",
+              "source": "Scenario ledger (_research/scenario-ledger.md)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The pattern's mechanism and cost in general.",
+            "introduces": "One case at the fictional Larkfield, labeled as fiction, with its ledger figures.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p95",
+          "controlling_idea": "The remedy is to name every dependency, count a second route only after real payments have used it, and never resend an unknown payment elsewhere.",
+          "function": "recommendation",
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The pattern as lived at Larkfield.",
+            "introduces": "The direction of the repair, and the Keel decision that takes it where there is one.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p96",
+          "controlling_idea": "Three chapters address the Single Rail (routing and orchestration, reliability, and acquiring), and the Adyen case and the contrast cases also name it.",
+          "function": "transition",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The remedy direction in two or three clauses.",
+            "introduces": "The chapters that work the remedy out, each with what it owns.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p97",
+          "controlling_idea": "The First of the Month sounds like a renewal run that has always started at midnight on the 1st.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Invented quote: “Renewals run at midnight on the 1st. They always have.”",
+              "shows": "Puts the warning sign in the words a colleague would use."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The Single Rail, closed by its chapter links.",
+            "introduces": "The First of the Month, the next row of the table, announced by its sub-heading and opened by its quote; the sub-heading is the transition.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p98",
+          "controlling_idea": "A First of the Month shows as a predictable peak sent at full speed, with refusals for volume counted as failed payments.",
+          "function": "description",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The First of the Month: the quoted symptom.",
+            "introduces": "The signs by which the pattern shows in general.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p99",
+          "controlling_idea": "A small batch never meets the per-customer share a provider allows, and a request refused for volume is a payment not tried, not a decline.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe's documentation (n.d., accessed November 2026): 100 requests a second per account in live mode and 25 per endpoint; Adyen's lists no rate limit for its payments APIs.",
+              "shows": "The limit a peak meets is published on one side and has to be asked for on the other; in neither case is it the provider's total capacity.",
+              "source": "Documented and cited in payment-developer-platform and payment-peak-load (key points)"
+            }
+          ],
+          "advances_thesis": {
+            "supports": [
+              "S3"
+            ],
+            "how": "Shows the pattern as a shortcut that matched the provider's API on the first day."
+          },
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What the pattern looks like.",
+            "introduces": "The first-day shortcut behind it and what later contradicts the shortcut.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p100",
+          "controlling_idea": "A First of the Month costs late revenue and dunning aimed at blameless customers, and its timeouts feed the Double Charge.",
+          "function": "cause_effect",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The mechanism of the pattern.",
+            "introduces": "What the mechanism costs in money, customers and trust.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p101",
+          "controlling_idea": "At Larkfield 38% of monthly renewals ran in six hours, and on 1 October 2026 the job hit Stripe's rate limit, delayed 7,900 renewals and sent their members dunning emails.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "The Renewal Wave (ledger and chapter 21 addition): 38% of monthly membership volume attempted in a 6-hour window on the 1st; on 1 October 2026 the renewal job hit Stripe's rate limit; an HTTP 429 was treated as a failed attempt; 7,900 renewals delayed to the next day; dunning emails sent to members who had done nothing wrong.",
+              "shows": "The provider refused requests it had never tried, and Larkfield told members their payments had failed.",
+              "source": "Scenario ledger (_research/scenario-ledger.md)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The pattern's mechanism and cost in general.",
+            "introduces": "One case at the fictional Larkfield, labeled as fiction, with its ledger figures.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p102",
+          "controlling_idea": "The remedy is to pace the peak on the merchant's side, serve checkout before the batch and treat a refusal as 'not attempted yet'.",
+          "function": "recommendation",
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The pattern as lived at Larkfield.",
+            "introduces": "The direction of the repair, and the Keel decision that takes it where there is one.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p103",
+          "controlling_idea": "Three chapters address the First of the Month (peak load, the developer platform, and subscriptions and billing engines), and the failed-renewal journey also names it.",
+          "function": "transition",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The remedy direction in two or three clauses.",
+            "introduces": "The chapters that work the remedy out, each with what it owns.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p104",
+          "controlling_idea": "The Borrowed Blueprint sounds like a team that takes a provider's Black Friday figure as its own design target.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Invented quote: “Stripe did 152,000 a minute on Black Friday. We should build for that.”",
+              "shows": "Puts the warning sign in the words a colleague would use."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The First of the Month, closed by its chapter links.",
+            "introduces": "The Borrowed Blueprint, the next row of the table, announced by its sub-heading and opened by its quote; the sub-heading is the transition.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p105",
+          "controlling_idea": "A Borrowed Blueprint shows as a small team adopting machinery that a large provider described.",
+          "function": "description",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The Borrowed Blueprint: the quoted symptom.",
+            "introduces": "The signs by which the pattern shows in general.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p106",
+          "controlling_idea": "A provider's published design answers the provider's own scale, often years ago, and a published peak figure is load carried for all customers, not capacity offered to one.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe's 2017 engineering post on rate limiters (evidence age: 9 years) describes four types of limiter in production; Stripe's newsroom reported more than 152,000 transactions per minute at peak over the Black Friday weekend of 2025.",
+              "shows": "Both are true statements about a provider serving all its customers, and neither is a design target for one integrator.",
+              "source": "Cited in payment-developer-platform and payment-peak-load"
+            }
+          ],
+          "advances_thesis": {
+            "supports": [
+              "S3"
+            ],
+            "how": "Shows the pattern as a shortcut that matched the provider's API on the first day."
+          },
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What the pattern looks like.",
+            "introduces": "The first-day shortcut behind it and what later contradicts the shortcut.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p107",
+          "controlling_idea": "A Borrowed Blueprint costs months of machinery and leaves the actual fault untouched.",
+          "function": "cause_effect",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The mechanism of the pattern.",
+            "introduces": "What the mechanism costs in money, customers and trust.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p108",
+          "controlling_idea": "Larkfield avoided the pattern twice in 2027: it declined an orchestration product in February, and in April it answered a provider's Black Friday figure with the per-account limit.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger additions of chapters 10 and 40: in February 2027 Daniel Osei proposed an orchestration product with per-payment routing and Femke de Graaf declined it (provider tied to country); in April 2027 he objected to K5 with 'Stripe did 152,000 a minute on Black Friday' against a wave of about 1,000 renewals a minute, and she answered with the per-account limit.",
+              "shows": "Both proposals borrowed an answer to a problem Larkfield had not measured.",
+              "source": "Scenario ledger (_research/scenario-ledger.md)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The pattern's mechanism and cost in general.",
+            "introduces": "One case at the fictional Larkfield, labeled as fiction, with its ledger figures.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p109",
+          "controlling_idea": "The remedy is to copy rules and not machinery, after asking which problem a design answered, at what volume and in which year.",
+          "function": "recommendation",
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The pattern as lived at Larkfield.",
+            "introduces": "The direction of the repair, and the Keel decision that takes it where there is one.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p110",
+          "controlling_idea": "Three chapters address the Borrowed Blueprint most directly (peak load, data stores and consistency, and ledgers); the Stripe and Adyen cases, the contrast cases and the closing chapter also name it.",
+          "function": "transition",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The remedy direction in two or three clauses.",
+            "introduces": "The chapters that work the remedy out, each with what it owns.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p111",
+          "controlling_idea": "The Accidental Bank sounds like a proposal to collect sellers' money into the platform's own account.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Invented quote: “Let's collect into our own account and pay the studios two weeks later. It makes refunds simpler.”",
+              "shows": "Puts the warning sign in the words a colleague would use."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The Borrowed Blueprint, closed by its chapter links.",
+            "introduces": "The Accidental Bank, the next row of the table, announced by its sub-heading and opened by its quote; the sub-heading is the transition.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p112",
+          "controlling_idea": "An Accidental Bank shows as sellers' money in the platform's account, liability taken by a default setting, or financial products on the roadmap.",
+          "function": "description",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The Accidental Bank: the quoted symptom.",
+            "introduces": "The signs by which the pattern shows in general.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p113",
+          "controlling_idea": "A platform is outside the rules for holding others' funds only while it never has possession or control of them, and product ideas do not arrive labeled as regulated.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "A platform is outside the licensing and safeguarding rules only while it never has possession or control of customers' funds; one arrow through its own bank account raises a license question.",
+              "shows": "The boundary is a property of the funds flow, so a small product change can cross it.",
+              "source": "Argued, with the regulation cited, in licences-and-safeguarding (key points)"
+            }
+          ],
+          "advances_thesis": {
+            "supports": [
+              "S3"
+            ],
+            "how": "Shows the pattern as a shortcut that matched the provider's API on the first day."
+          },
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What the pattern looks like.",
+            "introduces": "The first-day shortcut behind it and what later contradicts the shortcut.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p114",
+          "controlling_idea": "An Accidental Bank costs regulatory exposure and losses nobody priced.",
+          "function": "cause_effect",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The mechanism of the pattern.",
+            "introduces": "What the mechanism costs in money, customers and trust.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p115",
+          "controlling_idea": "Larkfield avoided the pattern in April 2027, when a proposed refund buffer of about €43 million in its own account was rebuilt as a held amount on each studio's balance at the provider.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger addition of chapter 16: in April 2027 the product team proposed a refund buffer (collect member payments into a Larkfield bank account, pay studios 14 days later, about €43 million held at any moment); Jonas Weber rejected it because it would put Larkfield in possession of studio funds; built instead as a longer payout schedule and a held amount on the studio's own balance at the provider.",
+              "shows": "The same business need was met without the money ever becoming Larkfield's to hold.",
+              "source": "Scenario ledger (_research/scenario-ledger.md)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The pattern's mechanism and cost in general.",
+            "introduces": "One case at the fictional Larkfield, labeled as fiction, with its ledger figures.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p116",
+          "controlling_idea": "The remedy is to draw the funds flow, mark the licensed holder and the loss bearer at every arrow, and choose liability on purpose.",
+          "function": "recommendation",
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The pattern as lived at Larkfield.",
+            "introduces": "The direction of the repair, and the Keel decision that takes it where there is one.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p117",
+          "controlling_idea": "Three chapters address the Accidental Bank (licenses and safeguarding, platform payment models, and embedded finance); the platform-payment and dispute journeys, the Adyen case and the contrast cases also name it.",
+          "function": "transition",
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The remedy direction in two or three clauses.",
+            "introduces": "The chapters that work the remedy out, each with what it owns.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "how-the-patterns-chain",
+      "heading": "How the Patterns Chain",
+      "controlling_idea": "The patterns chain in one direction: a chain is usually noticed at a money-truth pattern and started at an integration, trust, or platform-and-scale pattern, so the repair holds at the start.",
+      "function": "cause_effect",
+      "advances_thesis": {
+        "supports": [
+          "S4"
+        ],
+        "how": "Names three chains by the family where they start, follows each to the money-truth patterns where it is noticed, and shows one chain end to end at Larkfield with the repairs Keel makes at its start."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "A lead paragraph states the section's claim, then one chain per paragraph in the order of the families in the table (integration, trust, platform and scale), so the reader can check each chain against entries read in the same order. The Larkfield chain comes last because it is the worked instance of the claim, one chain (the scale chain) followed link by link; placed first, it would read as one more incident before the reader knows what a chain is."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "The sixteen patterns, each described on its own.",
+        "introduces": "The patterns as causes of one another: three chains, where each starts and where it is noticed.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p118",
+          "controlling_idea": "The patterns chain in one direction: a chain is usually noticed at a money-truth pattern and started at one of the other eleven, in three chains named by the family where they start.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "figure",
+              "what": "Figure: three columns of starting patterns (integration, trust, platform and scale) with arrows into the five money-truth patterns.",
+              "shows": "Shows at a glance that the arrows run from the other eleven into money truth."
+            }
+          ]
+        },
+        {
+          "id": "p119",
+          "controlling_idea": "The integration chain starts at an untested assumption about the interface (a Trusted Doorbell, A Card by Any Other Name, a Version Cliff) and ends in Phantom Payments, Orphaned Refunds and figures nobody can explain.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "The Silent Webhook's 3,200 memberships shown as unpaid for 9 hours; the direct debit marked `paid` at submission (both told above, from the ledger).",
+              "shows": "Two Larkfield cases in which an integration assumption surfaced as a wrong record of money.",
+              "source": "Scenario ledger (_research/scenario-ledger.md)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The claim that chains start outside money truth, in three families.",
+            "introduces": "The first chain, from the three integration patterns to the money-truth patterns they produce.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p120",
+          "controlling_idea": "The trust chain starts at an unwatched control: a Frozen Seller and an Open Till end in balances and refunds nobody can explain, a Vault Hostage feeds the Single Rail, and the Card in the Log is the exception that is not noticed in the money.",
+          "function": "cause_effect",
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "The integration chain, from interface assumptions to money-truth patterns.",
+            "introduces": "The second chain, from the four trust patterns, with the one pattern that does not end in money.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p121",
+          "controlling_idea": "The scale chain starts at an unrehearsed dependency or peak: the First of the Month and the Single Rail end in Double Charges and Phantom Payments, the Accidental Bank in refunds the platform funds, and the Borrowed Blueprint delays every repair.",
+          "function": "cause_effect",
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "The trust chain.",
+            "introduces": "The third chain, from the four platform-and-scale patterns to the money-truth patterns they produce.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p122",
+          "controlling_idea": "Larkfield's 1 November 2026 is one chain end to end (the renewal wave, a timeout, a retry under a new key, 1,840 double charges, 212 disputes), which is why Keel changes the pacing and the key and not the provider.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "The Double Charge and the Renewal Wave (ledger): 1 November 2026, first-of-month renewals, a timeout, a retry with a new key, 1,840 members charged twice, €71,300 refunded, 212 disputes; Keel decisions K1, K2 and K5; K8 adds no orchestration product.",
+              "shows": "The money error was the last of four links, and the refund left the first three in place.",
+              "source": "Scenario ledger (_research/scenario-ledger.md)"
+            },
+            {
+              "kind": "figure",
+              "what": "Figure: four links in a row (the wave, the timeout, the retry under a new key, the double charge) with the refund at the last link and the Keel decisions at the first three.",
+              "shows": "Makes visible that the refund acts on the last link and Keel on the earlier ones."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The three chains in general.",
+            "introduces": "One chain followed link by link at Larkfield, and the order of repair it implies.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "Using the Patterns",
+    "synthesis": "The catalog and the chains together say something neither says alone: a payment failure is recorded in one place and decided in another. It shows where the money is counted and was decided earlier, on the integrator's own side of the provider's API, by a retry rule, a webhook handler, a form or a schedule.",
+    "so_what": "A correction made only to the money has to be made again next month. The repair that holds is rarely a new provider: it is a key, a state, a ledger entry, a reconciliation and a named owner, and finding a pattern is not finding someone to blame, because each decision behind it was reasonable on the first day.",
+    "callback": {
+      "to": "The two customers of the opening: one charged twice, one who paid and was turned away.",
+      "how": "The reader can now name them (a Double Charge; a Phantom Payment begun at a Trusted Doorbell), look upstream, and ask who owns the assumption now."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Use the patterns as questions: in a design review at every step of one payment, in an incident review by naming the upstream pattern and assigning the owner there, and in a provider evaluation by asking to see the pattern and not the feature."
+    },
+    "hand_off": {
+      "to": "meet-larkfield",
+      "relationship": "example",
+      "carries_over": "The sixteen pattern names, and the Larkfield incidents the patterns page used one at a time as illustrations.",
+      "introduces": "The platform as a whole: its business lines and figures, its two providers, its systems and people, the eight incidents as one landscape's history, the Keel decisions and the recurring payments."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The catalog and the chains.",
+      "introduces": "What the two add up to, then the opening's two customers again, then three situations in which to use the patterns.",
+      "form": "sentence",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p123",
+        "controlling_idea": "The catalog and the chains together say that a payment failure shows where the money is counted and was decided earlier on the integrator's own side of the API, so a correction to the money alone repeats and the lasting repair is rarely a new provider.",
+        "function": "synthesis"
+      },
+      {
+        "id": "p124",
+        "controlling_idea": "The two customers of the opening can now be named (a Double Charge, and a Phantom Payment begun at a Trusted Doorbell) and traced upstream, where the question is who owns the assumption now, to be asked in three situations.",
+        "function": "analysis",
+        "transition_in": {
+          "relationship": "example",
+          "carries_over": "A failure is decided somewhere other than where it shows.",
+          "introduces": "The opening's two customers, named and traced upstream; ownership, not blame; the announcement of three situations.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p125",
+        "controlling_idea": "In a design review, walk one payment through the design and ask at every step which promise is recorded, which record proves it and which pattern occurs if that record is late, repeated or missing.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "elaboration",
+          "carries_over": "The question of who owns the assumption, and the announcement of three situations.",
+          "introduces": "The first situation: a design review, one payment walked through every step.",
+          "form": "sentence",
+          "placement": "both"
+        }
+      },
+      {
+        "id": "p126",
+        "controlling_idea": "In an incident review, name the money-truth pattern, then the upstream pattern, and assign the owner upstream, because a review that ends with the refund has repaired only the last link.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "similarity",
+          "carries_over": "The patterns used as questions about a design.",
+          "introduces": "The same names used after a failure: the pattern, the upstream pattern, the owner.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p127",
+        "controlling_idea": "In a provider evaluation, ask to see the pattern and not the feature, and record 'not public' as an answer, because most of what the questions reveal concerns the integrator's own side.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "similarity",
+          "carries_over": "The patterns used in an incident review.",
+          "introduces": "The same questions put to a provider: timeouts and keys, the webhook contract, account limits, how stored cards leave.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p128",
+        "controlling_idea": "The next page introduces Larkfield as a whole, with the eight incidents used here one at a time shown as one platform's history.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "example",
+          "carries_over": "The patterns and the Larkfield incidents used one at a time.",
+          "introduces": "The platform as a whole, on the next page.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "Teaching any remedy in depth; every pattern links to the chapters that own it."
+    },
+    {
+      "topic": "Introducing Larkfield as a company (business lines, systems landscape, cast, the Keel program as a whole); the page uses incidents and decisions one at a time.",
+      "covered_in": [
+        "meet-larkfield"
+      ]
+    },
+    {
+      "topic": "The book's claim, its evidence rules and how to read a 'Where They Differ' table.",
+      "covered_in": [
+        "introduction"
+      ]
+    },
+    {
+      "topic": "A 'Stripe and Adyen: Where They Differ' section and the three tiers of take-away: this is a preface page; provider behavior is repeated only from the chapters that document it."
+    },
+    {
+      "topic": "Public incident cases at real companies: the briefs hold dated provider documentation, not attributable incident reports, and the page cites no source of its own."
+    },
+    {
+      "topic": "Ranking the patterns by frequency or cost; no survey supports it."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "Chapters 42 to 47, 49 and 50 now exist and the 'Where this book helps' lines link each of them under the patterns its FAILURE PATTERNS callout names (verification pass of 17 November 2026). Chapter 48 (the comparison) was still unwritten; add it to the lines of the patterns it names when it exists.",
+    "Two patterns (The Card in the Log, The Open Till) are listed in the callout of one written chapter only; their 'Where this book helps' lines name that chapter alone. The Stranded Payout is now also named by the card-payment journey.",
+    "Resolved 17 November 2026: the journal spec's part-level outcome and the meet-larkfield entry's AC-2 now follow consistency rulings 24 and 20 (eight incidents, seven of them in 2026; the Silent Webhook on Monday 14 September 2026)."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "Organized the page as the sibling book ORDERED's patterns page: table, one sub-headed entry per pattern with seven units of fixed shape, then the chains, then the uses and the hand-off. The stage table of the sibling ('Where the Patterns Strike') is left out because the contract in PLAN.md does not ask for it and the ledger has no scale stages.",
+      "rejected": [
+        "One section per pattern, which would put sixteen second-level headings between the introduction and the chains.",
+        "An 'In public' unit per pattern: the page may not cite sources of its own."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Each of the eight ledger incidents illustrates one pattern (Double Charge, Silent Webhook as the Trusted Doorbell, Payout That Bounced as the Stranded Payout, Version Cliff, Card-Testing Weekend as the Open Till, Renewal Wave as the First of the Month, Frozen Studios as the Frozen Seller, Unexplained €0.4 Million as the Black-Box Balance). The other eight patterns use facts from the ledger's 'Additions by chapter' and are labeled 'no named incident' or 'avoided'; no canonical fact is added.",
+      "rejected": [
+        "Inventing new incidents for this page.",
+        "Using the Silent Webhook for the Phantom Payment, which would leave the Trusted Doorbell without its incident."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The chapters under 'Where this book helps' are taken from the FAILURE PATTERNS callouts of the written chapters (1 to 41), at most three per pattern, chosen by ownership in PLAN.md.",
+      "rejected": [
+        "Listing every chapter whose callout names the pattern (up to eighteen for The Phantom Payment)."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Between patterns the parallel sub-heading is the declared transition: the fifteen pattern-opening units carry relationship 'sequence', form 'phrase'. Inside an entry the bold label carries the transition.",
+      "rejected": [
+        "A connective sentence at the start of each of sixteen entries, which would disturb the catalog's repeated shape."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Consistency rulings applied: 12 (the confirming record is the object on Stripe, the webhook plus the settlement report on Adyen), 13 (K1's key includes the scheduled attempt number), 14 (no 3-D Secure example is attached to Mila's pass), 20 (the Silent Webhook is Monday 14 September 2026), 22 (no external URLs in the text), 23 (legacy Custom connected accounts), 24 (eight incidents, seven of them in 2026).",
+      "rejected": []
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Length: sixteen entries of about 270 words need more than the chapter target, so the page is sized at about 6,000 words with the 6,500 limit kept, as the coordinator's brief for this page allows.",
+      "rejected": [
+        "Shortening entries to five units."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "_research/style-guide.md",
+      "contributed": "The sixteen pattern names, warning signs and families; page format; valid permalinks; the figure suffix."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "The eight incidents, the Keel decisions and the chapter additions used as illustrations."
+    },
+    {
+      "kind": "internal",
+      "ref": "PLAN.md",
+      "contributed": "The page's contract and the chapter contracts that decide which chapter owns a remedy."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/consistency-issues.md",
+      "contributed": "Rulings 12, 13, 14, 20, 22, 23 and 24."
+    },
+    {
+      "kind": "internal",
+      "ref": "posts/01 to 41: the FAILURE PATTERNS callouts and KEY POINTS of the written chapters",
+      "contributed": "The chapter-to-pattern links, and every statement of provider behavior repeated on this page (with the chapters' own dated sources)."
+    },
+    {
+      "kind": "internal",
+      "ref": "journal-spec.json, entry where-payment-systems-go-wrong",
+      "contributed": "Intent outcome, acceptance criteria AC-1 to AC-6, thesis and role, copied unchanged; the hand-off relationship from the next page's transition_in."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/commerce-platform-architecture/posts/where-commerce-platforms-go-wrong",
+      "contributed": "The shape of the page and of each entry."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 38 claims checked against their owning chapters (36 confirmed, 1 corrected, 1 hedged, 0 unsupported and removed or relabeled, 0 unreachable); links added to chapters 42 to 50 under the patterns their callouts name, the 'one chapter' sentence removed from The Stranded Payout, and K3 and K4 named for The Stranded Payout and The Vault Hostage to agree with meet-larkfield."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Initial spec. (AI-mediated session)"
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected for rulings 12, 13, 20 and 24; intent, thesis and role re-synced."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation after verification: journal-spec entry and spec body brought into line with the verified page and consistency rulings (ruling 28 / K3: not nightly; stale open question closed). No unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: 'Adyen publishes no limit for payments' re-tested with a wide search (documentation and help-center sitemaps, web search of Adyen's domains); it holds. No change to the text."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('the other eleven' -> 'the other eleven')."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Count corrected: sixteen patterns less five money-truth patterns leave eleven, not twelve (key point, chains section, thesis, units)."
+    }
+  ],
+  "length": {
+    "target_words": 6000,
+    "max_words": 6500
+  }
+}

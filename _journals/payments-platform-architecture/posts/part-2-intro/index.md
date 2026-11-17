@@ -1,0 +1,77 @@
+---
+title: "Part II — ACCEPTANCE: Getting to Yes"
+date: 2026-11-17
+author: Željko Obrenović
+excerpt: "What decides whether a payment gets to “yes”, and what can a provider or a merchant do about it? Part II argues that an approval is produced in six layers around the issuer's decision, from the acquirer's license to the terminal on the counter, and that the provider and the merchant both help produce it."
+permalink: part-2
+timetoread: 5 min read
+---
+
+> **KEY POINTS:**
+>
+> * **A “yes” is produced in layers around the issuer's decision.** The acquirer and its license, the payment method, the provider's model of the payment, its actions inside the authorization call, the choice of providers and the terminal each change how often the answer is yes, or whether it can be taken back.
+> * **The provider and the merchant both help produce it.** The provider holds the license and reformats, retries or blocks inside the call; the merchant chooses the methods, the providers and the devices.
+> * **An approval rate belongs to a setup.** It cannot be compared between providers until the acquirer, the method mix, the metric and its denominator are held equal.
+
+<br>
+At 1,140 studios in the Netherlands and Germany that run on **Larkfield, the fictional studio-software platform this book follows**, a member who renews her membership online is charged through Stripe. When she taps the same card at the front desk, she is charged through Adyen. One card, one studio, one bank deciding; two providers, two routes to that bank, and two records of what “approved” meant. Even the sender differs: by Stripe's public pages the online request comes from an Irish e-money institution, and by my reading of Adyen's license page the counter request comes from a Dutch bank ([[acquiring-and-network-connectivity]]).
+
+<!-- illustration-placeholder
+{
+  "id": "part-2-one-card-two-stacks",
+  "status": "pending",
+  "asset": "assets/images/part-2-intro/part-2-one-card-two-stacks.jpeg",
+  "aspect_ratio": "16:9",
+  "placement": "after the opening paragraph",
+  "visual_goal": "Show one member and one card reaching one bank by two different provider stacks, each leaving its own record.",
+  "prompt": "Create a wide explainer illustration. Far left: one generic studio member holding one payment card. Far right: one bank building labeled \"Issuer\". Two paths run from the member to the bank. Upper path: the member's phone, then a blue rounded box labeled \"Provider A\", then the bank; a solid blue arrow labeled \"online\" joins them. Lower path: a counter with a card terminal, then a teal rounded box labeled \"Provider B\", then the bank; a solid teal arrow labeled \"front desk\" joins them. Under each provider box sits a small document card with a green check mark, labeled \"Record\", two in total. Between the two paths, near the member, a small tag labeled \"One card\". Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
+  "alt": "One member with one card reaches one issuing bank by two paths: from a phone through Provider A and from a counter terminal through Provider B, each leaving its own record.",
+  "caption": "At 1,140 Larkfield studios the same card reaches the same bank through Provider A (Stripe) online and Provider B (Adyen) at the front desk, and each keeps its own record of the approval."
+}
+-->
+
+Those two routes are what [[part-1]] left out. It treated the authorization as a message that goes to the issuer (the cardholder's bank) and comes back with an answer: the first of several promises, and one every party is paid for only when it is a yes. Part II turns to **the provider's side of that message**: who is allowed to send it, in what form, how many times, and what the answer is recorded as.
+
+Seen from that side, **a “yes” is produced in six layers that sit around the issuer's decision**. They are the licensed entity that acquires the payment; the payment method and what its scheme (its body of rules) lets “yes” mean; the provider's model of the payment between request and outcome; the changes and retries the provider makes inside the authorization call; the choice among providers; and, when the card is in the room, the terminal. Each layer changes how often the answer is yes, or whether that yes can later be taken back.
+
+<!-- illustration-placeholder
+{
+  "id": "part-2-six-layers-of-yes",
+  "status": "pending",
+  "asset": "assets/images/part-2-intro/part-2-six-layers-of-yes.jpeg",
+  "aspect_ratio": "16:9",
+  "placement": "after the paragraph that states the part's claim",
+  "visual_goal": "Show the issuer's decision at the center with six layers around it, which a payment request must cross.",
+  "prompt": "Create a wide conceptual diagram. At the center, a small bank building with a green check mark above it, labeled \"Issuer decides\". Around it, six concentric half-rings opening to the left, like layers of an onion cut in half, alternating blue and teal, with the outermost in orange. From the outside in, the rings are labeled \"Device\", \"Providers\", \"Optimization\", \"State model\", \"Method\", \"Acquirer\". On the far left, a shop icon labeled \"Merchant\". One solid blue arrow labeled \"request\" runs from the merchant straight through all six rings to the bank. One solid green arrow labeled \"yes\" returns from the bank through the rings to the merchant. Style: polished business explainer illustration for a book on payment infrastructure architecture, flat vector style, crisp outlines, minimal shading, light background, disciplined blue, teal, green and orange accents, generous margins. Few short labels, spelled exactly as given in quotes. No photorealism, no 3D render, no dense text, no title text. Draw no logos or brand marks and no real company, bank, card network or software names; show banks, card networks, payment providers, terminals and software as generic unbranded elements. Money is in euros: use the euro sign, never a dollar sign. People are generic customers, studio staff and professionals, never real people.",
+  "alt": "A payment request crossing six layers labeled Device, Providers, Optimization, State model, Method and Acquirer on its way to the issuer's decision, and a yes returning through them.",
+  "caption": "The shape of Part II: six layers sit around the issuer's decision, and a “yes” is what comes back through all of them."
+}
+-->
+
+The layers also have two holders. The provider holds the license, models the payment and makes the changes inside the call. The merchant chooses the methods it offers, the providers it uses and the devices it deploys. So an approval is **an outcome both help produce**, not a verdict the network hands back, and an approval rate describes a setup more than it describes the customers. I would not compare two providers' rates before lining up the acquirer, the method mix and the metric.
+
+That claim rests on what Stripe and Adyen publish, and the record has edges. The two document different arrangements at most of the layers. But neither lists its network memberships by network and country or publishes its volume per acquirer, and the approval gains each states for its optimization product are its own figures, on different metrics, audited by no third party. Each chapter says where its evidence stops.
+
+The six chapters take the layers in the order a “yes” is constrained, and each opens on a case at Larkfield: who acquires the payment and under which license; what “yes” means for methods that are not cards; how a payment is modeled as states; why issuers decline and what providers do inside the call; when a second provider helps and what it costs; and what changes when the card is in the room.
+
+## Chapters in this part
+
+[[acquiring-and-network-connectivity]] answers **who acquires the payment, and under which license**. Reaching a card network takes a membership that only a licensed entity can hold, so every payment has an acquirer of record, and it differs by country. Adyen holds one banking license (2017) extended by branches; Stripe names its own e-money institutions as acquirer in the EEA and the UK, and five banks plus a limited-purpose bank of its own in the United States. Larkfield's inventory finds four acquiring arrangements behind its two providers.
+
+[[local-payment-methods]] turns from the card networks, which answer in seconds, to **what “yes” means when the method is not a card**. One API unifies how a payment is started and reported, and cannot unify what success promises: an iDEAL payment cannot be disputed through the payer's bank, while a SEPA direct debit can be refunded without a reason for eight weeks. Larkfield treated direct debits, 21% of its online volume, like cards.
+
+[[payment-state-machines]] answers **how to model a payment whose outcome arrives late or needs the customer to act**: as one long-lived record with explicit states, in which the API response is one transition. Stripe exposes it as a PaymentIntent (2018) you can retrieve; Adyen's Checkout API has no endpoint that returns a payment by its identifier, so results and webhooks are assembled. The case is Mila Janssen's membership set-up of 12 January 2027, which waited for her banking app.
+
+[[authorization-optimization]] takes up the state machine's failed attempt and asks **why issuers decline genuine payments, and what providers do about it**. Both providers document reformatting, retrying and blocking inside the authorization call, so the approval rate is partly their product. Larkfield's two December rates, 82.0% on Stripe and 95.5% on Adyen *(illustrative)*, shrink from a 13.5-point gap to 0.8 points at the first attempt once both are counted the same way.
+
+[[payment-routing-and-orchestration]] weighs the usual answer to one provider's limits, a second provider, and asks **when it helps and what it costs**. A routing layer unifies the authorization request and nothing after it: disputes, settlement, balances and stored cards stay one set per provider. Larkfield keeps its rule, “the studio's provider”, with a rehearsed switch (Keel decision K8) and buys no orchestration product.
+
+[[in-person-payments]] leaves the payment made at a distance, which the five chapters before it assume, and asks **what changes when the card is in the room**. A terminal joins the payment path, and a payment it stores while offline is credit the merchant extends: Stripe and Adyen both document that the loss is the merchant's. A refund requested at the counter of one of the 1,140 split studios shows that “one payment across channels” is three properties, each checked separately.
+
+## Where to Begin
+
+Together the chapters let you place a decline, a late outcome or a provider question in one layer before you change anything, and by the end of the part the two routes of the opening card read as two stacks of the same six layers. The first layer is the box Part I labeled “acquirer”. Begin with [[acquiring-and-network-connectivity]].
+
+## Sources and Evidence
+
+Sources are cited in each chapter; this introduction makes no factual claim of its own. Larkfield is fictional, and its figures are the same in every chapter.

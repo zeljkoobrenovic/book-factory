@@ -1,0 +1,195 @@
+---
+title: "Domain Coverage: From the Planning Model to the Book's Chapters"
+date: 2026-11-17
+author: Željko Obrenović
+excerpt: "Which chapter covers which part of payments and revenue infrastructure? This reference page maps the 29 capabilities of the planning model behind the book to the chapters that treat them, says what the book covers only briefly or leaves out and why, and lists what it added that the model does not have."
+permalink: domain-coverage
+timetoread: 15 min read
+---
+
+> **IN THIS SECTION, YOU WILL:** Trace each of the 29 capabilities of the book's planning model to its chapters, learn what the book covers briefly, leaves out or added, and find a reading route for your role.
+
+> **KEY POINTS:**
+>
+> * **Every capability has a chapter to go to, and a grade.** Of the model's 29 capabilities, 20 are the subject of at least one chapter, 6 get a section inside a chapter on a wider subject, and 3 are only mentioned. No capability is absent.
+> * **The model lists products; the book follows the money.** Hosted checkout, payment links and standalone identity verification are product surfaces, so they are treated briefly inside chapters about the mechanism beneath them. Clearing, card vaults, 3-D Secure, idempotency, API versioning and all of Part VIII have no capability in the model and a chapter each in the book.
+> * **The model is a map, not evidence.** It is the author's own unpublished planning input. It describes products and jobs, not any company's internal systems, and nothing on this page or in the book cites it for a fact about Stripe, Adyen or anyone else.
+
+<br>
+The planning model behind this book, last reviewed on 15 November 2026, lists **29 capabilities** of payments and revenue infrastructure in four groups. None of the 29 is named for card clearing, a card vault, 3-D Secure, idempotency or API versioning, and this book gives each of those a chapter. So a plan and a book can differ, and this page records how. Use it to find the chapter for a system you own, looking the system up **by the job it does** and not by a product's name, or to learn that the book covers the job briefly, leaves it out or added it.
+
+To place that lookup among the others: this page opens the book's four reference pages, which gather what the chapters introduce where they need it. Domain coverage, this page, sends a capability to its chapter. The [[toolkit]] turns sixteen recurring questions into cards, each filled once with the facts of Larkfield, the fictional studio-software platform this book follows. The [[glossary]] gives each term one meaning, an owning chapter and, where they differ, its Stripe and Adyen names. The [[bibliography]] lists every cited source once, with its date and the pages that cite it. Each page is drawn from the chapters, so a disagreement between a chapter and a reference page is a defect to fix.
+
+The page itself runs in six steps. It says what the model is and how to read the tables; maps the 29 capabilities to chapters, group by group; lists what the book covers briefly or leaves out, and where to go instead; checks the book against the ten subjects it set out to cover; lists what the book added that the model lacks; and ends with a starting route for each of the model's five customer roles. It argues nothing about payments. For the argument, read the [[introduction]]; for the comparison of the two providers, [[stripe-and-adyen-bets-compared]].
+
+## Where the Model Comes From
+
+A **Productscape domain model** is a structured description of a product domain: the customers, what they need, the named capabilities that serve those needs (the model calls them **bricks**), and the logical modules and records behind each capability. The one behind this book is the author's own model of payments and revenue infrastructure. It is not public, and it was last reviewed on 15 November 2026. It takes one provider's product range as its subject and a second provider as its comparison, and it has 29 bricks in four groups. Beside the bricks it holds 7 product offerings, 5 customer roles in 4 groups, 48 logical records, 6 stress scenarios and a comparison list of 10 companies; this page uses the bricks, the roles and the scenarios. The table shows the shape that the coverage tables follow; every count in it, and on this page, was made from the model's own files.
+
+| Group | Sub-groups | Bricks |
+| --- | --- | --- |
+| Merchant Payments | Checkout and conversion (4); payment performance and omnichannel (2); processor choice (1) | 7 |
+| Revenue Automation | Monetization control plane (3); tax and accounting automation (3); merchant-of-record operations (1) | 7 |
+| Platform Money Movement | Platform onboarding (3); platform funds and financial products (4); business liquidity (1) | 8 |
+| Shared Financial Foundations | Trust and financial operations (4); developer and integration foundations (2); delegated authority (1) | 7 |
+| **Total** | | **29** |
+
+Because the model is a map of products and jobs, three rules govern its use in this book:
+
+- **Nothing in the model is a fact about a company.** Its own description says it "does not attempt to describe Stripe or Adyen’s complete internal service topology, physical databases, cloud regions or universal legal rights", and that its logical records and their ownership "are inferred from the modeled jobs". The book never presents a brick, a module or a record as how a provider is built. Facts about companies come only from dated public sources, cited in the chapters and listed in the [[bibliography]].
+- **No figure from the model is quoted.** The model states that it asserts no current values or targets without a measurement source, and its planning horizons are, in its words, "authoring choices, not a published vendor roadmap". The book takes neither.
+- **The running example is the book's own.** The model teaches with a fictional class-booking platform of its own. Larkfield ([[meet-larkfield]]) was written for this book, is not a disguised customer of any provider, and none of its figures or incidents belongs to a real company.
+
+With those rules in place, a row of the tables reads as follows. Each row is one brick, named as the model names it, with the model's short key in code type so the count of 29 can be checked. The **grade** says how far the book goes, and it was set by opening the chapters as written, not by reading the plan. **Chapter** means the capability is the subject of at least one chapter. **Section** means one or more sections inside a chapter on a wider subject. **Mention** means a paragraph, a table row or a passing reference. A fourth grade, **not covered**, was available; no whole brick needed it, and the parts of bricks that did are listed after the tables. The first chapter in a row is the main treatment; chapters in parentheses treat a related part.
+
+## Coverage by Capability
+
+Read group by group, the tally is **20 at chapter level, 6 at section level, 3 mentions and none left out**, and every group has chapters of its own. The first two groups already show the pattern the rest repeats: where a capability is a mechanism (getting an approval, rating usage, collecting an invoice), it has a chapter; where it is a product surface placed on top of a mechanism (a hosted page, a payment link), it has less. Usage metering and rating, for example, has its own chapter in Part VI.
+
+| Capability (key) | Group | Grade | Chapters |
+| --- | --- | --- | --- |
+| Hosted Checkout (`chck`) | Merchant Payments | Mention | [[tokenization-vaulting-and-pci]], as one of four ways to collect a card ([[payment-state-machines]] for the session as an entry point; [[merchant-of-record]]) |
+| Payment Elements (`elem`): payment fields embedded in the merchant's page | Merchant Payments | Section | [[tokenization-vaulting-and-pci]] |
+| Payment Links (`pmlk`) | Merchant Payments | Mention | [[merchant-of-record]], named beside hosted checkout as a hosted payment page ([[invoicing-collections-and-dunning]], as a link sent after a failed collection) |
+| Payment Method Orchestration (`pmtd`): which methods are offered where | Merchant Payments | Chapter | [[local-payment-methods]] ([[payments-what-is-moving]] for stablecoin acceptance) |
+| Authorization Optimization (`auth`): executing, authenticating and capturing a payment | Merchant Payments | Chapter | [[authorization-optimization]], [[payment-authorization]], [[payment-state-machines]] ([[three-d-secure-and-sca]], [[network-tokens]], [[clearing-and-settlement]]) |
+| Terminal and Reader Operations (`term`) | Merchant Payments | Chapter | [[in-person-payments]] |
+| Processor Routing and Execution Contracts (`rout`) | Merchant Payments | Chapter | [[payment-routing-and-orchestration]] ([[idempotency-and-retries]]) |
+| Subscription and Price Management (`subs`) | Revenue Automation | Chapter | [[subscriptions-and-billing-engines]] ([[journey-failed-renewal]]) |
+| Usage Metering and Rating (`usag`) | Revenue Automation | Chapter | [[usage-metering-and-rating]] |
+| Invoicing and Collections (`invo`) | Revenue Automation | Chapter | [[invoicing-collections-and-dunning]] ([[journey-failed-renewal]]) |
+| Tax Determination and Registration (`taxx`) | Revenue Automation | Chapter | [[billing-and-payment-tax]] ([[merchant-of-record]]) |
+| Revenue Recognition (`revn`) | Revenue Automation | Chapter | [[billing-revenue-recognition]] |
+| Reporting and Data Export (`rpts`) | Revenue Automation | Section | [[payment-reconciliation-and-reporting]] |
+| Merchant-of-Record Responsibility and Support (`morc`) | Revenue Automation | Chapter | [[merchant-of-record]] |
+
+The platform and shared-foundation groups complete the map in the same way. Accounts, verification, splits, payouts, fraud, disputes, ledgers, reconciliation, webhooks and the developer platform each have a chapter. Issued cards, financing, financial accounts and delegated authority get a section. Identity verification as a product of its own gets a mention. With these fifteen rows the tally can be checked: 20 + 6 + 3 = 29.
+
+| Capability (key) | Group | Grade | Chapters |
+| --- | --- | --- | --- |
+| Connected Account Lifecycle (`acct`) | Platform Money Movement | Chapter | [[platform-payment-models]], [[platform-onboarding-and-verification]] |
+| KYC and KYB Verification (`kycb`): checking a person or a business before it may be paid | Platform Money Movement | Chapter | [[platform-onboarding-and-verification]], [[payment-compliance-and-regulation]] |
+| Identity Verification (`iden`) | Platform Money Movement | Mention | Identity evidence as one requirement in [[platform-onboarding-and-verification]] and [[payment-compliance-and-regulation]] |
+| Funds Routing and Split Settlement (`split`) | Platform Money Movement | Chapter | [[splits-balances-and-platform-payouts]] ([[journey-platform-payment]]) |
+| Payout Execution and Returns (`pyot`) | Platform Money Movement | Chapter | [[payouts-and-money-movement]] ([[splits-balances-and-platform-payouts]]) |
+| Issuing and Spend Controls (`issu`) | Platform Money Movement | Section | [[embedded-finance]] |
+| Capital and Financing Offers (`capm`) | Platform Money Movement | Section | [[embedded-finance]] |
+| Financial Accounts and Business Liquidity (`tres`) | Platform Money Movement | Section | [[embedded-finance]] ([[licences-and-safeguarding]] for who may hold the money; [[balances-and-funds-flows]] for currency conversion) |
+| Fraud Detection and Adaptive Risk Controls (`rada`) | Shared Financial Foundations | Chapter | [[payment-fraud-and-risk]] |
+| Disputes and Chargeback Operations (`disp`) | Shared Financial Foundations | Chapter | [[refunds-reversals-and-disputes]], [[journey-dispute]] |
+| Balances and Internal Ledger (`ledg`) | Shared Financial Foundations | Chapter | [[payment-ledgers]], [[balances-and-funds-flows]] |
+| Reconciliation and Balance Operations (`reca`) | Shared Financial Foundations | Chapter | [[payment-reconciliation-and-reporting]] |
+| Eventing and Webhooks (`webh`) | Shared Financial Foundations | Chapter | [[payment-webhooks-and-events]] |
+| Developer API and Dashboard Foundations (`devx`) | Shared Financial Foundations | Chapter | [[payment-developer-platform]], [[payment-api-design]] |
+| Delegated Authority and Approvals (`mand`) | Shared Financial Foundations | Section | [[payments-what-is-moving]] |
+
+## What the Book Covers Briefly or Leaves Out
+
+Twenty capabilities have a chapter; nine do not. Those nine are either product surfaces or separately licensed products, and the book treats each inside a chapter about the mechanism beneath it. The table says where each stands and why, so that a reader does not go looking for a chapter that was never written.
+
+| Capability | Grade | Where it stands | Why |
+| --- | --- | --- | --- |
+| Hosted checkout | Mention | The provider's hosted page is one of four ways to collect a card in [[tokenization-vaulting-and-pci]]; the session object is named as an entry point in [[payment-state-machines]] | For an engineer the page matters for what it removes from compliance scope and for the payment object behind it; page design and conversion are the merchant's commerce subject |
+| Payment links | Mention | Named with hosted checkout as a hosted payment page in [[merchant-of-record]], and as a link sent to a customer after a failed collection in [[invoicing-collections-and-dunning]] | A link is a second way to reach the same hosted page; it adds no mechanism |
+| Identity verification as a standalone product | Mention | Identity documents appear as one requirement among others in [[platform-onboarding-and-verification]] and [[payment-compliance-and-regulation]] | The book covers verification of the party that is paid; checking an arbitrary end user's identity is a product outside the path of the payment |
+| Payment fields embedded in the merchant's page | Section | Two sections of [[tokenization-vaulting-and-pci]]: how a card number reaches the provider without passing through the merchant, and what stays the merchant's on the page around the fields | The fields matter as the boundary of card-data scope, which is that chapter's subject |
+| Reporting and data export | Section | The section on what customers get in [[payment-reconciliation-and-reporting]]: reports itemized by payout and by batch, and the data offered as tables | Reports are taught as the input to reconciliation, not as an analytics product |
+| Issued cards and spend controls | Section | The section on issuing from the issuer's side in [[embedded-finance]] | A separate product with its own license; the chapter says what it demands of a platform |
+| Financing offers | Section | One of three products in a shared section of [[embedded-finance]], and a row in its availability table | Little is public beyond eligibility and repayment terms; the chapter is short and says so |
+| Financial accounts and business liquidity | Section | Accounts for a platform's sellers in [[embedded-finance]]; the licenses behind held funds in [[licences-and-safeguarding]] | The book takes the platform's side; a company's own treasury operations are left out (below) |
+| Delegated authority and approvals | Section | The section on agents that pay in [[payments-what-is-moving]] | Most of it was announced or in preview at the research cut-off; the chapter labels each item and teaches only what was released |
+
+Beyond whole capabilities, some parts of capabilities the book does cover are left out by decision. Most belong to a sibling book that already teaches them. The table names each part, the capability it belongs to, where to go instead and why.
+
+| Part left out | Belongs to | Where to go instead | Why |
+| --- | --- | --- | --- |
+| Posting provider payouts, fees and refunds into an ERP's general ledger, and approving the close | `rpts`, `reca`, `revn` | RECONCILED, the sibling book on finance systems: [[payments-to-ledger]], [[traceability-and-reconciliation]] | It is the finance side. This book stops at the reconciled provider record and the schedule; [[payment-reconciliation-and-reporting]] and [[billing-revenue-recognition]] say where they stop |
+| The accounting standards behind revenue recognition | `revn` | RECONCILED: [[accounting-for-architects]] | The chapter teaches how an invoice line becomes a schedule, not the standard |
+| Cart, offer and order facts behind a checkout session | `chck` | ORDERED, the sibling book on commerce platforms: [[commerce-payments]] | The model itself places them in the merchant's commerce systems |
+| Agent-commerce protocols and what an agent is permitted to do | `mand`, `chck` | ORDERED: [[ai-and-agentic-commerce]]; Architecting Agentic Systems: [[agent-identity-and-least-privilege]] | This book covers only the payment an agent makes: who authorized it |
+| Tax law by country and the filing of returns | `taxx` | No chapter; the merchant's side of tax is in ORDERED's [[tax-invoicing-and-ledger]] | [[billing-and-payment-tax]] teaches what a calculation needs and where it can live, not the rules of a jurisdiction |
+| A company's own treasury: cash positioning and currency management for its own funds | `tres` | No chapter | A finance discipline with its own tools; Larkfield, a platform, meets accounts only as a feature for its studios |
+| Dashboard users, operator roles and the audit of human actions | `devx` | No chapter | [[payment-developer-platform]] covers API credentials, test environments and request limits; operator access in a provider's dashboard is ordinary access management |
+
+## The Ten Subjects the Book Set Out to Cover
+
+The model was not the book's starting point. The author began from a list of ten subjects the book had to cover, and the model served as a research map to check that list for gaps. Measured against the list instead of the model, every subject has chapters, and the ten map onto the book's parts almost one to one. That is why the book is ordered by the path of the money and not by the model's product groups.
+
+| Subject on the author's list | Chapters |
+| --- | --- |
+| The payment lifecycle | [[journey-of-a-payment]], [[payment-authorization]], [[clearing-and-settlement]], [[refunds-reversals-and-disputes]] and [[payment-state-machines]]; end to end in [[journey-card-payment]] |
+| Acquiring, network connectivity, local methods, routing, orchestration | [[acquiring-and-network-connectivity]], [[local-payment-methods]], [[payment-routing-and-orchestration]] (also [[authorization-optimization]], [[in-person-payments]]) |
+| Ledgers, money movement, reconciliation, payouts | [[payment-ledgers]], [[balances-and-funds-flows]], [[payouts-and-money-movement]], [[payment-reconciliation-and-reporting]] (also [[licences-and-safeguarding]]) |
+| API design: idempotency, versioning, webhooks, retries | [[payment-api-design]], [[idempotency-and-retries]], [[payment-api-versioning]], [[payment-webhooks-and-events]] (also [[payment-developer-platform]]) |
+| Tokenization, vaulting, PCI, network tokens | [[tokenization-vaulting-and-pci]], [[network-tokens]] |
+| Fraud, risk, 3-D Secure and strong customer authentication | [[payment-fraud-and-risk]], [[three-d-secure-and-sca]] (also [[payment-compliance-and-regulation]]) |
+| Billing, subscriptions, invoicing, tax, revenue recognition | [[subscriptions-and-billing-engines]], [[usage-metering-and-rating]], [[invoicing-collections-and-dunning]], [[billing-and-payment-tax]], [[billing-revenue-recognition]] (also [[merchant-of-record]]) |
+| Platform models, on both providers' platform products | [[platform-payment-models]], [[platform-onboarding-and-verification]], [[splits-balances-and-platform-payouts]] (also [[embedded-finance]], [[journey-platform-payment]]) |
+| Reliability, multi-region operation, consistency | [[payment-reliability-and-availability]], [[payment-data-stores-and-consistency]], [[payment-multi-region-and-data-residency]] (also [[payment-peak-load]], [[payment-safe-change]]) |
+| Where Stripe and Adyen made different bets | [[case-stripe]], [[case-adyen]], [[stripe-and-adyen-bets-compared]]; and a section titled “Stripe and Adyen: Where They Differ” in every chapter of Parts I to VIII |
+
+## What the Book Added
+
+Because the book started from those ten subjects, much of it has no brick behind it. A product model answers what a customer can buy and which job it does. An engineer new to payments first needs something no brick states: what happens to the money, and why the obvious integration fails. So Parts I, IV and VIII have few or no bricks behind them. The table sets what the model has beside what the book adds, and names the chapters.
+
+| The model has | The book adds | Where |
+| --- | --- | --- |
+| Four dated milestones in a tutorial | A walk from cash to today's layers, one need and one concept per step | [[how-payments-got-complicated]] |
+| Six stress scenarios | Sixteen named failure patterns, each with a warning sign | [[where-payment-systems-go-wrong]] |
+| Capture and refund outcomes inside the authorization brick; no brick for clearing, settlement or fees | Part I: the parties, the promise an authorization makes, how the money moves days later, how it comes back, who earns what | [[part-1]], [[clearing-and-settlement]], [[payment-economics]] |
+| No brick for the license or network membership a provider stands on | Acquiring and licenses | [[acquiring-and-network-connectivity]], [[licences-and-safeguarding]] |
+| A token record and “credential lifecycle” inside the authorization brick | Card vaults, PCI scope and network tokens as chapters | [[tokenization-vaulting-and-pci]], [[network-tokens]] |
+| “Payment authentication” as two words inside the authorization brick | 3-D Secure and strong customer authentication | [[three-d-secure-and-sca]] |
+| Payment state and idempotency named inside other bricks | A chapter each | [[payment-state-machines]], [[idempotency-and-retries]] |
+| One brick for the API, its credentials and the dashboard | API object models and API versioning | [[payment-api-design]], [[payment-api-versioning]] |
+| No brick for running the system; the model declines to describe internal topology, databases or regions | The whole of Part VIII: reliability, data stores and consistency, regions, peak load, safe change | [[part-8]], [[payment-reliability-and-availability]], [[payment-data-stores-and-consistency]], [[payment-multi-region-and-data-residency]], [[payment-peak-load]], [[payment-safe-change]] |
+| One walkthrough of a single booking | Four end-to-end journeys, each through every record | [[part-9]], [[journey-card-payment]], [[journey-failed-renewal]], [[journey-platform-payment]], [[journey-dispute]] |
+| A comparison list of ten companies | Two cases built from dated public sources, the bets compared, three contrast cases, and what is moving | [[case-stripe]], [[case-adyen]], [[stripe-and-adyen-bets-compared]], [[payment-contrast-cases]], [[payments-what-is-moving]] |
+
+The second row deserves a closer look, as an example of a replacement that kept most of its subject. The model's stress scenarios are hypotheses about shocks from outside; the book teaches failures a newcomer meets from inside. Five of the six scenarios still have a nearest chapter, and one has none.
+
+| The model's stress scenario | Nearest chapter |
+| --- | --- |
+| A banking partner leaves a country and ends local processing and settlement | [[licences-and-safeguarding]], [[acquiring-and-network-connectivity]] |
+| A country redenominates its currency and imposes conversion and withdrawal controls | None |
+| A platform's contracted loss exposure or liability allocation changes | [[platform-payment-models]] |
+| Autonomous agents begin purchasing within delegated budgets | [[payments-what-is-moving]] |
+| An instant-transfer and payee-verification obligation changes payout operations | [[payouts-and-money-movement]], [[payments-what-is-moving]] |
+| A merchant makes every processor a replaceable route behind its own orchestrator | [[payment-routing-and-orchestration]] |
+
+## The Model's Customers and the Book's Readers
+
+The book also reuses the model's customers, as reading routes. The model describes five customer roles in four groups. They are the people the book's reader builds for, and each has a nearest seat in the fictional Larkfield cast and a short list of chapters to start with. The roles are archetypes and the seats are fiction; neither is a real customer account.
+
+| Role in the model | Responsible for | Nearest seat at Larkfield | Start with |
+| --- | --- | --- | --- |
+| Growth commerce lead (direct merchant) | Conversion, approval rates, expansion to new markets | No exact seat; the payments team under Femke de Graaf owns acceptance | [[authorization-optimization]], [[local-payment-methods]], [[payment-fraud-and-risk]] |
+| Revenue operations lead (recurring revenue) | Subscriptions, usage pricing, invoices that can be explained | The team that runs Larkfield's own subscription billing | [[subscriptions-and-billing-engines]], [[invoicing-collections-and-dunning]], [[journey-failed-renewal]] |
+| Platform payments lead | Onboarding sellers, moving their money, carrying or assigning loss | Femke de Graaf, Head of Payments Engineering; Jonas Weber, Risk and Compliance Lead | [[platform-payment-models]], [[platform-onboarding-and-verification]], [[splits-balances-and-platform-payouts]] |
+| Platform seller and payout recipient | Getting verified, getting paid, knowing why a payout is late | Ines Bakker of Studio Noord; Ravi Shah of Ironworks Climbing | [[journey-platform-payment]], [[payouts-and-money-movement]] |
+| Treasury and finance controller | Cash availability, reconciliation, the close | Priya Raman, Finance Controller | [[balances-and-funds-flows]], [[payment-reconciliation-and-reporting]], [[billing-revenue-recognition]] |
+
+By contrast with the routes, the question differs. Each role in the model asks about an outcome: collected revenue, usable funds, a correct bill, explained cash. The book's reader is the engineer who builds for them, and asks something else: **which record proves the outcome, and what happens when two records disagree?** Every chapter adds that question to the model's.
+
+## One Map, Three Answers
+
+Taken together, the tables give one of three answers to a lookup. The answer is a chapter when the capability is a mechanism the book teaches. It is a section or a mention when the capability is a product surface on top of a mechanism. It is another book when the subject belongs to the finance, commerce or agent side. All three follow from one difference: the model is organized by what can be bought, and the book by what happens to the money. That also answers the opening. The 29 capabilities name no clearing, vault, 3-D Secure, idempotency or versioning because those are mechanisms beneath the products, and the table of added subjects names the chapter for each. So match each system you own by the job it does, read the grade before the chapter, check the left-out list against your business, and never quote the model, or this page, for a fact about a provider.
+
+From here, continue to the [[toolkit]] for the sixteen cards and templates these chapters introduce, each with a filled Larkfield example. Use the [[glossary]] to look up a term and the [[bibliography]] to trace a claim to its dated source.
+
+## Sources and Evidence
+
+*Company, product and investor sources*
+
+- None. This page states no fact about Stripe, Adyen or any other company; such facts are made, with dated sources, in the chapters the tables point to.
+
+*Standards, regulation and official documentation*
+
+- None.
+
+*Research and practitioner sources*
+
+- *Payments and Revenue Infrastructure*, a Productscape domain model, the author, last reviewed 15 November 2026. Not public. The author's own planning input: 29 capability bricks in four groups, with product offerings, customer roles, logical records, stress scenarios and a comparison list. A planning map; not a description of any company's architecture and not a source for any fact in this book.
+- The chapters of this book as written on 17 November 2026: each row of the coverage tables was checked against the chapter it names.
+
+Larkfield is fictional; architectural recommendations, labeled inferences and labeled assumptions are the author's judgement.

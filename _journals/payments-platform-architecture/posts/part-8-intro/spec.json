@@ -1,0 +1,597 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "part-8",
+  "journal": "payments-platform-architecture",
+  "part": "part-8",
+  "title": "Part VIII — SCALE: Reliability, Data and Operations",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "basis": "Written on 2026-11-17 from the part-8 entry and the part thesis, opening and flow in journal-spec.json, the scenario ledger, and a full reading of the five written chapters of Part VIII. The page makes no external factual claim of its own: every statement about Stripe or Adyen repeats one that a chapter of the part makes and cites, except the statement that neither has published how its webhook sender is built, which acceptance criterion AC-3 requires and which chapter 20 (payment-webhooks-and-events) makes and is linked for.",
+  "intent": {
+    "outcome": {
+      "know": [
+        "Part VIII answers five questions in order: how a payment path stays up, how its data stays consistent when split, where systems and data may live, how a peak is met, and how the system is changed while running.",
+        "This is the part of the book with the least public evidence, and chapter 39 is short for that reason."
+      ],
+      "believe": [
+        "In a money path, late is cheaper than wrong."
+      ],
+      "can_do": [
+        "Pick the Part VIII chapter that answers the operational question in front of them."
+      ]
+    },
+    "audience": {
+      "who": "Engineers and architects new to payments who have read Parts I to VII and are about to start the chapters on operating a payment system, or who arrive with one operational question (an outage, a database split, a residency questionnaire, a peak, a risky deploy) and want the chapter that answers it.",
+      "already_knows": [
+        "What redundancy, replication, sharding in general, rate limits, queues and deployments are.",
+        "Parts I to VII: the payment's journey, the unknown outcome of a timed-out request and the idempotency key, webhooks, the ledger and reconciliation, the platform account model.",
+        "Larkfield in outline: a fictional studio-software platform on Stripe and Adyen, its incidents and its 2027 repair program Keel."
+      ],
+      "does_not_know": [
+        "Graceful degradation, consistency boundary, outbox, data localization, backpressure, progressive rollout: each is owned by a Part VIII chapter and is glossed in a clause here or only named.",
+        "What Stripe and Adyen have each published about operating at scale, and where that record stops; the page states it in a clause per chapter and leaves the evidence to the chapter."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "A reader of this page alone can name the five chapters' subjects in reading order and state the part's claim in one sentence.",
+        "check": "intro_predicts_content",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "After reading only this page: what does Part VIII argue, and what will each of the next five chapters tell you, in order?",
+        "expected": "At scale something must give way, and in a payment system it is never the record of money; then reliability and outages, data stores and consistency, regions and data residency (short, little is public), peak load, safe change."
+      },
+      {
+        "id": "AC-2",
+        "statement": "The page opens on the two Larkfield first-of-month runs with the ledger's figures and says which was late and which was wrong.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "major"
+      },
+      {
+        "id": "AC-3",
+        "statement": "The page tells the reader, before any chapter, that a cell design, the topology and timing of a failover between regions, which data is replicated synchronously and the webhook sender are not public for either company.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "major"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "How is a system that moves money kept running through failures, growth, legal limits on where data may live, peaks and constant change, and how much of Stripe's and Adyen's answer is public?",
+    "claim": "A payment platform is run at scale by deciding in advance what gives way (the freshness of the books under failure, a system-wide transaction under growth, a global identifier under a localization law, a caller's burst under peak, the reach of a rollout under change), and in every design Stripe or Adyen has published the record of money is not among the things relaxed; the two have documented their choices on outages, data stores, limits and rollouts, and neither has published a cell design or the topology or timing of a failover of its payment path between its data centers or regions.",
+    "disputed_by": "The view that scale in payments is ordinary web scale with a stricter number: add redundancy and capacity until the uptime figure is reached, keep everything strongly consistent everywhere, and treat availability as the first measure of a provider.",
+    "so_what": "A team that accepts the claim writes down, for each of its own money-moving paths, what is allowed to lag, be refused, be paced or be rolled back, and stops comparing providers by a count of nines or by an assumed failover design that neither provider has documented.",
+    "how_why": "Something has to give when a dependency fails, data outgrows one database, a law fixes where data sits, a month's renewals arrive in six hours or a change goes wrong. The published designs show what was chosen: Adyen's 2021 account lets accounting run behind so the edge keeps answering; Stripe's 2017 account sheds non-critical requests first and its 2024 account moves data between shards with a write pause of under two seconds that retries absorb; Stripe's India page (updated 2023) records features cut to keep data in the country; Stripe's documented limits (accessed November 2026) cap each account long before capacity; Stripe's 2023 annual letter stages every change by traffic share. In none of them is the record of money the thing that is relaxed. On the topology and timing of failover, on cells and on which data is replicated synchronously the public record of both companies stops (Adyen lists its data centers by continent or country and states that its load balancers fail over between them; Stripe names no AWS region and describes takeover only for billing usage events, not for payments), and the part says so instead of inferring.",
+    "supporting_claims": [
+      {
+        "id": "P8-1",
+        "claim": "A payment path stays available because its operator decides beforehand what may lag or be shed, and the lasting cost of an outage is the payments left with an unknown outcome, which published uptime figures do not report."
+      },
+      {
+        "id": "P8-2",
+        "claim": "Once money data is split across shards or clusters, it is kept consistent by small local transactions, idempotent retries, messages between clusters and verification afterwards, not by a transaction that spans the system."
+      },
+      {
+        "id": "P8-3",
+        "claim": "Where payment data lives is settled by localization law where one applies and by the provider's hosting model elsewhere, before any engineering goal, and the public record gives each provider's hosting, the regions Adyen names and what each has said about India, but not the topology or timing of a failover."
+      },
+      {
+        "id": "P8-4",
+        "claim": "A merchant's predictable peak fails at the provider's per-customer limits, not at the provider's capacity, so the load has to be paced by the party that creates it."
+      },
+      {
+        "id": "P8-5",
+        "claim": "Change on a money path is made safe by bounding how much live traffic a mistake can reach and testing the way back, and a change is finished only when the records agree after it."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Performs the part's opening: the two Larkfield months, the part thesis, the reading order and the warning about where the evidence is thin.",
+    "supports": []
+  },
+  "flow": {
+    "pattern": "large_to_small",
+    "additional_patterns": [
+      {
+        "pattern": "prerequisite_order",
+        "applies_to": "chapters: the five chapter paragraphs, in the part's reading order"
+      }
+    ],
+    "rationale": "The page opens on two months at one company, one late and one wrong, and widens them into the part's claim, then narrows: from the reversal of priorities the two months show, to the claim (something is chosen to give way and the record of money is not it), to how far the public evidence carries the claim, to the five questions in order, to one paragraph per chapter. The two months have to come first because 'late before wrong' is an abstraction until the reader has seen what each cost. The claim has to precede the chapter list because each chapter paragraph names what gives way in its subject, and a reader who has not been told that something always gives way reads the list as five unrelated operations topics. The evidence paragraph has to precede the list because the chapter paragraphs state what Stripe and Adyen document, and acceptance criterion AC-3 asks that the reader know before any chapter which parts are not public. The chapter paragraphs keep the part's own reading order, which the journal spec justifies as an argument from what must hold (the record) to what threatens it (growth, law, load, change); reordering them here would contradict the roadmap."
+  },
+  "introduction": {
+    "hook": {
+      "type": "intriguing_example",
+      "content": "On 1 October 2026 Larkfield's renewal job hit its provider's rate limit and 7,900 membership renewals were delayed to the next day; dunning emails went to members who had done nothing wrong. On 1 November 2026 a provider call timed out, the job retried with a new idempotency key, and 1,840 members were charged twice: €71,300 refunded, and 212 disputes anyway. The first month was late. The second was wrong."
+    },
+    "bridge": {
+      "from_reader_world": "The engineer's habit of counting downtime as the cost of failure, and Parts II to VII, which described each mechanism for one payment at a time.",
+      "to_topic": "The two Larkfield months, where the late run cost emails and the wrong run cost refunds and disputes: in a money path the order of priorities is the reverse of a content site's, and Part VIII puts the mechanisms under failure, growth, law, peak and change."
+    },
+    "thesis_statement": {
+      "text": "A payment platform is run at scale by deciding in advance what gives way (the freshness of the books under failure, a system-wide transaction under growth, a global identifier under a localization law, a caller's burst at peak, the reach of a rollout under change); in every design Stripe or Adyen has published the record of money is not among the things relaxed; and neither has published a cell design or the topology or timing of a failover between regions.",
+      "placement": "KEY POINTS bullets 1 to 3, and paragraphs p03 (the claim) and p04 (where the public record stops)."
+    },
+    "roadmap": {
+      "placement": "paragraph p05",
+      "promises": [
+        {
+          "promise": "Five chapters, each naming what gives way so that the record does not: how a payment path stays up and what an outage leaves behind; which databases hold the money and how they stay consistent when split; where the systems and the data are allowed to live, a short chapter because little is public; how a predictable peak is met; and how a system that cannot stop is changed.",
+          "kept_in": [
+            "chapters"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "On two first-of-month runs at Larkfield, a rate limit made 7,900 renewals a day late in October 2026 and a retry under a new idempotency key charged 1,840 members twice in November 2026: the first month was late and the second was wrong.",
+        "function": "example",
+        "organization": "illustration",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Larkfield (fictional), the Renewal Wave: on 1 October 2026 the renewal job hit its provider's rate limit and 7,900 renewals were turned away before any card was charged, marked failed and delayed to the next day; the email job could not tell a declined card from one never charged and sent dunning emails (ruling 37a).",
+            "source": "_research/scenario-ledger.md (The eight incidents)",
+            "shows": "A run that was late: its cost was mistaken emails and a day."
+          },
+          {
+            "kind": "scenario",
+            "what": "Larkfield (fictional), the Double Charge: on 1 November 2026 a provider call timed out during the renewals, the job retried with a new idempotency key, and 1,840 members were charged twice; €71,300 refunded, 212 disputes anyway.",
+            "source": "_research/scenario-ledger.md (The eight incidents)",
+            "shows": "A run that was wrong: its cost was refunds and disputes that an apology could not remove."
+          },
+          {
+            "kind": "figure",
+            "what": "Figure 1: two calendar pages side by side, one for October marked 'Late' with waiting renewals and a clock, one for November marked 'Wrong' with a doubled charge and money going back.",
+            "shows": "The hook as a picture: two months, two kinds of failure, two different costs."
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "Parts II to VII described each mechanism for one payment at a time; Part VIII puts them under conditions no single payment shows, and Larkfield's two months show that there the order of priorities is the reverse of a content site's: the late run cost emails, the wrong run cost refunds and disputes.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "The part's transition_in and bridge: the mechanisms of Parts II to VII, ending with Part VII's account model, under a dependency failing, data outgrowing one database, a law on where data sits, a month of renewals in six hours and several hundred deployments a day; the engineer's habit of counting downtime set against the costs of the two months.",
+            "source": "journal-spec.json, part-8 transition_in and opening.bridge",
+            "shows": "What the reader already holds, and why the habit they bring (minutes of downtime as the measure) ranks the two months the wrong way round."
+          }
+        ],
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "The two months, one late and one wrong, and Parts II to VII's mechanisms described one payment at a time.",
+          "introduces": "The conditions no single payment shows (failure, growth, law, peak, change), under which lateness is the cheaper failure.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "Part VIII's claim is that a payment platform is run at scale by deciding in advance what gives way (the freshness of the books under failure, a system-wide transaction under growth, a global identifier under a localization law, a caller's burst at peak, the reach of a rollout under change), and that in every design Stripe or Adyen has published the record of money is not among the things relaxed. Larkfield's late October run is the fourth of these met without a plan: a burst that had to wait.",
+        "function": "claim",
+        "organization": "classification",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "The five things the part thesis names as giving way, one per chapter, and its statement that in none of the published designs is the record of money relaxed; chapter 37 labels the common ordering (late before wrong) as the author's inference and says neither company states it as a principle.",
+            "source": "journal-spec.json, part-8 thesis; payment-reliability-and-availability, 'How a Payment Path Stays Up'",
+            "shows": "Something has to give under each of the five conditions, and what was chosen is on the public record for each."
+          },
+          {
+            "kind": "figure",
+            "what": "Figure 2: a record book at the center that does not move, and five springs around it that compress under five pressures, labeled 'Freshness', 'Transaction', 'Identifier', 'Burst' and 'Rollout'.",
+            "shows": "The part's shape in one picture: five things that give way, one per chapter, and one thing that does not."
+          }
+        ],
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The reversed order of priorities: late is cheaper than wrong.",
+          "introduces": "What follows for design: something else is chosen in advance to give way, five times over, so that the record does not.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "controlling_idea": "This is the part of the book with the least public evidence: both companies have documented their choices on outages, data stores, limits and rollouts, and neither has published a cell design, the topology or timing of a failover between regions, which data is replicated synchronously, or how its webhook sender is built, so an unsourced sentence about them is a guess and an uptime figure does not replace one.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "fact",
+            "what": "As the chapters establish and cite: failover between data centers is not found for Stripe's payment path (described for billing usage events only, 2025) and is stated by Adyen in general terms, with no topology or timings; 'cell architecture' is named once in a 2024 Stripe talk with no detail (chapter 37); which data is replicated synchronously and read consistency are not public for either (chapter 38; ruling 42b); neither describes between which places one region or data center takes over from another or how fast, and Stripe names no AWS region (chapter 39); the published uptime figures are five different measurements that cannot be ranked (chapter 37).",
+            "source": "payment-reliability-and-availability; payment-data-stores-and-consistency; payment-multi-region-and-data-residency",
+            "shows": "The reader knows before the chapter list where the comparisons that follow cannot be completed, and why chapter 39 is short."
+          },
+          {
+            "kind": "fact",
+            "what": "As chapter 20 states: 'Neither Stripe nor Adyen has published how its webhook sender is built.'",
+            "source": "payment-webhooks-and-events, the section on the sender",
+            "shows": "The one item of AC-3 that a chapter outside the part owns; it is linked, not re-argued."
+          }
+        ],
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "The claim, which rests on designs the two companies have published.",
+          "introduces": "What they have not published, and that this part has less public evidence than any other.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p05",
+        "controlling_idea": "The five chapters each name what gives way so that the record does not, each opening on a case at Larkfield: how a payment path stays up and what an outage leaves behind, which databases hold the money and how they stay consistent when split, where systems and data may live, how a predictable peak is met, and how a system that cannot stop is changed.",
+        "function": "transition",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "The part's roadmap and flow rationale: reliability first because it introduces the split between a path that must answer and a record that must be right; data stores show how the record stays right once spread over shards; regions ask where the shards may be; the peak chapter needs the hosting difference; change comes last because the incidents the earlier chapters cite were set off by a change.",
+            "source": "journal-spec.json, part-8 opening.roadmap and flow.rationale",
+            "shows": "The order is an argument from what must hold to what threatens it, so the reader has a reason to read in sequence."
+          }
+        ],
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The claim and the limits of its evidence.",
+          "introduces": "The five questions in reading order, and that each chapter opens on a Larkfield case.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "chapters",
+      "heading": "Chapters in this part",
+      "controlling_idea": "Each of the five chapters answers one question about operating a money path, names what gives way there and opens on one Larkfield case, and each relies on the chapters before it.",
+      "function": "description",
+      "advances_thesis": {
+        "supports": [
+          "P8-1",
+          "P8-2",
+          "P8-3",
+          "P8-4",
+          "P8-5"
+        ],
+        "how": "Each paragraph introduces the chapter that argues one of the part's supporting claims, so the list is the part's argument in outline."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "additional_patterns": [
+          {
+            "pattern": "problem_solution",
+            "applies_to": "p09 to p10: a system that cannot be stopped for its peak, then how it is changed while running"
+          }
+        ],
+        "rationale": "The part's own reading order, as the journal spec declares it. Reliability introduces the split every later chapter uses, a path that must answer and a record that must be right. Data stores show how that record stays right once divided into shards; regions take the same shards and ask where they may be, and introduce the hosting difference the peak chapter starts from. Change is last because the incidents the first four chapters cite were set off by changes. Putting regions before data stores would ask where shards may live before saying what a shard is."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The five questions in order (p05).",
+        "introduces": "One paragraph per chapter: the question in bold, what gives way, what Stripe and Adyen have documented and the Larkfield case it opens on.",
+        "form": "sentence",
+        "placement": "end_of_previous"
+      },
+      "paragraphs": [
+        {
+          "id": "p06",
+          "controlling_idea": "The reliability chapter answers how a payment path stays up and what an outage leaves behind: it stays up because the books or the non-critical requests give way, and what a merchant repairs afterwards is the payments with unknown outcomes, which Larkfield measures with a scripted 44-minute outage drill.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P8-1"
+            ],
+            "how": "Introduces the chapter that establishes the split between the answering path and the record, and the unknown outcome as the lasting cost of an outage."
+          },
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "As chapter 37 documents: Adyen described in 2021 an edge that keeps answering while accounting runs behind; Stripe described in 2017 shedding non-critical requests to protect the creation of charges; the published uptime figures do not report what became of requests that timed out.",
+              "source": "payment-reliability-and-availability",
+              "shows": "What gives way under failure, in each company's own account."
+            },
+            {
+              "kind": "scenario",
+              "what": "Larkfield (fictional): in May 2027 CEO Sofie Vermeer asks which provider is more reliable; Femke de Graaf answers with an outage drill in June 2027, a scripted degradation of 44 minutes that leaves 760 payments with no usable answer (assumption) and ends when the count of unknown payments is zero.",
+              "source": "payment-reliability-and-availability, 'In Practice at Larkfield: A Scripted Forty-Four Minutes'",
+              "shows": "Reliability measured as the time until every outcome is known, not as minutes of downtime."
+            }
+          ]
+        },
+        {
+          "id": "p07",
+          "controlling_idea": "The data-stores chapter answers which databases hold the money and how they stay consistent once divided: Stripe scaled a document database and Adyen a relational one, in what either has published no transaction spans the shards, and the small-scale version is the outbox Larkfield builds after purchases were paid and not activated.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P8-2"
+            ],
+            "how": "Introduces the chapter that shows how the record is kept right without a system-wide transaction."
+          },
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "As chapter 38 documents: Stripe's DocDB, an extension of MongoDB Community, with more than 2,000 shards (2024); Adyen's PostgreSQL with accounting clusters filled in rotation (2021); neither account mentions a transaction across shards or clusters, and the conclusion that both rely on local transactions, retries, messages and later verification is the author's labeled inference.",
+              "source": "payment-data-stores-and-consistency",
+              "shows": "Two different stores and one shared absence."
+            },
+            {
+              "kind": "scenario",
+              "what": "Larkfield (fictional): in 2026, 146 purchases (illustrative) were marked paid in the payment record store and never activated in the booking app; the outbox has been live since 1 March 2027.",
+              "source": "payment-data-stores-and-consistency, 'Setting the Scene at Larkfield' and 'In Practice at Larkfield'",
+              "shows": "The same design at one-database scale."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Chapter 37's split: the answering path is independent of the record, which may lag and may not be wrong.",
+            "introduces": "The consequence: the record has to be kept right on its own terms, in databases divided into shards.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p08",
+          "controlling_idea": "The regions chapter answers where systems and data are allowed to live and is short because little is public: a localization law decides first and the provider's hosting model second, Stripe runs on Amazon Web Services and names no AWS region, Adyen runs its own data centers and names them by continent or country, no finer, and a studio chain's questionnaire puts the question to Larkfield.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P8-3"
+            ],
+            "how": "Introduces the chapter that fixes what can and cannot be said about where either provider runs."
+          },
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "As chapter 39 documents: Stripe's page on its India data storage (last updated 16 May 2023) lists features changed or disabled to keep data in the country; Stripe runs on AWS (2023, 2024, current documentation) and names no AWS region; Adyen runs its own infrastructure (2021, 2025, 2026) its documentation names five integration regions, and its website places its data centers by continent or country, no finer.",
+              "source": "payment-multi-region-and-data-residency",
+              "shows": "The four kinds of statement the public record supports."
+            },
+            {
+              "kind": "scenario",
+              "what": "Larkfield (fictional): in April 2027 a pilates chain in Hamburg asks where its members' payment data is stored and whether it leaves the European Union; a ten-minute draft answer has no source for any clause.",
+              "source": "payment-multi-region-and-data-residency, 'Setting the Scene at Larkfield'",
+              "shows": "An unsourced sentence about regions is a guess."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Chapter 38's shards: data divided by engineers, for size and load, in designs described at length.",
+            "introduces": "Data divided by country and by law, where both companies have published very little.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p09",
+          "controlling_idea": "The peak chapter answers how a predictable peak is met: a merchant's own peak meets the provider's per-customer limit before the provider's capacity, so the party that creates the load paces it, as Larkfield does by running its first-of-month wave over 18 hours.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P8-4"
+            ],
+            "how": "Introduces the chapter that locates a merchant's peak at its own share and makes lateness the design goal."
+          },
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "As chapter 40 documents: Stripe's documentation (n.d., accessed November 2026) allows an account 100 requests a second; Adyen publishes no limit for payment requests.",
+              "source": "payment-peak-load",
+              "shows": "The limit a merchant meets first is published by one provider and has to be asked for at the other."
+            },
+            {
+              "kind": "scenario",
+              "what": "Larkfield (fictional): the wave of about 357,000 renewals, sent until Keel in the first six hours of the 1st; in April 2027 CTO Daniel Osei objects that Stripe carried 152,000 transactions a minute on Black Friday; Keel decision K5 paces the run over 18 hours.",
+              "source": "payment-peak-load; _research/scenario-ledger.md (K5, The first of the month)",
+              "shows": "A run more than a hundred times smaller than a published peak still failed, at the per-customer limit."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Chapter 39's documented hosting difference: rented cloud capacity at Stripe, owned infrastructure at Adyen.",
+            "introduces": "What follows when load arrives at once, and the per-customer share a merchant reaches first on both.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "controlling_idea": "The safe-change chapter answers how a system that cannot stop is changed: each change first reaches a bounded share of live traffic, is withdrawn automatically and has a tested way back, and because even 1% is real payments the author's rule is that a change is finished when the records agree, which Larkfield's upgrades of March 2026 and May 2027 show from both sides.",
+          "function": "description",
+          "advances_thesis": {
+            "supports": [
+              "P8-5"
+            ],
+            "how": "Introduces the chapter that bounds a mistake's reach and makes reconciliation the test that a change is done; it also carries the part's closing."
+          },
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "As chapter 41 documents: Stripe's 2023 annual letter (published March 2024) describes about 400 deployments a day to one core API service, staged by share of traffic with automatic withdrawal; on 8 February 2024 a change that reached 1% of its critical tier failed payments for six minutes; Adyen's 2018 account describes toggling features one by one after a release.",
+              "source": "payment-safe-change",
+              "shows": "Bounded exposure limits the damage and does not remove it."
+            },
+            {
+              "kind": "scenario",
+              "what": "Larkfield (fictional): the March 2026 library upgrade (the Version Cliff) reached every request in one deploy and subscription revenue reports were wrong for six days; the May 2027 upgrade is staged by studio, first to 62 of 6,200.",
+              "source": "payment-safe-change; _research/scenario-ledger.md",
+              "shows": "The same upgrade as an unbounded change and as a staged one."
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "Chapter 40's open problem: a payment system cannot be stopped for its peaks.",
+            "introduces": "How it is changed while it runs: bounded exposure, automatic withdrawal, a tested way back, and reconciliation as the finish.",
+            "form": "phrase",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "Where to Begin",
+    "synthesis": "Read in order, the five chapters are one argument from what must hold, the record, to what threatens it (growth, law, load and change); a reader who enters at one operational question finds the same test there: what gives way, and is the record on the list.",
+    "so_what": "Faced with an outage, a split database, a residency question, a peak or a risky deploy, the reader asks first what is allowed to be late, and makes a money path late before it is wrong.",
+    "callback": {
+      "to": "The opening's two first-of-month runs at Larkfield, 7,900 renewals late in October 2026 and 1,840 members charged twice in November 2026 (p01).",
+      "how": "The reader is told that by the end of the part the two runs read as one design choice, late before wrong, made by accident in 2026 and on purpose under Keel."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Begin with the reliability chapter: the first thing that gives way, under failure, is the freshness of the books."
+    },
+    "hand_off": {
+      "to": "payment-reliability-and-availability",
+      "relationship": "elaboration",
+      "carries_over": "The part opening's two first-of-month runs and its claim that something must give way so the record does not.",
+      "introduces": "The first thing that gives way: under failure, the freshness of the books and the non-critical requests, and what a merchant is left to repair afterwards."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The five chapters and what gives way in each.",
+      "introduces": "How to use them: in order, or entered at one question, and where to begin.",
+      "form": "sentence",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p11",
+        "controlling_idea": "The five chapters run from what must hold to what threatens it and are best read in order, though each restates what it borrows; by the end the two first-of-month runs read as one choice, late before wrong; the first thing that gives way, under failure, is the freshness of the books.",
+        "function": "synthesis"
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "Teaching reliability, consistency, residency, peak handling or rollout; the page summarizes and does not re-argue the chapters.",
+      "covered_in": [
+        "payment-reliability-and-availability",
+        "payment-data-stores-and-consistency",
+        "payment-multi-region-and-data-residency",
+        "payment-peak-load",
+        "payment-safe-change"
+      ]
+    },
+    {
+      "topic": "The part's closing (the asymmetry between what the providers documented and what a merchant cannot verify, Keel's K5 and K1 as the answer to the two months, and the one-line takeaway per money path).",
+      "covered_in": [
+        "payment-safe-change"
+      ]
+    },
+    {
+      "topic": "Rate limits themselves and the design of webhook delivery, which earlier chapters own.",
+      "covered_in": [
+        "payment-developer-platform",
+        "payment-webhooks-and-events"
+      ]
+    },
+    {
+      "topic": "A 'Stripe and Adyen: Where They Differ' table, take-away tiers, failure-pattern callout and Questions to Ask; part intros do not carry them (style guide)."
+    },
+    {
+      "topic": "External factual claims of the page's own; every company statement repeats a chapter, which cites it."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "The closing sentence 'Begin with …' sits under its own heading, 'Where to Begin', as the conclusion's one paragraph.",
+      "rejected": [
+        "Ending the 'Chapters in this part' section with it: the draft checker reads a conclusion only from a heading of its own, and the other part intros of this book use the same heading."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The statement that the webhook sender is not public, required by AC-3, is made with a link to chapter 20, which owns and cites it, although chapter 20 is outside Part VIII.",
+      "rejected": [
+        "Leaving it out, which fails AC-3.",
+        "Stating it without a link, which would be a claim of the page's own."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The claim paragraph says that 'the record is not among the things relaxed' is the author's reading of the published designs, as chapter 37 labels it.",
+      "rejected": [
+        "Stating it as something either company has said: neither states it as a principle."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Keel's answer to the two months (K5 paces, K1 fixes the key) is only touched in the peak paragraph; the full callback is left to chapter 41, which carries the part's closing.",
+      "rejected": [
+        "Resolving the hook in the intro, which would pre-empt the closing."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "journal-spec.json (part-8: thesis, opening, flow, transition_in; post entry part-8)",
+      "contributed": "Intent, thesis, role, hook, bridge, roadmap and the order of chapters."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "The Renewal Wave and the Double Charge with their figures, Keel decisions K1 and K5, the additions by chapters 37 to 41."
+    },
+    {
+      "kind": "internal",
+      "ref": "posts/37-payment-reliability, 38-payment-data-stores-and-consistency, 39-multi-region-and-data-residency, 40-payment-peak-load, 41-safe-change (index.md, read in full); posts/20-webhooks-and-events (the statement on the webhook sender)",
+      "contributed": "What each chapter argues, its Larkfield case, its numbers and the documented Stripe and Adyen facts repeated here."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/consistency-issues.md (rulings 22, 24, 25)",
+      "contributed": "No external URLs in the running text; 'eight incidents', seven of them in 2026; publication dates as displayed (the page gives years only)."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation pass (parts 6-8): fields copied from the journal spec and unit-level controlling ideas and evidence brought into line with the verified page and the consistency rulings; no unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Spec created from the journal spec and the five written chapters of Part VIII."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "After the flow rubric: p03 now ties the late October run to the list of things that give way (a burst that had to wait), and the conclusion says the chapters are best read in order instead of inviting entry anywhere without qualification. The article glosses 'outbox' in the chapter paragraph. Notes not acted on: the roadmap paragraph (p05) is kept although the chapter list repeats its five questions, because the style guide and AC-1 ask for the reading order in the lead; the top-level pattern stays large_to_small although the first three paragraphs widen from a case to the claim, as in the other part intros of this book; 'non-critical requests' in the reliability paragraph is chapter 37's second lever under failure and is named there, not in the claim's list of five."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 29 claims checked against chapters 37 to 41 and 20, their verification files and rulings 18 to 45 (26 agree, 3 corrected to match, 0 removed). Most significant fix: 'neither has published how its regions, cells, failover or replication settings work' narrowed to what the chapters now support (Adyen states failover in general terms and names its data centers by continent or country; replication per ruling 42b). Also the two-step account of the 7,900 emails (ruling 37a). Wording inside units only. The copied fields thesis.claim, thesis.how_why, AC-3 and the thesis statement still carry the older wording and wait for the journal spec."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Part thesis claim reworded as approved by the author after verification (clause made too strong by the verified sources)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: statements re-tested with a wide search. Holds: Stripe names no AWS region; Adyen publishes no rate limit for payment requests. No change to the text. Overturned elsewhere and relevant to the locked thesis wording: Stripe has described two-region failover for billing usage events (2025), not for payments."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Sweep of rulings 46 to 48: p04 evidence scopes Stripe's missing failover statement to the payment path (46g); prose unchanged. Part thesis how_why (not the claim) now says Stripe describes takeover only for billing usage events, where it said 'says nothing on takeover'."
+    }
+  ],
+  "length": {
+    "target_words": 1050,
+    "max_words": 1200
+  }
+}

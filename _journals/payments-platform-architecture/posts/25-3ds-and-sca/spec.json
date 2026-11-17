@@ -1,0 +1,1579 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "three-d-secure-and-sca",
+  "journal": "payments-platform-architecture",
+  "part": "part-5",
+  "title": "Proving It Is You: 3-D Secure and Strong Customer Authentication",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "What strong customer authentication requires under PSD2, its exemptions with their thresholds, and why merchant-initiated payments fall outside it.",
+        "The parts and flows of EMV 3-D Secure 2: the 3DS server, directory server and access control server; frictionless and challenge.",
+        "When a successful authentication moves the fraud loss to the issuer and when it does not.",
+        "How Stripe and Adyen each expose authentication decisions, as documented in November 2026, and the status of PSD3 and the Payment Services Regulation on 17 November 2026."
+      ],
+      "believe": [
+        "Whether to authenticate is a decision about who carries a fraud loss, weighed against customers lost to a challenge.",
+        "The issuer, not the merchant or the provider, has the last word on whether the payer is challenged.",
+        "A provider's capacity to request exemptions depends on the fraud rate of all its merchants together."
+      ],
+      "can_do": [
+        "For a given payment, say whether authentication is required, which exemption could apply, and who carries the loss under each outcome.",
+        "Design a membership or subscription so that the first payment is authenticated and later ones are correctly marked as merchant-initiated.",
+        "Model a payment that needs authentication as a state the client must resolve, not as one synchronous call."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a payment that skipped authentication under an exemption and turned out to be fraud, the reader says who bears the loss and what would have changed that.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A Dutch bookshop's provider skips the 3-D Secure check on a €40 online payment by requesting a low-risk exemption (the rule that lets a payment judged low-risk go without two-factor authentication). The issuer agrees. The payment later turns out to be fraud. Who bears the loss, and what would have had to happen for someone else to bear it?",
+        "expected": "The bookshop: when the merchant's side requests the exemption and the issuer grants it, there is no liability shift. Had the payment been authenticated through 3-D Secure, or had the issuer applied the exemption on its own without being asked, the issuer would have carried the fraud dispute."
+      },
+      {
+        "id": "AC-2",
+        "statement": "Given a recurring product the chapter does not use as its example, the reader says which payment must be authenticated and what the later ones are.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A language-learning app in Germany sells a €12 monthly plan paid by card. Which payment has to be authenticated by the cardholder, why do the later ones not, and who carries the loss if a later one is disputed as fraud?",
+        "expected": "The first payment, when the cardholder sets up the series, needs strong customer authentication. Later charges are initiated by the merchant with the payer absent, so they are outside the rule; like an exemption, they involve no challenge and no liability shift, so the app carries a fraud dispute on them."
+      },
+      {
+        "id": "AC-3",
+        "statement": "The chapter states that PSD3 and the Payment Services Regulation were not adopted on 17 November 2026, attributes its description of their content to the secondary reading it comes from, and marks scheme passkeys as in pilot or first rollout.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "How does the issuer check who is paying, and how do providers decide when to ask?",
+    "claim": "The issuer checks the payer through 3-D Secure, either silently from transaction and device data the merchant's side sends or by challenging the cardholder, and the issuer has the final say on which; a provider decides when to ask by weighing the customers a challenge would lose against the fraud loss the merchant keeps whenever a payment goes through unauthenticated, within what the law requires, because the loss moves to the issuer only when authentication happens.",
+    "disputed_by": "The view that authentication is friction and nothing else: an exemption or a skipped challenge saves a customer and changes nothing besides, so the right policy is always to authenticate as rarely as the rules allow.",
+    "so_what": "A team should set its authentication policy as a loss-allocation policy: know for each kind of payment whether an exemption, a merchant-initiated flag or a full authentication applies and who pays for fraud in each case, and expect the limits to move with the provider's fraud rate and with regulation.",
+    "how_why": "Stripe's documentation says it cannot guarantee a requested flow 'because the issuer determines the ultimate authentication flow'. PSD2 Article 74(2) puts the loss on the side that does not require or accept strong authentication, and the network rules follow: Adyen's documentation says that when the acquirer requests a low-risk exemption 'the chargeback liability stays with you', and Stripe's says that when the bank approves an exemption request 'liability shift for fraudulent transactions doesn't apply'. Merchant-initiated payments are out of scope and likewise carry no shift. The low-risk exemption is rationed by the provider's own fraud rate (0.13%, 0.06% and 0.01% for payments up to €100, €250 and €500 in the 2018 technical standards), so one merchant's ceiling depends on every other merchant at that provider. Both providers now make the choice by model and expose rules as constraints, with documented differences (November 2026): Stripe requests 3-D Secure through Radar rules and publishes its exemption ceiling of €250; Adyen keeps a separate ordered list of Dynamic 3-D Secure rules, returns the exemption it requested on each payment, and argued in September 2026 that being authentication provider and acquirer in one lets its models learn from authorization outcomes. Method selection beyond 3-D Secure (scheme passkeys) is documented at Adyen as a pilot, with a first rollout in the UK announced on 29 October 2026; for Stripe an undated support article describes Stripe Authentication, a device-verification method in trial, and its product page and a Sessions 2026 talk describe an engine that selects the authentication pathway, which its documentation does not. PSD3 and the Payment Services Regulation were not adopted on 17 November 2026.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "Strong customer authentication is a legal duty on payment service providers to check the payer with two independent factors when the payer initiates an electronic payment; the technical standards list exemptions with thresholds, and a payment the merchant initiates is outside the duty once its set-up was authenticated."
+      },
+      {
+        "id": "S2",
+        "claim": "3-D Secure carries the question to the issuer: the merchant's side sends transaction and device data through the network's directory server to the issuer's access control server, which answers silently or by challenge, and the issuer decides which."
+      },
+      {
+        "id": "S3",
+        "claim": "A fraud loss moves to the issuer only when the payer is authenticated or the issuer skips authentication unasked; an exemption the merchant's side requests, a merchant-initiated payment and a data-only flow leave it with the merchant, and even an authenticated payment's shift is not guaranteed."
+      },
+      {
+        "id": "S4",
+        "claim": "Deciding when to ask is therefore an optimization between customers lost to a challenge and fraud loss kept, made per payment inside the legal floor, with the low-risk exemption rationed by the provider's fraud rate across all its merchants."
+      },
+      {
+        "id": "S5",
+        "claim": "Stripe and Adyen both enforce the floor themselves, decide the rest by model and expose rules as constraints, with documented differences in where the rules live, what is disclosed about exemptions and which methods can be selected."
+      },
+      {
+        "id": "S6",
+        "claim": "The limits are moving: mandates differ outside Europe, authentication by scheme passkey is a pilot, and PSD3 and the Payment Services Regulation were not adopted on 17 November 2026."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Shows the fourth relocation and the only one in the part that moves a loss outright: authentication shifts a fraud dispute to the issuer, and exemptions keep it where it was.",
+    "supports": [
+      "P5-4"
+    ]
+  },
+  "flow": {
+    "pattern": "prerequisite_order",
+    "additional_patterns": [
+      {
+        "pattern": "problem_solution",
+        "applies_to": "scene to in-practice: a question posed at Larkfield, answered after the rule and the mechanisms are taught"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "providers and where-they-differ"
+      }
+    ],
+    "rationale": "The reader meets two payments treated differently and a loss nobody chose, then gets what is needed to explain them in the order each depends on the last: the legal duty and its exits define the categories, the protocol shows who answers, the liability rule attaches a loss to each category, the membership design and the decision of when to ask apply the rule, and only then can the two providers' controls be read as ways of making that decision. What is moving comes after the present rules it modifies; Larkfield's policy and the failures use everything before them. Putting the providers before the liability rule would turn their controls into a feature list; putting the decision before the liability rule would leave it with nothing to weigh."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "Two members buy the same €120 class pass from the same studio through the same checkout. One is sent to her banking app to approve the payment; the other pays without being asked anything. Three weeks later the second payment is disputed as fraud and the studio loses the €120 and a dispute fee; had the first been disputed the same way, the member's bank would have paid. Nobody at the studio chose either path."
+    },
+    "bridge": {
+      "from_reader_world": "An engineer sees authentication as a pop-up between the customer and the sale: friction that loses customers, to be shown as rarely as the rules allow. Chapter 24's risk rules offered it as a third action between allow and block.",
+      "to_topic": "The third action hands the question of who is paying to the card's issuer, and with a successful answer the fraud loss goes to the issuer too; skipping the question keeps the loss with the merchant, so the choice of when to ask allocates a loss."
+    },
+    "thesis_statement": {
+      "text": "The issuer checks the payer through 3-D Secure, silently from data the merchant's side sends or by challenging the cardholder, and the issuer decides which. A provider decides when to ask by weighing customers lost to a challenge against the fraud loss the merchant keeps on every unauthenticated payment, inside what the law requires, because the loss moves to the issuer only when authentication happens.",
+      "placement": "KEY POINTS callout (bullets 1 and 2) and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p04",
+      "promises": [
+        {
+          "promise": "Start at Larkfield with one member who was challenged and one who was not, and the dispute that followed.",
+          "kept_in": [
+            "scene"
+          ]
+        },
+        {
+          "promise": "State what the law requires, its exemptions and what falls outside it.",
+          "kept_in": [
+            "law"
+          ]
+        },
+        {
+          "promise": "Show how 3-D Secure carries the question to the issuer and why the issuer has the last word.",
+          "kept_in": [
+            "protocol"
+          ]
+        },
+        {
+          "promise": "Say when a fraud loss moves to the issuer and when it stays.",
+          "kept_in": [
+            "liability"
+          ]
+        },
+        {
+          "promise": "Design a membership: an authenticated first payment and merchant-initiated payments after it.",
+          "kept_in": [
+            "recurring"
+          ]
+        },
+        {
+          "promise": "Treat the decision to ask as an optimization and compare the policies available.",
+          "kept_in": [
+            "decision"
+          ]
+        },
+        {
+          "promise": "Describe how Stripe and Adyen each expose that decision, and compare them.",
+          "kept_in": [
+            "providers",
+            "where-they-differ"
+          ]
+        },
+        {
+          "promise": "Mark what is moving: rules outside Europe, passkeys, and the status of PSD3 and the Payment Services Regulation.",
+          "kept_in": [
+            "moving"
+          ]
+        },
+        {
+          "promise": "Write Larkfield's authentication policy as a table of who carries the loss, and list how authentication fails.",
+          "kept_in": [
+            "in-practice",
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "Two customers buying the same thing through the same checkout can be treated differently, one challenged and one not, and the difference decides who pays if the payment turns out to be fraud.",
+        "function": "context",
+        "organization": "narration",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Two €120 pass purchases at one studio: one approved in a banking app, one not asked; the second disputed as fraud three weeks later, the studio losing €120 and a dispute fee.",
+            "shows": "Shows that the visible difference (a prompt) carries an invisible one (who bears the loss), and that the studio chose neither."
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "Authentication is the question of who is paying handed to the issuer, and the fraud loss follows the question: it moves to the issuer only when authentication happens, so deciding when to ask is deciding who carries the loss.",
+        "function": "claim",
+        "transition_in": {
+          "relationship": "elaboration",
+          "carries_over": "Chapter 24's risk rule had a third action between allow and block, 'request 3-D Secure', and the merchant carried the loss on every payment it allowed; the engineer's view of authentication as friction.",
+          "introduces": "What the third action is: the question of who is paying goes to the issuer, and under stated conditions the fraud loss goes with it. The chapter's thesis.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "Mila's class pass was paid from a phone wallet that authenticated her on the device, so it met no 3-D Secure; this chapter covers the step a typed card number takes instead, which Mila met on 12 January 2027 when she set up her membership.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's €120.00 pass of 9 March 2027 paid from her phone's wallet (fingerprint, no 3-D Secure challenge); her €49.00 membership set up on 12 January 2027 by typing the card and passing a 3-D Secure challenge in her banking app.",
+            "shows": "Places the chapter on the payment's journey: the recurring payment skipped this step, the membership set-up took it.",
+            "source": "Larkfield scenario ledger (fictional)"
+          }
+        ],
+        "transition_in": {
+          "relationship": "place",
+          "carries_over": "The chapter's claim.",
+          "introduces": "Its position relative to the recurring payment.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "controlling_idea": "The chapter goes from Larkfield's two members to the law, the protocol, the liability rule, the design of a membership, the decision of when to ask, the two providers and their comparison, what is moving, Larkfield's policy and the failures.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The position on the journey.",
+          "introduces": "The order of the sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: One Member Challenged, One Not",
+      "controlling_idea": "At one studio in early 2027 a €49 membership set-up was challenged and a €120 pass was not, the pass was disputed as fraud, and nobody at Larkfield could say who had decided either or why the studio paid.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S4"
+        ],
+        "how": "Poses the chapter's question as a concrete pair of payments: who decides when to ask, and who pays when nobody asked."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The roadmap's first stop.",
+        "introduces": "Two real-looking payments at Studio Noord and the dispute on one of them.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p05",
+          "controlling_idea": "Within three weeks Studio Noord took two card payments that were treated differently: Mila Janssen's €49 membership set-up was challenged in her banking app, and Bram de Wit's €120 pass went through with no prompt.",
+          "function": "example",
+          "organization": "narration",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Mila Janssen, membership €49.00 set up on 12 January 2027 with a typed Dutch Visa debit card and a 3-D Secure challenge; Bram de Wit, ten-class pass €120.00 on 2 February 2027 with a Dutch Mastercard credit card, no challenge. Studio Noord is on Adyen.",
+              "shows": "Two customer-present card payments at one merchant on one provider with different treatment.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ]
+        },
+        {
+          "id": "p06",
+          "controlling_idea": "When Bram's payment came back as a chargeback on 24 February with a €15 fee, Jonas Weber asked Femke de Graaf who had decided not to ask Bram and why Studio Noord, which had decided nothing, carried the loss.",
+          "function": "example",
+          "organization": "narration",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "The €120 dispute: chargeback on 24 February 2027, 'not recognized', €15.00 dispute fee (illustrative); under Larkfield's terms the studio carries a lost dispute and its fee; the payment carried no liability shift (assumption).",
+              "shows": "States the two questions the chapter answers: who decides when to authenticate, and who pays when a payment was not authenticated.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The unchallenged €120 payment.",
+            "introduces": "Its dispute, and the two questions it raises.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "law",
+      "heading": "What the Law Requires: Two Factors, Unless an Exemption Applies",
+      "controlling_idea": "European law obliges payment service providers to authenticate the payer with two independent factors when the payer initiates an electronic payment, lists the cases in which they may skip it, and leaves payments the merchant initiates outside the rule.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "Establishes the legal floor inside which every later decision is made, and the categories (exemption, out of scope) the liability rule attaches to."
+      },
+      "flow": {
+        "pattern": "large_to_small",
+        "rationale": "The duty first, then its exceptions from the general list to the one that matters most online, then what is outside the duty altogether, then how often each is used; the exceptions cannot be read without the duty."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "Who decided not to ask Bram.",
+        "introduces": "The rule that says when a payer must be asked at all.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p07",
+          "controlling_idea": "Strong customer authentication is a duty the second Payment Services Directive puts on payment service providers, in practice the card issuer: to check the payer with at least two independent elements out of knowledge, possession and inherence whenever the payer initiates an electronic payment.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "PSD2 Article 4(30): 'an authentication based on the use of two or more elements categorised as knowledge (something only the user knows), possession (something only the user possesses) and inherence (something the user is) that are independent, in that the breach of one does not compromise the reliability of the others'; Article 97(1): a payment service provider applies it where the payer '(b) initiates an electronic payment transaction'.",
+              "shows": "Defines the term from the legal text and shows the duty sits with providers, not merchants, and is triggered by the payer initiating.",
+              "source": "Directive (EU) 2015/2366 (PSD2), http://publications.europa.eu/resource/celex/32015L2366, published 2015-11-25 (evidence age: 11 years; in force)"
+            },
+            {
+              "kind": "fact",
+              "what": "The regulatory technical standards 'shall apply from 14 September 2019' (Article 38).",
+              "shows": "Dates the rule.",
+              "source": "Commission Delegated Regulation (EU) 2018/389, http://publications.europa.eu/resource/celex/32018R0389, published 2018-03-13 (evidence age: 8 years; in force)"
+            }
+          ]
+        },
+        {
+          "id": "p08",
+          "controlling_idea": "The technical standards list the cases in which a provider, on the issuer's side or on the merchant's, may skip the two factors, and for online card payments three matter: low value, a payee the payer has listed as trusted, and a payment judged low-risk by transaction risk analysis.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Exemption by article and condition: low-value remote (Art. 16: not over EUR 30, and cumulative not over EUR 100 or not more than five payments since the last authentication); trusted beneficiaries (Art. 13); transaction risk analysis (Art. 18: provider's fraud rate at or below the reference rate, amount within the band, no risk signal in a real-time analysis).",
+              "shows": "Gives the thresholds the intent names, from the legal text.",
+              "source": "Commission Delegated Regulation (EU) 2018/389, http://publications.europa.eu/resource/celex/32018R0389, published 2018-03-13 (evidence age: 8 years; in force)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The duty to apply two factors.",
+            "introduces": "The listed cases in which a provider may skip them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p09",
+          "controlling_idea": "The low-risk exemption is rationed by the provider's own fraud rate across all its card payments, so the largest amount a merchant can have exempted depends on every other merchant at that provider.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "statistic",
+              "what": "RTS Annex, remote electronic card-based payments: reference fraud rate 0.13% for payments up to EUR 100, 0.06% up to EUR 250, 0.01% up to EUR 500; Article 18(2)(a): 'the fraud rate for that type of transaction, reported by the payment service provider'; Article 20(2): a provider 'shall immediately cease to make use of the exemption' in a band 'where their monitored fraud rate exceeds for two consecutive quarters the reference fraud rate'.",
+              "shows": "The ceiling is a property of the provider's whole portfolio, and it can be withdrawn.",
+              "source": "Commission Delegated Regulation (EU) 2018/389, http://publications.europa.eu/resource/celex/32018R0389, published 2018-03-13 (evidence age: 8 years; in force)"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe: the limit 'depends on the Stripe overall fraud rates and your access to the Stripe authentication offerings'; 'EEA merchants have access to TRA exemptions for qualifying low risk transactions up to 250 EUR'; UK and Swiss merchants 'up to 220 GBP'. Adyen states no ceiling of its own in its documentation, help center or site (searched November 2026).",
+              "shows": "One provider states the dependency and its current ceiling; the other's is not public.",
+              "source": "Stripe documentation, 'Strong Customer Authentication (SCA) exemptions', https://docs.stripe.com/payments/3d-secure/strong-customer-authentication-exemptions, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "emphasis",
+            "carries_over": "The transaction-risk-analysis exemption among the listed cases.",
+            "introduces": "What limits it: the provider's fraud rate, shared by all its merchants.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "controlling_idea": "A payment the merchant initiates with the payer absent, such as a membership renewal, is not an exemption but outside the rule, on the condition that the payer was authenticated when the series was set up.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "RTS Article 14(1): providers 'shall apply strong customer authentication when a payer creates, amends, or initiates for the first time, a series of recurring transactions with the same amount and with the same payee'. Stripe: such payments 'technically fall outside the scope of SCA'. Adyen: 'The initial transaction should have gone through SCA and the shopper should have agreed to the terms and conditions of the succeeding MITs.'",
+              "shows": "Article 97 is triggered by the payer initiating; a merchant-initiated payment does not meet the trigger, but its set-up does.",
+              "source": "Commission Delegated Regulation (EU) 2018/389, http://publications.europa.eu/resource/celex/32018R0389, published 2018-03-13 (evidence age: 8 years; in force); Stripe documentation, 'Strong Customer Authentication (SCA) exemptions', https://docs.stripe.com/payments/3d-secure/strong-customer-authentication-exemptions, n.d., accessed 2026-11; Adyen documentation, 'SCA is not required', https://docs.adyen.com/online-payments/psd2-sca-compliance-and-implementation-guide/business-models/out-of-scope-transactions, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Exemptions, which apply to payments inside the rule.",
+            "introduces": "Merchant-initiated payments, which are outside it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "controlling_idea": "Skipping the two factors is the common case for remote card payments, not an edge case: in the 2024 data of the European Banking Authority and the European Central Bank the low-risk exemption, merchant-initiated payments and out-of-scope payments together account for most remote card payments made without strong authentication.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "statistic",
+              "what": "'In 2024, around 29% of remote card payments without SCA were exempted under TRA'; merchant-initiated transactions 'amounted to 22% in 2024'; 'In 2024, 26% of remote transactions were reported as being outside the scope of SCA requirements under PSD2'. Also: 'The fraud rates for card payment transactions authenticated with SCA were consistently and substantially below fraud rates for card transactions without SCA.'",
+              "shows": "Shows how much volume travels through the exits the section described, and that the exits carry more fraud.",
+              "source": "EBA and ECB, '2025 Report on Payment Fraud' (EBA/REP/2025/40), https://www.ecb.europa.eu/press/intro/publications/pdf/ecb.ebaecb202512.en.pdf, published 2025-12"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The exemptions and the out-of-scope payments.",
+            "introduces": "How often they are used, from the regulators' data.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "protocol",
+      "heading": "How 3-D Secure Carries the Question to the Issuer",
+      "controlling_idea": "3-D Secure is the card networks' protocol by which the merchant's side sends transaction and device data through the network to the issuer, which answers silently or by challenging the cardholder, and the issuer chooses which.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "S2"
+        ],
+        "how": "Explains the mechanism the thesis names and establishes that the issuer has the final say on frictionless or challenge."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The parties first, then the messages between them, then the two outcomes and who picks, then what that means for the integrator's state model; each needs the one before."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "A legal duty on the issuer to check the payer of an online payment the issuer does not see until authorization.",
+        "introduces": "The protocol that lets the issuer do it from the merchant's checkout.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p12",
+          "controlling_idea": "3-D Secure connects three parties that each run one component: a 3DS server on the merchant's side, operated by the provider, a directory server at the card network, and an access control server at the issuer.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "EMVCo: 'EMV 3DS enables the exchange of data, or messages, between the merchant and the issuer to authenticate the consumer and approve the transaction. The data includes information about the transaction, payment method and device.'",
+              "shows": "Defines the protocol by what it exchanges and between whom.",
+              "source": "EMVCo, 'EMV 3-D Secure', https://www.emvco.com/emv-technologies/3-d-secure/, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'Stripe communicates with the card network's DS and the issuer's Access Control Server (ACS).' Stripe also notes 'Major card brands no longer support 3D Secure 1' and that it 'supports the 3DS protocol up to and including version 2.3.1'.",
+              "shows": "Names the components as a provider describes them and fixes the version in use.",
+              "source": "Stripe documentation, 'Standalone 3DS', https://docs.stripe.com/payments/3d-secure/standalone-3d-secure, n.d., accessed 2026-11"
+            }
+          ]
+        },
+        {
+          "id": "p13",
+          "controlling_idea": "The exchange has up to four steps: collect device data, send an authentication request through the directory server to the access control server, run a challenge between the cardholder and the issuer if the issuer wants one, and carry the result into the authorization request.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe's standalone API steps: 'Create ... Fingerprint (optional) ... Submit the authentication to the issuer ... Challenge (if required). Present the issuer's challenge to the cardholder ... Retrieve the authentication outcome. On success, extract the cryptogram, ECI, and DS Transaction ID.' 'When authenticated, submit the cryptogram as part of a payment authorization request.'",
+              "shows": "A provider's documented view of the same sequence, and of the three values the authorization carries.",
+              "source": "Stripe documentation, 'Standalone 3DS', n.d., accessed 2026-11"
+            },
+            {
+              "kind": "figure",
+              "what": "Message-flow figure: customer device, 3DS server (provider), directory server (network), access control server (issuer); request, answer, optional challenge, result into authorization.",
+              "shows": "Makes the path and the optional step visible."
+            },
+            {
+              "kind": "reasoning",
+              "what": "The EMVCo specification sits behind a license and was not read; the message sequence is described from the providers' documentation and industry knowledge, and protocol message names are left out.",
+              "shows": "Marks where the evidence stops."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The three components.",
+            "introduces": "The messages that pass between them, in order.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p14",
+          "controlling_idea": "The issuer's answer takes one of two forms, frictionless or challenge, and the merchant's side can state a preference but cannot choose.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'In a frictionless flow, the acquirer, issuer, and card scheme exchange all necessary information in the background through passive authentication using the shopper's device fingerprint. The transaction is completed without further shopper interaction.' 'In a challenge flow, the issuer requires additional shopper interaction, either through biometrics, two-factor authentication, or similar methods'.",
+              "shows": "Defines the two flows.",
+              "source": "Adyen documentation, '3D Secure 2 authentication', https://docs.adyen.com/online-payments/3d-secure, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'Stripe can't guarantee your preference because the issuer determines the ultimate authentication flow.' Adyen: the flow is 'depending on the issuer'.",
+              "shows": "Both providers document that the issuer has the last word.",
+              "source": "Stripe documentation, 'Authenticate with 3D Secure', https://docs.stripe.com/payments/3d-secure/authentication-flow, n.d., accessed 2026-11; Adyen documentation, 'Dynamic 3D Secure', https://docs.adyen.com/risk-management/dynamic-3d-secure, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The authentication request reaching the access control server.",
+            "introduces": "The two ways the issuer can answer, and who picks.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p15",
+          "controlling_idea": "For the integrator, authentication turns a card payment into a state the customer's device must resolve, with a wait that can last minutes or never end, so the payment cannot be modeled as one synchronous call.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: 'The PaymentIntent transitions to a status of `requires_action`'; the client inspects `next_action`. Adyen returns an `action` object and result codes such as `IdentifyShopper`, `ChallengeShopper` and `RedirectShopper` (chapter 8).",
+              "shows": "Both providers expose the wait as a state with an instruction for the client.",
+              "source": "Stripe documentation, 'Authenticate with 3D Secure', https://docs.stripe.com/payments/3d-secure/authentication-flow, n.d., accessed 2026-11; Adyen documentation, 'Result codes', https://docs.adyen.com/online-payments/build-your-integration/payment-result-codes, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "table",
+              "what": "Requirements of the authentication step: who decides the flow (the issuer); how long it takes (a silent answer within the checkout call; a challenge for as long as the customer takes, or never); what the merchant's server learns synchronously (a state, not an outcome); what happens if 3-D Secure is unavailable or errors (Stripe: 'the payment proceeds normally', and liability 'doesn't generally shift').",
+              "shows": "States the properties an engineer designs for.",
+              "source": "Stripe documentation, 'Authenticate with 3D Secure', https://docs.stripe.com/payments/3d-secure/authentication-flow, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The challenge, which runs between the cardholder and the issuer.",
+            "introduces": "What that does to the merchant's state model.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "liability",
+      "heading": "When the Loss Moves, and When It Stays",
+      "controlling_idea": "A fraud dispute moves to the issuer when the payer was authenticated or the issuer skipped authentication of its own accord, and stays with the merchant when the merchant's side asked to skip it, initiated the payment itself or only shared data; even then the shift is an expectation, not a guarantee.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "S3"
+        ],
+        "how": "States the rule that makes authentication a loss-allocation decision: the 'because' of the thesis."
+      },
+      "flow": {
+        "pattern": "large_to_small",
+        "rationale": "The rule and its legal root, then the cases in a table, then the one case where the two providers' wording differs, then the limits of the shift; the exceptions mean nothing before the rule."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "The issuer answers the question of who is paying.",
+        "introduces": "What the answer does to the fraud loss.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p16",
+          "controlling_idea": "The liability shift is the card networks' rule that a payment authenticated through 3-D Secure, if later disputed as fraud, is the issuer's loss and not the merchant's, and it has a statutory root in PSD2: whoever does not require or accept strong authentication pays.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "PSD2 Article 74(2): 'Where the payer's payment service provider does not require strong customer authentication, the payer shall not bear any financial losses unless the payer has acted fraudulently. Where the payee or the payment service provider of the payee fails to accept strong customer authentication, it shall refund the financial damage caused to the payer's payment service provider.'",
+              "shows": "The law assigns the loss to the side that avoids authentication.",
+              "source": "Directive (EU) 2015/2366 (PSD2), http://publications.europa.eu/resource/celex/32015L2366, published 2015-11-25 (evidence age: 11 years; in force)"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'If 3DS authenticates a payment, the liability for any fraud-related disputes for that payment typically shifts from the seller to the issuer.' The rule covers fraud disputes only.",
+              "shows": "The network rule as a provider states it, and its limit to fraud disputes.",
+              "source": "Stripe documentation, 'Radar rules', https://docs.stripe.com/radar/rules, n.d., accessed 2026-11; Stripe documentation, 'Authenticate with 3D Secure', https://docs.stripe.com/payments/3d-secure/authentication-flow, n.d., accessed 2026-11"
+            }
+          ]
+        },
+        {
+          "id": "p17",
+          "controlling_idea": "Sorted by what happened before authorization, the cases divide cleanly: where the issuer authenticated the payer the loss is the issuer's, and where the merchant's side asked not to authenticate, initiated the payment itself or only shared data, the loss stays with the merchant.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "What happened by who carries a fraud dispute, with source: challenge completed (issuer; Adyen general rule); frictionless (issuer; Adyen: 'Both a successful challenge flow and a successful frictionless flow result in a liability shift', with regional rules by scheme); exemption requested by merchant or acquirer and granted (merchant; Adyen: 'the chargeback liability stays with you'; Stripe: 'liability shift for fraudulent transactions doesn't apply'); merchant-initiated (merchant; Stripe: 'neither a customer challenge nor a liability shift occurs'); data-only (merchant; Adyen: 'there is no liability shift for the data-only flow'; Stripe: 'no liability shift occurs for the business'); wallet with device authentication (usually issuer; Adyen: 'Apple Pay supports liability shift', Stripe: `has_liability_shift` 'might not always be the same as 3DS, for example Apple Pay in certain regions').",
+              "shows": "Each row is a documented statement; together they show the loss follows the act of authenticating.",
+              "source": "Adyen documentation, 'SCA exemptions', https://docs.adyen.com/online-payments/psd2-sca-compliance-and-implementation-guide/sca-exemptions, n.d., accessed 2026-11; Adyen documentation, 'Dynamic 3D Secure', https://docs.adyen.com/risk-management/dynamic-3d-secure, n.d., accessed 2026-11; Stripe documentation, 'Strong Customer Authentication (SCA) exemptions', https://docs.stripe.com/payments/3d-secure/strong-customer-authentication-exemptions, n.d., accessed 2026-11; Adyen documentation, 'Data-only', https://docs.adyen.com/online-payments/3d-secure/data-only, n.d., accessed 2026-11; Adyen documentation, 'Apple Pay', https://docs.adyen.com/payment-methods/apple-pay, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "figure",
+              "what": "Conceptual figure: a fork after checkout; the 'ask the bank' branch ends with the loss at the issuer, the 'skip' branch with the loss at the merchant.",
+              "shows": "Makes the central rule memorable."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The rule that an authenticated payment's fraud loss is the issuer's.",
+            "introduces": "The cases, one by one, including those where no authentication happens.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p18",
+          "controlling_idea": "One case turns on who asked: when the issuer applies the low-risk exemption on its own, without a request from the merchant's side, Adyen documents that the loss shifts to the issuer, while Stripe's wording on issuer-applied exemptions is blunter and should be checked per network.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'TRA exemption from the issuer: The card issuer can apply the TRA exemption even if you or your acquirer did not request for it ... The chargeback liability shifts to the issuer.' Adyen's Mastercard table: '3D Secure 2 transactions where issuing bank applies a PSD2 exemption without the merchant or acquirer requesting for it. For example, issuer TRA.' Liability shift applies: 'Yes'.",
+              "shows": "The issuer that chooses not to ask keeps the loss, consistent with Article 74(2).",
+              "source": "Adyen documentation, 'SCA exemptions', https://docs.adyen.com/online-payments/psd2-sca-compliance-and-implementation-guide/sca-exemptions, n.d., accessed 2026-11; Adyen documentation, '3D Secure for regulation compliance', https://docs.adyen.com/online-payments/3d-secure-for-regulation-compliance, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'If the card issuer applies exemptions, the payment isn't authenticated through 3D Secure, and liability shift doesn't apply.'",
+              "shows": "A provider sentence that reads the other way for payments that never went through 3-D Secure; the difference is whether the payment was sent through 3-D Secure at all.",
+              "source": "Stripe documentation, 'Strong Customer Authentication readiness', https://docs.stripe.com/strong-customer-authentication, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "An exemption the merchant's side requested, which leaves the loss with the merchant.",
+            "introduces": "An exemption the issuer applies unasked.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p19",
+          "controlling_idea": "Even for an authenticated payment the shift is an expectation and not a guarantee: both providers document cases in which it is withdrawn or downgraded after the fact.",
+          "function": "counterargument",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'Successful 3DS authentication doesn't guarantee liability shift'; exceptions include enrollment in a network fraud monitoring program and a 'no-reply' chargeback after an unanswered inquiry that 'could invalidate the liability shift'. Adyen: 'For Visa transactions, the chargeback protection is valid for 90 days'; 'A card scheme can downgrade a payment's liability shift during authorization, even if the ECI value indicated a liability shift during authentication.'",
+              "shows": "Bounds the rule: the shift covers eligible fraud disputes, within a window, on accounts in good standing.",
+              "source": "Stripe documentation, 'Authenticate with 3D Secure', https://docs.stripe.com/payments/3d-secure/authentication-flow, n.d., accessed 2026-11; Adyen documentation, '3D Secure for regulation compliance', https://docs.adyen.com/online-payments/3d-secure-for-regulation-compliance, n.d., accessed 2026-11; Adyen documentation, 'Scheme passkeys', https://docs.adyen.com/online-payments/authentication/scheme-passkeys, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The cases in which the loss moves.",
+            "introduces": "The limits on the move even when authentication succeeded.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "recurring",
+      "heading": "The First Payment and the Ones After It",
+      "controlling_idea": "A membership or subscription is built as one authenticated, customer-initiated set-up followed by merchant-initiated payments that reference it, and the later payments carry no challenge and no liability shift.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "S1",
+          "S3"
+        ],
+        "how": "Applies the scope rule and the liability rule to the recurring case the intent asks the reader to be able to design."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "Set-up, then the later charges, then what happens when a later charge is flagged wrongly or refused; it follows the life of one membership."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "Merchant-initiated payments, outside the rule and without a shift.",
+        "introduces": "How a recurring product is built from that: the first payment and the later ones.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p20",
+          "controlling_idea": "The set-up is the one moment the cardholder is present, so it must be authenticated and must record the customer's agreement to later charges; both providers give it a distinct shape in the API.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: 'you authenticate the card when it's being saved. You must also secure agreement from the customer (through a mandate) to charge their card at a later point'; save with `setup_future_usage` set to `off_session` during a payment, or with the Setup Intents API and `usage` `off_session`. Adyen: the first payment is sent with `shopperInteraction` Ecommerce and a `recurringProcessingModel` such as Subscription; 'Zero-value authorizations to set up merchant-initiated transactions, for example subscriptions, do require SCA.'",
+              "shows": "The documented way to mark the authenticated first payment on each provider.",
+              "source": "Stripe documentation, 'Strong Customer Authentication (SCA) exemptions', https://docs.stripe.com/payments/3d-secure/strong-customer-authentication-exemptions, n.d., accessed 2026-11; Stripe documentation, 'Strong Customer Authentication readiness', n.d., accessed 2026-11; Adyen documentation, 'SCA is not required' and 'Make token payments', https://docs.adyen.com/online-payments/tokenization/make-token-payments, n.d., accessed 2026-11"
+            },
+            {
+              "kind": "figure",
+              "what": "Timeline figure of a membership: an authenticated first payment on 12 January, then renewals on the 1st of each month marked merchant-initiated, with the loss at the issuer for the first and at the merchant for the rest.",
+              "shows": "Shows the asymmetry across the life of one membership."
+            }
+          ]
+        },
+        {
+          "id": "p21",
+          "controlling_idea": "Every later charge is flagged as merchant-initiated, which spares the customer a challenge that nobody is present to answer and leaves the merchant carrying any fraud dispute on it.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'Set off_session to true when creating an off-session payment'; 'marking a payment as MIT is similar to requesting an exemption; neither a customer challenge nor a liability shift occurs'. Adyen: merchant-initiated payments set `shopperInteraction` to ContAuth with `recurringProcessingModel` Subscription or UnscheduledCardOnFile; its Mastercard table lists 'PSD2 SCA out-of-scope transactions that were not authenticated with 3D Secure 2' with liability shift 'No'.",
+              "shows": "The flag on each provider and its two consequences.",
+              "source": "Stripe documentation, 'Strong Customer Authentication (SCA) exemptions', https://docs.stripe.com/payments/3d-secure/strong-customer-authentication-exemptions, n.d., accessed 2026-11; Adyen documentation, 'Make token payments', n.d., accessed 2026-11; Adyen documentation, '3D Secure for regulation compliance', https://docs.adyen.com/online-payments/3d-secure-for-regulation-compliance, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The authenticated set-up.",
+            "introduces": "The charges that follow it and how they are marked.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p22",
+          "controlling_idea": "The flag is a claim the issuer and the network can reject: a charge marked merchant-initiated can still come back asking for authentication, and then the only remedy is to bring the customer back into a checkout.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'Exemptions aren't guaranteed, and off-session payments might still require authentication by the bank'; 'Stripe and the card network classify transactions as MIT or CIT based on signals of cardholder participation, not solely on API parameters like off_session'; its decline codes include `authentication_required`. Adyen: 'some issuing banks require SCA for ContAuth with CardOnFile transactions'.",
+              "shows": "The merchant's label does not bind the issuer.",
+              "source": "Stripe documentation, 'Strong Customer Authentication readiness' and 'Place a hold on a payment method', https://docs.stripe.com/payments/place-a-hold-on-a-payment-method, n.d., accessed 2026-11; Adyen documentation, 'Make token payments', n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The flag that takes a renewal outside the rule.",
+            "introduces": "The issuer's freedom to disagree with it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "decision",
+      "heading": "Deciding When to Ask: Three Policies and Their Cost",
+      "controlling_idea": "For a customer-present payment that the law lets the merchant's side exempt, asking costs some customers and not asking keeps the fraud loss, so the right policy depends on the fraud probability of the payment, which is why both providers decide per payment from a risk score.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S4"
+        ],
+        "how": "Turns the liability rule into the optimization the thesis describes and compares the realistic policies."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "The terms of the trade, a worked break-even, the three policies it sorts, then the two things outside the merchant's control (the issuer's silent answer and the issuer's refusal of an exemption); the policies are judged by the arithmetic before them."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "Merchant-initiated payments, where there is nothing to decide.",
+        "introduces": "Customer-present payments inside the rule, where the merchant's side chooses whether to ask.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p23",
+          "controlling_idea": "The decision has three terms: the customers a challenge loses, the fraud loss the merchant keeps when it does not ask, and a fee per authentication attempt.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'By requesting 3D Secure, you add friction. This friction impacts conversion because some shoppers might drop off. However, at the same time, if the authentication is successful, you reduce fraud and obtain a liability shift.' Risk-based authentication 'increases authentication costs'. Stripe's Dutch pricing page lists '€0.03 per 3D Secure attempt for accounts with custom pricing'.",
+              "shows": "A provider states the trade in its own documentation, and authentication has a unit price.",
+              "source": "Adyen documentation, 'Dynamic 3D Secure', https://docs.adyen.com/risk-management/dynamic-3d-secure, n.d., accessed 2026-11; Stripe pricing (Netherlands), https://stripe.com/en-nl/pricing, n.d., accessed 2026-11"
+            }
+          ]
+        },
+        {
+          "id": "p24",
+          "controlling_idea": "With assumed figures for one €120 pass, exempting is cheaper than challenging until the chance that the payment is fraud passes about 2.7%, far above the fraud rate of ordinary traffic.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Per 1,000 payments of €120, assuming 3% of challenged customers abandon and a fraud dispute costs €135 (€120 plus the €15 fee): challenge loses 30 sales, €3,600; exemption at a 0.05% fraud probability loses 0.5 disputes, €67.50; at 5%, 50 disputes, €6,750. Break-even: 3% × €120 ÷ €135 ≈ 2.7%. All rates are assumptions for the arithmetic.",
+              "shows": "Shows the decision has a threshold in fraud probability, so it must be made per payment from a risk estimate.",
+              "source": "Author's arithmetic on ledger amounts (pass €120.00, illustrative dispute fee €15.00); rates labeled as assumptions"
+            },
+            {
+              "kind": "statistic",
+              "what": "EBA and ECB: the fraud rate of remote card payments in 2024 was '0.091% in values'.",
+              "shows": "Anchors 'ordinary traffic' well below the break-even.",
+              "source": "EBA and ECB, '2025 Report on Payment Fraud' (EBA/REP/2025/40), https://www.ecb.europa.eu/press/intro/publications/pdf/ecb.ebaecb202512.en.pdf, published 2025-12"
+            },
+            {
+              "kind": "figure",
+              "what": "Conceptual figure: a balance with lost customers on one pan and kept fraud loss on the other, the pointer moved by a risk score.",
+              "shows": "Makes the trade memorable."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The three terms.",
+            "introduces": "A worked break-even on the chapter's €120 payment.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p25",
+          "controlling_idea": "Three policies are realistic: always ask, ask only when the law or the issuer insists, and ask according to risk; the third is the only one that follows the break-even, and it requires trusting a score.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Policy by what it does, who carries fraud on unauthenticated payments, what it costs, when it is right: always authenticate; authenticate only when required; risk-based (exempt low risk, send medium risk to 3-D Secure, block the highest).",
+              "shows": "The trade-off table the chapter's argument needs.",
+              "source": "Author's judgement; the risk-based row follows Adyen's documented table (low risk: exemption, frictionless or data-only; high: challenge; very high: declined) and Stripe's adaptive 3DS ('Stripe runs machine learning in the background to authenticate medium-risk payments')"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "A break-even that depends on the fraud probability of the single payment.",
+            "introduces": "The three policies, sorted by whether they use it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p26",
+          "controlling_idea": "The outcome that gives the merchant both the sale and the shift is a frictionless authentication, which only the issuer can grant; what the merchant's side controls is the data it sends with the request.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'Send additional information in your payment request to maximize the probability of getting the exemption'; 'By default, to optimize conversion, a transaction will use the frictionless flow if it is available.' Stripe: 'Stripe.js collects basic device information during 3DS2 authentication and sends it to the issuing bank for their risk analysis.'",
+              "shows": "Both providers document that richer data raises the chance of a silent answer, and that the choice remains the issuer's.",
+              "source": "Adyen documentation, 'SCA exemptions', https://docs.adyen.com/online-payments/psd2-sca-compliance-and-implementation-guide/sca-exemptions, n.d., accessed 2026-11; Adyen documentation, 'Dynamic 3D Secure', https://docs.adyen.com/risk-management/dynamic-3d-secure, n.d., accessed 2026-11; Stripe documentation, 'Authenticate with 3D Secure', https://docs.stripe.com/payments/3d-secure/authentication-flow, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "A policy that asks according to risk.",
+            "introduces": "The answer the merchant would most like from asking, and the only lever it has on it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p27",
+          "controlling_idea": "An exemption is a request the issuer can refuse, and the refusal arrives as a decline that asks for authentication, after which the provider sends the payment through 3-D Secure after all.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'The issuer decides whether to grant the exemption.' Stripe: 'If requested by the issuer with a soft decline, we automatically reattempt and continue as if required'; Stripe triggers 3-D Secure 'if requested by an issuer with a soft decline code'. France, per Adyen: from 10 March 2025 'issuers will soft decline all customer initiated authorization exemptions except those requested via EMV 3DS'. 'Soft decline' is the providers' shorthand, not a network term.",
+              "shows": "The floor is enforced by the issuer per payment, and national practice can narrow the exits.",
+              "source": "Adyen documentation, 'SCA exemptions', https://docs.adyen.com/online-payments/psd2-sca-compliance-and-implementation-guide/sca-exemptions, n.d., accessed 2026-11; Stripe documentation, 'Authenticate with 3D Secure', https://docs.stripe.com/payments/3d-secure/authentication-flow, n.d., accessed 2026-11; Adyen documentation, '3D Secure for regulation compliance', https://docs.adyen.com/online-payments/3d-secure-for-regulation-compliance, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What the merchant's side can ask for.",
+            "introduces": "What the issuer does when it does not agree.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "providers",
+      "heading": "How Stripe and Adyen Expose the Decision",
+      "controlling_idea": "Both providers enforce the legal floor themselves, decide the rest by model and let the merchant add constraints; Stripe attaches those constraints to its fraud rules, and Adyen keeps a separate rule list, reports the exemption it requested and argues that authenticating and acquiring in one company improves the model.",
+      "function": "description",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "Gives the documented surface of each provider's authentication decision, which the comparison section then sets side by side."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "What the two share, then Stripe, then Adyen, then Adyen's stated argument and where Stripe is silent; the shared floor comes first so the differences are read against it."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "A risk-based policy that requires a score.",
+        "introduces": "The two providers that run such a policy for their merchants, as documented in November 2026.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p28",
+          "controlling_idea": "Both providers apply the legal floor on their own account and request exemptions for the merchant by default, and neither lets the merchant switch the floor off.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'Stripe's mandatory authentication rules run automatically, regardless of whether or not you manually request 3DS'; 'You can't use Stripe APIs to manually turn off 3DS'; 'Stripe requests applicable SCA exemptions on your behalf'. Adyen: 'we always authenticate transactions with 3D Secure if this is required by regulations such as PSD2'; 'By default Adyen sends a request for the most suitable exemption type on your behalf.'",
+              "shows": "The common base: compliance is the provider's, and so is the default exemption strategy.",
+              "source": "Stripe documentation, 'Authenticate with 3D Secure', https://docs.stripe.com/payments/3d-secure/authentication-flow, n.d., accessed 2026-11; Stripe documentation, 'Strong Customer Authentication (SCA) exemptions', https://docs.stripe.com/payments/3d-secure/strong-customer-authentication-exemptions, n.d., accessed 2026-11; Adyen documentation, 'Dynamic 3D Secure', https://docs.adyen.com/risk-management/dynamic-3d-secure, n.d., accessed 2026-11; Adyen documentation, 'SCA exemptions', https://docs.adyen.com/online-payments/psd2-sca-compliance-and-implementation-guide/sca-exemptions, n.d., accessed 2026-11"
+            }
+          ]
+        },
+        {
+          "id": "p29",
+          "controlling_idea": "Stripe exposes the merchant's part of the decision through its fraud product: a Radar rule can request 3-D Secure, later rules can act on the result, an API parameter can state a preference, and the charge records which flow the issuer chose.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'The default method to trigger 3DS is using Radar to dynamically request 3D Secure based on risk level and other requirements. Triggering 3DS manually is for advanced users integrating Stripe with their own fraud engine.' Example rule: `Request 3D Secure if :risk_level: != 'normal' and :amount_in_usd: > 25`. Attributes `is_3d_secure`, `is_3d_secure_authenticated`, `has_liability_shift`. `request_three_d_secure` set to `any` or `challenge`. `authentication_flow` on the charge. Adaptive 3DS: 'Stripe runs machine learning in the background to authenticate medium-risk payments'; custom rules need Radar Plus.",
+              "shows": "Stripe's documented controls, in the order a merchant meets them.",
+              "source": "Stripe documentation, 'Authenticate with 3D Secure', https://docs.stripe.com/payments/3d-secure/authentication-flow, n.d., accessed 2026-11; Stripe documentation, 'Radar rules', https://docs.stripe.com/radar/rules, n.d., accessed 2026-11; Stripe documentation, 'Risk settings', https://docs.stripe.com/radar/risk-settings, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The shared floor.",
+            "introduces": "Stripe's controls above it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p30",
+          "controlling_idea": "Adyen exposes it as a rule list of its own, Dynamic 3D Secure, with a default preference and ordered rules, reports on each payment which exemption it requested, and warns that request-level overrides reduce its ability to optimize.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Default rule 'Prefer not' or 'Always'; 'When you create a new company account or merchant account, the default rule is set to Prefer not'; 'Rules are evaluated in order, from first to last'; a rule can be triggered by a pre-authorization custom risk rule with the 'Check for 3DS' action. 'you receive an additionalData.scaExemptionRequested field in the payment response, containing the type of exemption'. Sending certain parameters 'overrides Adyen's authentication decisions, reducing our ability to optimize the authentication flow'. 'From July 2026, Adyen is rolling out risk-based exemptions to select companies using Protect premium', said to boost 'authorization rates by up to ten percent' (vendor claim, no method published).",
+              "shows": "Adyen's documented controls and its one published performance claim, attributed.",
+              "source": "Adyen documentation, 'Dynamic 3D Secure', https://docs.adyen.com/risk-management/dynamic-3d-secure, n.d., accessed 2026-11; Adyen documentation, 'SCA exemptions', https://docs.adyen.com/online-payments/psd2-sca-compliance-and-implementation-guide/sca-exemptions, n.d., accessed 2026-11; Adyen documentation, 'Authentication', https://docs.adyen.com/online-payments/authentication, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Stripe's rules inside its fraud product.",
+            "introduces": "Adyen's separate rule list and per-payment report.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p31",
+          "controlling_idea": "Adyen has also published an argument for its design, that a company which is both authentication provider and acquirer can train on authorization outcomes and can choose among methods beyond 3-D Secure; Stripe occupies the same position; its documentation makes no such argument, its product page claims an engine that selects the authentication pathway and calls Stripe a full-stack solution, and a 2026 Stripe Sessions talk says Adaptive 3DS is trained on past issuer behavior.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen, 22 September 2026: Authenticate makes 'three machine learning powered decisions on every transaction: whether authentication is needed, which method will perform best, and which data to share'; 'unlike legacy 3D Secure (3DS) providers, Adyen operates as both the authentication provider and the acquirer. This position allows Authenticate's machine learning ... to learn from final authorization outcomes down the funnel, rather than authentication results alone.' Customer figures in the release (11% and 12% conversion increases) are testimonials without a method.",
+              "shows": "The stated design argument, with its date and the status of its numbers.",
+              "source": "Adyen press release, 'Adyen Launches First-to-Market Upgrade to Authenticate', https://www.adyen.com/press-and-media/adyen-launches-authenticate-upgrade, 2026-09-22"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen's Authentication Engine 'Selects the most appropriate authentication method, such as 3D Secure 2, scheme passkey authentication, or Google Secure Payment Authentication'. Both companies also sell authentication detached from acquiring (Stripe standalone 3DS; Adyen standalone authentication).",
+              "shows": "Method selection is documented at Adyen only; both will authenticate for another acquirer.",
+              "source": "Adyen documentation, 'Authentication', https://docs.adyen.com/online-payments/authentication, n.d., accessed 2026-11; Stripe documentation, 'Standalone 3DS', n.d., accessed 2026-11"
+            },
+            {
+              "kind": "reasoning",
+              "what": "INFERENCE, NOT DOCUMENTED: Stripe also authenticates and acquires, so the same training signal is available to it; Stripe's 2026 talk names past issuer behavior as a training input; whether that includes final authorization outcomes, and how either company's model is built, is not public.",
+              "shows": "Keeps the comparison to what is published."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Adyen's documented controls.",
+            "introduces": "The design argument Adyen has published for them, and the little Stripe says on it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "The public record shows the same floor and the same model-first default at both companies, and differences in where the merchant's rules live, what is disclosed about exemptions and which authentication methods are selectable.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "Sets the documented facts of the previous section side by side and says what an integrator does differently on each."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "Each company's documented controls.",
+        "introduces": "The two compared directly, aspect by aspect.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p32",
+          "controlling_idea": "On six aspects the documentation of November 2026 can be compared, and on four of them it differs.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Aspect by Stripe, Adyen and what the difference suggests: the floor and default; where the merchant's rules live; per-request override; what is disclosed about exemptions; method selection beyond 3-D Secure; stated design argument.",
+              "shows": "The required comparison; every Stripe and Adyen cell repeats a fact cited in the chapter or says 'Not public'.",
+              "source": "Sources as cited in the sections above; the last column is the author's inference"
+            }
+          ]
+        },
+        {
+          "id": "p33",
+          "controlling_idea": "An integrator on Stripe should treat authentication rules as part of its fraud rules and store the flow and the expected liability shift from the charge; an integrator on Adyen should keep its request free of override parameters, store the exemption Adyen reports and decide early between native and redirect 3-D Secure.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen: to use the Authentication Engine in the Sessions flow 'You must set the nativeThreeDS to disabled'; native runs 'within your website or mobile app', redirect 'might lead to lower conversion rates due to technical errors during the redirection'.",
+              "shows": "The newer method selection requires the redirect flow, which Adyen's own 3-D Secure page describes as the weaker experience.",
+              "source": "Adyen documentation, 'Authentication', https://docs.adyen.com/online-payments/authentication, n.d., accessed 2026-11; Adyen documentation, '3D Secure 2 authentication', https://docs.adyen.com/online-payments/3d-secure, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The documented differences.",
+            "introduces": "What an integrator does differently on each provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "moving",
+      "heading": "What Is Moving: Other Markets, Passkeys and PSD3",
+      "controlling_idea": "The rules this chapter describes are European and dated: other markets mandate or reward authentication differently, authentication by a scheme passkey is at pilot stage, and PSD3 with the Payment Services Regulation was not adopted on 17 November 2026.",
+      "function": "context",
+      "advances_thesis": {
+        "supports": [
+          "S6"
+        ],
+        "how": "Shows the limits the thesis says will move: geography, method and regulation, each with its status and source quality."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "Three independent kinds of change, ordered from what is in force (other markets) through what is piloted (passkeys) to what is not yet law (PSD3 and the Regulation)."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The two providers' behavior under today's European rules.",
+        "introduces": "Where those rules differ by market and where they are about to change.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p34",
+          "controlling_idea": "Outside the European Economic Area the same protocol serves different rules: the United Kingdom, India, Japan and Australia mandate authentication in their own terms, and the United States and Canada have no mandate and reward data sharing instead.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Market by rule as the providers document it: UK (SCA under the Payment Services Regulations 2017; Stripe thresholds 25, 85, 220, 440 GBP); India ('banks are required to perform authentication on all domestic ecommerce transactions'); Japan (3-D Secure for online credit card payments from 1 April 2025, customer-initiated only); Australia (mandatory after a merchant exceeds AUD 50,000 of fraud and a 0.2% fraud-to-sales ratio for two consecutive quarters); US and Canada (no mandate; data-only flows and Visa's Digital Commerce Authentication Program, with no liability shift).",
+              "shows": "Authentication mandates are national; the regulator texts for the UK, India, Japan and Australia were not read, so each row is the providers' account.",
+              "source": "Adyen documentation, '3D Secure for regulation compliance', https://docs.adyen.com/online-payments/3d-secure-for-regulation-compliance, n.d., accessed 2026-11; Adyen documentation, 'Credit Card Security Guidelines compliance guide' and 'AusPayNet compliance guide', n.d., accessed 2026-11; Stripe documentation, 'Strong Customer Authentication (SCA) exemptions', https://docs.stripe.com/payments/3d-secure/strong-customer-authentication-exemptions, n.d., accessed 2026-11; Stripe and Adyen documentation, 'Data Only' / 'Data-only', n.d., accessed 2026-11"
+            }
+          ]
+        },
+        {
+          "id": "p35",
+          "controlling_idea": "Authentication by a passkey that the card network holds, in place of a challenge from the issuer, is documented at Adyen as a pilot for selected merchants, with a first rollout in the UK announced on 29 October 2026; no Stripe page on scheme passkeys was found, and Stripe's support site describes Stripe Authentication, a trial of authentication delegated to Stripe; neither company documents delegated authentication by the merchant as a product.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa announced its Payment Passkey Service on 15 May 2024. Adyen press, 29 October 2026: 'Adyen will initially offer Visa Payment Passkey through Authenticate in the UK, with further enhancements and a global expansion planned for 2027.' Adyen documentation: 'Scheme passkeys are currently in pilot phase, and only enabled for a specific group of merchants'; 'supported for Mastercard network tokenized transactions'; 'You cannot enforce scheme passkey authentication'.",
+              "shows": "Announced, in one market, in pilot: the status the acceptance criterion requires; and the documentation is narrower than the press release.",
+              "source": "Visa press release, 2024-05-15; Adyen press release, https://www.adyen.com/press-and-media/adyen-visa-payment-passkey, 2026-10-29; Adyen documentation, 'Scheme passkeys', n.d., accessed 2026-11"
+            },
+            {
+              "kind": "reasoning",
+              "what": "No Stripe page on Click to Pay or on Visa or Mastercard payment passkeys was found in its documentation, support site or product pages (searched November 2026); calling scheme passkeys a form of delegated authentication is the author's classification.",
+              "shows": "Marks the absence and the author's reading."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "Rules in force outside Europe.",
+            "introduces": "A change of method that is being piloted.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p36",
+          "controlling_idea": "PSD3 and the Payment Services Regulation were not adopted on 17 November 2026: both stood at the European Parliament's second reading with an indicative plenary date of 14 December 2026, and what they change for authentication is known here only from Adyen's reading of the agreed text.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "European Parliament Legislative Observatory, procedure 2023/0210(COD): stage 'Awaiting Parliament 2nd reading'; 'Indicative plenary sitting date, 2nd reading' 14 December 2026. The Directive, 2023/0209(COD), is at the same stage.",
+              "shows": "The official status on the research cut-off date.",
+              "source": "European Parliament Legislative Observatory, https://oeil.secure.europarl.europa.eu/oeil/en/procedure-file?reference=2023/0210(COD), accessed 2026-11-17"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen, 12 October 2026 (a secondary reading; the legal text was not read): 'SCA isn't going anywhere'; 'Merchant-initiated transactions for recurring billing also stay as they are'; 'The transaction risk analysis exemption remains but its qualifying conditions could change'; 'Issuing banks can seek to recoup losses from acquirers'; 'Whether a specific passkey flow qualifies as SCA will depend on the EBA's technical standards'; general application forecast for 'around late 2028'.",
+              "shows": "What a payment company expects the texts to change, attributed, with the forecast marked as a forecast.",
+              "source": "Adyen knowledge hub, 'PSD3', https://www.adyen.com/knowledge-hub/psd3, 2026-10-12 (secondary source)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "A method in pilot.",
+            "introduces": "A law not yet adopted.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: The Policy Written as a Loss Table",
+      "controlling_idea": "Larkfield answers Jonas's question by writing its authentication policy as a table of payment types, what happens to each and who carries a fraud loss, and by storing those facts on every payment so a studio can be told why it paid.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S4"
+        ],
+        "how": "Works the thesis through on ledger payments: each kind of payment gets a row with its loss bearer, and the one policy choice is made by naming who pays."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "The answer to Jonas's question for Bram's payment, then the table for every payment type, then the one rule Larkfield changes and the fields it stores, then the size of what stays unprotected by design."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The rule, the designs and the two providers' controls.",
+        "introduces": "Larkfield's four payments worked through with them.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p37",
+          "controlling_idea": "Bram's payment was not challenged because the provider requested the low-risk exemption for it and his bank agreed, so by the rule of this chapter the loss stayed on the merchant's side, which under Larkfield's terms is Studio Noord.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Assume the payment response for Bram de Wit's €120.00 pass of 2 February 2027 carried `scaExemptionRequested` with the transaction-risk-analysis type (illustration; the ledger assumes no liability shift). Loss: €120.00 plus the €15.00 fee = €135.00, carried by Studio Noord under Larkfield's terms.",
+              "shows": "Answers the scene's two questions with the documented rule: the provider's default decided, and the requester's side pays.",
+              "source": "Larkfield scenario ledger (fictional); Adyen behavior as documented in 'SCA exemptions'"
+            }
+          ]
+        },
+        {
+          "id": "p38",
+          "controlling_idea": "Written as a table, Larkfield's payments fall into four rows, and only one of them is a choice.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Payment by what happens and who carries a fraud dispute: Mila's pass, €120.00, phone wallet (device authentication; issuer, as documented for wallets); Mila's membership set-up, €49.00, typed card (challenge required because a series is created; issuer); Mila's renewals, €49.00 on the 1st (merchant-initiated, no challenge; the studio); a typed-card pass such as Bram's, €120.00 (exempted, frictionless or challenged by the provider's model and the issuer; the studio if exempted, the issuer if authenticated).",
+              "shows": "Applies the liability table to the ledger's recurring examples; the fourth row is the only one where policy matters.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "One payment explained.",
+            "introduces": "Every kind of payment Larkfield takes, in the same terms.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p39",
+          "controlling_idea": "For the fourth row Femke and Jonas keep the providers' risk-based default and add one constraint on both providers, a request for 3-D Secure on a new member's first typed-card purchase of €100 or more, and they store the result of every decision on the payment record.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield's April 2027 policy (illustration): provider default elsewhere; one added rule (an Adyen Dynamic 3D Secure rule set to 'Always', a Stripe Radar 'Request 3D Secure' rule); the payment record store gains three fields per card payment: authentication outcome (none, frictionless, challenge), exemption requested, liability shift expected. The break-even of about 2.7% is the stated reason for not authenticating everything.",
+              "shows": "Shows a policy set by naming the loss bearer, using only documented controls, and makes the answer to a studio's question a lookup.",
+              "source": "Larkfield scenario ledger (fictional) (new facts appended by this chapter)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "One row where there is a choice.",
+            "introduces": "The choice Larkfield makes, and what it records.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p40",
+          "controlling_idea": "The largest unprotected amount is there by design: about 540,000 card renewals a month, roughly €26.5 million, are merchant-initiated and carry no shift, and the policy says so in writing instead of leaving studios to discover it in a dispute.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "statistic",
+              "what": "About 540,000 monthly card renewals (illustrative assumption from chapter 9) at the typical €49 = €26.46 million a month.",
+              "shows": "Sizes the exposure the membership design accepts in exchange for renewals without challenges.",
+              "source": "Larkfield scenario ledger (fictional); author's arithmetic"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The row where Larkfield chose.",
+            "introduces": "The row where there is no choice, sized.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong",
+      "controlling_idea": "Authentication fails in four ways an integrator can detect: the customer never finishes, the issuer's side is unavailable and the payment proceeds unprotected, a renewal comes back demanding authentication, and the provider's exemption ceiling moves.",
+      "function": "cause_effect",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S4"
+        ],
+        "how": "Shows what the state model and the loss-allocation view each have to catch in operation."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "Four independent failures ordered from the single payment (an unfinished challenge, an unavailable issuer) to the series (a refused renewal) to the whole portfolio (the ceiling)."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The policy working as designed.",
+        "introduces": "The ways the mechanism under it fails.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p41",
+          "controlling_idea": "A challenge the customer never finishes leaves the payment waiting on the customer, and a system that reads that state as paid or as failed has a payment that exists only in its own records.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'For payments stuck in an incomplete (Dashboard) or requires_action (API) status ... Your customer might also have abandoned the checkout flow.' Larkfield's payment record store keeps `waiting_on` = `customer` for this state (chapter 8).",
+              "shows": "The documented symptom and the record that makes it detectable.",
+              "source": "Stripe documentation, 'Strong Customer Authentication readiness', n.d., accessed 2026-11; Larkfield scenario ledger (fictional)"
+            }
+          ]
+        },
+        {
+          "id": "p42",
+          "controlling_idea": "When 3-D Secure is unavailable for a card or errors out, the payment can still be approved, without the shift the merchant expected, so an outage on the issuer's side changes who carries losses without failing anything.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'If a card doesn't support 3DS or an error occurs during the authentication process, the payment proceeds normally. When this occurs, liability doesn't generally shift to the issuer'.",
+              "shows": "The documented behavior; the detection is a count of authenticated payments without an expected shift.",
+              "source": "Stripe documentation, 'Authenticate with 3D Secure', https://docs.stripe.com/payments/3d-secure/authentication-flow, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "An authentication that never completes.",
+            "introduces": "An authentication that could not run, on a payment that succeeds anyway.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p43",
+          "controlling_idea": "A renewal that the issuer answers with a demand for authentication cannot be retried into success, because the customer is not there: it has to become a message to the customer and a new customer-initiated payment.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: for an `authentication_required` decline on a saved card, use the declined payment's client secret 'to allow the customer to authenticate the payment'.",
+              "shows": "The documented recovery: back to a checkout, which is the dunning process of a later chapter.",
+              "source": "Stripe documentation, 'Save and reuse a payment method', https://docs.stripe.com/payments/save-and-reuse, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Failures of a customer-present payment.",
+            "introduces": "A failure of a merchant-initiated one.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p44",
+          "controlling_idea": "The provider's exemption ceiling can fall for reasons no single merchant controls, and the merchant sees it only as more challenges at the same checkout.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "From RTS Article 20(2) (a provider ceases to use a band after two consecutive quarters above the reference rate) and Stripe's statement that the limit 'depends on the Stripe overall fraud rates'. No public account of either company losing a band was found; this is a consequence of the rule, not a documented incident.",
+              "shows": "The shared ceiling is an operational dependency worth a monitor: challenge rate by amount band.",
+              "source": "Commission Delegated Regulation (EU) 2018/389, http://publications.europa.eu/resource/celex/32018R0389, published 2018-03-13 (evidence age: 8 years; in force); Stripe documentation, 'Strong Customer Authentication (SCA) exemptions', https://docs.stripe.com/payments/3d-secure/strong-customer-authentication-exemptions, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Failures of single payments and series.",
+            "introduces": "A change at the provider that moves the limit for everyone.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "The law's scope, the protocol's two answers, the liability rule, the membership design and the providers' rule engines are one mechanism seen from five sides: a question about the payer that can be put to the issuer or withheld, where putting it moves the fraud loss and withholding it keeps the customer and the loss together. Every control a provider exposes is a way of choosing, per payment, between those two.",
+    "so_what": "A team that sets authentication policy to minimize prompts has allocated its fraud losses without knowing it, and on a platform it has allocated them to its sellers. Written as a table of payment types and loss bearers, with the outcome stored on each payment, the same policy can be priced, explained to the party that pays and revised when the provider's ceiling or the law moves.",
+    "callback": {
+      "to": "The introduction's two members who bought the same €120 pass, one challenged and one not.",
+      "how": "The reader can now say who decided (the provider's model and each member's bank), why only one loss fell on the studio (an exemption requested on the merchant's side), and what would have moved it (an authentication, or an exemption the issuer applied unasked)."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Write the authentication policy as a loss table: one row per kind of payment, with whether authentication is required, exempted, out of scope or chosen, and who carries a fraud dispute in each case; store the authentication outcome, the exemption requested and the expected liability shift on every payment."
+    },
+    "hand_off": {
+      "to": "payment-compliance-and-regulation",
+      "relationship": "contrast",
+      "carries_over": "Four chapters about the payer and the card: where the number is kept, which credential is sent, whether the payment looks like fraud, whether the cardholder was authenticated. Each was a decision about one payment.",
+      "introduces": "The other end of the payment: the business being paid, which the provider must know and keep knowing, as a standing state on an account instead of a decision per payment."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The failures and their detection.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p45",
+        "form": "list",
+        "controlling_idea": "Established: the legal duty and its thresholds, the issuer's control of the flow, and the rule that a requested exemption or a merchant-initiated payment carries no liability shift are documented in the legal texts and by both providers.",
+        "function": "synthesis"
+      },
+      {
+        "id": "p46",
+        "form": "list",
+        "controlling_idea": "Depends on context: whether to add authentication rules to the provider's default, how to treat first purchases, and whether to use one provider for authentication and another for acquiring each turn on stated conditions.",
+        "function": "synthesis",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is documented.",
+          "introduces": "What changes with the situation.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p47",
+        "form": "list",
+        "controlling_idea": "The author's synthesis: an authentication policy is a loss-allocation policy and should be written, stored and explained as one, and the exemption ceiling should be treated as a dependency on the provider.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is established and what depends on context.",
+          "introduces": "The author's own position, labeled as such.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p48",
+        "form": "list",
+        "controlling_idea": "Eight questions let the reader test an authentication policy in a design review or a provider evaluation.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The take-aways.",
+          "introduces": "Questions that apply them.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p49",
+        "controlling_idea": "The four chapters so far in this part decided something about one payment and its payer; the last control concerns the other end, the business being paid, which the provider must know and keep knowing as a standing state on an account.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "Decisions about one payment: where the number is kept, which credential is sent, whether it looks like fraud, whether the cardholder was authenticated.",
+          "introduces": "The seller's side, where the provider's duty is continuous and becomes account state; the next chapter.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "The risk score, fraud signals, card testing and the model's feedback loop.",
+      "covered_in": [
+        "payment-fraud-and-risk"
+      ]
+    },
+    {
+      "topic": "Network tokens, cryptograms and wallets as device tokens in depth.",
+      "covered_in": [
+        "network-tokens"
+      ]
+    },
+    {
+      "topic": "The dispute process, evidence and deadlines.",
+      "covered_in": [
+        "refunds-reversals-and-disputes"
+      ]
+    },
+    {
+      "topic": "The payment state model and next actions in general.",
+      "covered_in": [
+        "payment-state-machines"
+      ]
+    },
+    {
+      "topic": "The chip liability shift for in-person payments.",
+      "covered_in": [
+        "in-person-payments"
+      ]
+    },
+    {
+      "topic": "Retry schedules and dunning after a failed renewal.",
+      "covered_in": [
+        "invoicing-collections-and-dunning",
+        "authorization-optimization"
+      ]
+    },
+    {
+      "topic": "PSD3 and the Payment Services Regulation beyond authentication (licensing, verification of payee, the regulatory calendar).",
+      "covered_in": [
+        "payment-compliance-and-regulation",
+        "payments-what-is-moving"
+      ]
+    },
+    {
+      "topic": "The EMV 3-D Secure message specification field by field; it was not read (license click-through)."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "The EMVCo 3-D Secure specification was not read; the message flow is described from provider documentation and industry knowledge, and message names are omitted.",
+    "Adyen's transaction-risk-analysis ceiling and the fraud rates behind either company's use of the exemption are not published.",
+    "Stripe's 'If the card issuer applies exemptions ... liability shift doesn't apply' and Adyen's 'The chargeback liability shifts to the issuer' for issuer-applied exemptions read differently; the chapter reports both and does not resolve them from network rules (Mastercard rules unreadable, Visa's not consulted on this point).",
+    "PSD3 and Payment Services Regulation final texts were not read; content is Adyen's reading of 12 October 2026.",
+    "No Stripe statement on scheme passkeys or Click to Pay was found; Stripe's support site describes Stripe Authentication (device verification under delegated authentication, in trial), found in the verification pass.",
+    "Regulator texts for the UK, India, Japan and Australia were not read; those rows rest on provider documentation.",
+    "Challenge abandonment rates are not published by either company in a comparable form; the worked example uses a labeled assumption."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "Flow rubric notes acted on: paragraph p08 now says either side may invoke an exemption, the liability section is declared large_to_small, and the data-only flow is defined where the liability table first uses it. Notes not acted on, left to the author: merging the comparison section into the providers section (the style guide requires the separate titled section), moving the state-model paragraph p15 next to the failures, and placing the section on what is moving after Larkfield's policy.",
+      "rejected": [
+        "Reordering sections on a verdict of sound with notes."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Use the membership set-up of 12 January 2027 as the challenge example and Bram de Wit's disputed €120 pass as the exempted payment, per consistency ruling 14; Mila's pass appears as the wallet case.",
+      "rejected": [
+        "'Mila's frictionless authentication' from the PLAN contract, which the ruling overrides (her pass is paid from a phone wallet)."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Put the liability rule before the membership design and the decision of when to ask, so both are read as applications of it.",
+      "rejected": [
+        "Law, protocol, exemption strategy, then liability, which would have described the optimization before the thing being optimized."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Keep longer provider material in its own section before the required comparison, as the style guide directs.",
+      "rejected": [
+        "One combined section, which would have buried the table."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Cite Adyen documentation as 'n.d.' although its markdown pages carry a last-modified field, because on the pages used that field predates content the page contains (a 2023 date on a page describing a July 2026 roll-out).",
+      "rejected": [
+        "Citing the metadata date as a publication date."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "PLAN.md, contract for 25-3ds-and-sca; _research/consistency-issues.md rulings 14, 15, 17",
+      "contributed": "Scope, owned terms, the Larkfield thread and the ruling on Mila's pass."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-card-data-tokens-and-authentication.md, Part 4 and sections 3.5–3.6",
+      "contributed": "Legal texts, exemptions, 3-D Secure components and versions, liability shift, data-only, other markets, PSD3 status, both companies' authentication controls, open questions."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-fraud-risk-and-compliance.md (1.2, 1.3, 1.5), brief-card-lifecycle-and-networks.md (stored credentials), brief-optimization-routing-orchestration.md",
+      "contributed": "EBA and ECB fraud statistics, rule actions, adaptive 3DS, merchant-initiated flags on each provider."
+    },
+    {
+      "kind": "external",
+      "ref": "Pages fetched on 17 November 2026: Stripe documentation (authentication flow, SCA exemptions, Radar rules, risk settings, standalone 3DS, SCA readiness, CIT and MIT); Adyen documentation (SCA exemptions, out-of-scope, Dynamic 3D Secure, Authentication, 3D Secure 2, regulation compliance, scheme passkeys, data-only, Apple Pay); Adyen press releases of 22 September and 29 October 2026 and knowledge-hub article of 12 October 2026; European Parliament Legislative Observatory; PSD2 and RTS texts; EBA and ECB 2025 fraud report; EMVCo 3-D Secure page.",
+      "contributed": "Verification of every quotation used."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 126 claims checked (107 confirmed, 12 corrected, 6 hedged, 1 unsupported and relabeled, 0 unreachable); the most significant fix: Stripe is not silent on methods beyond 3-D Secure (its support site describes Stripe Authentication, a delegated-authentication trial), and Bram's EUR 135.00 is now stated as the amount at stake with an illustrative fee, since Adyen charges a fee for every booked chargeback."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Evidence lists trimmed to the items the draft uses, after the article was cut for length; no unit, order or controlling idea changed."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Initial outcome spec, written from the PLAN contract, the research briefs and pages fetched in the session; intent, thesis and role copied from the journal spec."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation after verification (17 November 2026): AC-3, how_why and p35 now give Adyen's first rollout of scheme passkeys and Stripe Authentication (support site, in trial) instead of 'nothing was found for Stripe'."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit (17 November 2026): nine statements of absence re-tested with a wide search. Narrowed: Adyen's chargeback fee (CAD 24.00 in its Canadian fee disclosure; no euro amount), Stripe's design argument and method selection (product page and a 2026 Sessions talk on Adaptive 3DS; nothing in documentation). The rest hold and now say what was searched. p8, p31 and p35 evidence aligned."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('for Stripe only an undated support article on Stripe Authent' -> 'for Stripe an undated support article describes Stripe Authe')."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Sweep of rulings 46-48: thesis how_why no longer says no selection among methods was found for Stripe: its product page and a Sessions 2026 talk describe an engine that selects the authentication pathway (ruling 48f). Prose unchanged."
+    }
+  ],
+  "length": {
+    "target_words": 6000,
+    "max_words": 6500
+  }
+}

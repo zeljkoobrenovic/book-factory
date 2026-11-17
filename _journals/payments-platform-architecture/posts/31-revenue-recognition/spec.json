@@ -1,0 +1,1311 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "billing-revenue-recognition",
+  "journal": "payments-platform-architecture",
+  "part": "part-6",
+  "title": "Cash Is Not Revenue: Revenue Recognition and the Hand-off to Finance",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "Why cash, billings and revenue are three different numbers, and what a performance obligation, a revenue schedule and deferred revenue are, at an architect's level.",
+        "The five steps of IFRS 15 and ASC 606 (issued together in May 2014) in one line each.",
+        "How Stripe Revenue Recognition is documented: built on a double-entry ledger, each invoice line treated as one performance obligation and amortized evenly over its period, with rules and imports for the rest. No Adyen revenue-recognition product was found; Orb documents one of its own."
+      ],
+      "believe": [
+        "A payments report is not a revenue report.",
+        "Recognition inside a billing provider fits a business whose contracts equal its invoices; past that point the schedule belongs in a finance system."
+      ],
+      "can_do": [
+        "Say how much of an up-front payment is revenue on a given date and what the rest is.",
+        "Specify the export a billing engine owes finance: per invoice line, the amount net of tax, the service period and every later adjustment with its own date.",
+        "Recognize a contract that the provider's default method will get wrong."
+      ]
+    },
+    "audience": {
+      "who": "A software engineer or architect who builds or integrates billing on a payment provider and has never had to explain to a finance team why the payments report is not the revenue report.",
+      "already_knows": [
+        "Subscriptions, billing periods, proration and the invoice as the billing engine's output (subscriptions-and-billing-engines).",
+        "Usage events and meters (usage-metering-and-rating).",
+        "Finalized invoices, credit notes, refunds, disputes and dunning (invoicing-collections-and-dunning, refunds-reversals-and-disputes).",
+        "The tax line on an invoice (billing-and-payment-tax).",
+        "Double-entry ledgers and clearing accounts (payment-ledgers).",
+        "Larkfield, its two providers and its 2026 incidents (meet-larkfield)."
+      ],
+      "does_not_know": [
+        "Billings versus revenue, performance obligation, deferred revenue, revenue schedule, contra revenue, accounting period close, subledger and general ledger.",
+        "IFRS 15 and ASC 606.",
+        "What Stripe Revenue Recognition assumes, and that no Adyen counterpart is documented."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given an up-front payment in a case the chapter does not contain, the reader splits it into recognized and deferred revenue and names the data needed to do so.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A customer pays €1,200 on 1 January for one year of a software service. On 31 March: how much of it is revenue, what is the rest called, and what must the billing system have recorded for finance to work this out?",
+        "expected": "About €300 is revenue (three of twelve months); about €900 is deferred revenue, a liability until the service is delivered. Needed: the invoice line's amount net of tax, the start and end of its service period, and any refund, dispute or credit note with its own date."
+      },
+      {
+        "id": "AC-2",
+        "statement": "The reader identifies a contract for which invoice-line-equals-obligation recognition gives the wrong schedule.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A sales team sells, on one invoice line, a year of software access together with a one-day onboarding workshop held in the first week. Why might a billing provider's default revenue schedule be wrong for this sale, and what are the options?",
+        "expected": "The default treats the invoice line as a single obligation spread evenly over the year, but the workshop is a separate promise delivered at one point in time. Options: split the line, apply a rule or import that splits the treatment, or keep the schedule in a finance system fed by the billing data."
+      },
+      {
+        "id": "AC-3",
+        "statement": "The chapter links to RECONCILED for posting to the general ledger and does not re-teach it; it stops at the data the billing side must hand over.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "major"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "How does a billing system turn invoices and payments into recognized revenue, and where should it stop?",
+    "claim": "A billing system turns invoices into revenue by giving each invoice line a service period, deferring its amount and releasing it as the service is delivered, with every refund, dispute and credit note as a dated adjustment; it should stop where contracts stop matching invoices. Stripe Revenue Recognition is documented on exactly that assumption (each invoice line is one performance obligation, amortized evenly over its period), so it serves a business whose contracts equal its invoices, and beyond that the schedule belongs in a finance system that the billing engine feeds. Adyen documents no revenue-recognition product; its reports describe payments, settlement and fees.",
+    "disputed_by": "The view that revenue is what was charged in the month, so the payment provider's report is the revenue report; and the opposite view that recognition is the ERP's business alone and the billing engine owes finance nothing but totals.",
+    "so_what": "An architect can specify what the billing side must export whatever tool does the recognition: per invoice line, the amount net of tax, the service period, and each later adjustment with its own date; and, for usage, the date of the usage as well as the date of the invoice, because they fall in different accounting periods at every month end.",
+    "how_why": "IFRS 15 and ASC 606 recognize revenue when a promise to the customer is fulfilled, which for a service is over time; the cash for an annual plan arrives on one day and is a liability until earned. That is the part's third time failure, the wrong period, and it is produced by reading a payments report as revenue. Stripe documents its product as a double-entry ledger over the activity inside Stripe, with one rule per transaction and CSV imports for what Stripe did not process, and reports that update hours later; Stripe's own product page calls it 'a centralised revenue subledger', and its output still has to reach the general ledger. Orb documents recognition from invoices and raw usage for its own product, which describes Orb and not Adyen's platform; no Adyen revenue-recognition product was found in its documentation, help center or site, where revenue recognition is mentioned only on an Orb partner page and in an article of 22 October 2026.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "Cash, billings and revenue are three numbers with three dates; IFRS 15 and ASC 606 recognize revenue when a performance obligation is satisfied, which for a service is over time, so money paid up front is deferred revenue, a liability, until earned."
+      },
+      {
+        "id": "S2",
+        "claim": "A revenue schedule is computed from the invoice line (amount net of tax, service period) and changed only by dated adjustments (refund, dispute, credit note) and, for usage, by the date of use; payment status does not drive it and closed periods are corrected, not rewritten."
+      },
+      {
+        "id": "S3",
+        "claim": "Stripe documents Revenue Recognition as a double-entry ledger over activity inside Stripe in which each invoice line is one performance obligation amortized evenly over its period, with rules, imports and a preview API for the rest and reports that update hours later; that it is a subledger whose output must still reach the general ledger is the author's inference."
+      },
+      {
+        "id": "S4",
+        "claim": "No Adyen revenue-recognition product or documentation was found: Adyen's reports describe payments, settlement and fees, and Orb's documented recognition describes Orb's own product, not Adyen's platform."
+      },
+      {
+        "id": "S5",
+        "claim": "Recognition inside the billing system fits a business whose contracts equal its invoices; beyond that the schedule belongs in a finance system, and in both cases the billing side owes the same line-level export."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Supplies the part's third failure of time, the wrong period, and draws the line between what a billing engine must hand to finance and what finance must do itself.",
+    "supports": [
+      "P6-4"
+    ]
+  },
+  "flow": {
+    "pattern": "prerequisite_order",
+    "additional_patterns": [
+      {
+        "pattern": "problem_solution",
+        "applies_to": "scene to in-practice: the two February numbers are posed in the first section and resolved, with Larkfield's decision, in the eighth"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "stripe-documented, adyen-documented, where-they-differ; and where-to-stop"
+      }
+    ],
+    "rationale": "The reader meets two numbers that disagree, then gets the three terms that explain the disagreement, then the mechanism that computes the right one, because 'each invoice line is one performance obligation amortized over its period' means nothing before obligation, deferral and schedule exist. The two companies follow the mechanism so that each can be read as an implementation or an absence of it. The designs come after the companies because the second design is the one Stripe documents and its limit is the assumption just quoted; the export specification closes the designs because it is what remains constant across them. The comparison table keeps the book's fixed position after designs and trade-offs. Larkfield's worked schedule and the failures come last because they use every earlier term. Put the companies first and the chapter is a product description; put the designs first and 'contracts equal invoices' has no mechanism behind it."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "On 1 February 2027 a customer pays €1,890 for a year of software. At the end of the month one dashboard says February revenue from that customer was €1,890 and the finance controller's books say €144.99. Both were computed from the same invoice, and neither has a bug."
+    },
+    "bridge": {
+      "from_reader_world": "An engineer who integrates a payment provider sees a successful charge and a total per month, and it is natural to call that total revenue.",
+      "to_topic": "Accounting counts revenue when the service is delivered, not when it is charged, so the billing system owes finance more than a total: the period each amount is for and every later change to it."
+    },
+    "thesis_statement": {
+      "text": "A billing system turns invoices into revenue by giving each invoice line a service period, deferring its amount and releasing it as the service is delivered, with every refund, dispute and credit note as a dated adjustment; it should stop where contracts stop matching invoices. Stripe Revenue Recognition is documented on that assumption; Adyen documents no revenue-recognition product.",
+      "placement": "KEY POINTS bullets 1 to 3, and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p04",
+      "promises": [
+        {
+          "promise": "Start from two Larkfield reports that disagree about February's subscription revenue.",
+          "kept_in": [
+            "scene"
+          ]
+        },
+        {
+          "promise": "Define billings, cash, revenue, performance obligation, deferred revenue and the revenue schedule.",
+          "kept_in": [
+            "three-numbers"
+          ]
+        },
+        {
+          "promise": "Show how an invoice line becomes a schedule and what refunds, disputes, credit notes, usage and the period close do to it.",
+          "kept_in": [
+            "mechanism"
+          ]
+        },
+        {
+          "promise": "Set out what Stripe documents and what was and was not found for Adyen and Orb.",
+          "kept_in": [
+            "stripe-documented",
+            "adyen-documented",
+            "where-they-differ"
+          ]
+        },
+        {
+          "promise": "Compare three places to keep the schedule and specify the export the billing side owes finance.",
+          "kept_in": [
+            "where-to-stop"
+          ]
+        },
+        {
+          "promise": "Work the annual plan month by month and list the quiet ways recognition fails.",
+          "kept_in": [
+            "in-practice",
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "function": "context",
+        "controlling_idea": "One payment of €1,890 on 1 February 2027 for a year of software gives three different and equally correct answers to 'what did we make in February?': €1,890 invoiced, €1,890 collected and about €145 earned.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Ironworks Climbing pays €1,890 up front on 1 February 2027 for an annual €189 plan at one location; one-twelfth of a 365-day period that starts on 1 February is 28 days, €144.99.",
+            "shows": "The same event read by three reports gives three numbers, and only one of them is revenue.",
+            "source": "scenario ledger"
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "function": "claim",
+        "controlling_idea": "A billing system turns an invoice line into revenue by giving it a service period, deferring its amount and releasing it as the service is delivered, with every refund, dispute and credit note as a dated adjustment, and it should stop where contracts stop matching invoices.",
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "Three numbers for one payment.",
+          "introduces": "The rule that separates them and the chapter's thesis, including what Stripe documents and what Adyen does not.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "function": "context",
+        "controlling_idea": "Revenue recognition is off the path of Mila's class pass but reads the same records: Larkfield's €2.53 fee on her €120.00 pass is earned on 9 March 2027, while the pass itself is ten classes the studio still owes her, which is why her later refund is €84.00 for seven unused classes.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's ten-class pass, €120.00, 9 March 2027; Larkfield's fee €2.53; refund of €84.00 for seven unused classes on 18 March 2027.",
+            "shows": "A payment the reader already knows contains both kinds of revenue: a fee earned at one moment and a prepaid service earned class by class.",
+            "source": "scenario ledger"
+          }
+        ],
+        "transition_in": {
+          "relationship": "place",
+          "carries_over": "The chapter's claim.",
+          "introduces": "Where it sits relative to the recurring payment.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "function": "transition",
+        "controlling_idea": "The chapter goes from Larkfield's three numbers, through the vocabulary and the mechanism of a revenue schedule, to what Stripe and Adyen each document, the three places a schedule can live, the comparison, the annual plan worked month by month, and the ways the number goes wrong.",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The chapter's position.",
+          "introduces": "The order of its sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: Three Numbers for February",
+      "controlling_idea": "At the February 2027 close two Larkfield reports disagree about subscription revenue by a factor of thirteen on one customer, and neither has a bug: they answer different questions.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "Poses the chapter's question with ledger numbers before any accounting term is defined."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The roadmap.",
+        "introduces": "The situation at Larkfield that poses the question.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p05",
+          "function": "context",
+          "controlling_idea": "The growth team's dashboard counts Ironworks Climbing's €1,890 as February subscription revenue, and Priya Raman's books count €144.99.",
+          "organization": "narration",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ironworks Climbing, annual plan, €1,890 paid 1 February 2027; the billing integration was owned by the growth team until 2027; Priya Raman is Finance Controller and owns the close.",
+              "shows": "Two teams read the same Stripe invoice and report numbers thirteen times apart.",
+              "source": "scenario ledger"
+            }
+          ]
+        },
+        {
+          "id": "p06",
+          "function": "claim",
+          "controlling_idea": "The question Femke de Graaf inherits with the billing integration is what the billing side must hand finance so that the second number can be computed and defended, and whether the provider should compute it.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "The Version Cliff, March 2026: an API upgrade removed a field the finance export read, and subscription revenue reports were wrong for 6 days.",
+              "shows": "Finance already depends on an export from the billing integration, and that dependency has already failed once.",
+              "source": "scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Two numbers for one invoice.",
+            "introduces": "The design question behind them: the hand-off from billing to finance.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "three-numbers",
+      "heading": "Cash, Billings and Revenue: Three Numbers, Three Dates",
+      "controlling_idea": "Billings, cash and revenue measure three different events (an invoice issued, money received, a promise kept), and the accounting standards tie revenue to the third.",
+      "function": "definition",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "Supplies the vocabulary (billings, performance obligation, deferred revenue, revenue schedule) and the rule that the rest of the chapter mechanizes."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The three numbers first because the reader has just seen them; then the standard that picks one of them; then the two terms the standard introduces, each needed by the next: a schedule cannot be defined before the obligation it releases."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Two numbers that are both right.",
+        "introduces": "The definitions that explain why.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p07",
+          "function": "definition",
+          "controlling_idea": "Billings are what was invoiced in a period, cash is what was collected and revenue is what was earned by delivering, and for anything paid in advance or in arrears the three fall in different months.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Three numbers for two Larkfield cases: the Ironworks annual plan in February 2027 (billings €1,890, cash €1,890, revenue €144.99) and an illustrative €70.00 of SMS overage (1,000 messages at €0.07) used in March and invoiced in April (March: billings 0, cash 0, revenue €70.00).",
+              "shows": "One case is paid before delivery and one after; in both, the payment report puts the amount in the wrong month.",
+              "source": "scenario ledger; the 1,000 messages are an illustrative assumption"
+            }
+          ]
+        },
+        {
+          "id": "p08",
+          "function": "explanation",
+          "controlling_idea": "IFRS 15 and ASC 606, issued together in May 2014, recognize revenue when a promise to the customer is fulfilled, in five steps (find the contract, find its promises, set the price, allocate the price across the promises by what each would sell for alone, recognize as each is fulfilled), none of which starts from the payment.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Joint IASB and FASB news release of 28 May 2014: 'today issued jointly a converged standard on the recognition of revenue from contracts with customers', introduced into the FASB codification 'as Topic 606' (evidence age 12 years). IFRS Foundation page: 'In May 2014 the Board issued IFRS 15 Revenue from Contracts with Customers, together with the introduction of Topic 606 into the Financial Accounting Standards Board's Accounting Standards Codification'; effective for annual periods beginning on or after 1 January 2018; the five steps: identify the contract(s) with a customer; identify the performance obligations; determine the transaction price; allocate the transaction price to each performance obligation; recognise revenue when a performance obligation is satisfied.",
+              "shows": "The rule is the same under both frameworks and none of its five steps mentions cash.",
+              "source": "https://www.ifrs.org/issued-standards/list-of-standards/ifrs-15-revenue-from-contracts-with-customers/ (IFRS Foundation, n.d., accessed 2026-11); http://web.archive.org/web/20210924180526/https://www.fasb.org/jsp/FASB/FASBContent_C/NewsPage&cid=1176164075286 (FASB news release, 2014-05-28, archived copy; fasb.org returned 403 on 2026-11-17); https://www.ifrs.org/news-and-events/news/2014/05/iasb-and-fasb-issue-converged-standard-on-revenue-recognition/ (IFRS Foundation, 2014-05-28)"
+            },
+            {
+              "kind": "table",
+              "what": "The five steps, one line each, with what a billing system holds for each step (contract: often outside billing; obligations: products and invoice lines; price: the invoice amount net of tax; allocation: line amounts; satisfaction: the service period).",
+              "shows": "Shows which steps a billing system has data for and which are accounting judgement."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "Revenue as 'what was earned'.",
+            "introduces": "The standard that defines earned.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p09",
+          "function": "definition",
+          "controlling_idea": "A performance obligation is one distinct promise in a contract, which may hold several, and each is satisfied either at a point in time or over time, which decides whether its revenue lands on one date or is spread.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Performance obligations are promises in a contract to transfer to a customer goods or services that are distinct'; 'A performance obligation may be satisfied at a point in time (typically for promises to transfer goods to a customer) or over time (typically for promises to transfer services to a customer).'",
+              "shows": "The IFRS Foundation's summary of the standard's definition and its two timing cases.",
+              "source": "https://www.ifrs.org/issued-standards/list-of-standards/ifrs-15-revenue-from-contracts-with-customers/ (IFRS Foundation, n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "example",
+              "what": "A year of software access is satisfied over time; a one-day onboarding workshop and Larkfield's fee on one payment are satisfied at a point in time.",
+              "shows": "Gives each timing case an example the reader meets again in the designs section."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "Step two of the five.",
+            "introduces": "The term the chapter owns and its two timing cases.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "function": "definition",
+          "controlling_idea": "Deferred revenue is the part of an invoiced amount not yet earned, a liability and not income, and the revenue schedule is the dated plan by which it becomes revenue.",
+          "evidence": [
+            {
+              "kind": "example",
+              "what": "Ironworks at 31 March 2027: 59 of 365 days delivered, €305.51 recognized and €1,584.49 deferred; counted as two of twelve equal months, €315.00 and €1,575.00.",
+              "shows": "Splits an up-front payment into its two parts and shows that by-day and by-month are both conventions, chosen once by finance.",
+              "source": "scenario ledger; the arithmetic is the author's"
+            },
+            {
+              "kind": "figure",
+              "what": "Illustration 31-cash-is-not-revenue: one payment on day one against twelve monthly slices of revenue.",
+              "shows": "Makes the central distinction visible: the money arrives once, the revenue arrives monthly."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "A promise satisfied over time.",
+            "introduces": "What the unearned part is called and how it is released.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "mechanism",
+      "heading": "How an Invoice Line Becomes a Schedule",
+      "controlling_idea": "A schedule is computed from the invoice line (amount net of tax, service period) and changed only by dated adjustments; payment status does not drive it, and a closed period is corrected, not rewritten.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "S2"
+        ],
+        "how": "Turns the definitions into a mechanism with inputs, entries and failure behavior, which is what the two providers are then compared on."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The undisturbed case first (entries, then inputs), then the three things that disturb it in the order a billing period meets them: money going back, usage arriving after the period, and the period being closed."
+      },
+      "transition_in": {
+        "relationship": "sequence",
+        "carries_over": "The schedule as a definition.",
+        "introduces": "The schedule as a computation with inputs and entries.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p11",
+          "function": "process",
+          "controlling_idea": "When an invoice is finalized each line's net amount is booked as deferred revenue, and a slice moves to revenue as each day of the service period passes, whether or not the invoice has been paid.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'an entry which finalizes an invoice would debit AccountsReceivable and credit DeferredRevenue. Paying an invoice would debit Cash and credit AccountsReceivable.' Orb: 'the payment status of an individual invoice is not factored into accounting treatment'.",
+              "shows": "Two vendors document the same three entries, and payment touches cash and receivables only.",
+              "source": "https://docs.stripe.com/revenue-recognition/methodology.md (Stripe documentation, n.d., accessed 2026-11); https://docs.withorb.com/revenue-reporting/revenue-recognition.md (Orb documentation, n.d., accessed 2026-11)"
+            }
+          ]
+        },
+        {
+          "id": "p12",
+          "function": "explanation",
+          "controlling_idea": "The schedule needs four inputs per invoice line (the amount net of tax, the start and end of the service period, the product that identifies the promise, and the currency), and a missing input fails silently into a default.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Requirements table: input, where it comes from, what happens when it is missing (no service period: recognized in full at finalization, per Stripe's documented default; tax inside the amount: revenue overstated; no product: no way to treat a workshop differently from access).",
+              "shows": "States the inputs as requirements and names the silent default for each.",
+              "source": "https://docs.stripe.com/revenue-recognition/methodology/subscriptions-and-invoicing.md (Stripe documentation, n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The entries.",
+            "introduces": "The data they are computed from.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p13",
+          "function": "explanation",
+          "controlling_idea": "A refund, a dispute or a credit note is a dated adjustment that splits in two: the part already recognized becomes contra revenue, an account that reduces revenue without deleting the original entry, and the part still deferred is removed from the liability.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'if you issue a 120 USD refund on an annual subscription during the second month, 20 USD for the first 2 months is contra revenue. The remaining 100 USD is adjusted and reflected in your deferred revenue balance'.",
+              "shows": "A vendor's worked example of the split.",
+              "source": "https://docs.stripe.com/revenue-recognition/methodology.md (Stripe documentation, n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "example",
+              "what": "Had Ironworks disputed the whole €1,890 on 1 August 2027 (hypothetical): 181 days delivered, €937.23 becomes contra revenue and €952.77 leaves deferred revenue.",
+              "shows": "The same split with ledger numbers; the adjustment needs the original line and its period to be computed at all.",
+              "source": "scenario ledger; hypothetical, the author's arithmetic"
+            },
+            {
+              "kind": "figure",
+              "what": "Illustration 31-line-to-schedule: an invoice line fills a deferred-revenue tank that drains month by month into revenue, with a refund drawing from both.",
+              "shows": "Shows the mechanism and the two-way split of an adjustment in one picture."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A schedule that runs undisturbed.",
+            "introduces": "What happens when money goes back.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p14",
+          "function": "explanation",
+          "controlling_idea": "Usage is earned on the day it happens and invoiced later, so at every month end some revenue belongs to a month whose invoice does not exist yet, and the schedule needs the usage date as well as the invoice date.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Orb: calculating recognized revenue for usage 'requires understanding exactly when usage occurs. This can be particularly difficult when invoicing and accounting periods do not align'; 'Revenue is recognized for usage as it occurs on a daily basis, regardless of the associated line item's service period.'",
+              "shows": "A billing vendor states the problem and its own rule: time attribution comes from the event, not the invoice.",
+              "source": "https://docs.withorb.com/revenue-reporting/revenue-recognition.md (Orb documentation, n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Amounts invoiced before delivery.",
+            "introduces": "Amounts invoiced after it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p15",
+          "function": "explanation",
+          "controlling_idea": "Once finance closes a month, a late change to that month is booked as a correction in the current period, so the schedule must know which periods are closed.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe documents accounting periods that close automatically or manually and can be reopened to 'make adjustments to past data without creating corrections in the current period'; Orb documents accounting period locks: 'Closing an accounting period ensures that there will be no subsequent changes to that period'.",
+              "shows": "Both products model the close as state the schedule must respect.",
+              "source": "https://docs.stripe.com/revenue-recognition/revenue-settings/accounting-period-control.md (n.d., accessed 2026-11); https://docs.withorb.com/revenue-reporting/revenue-recognition.md (Orb documentation, n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Adjustments and late usage.",
+            "introduces": "The rule for where a late change may land.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "stripe-documented",
+      "heading": "What Stripe Documents: A Ledger Over What Stripe Sees",
+      "controlling_idea": "Stripe documents Revenue Recognition as a double-entry ledger over activity inside Stripe that treats each invoice line as one performance obligation amortized evenly over its period, with rules, imports and previews for everything else.",
+      "function": "evidence",
+      "advances_thesis": {
+        "supports": [
+          "S3"
+        ],
+        "how": "Sets out the documented behavior of the one first-party product either anchor company has, and separates it from the author's reading of it."
+      },
+      "flow": {
+        "pattern": "assertion_evidence_reasoning",
+        "rationale": "The core assumption, then its defaults, then the overrides, then the outputs with the author's reading, and last the limit of the evidence, so that the inference comes after every fact it rests on."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The mechanism in general.",
+        "introduces": "One provider's documented implementation of it.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p16",
+          "function": "evidence",
+          "controlling_idea": "Stripe says the product is built on a double-entry ledger over 'all transactions that happen within Stripe', and that each invoice line is its own performance obligation, deferred at finalization and amortized evenly, by the day unless configured otherwise.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Stripe built Revenue Recognition on top of a double-entry accounting ledger that tracks debits and credits resulting from your business activity'; 'Revenue Recognition treats each invoice line item as its own performance obligation. When the invoice finalizes, Revenue Recognition defers the total recognizable amount and subsequently amortizes it evenly over the period of each invoice line item.'",
+              "shows": "The simplifying assumption in Stripe's own words: step two of the standard is mapped onto the invoice structure.",
+              "source": "https://docs.stripe.com/revenue-recognition/methodology.md (Stripe documentation, n.d., accessed 2026-11)"
+            },
+            {
+              "kind": "fact",
+              "what": "Settings page: 'By default, Stripe Revenue Recognition recognizes revenue by the day'; by second and two by-month options exist. The subscriptions-and-invoicing page says 'Revenue recognition amortizes revenue by the second, but our example uses a daily interval'; the chapter notes the discrepancy and follows the settings page.",
+              "shows": "The by-day convention used in the Ironworks numbers is the documented default.",
+              "source": "https://docs.stripe.com/revenue-recognition/revenue-settings.md (n.d., accessed 2026-11)"
+            }
+          ]
+        },
+        {
+          "id": "p17",
+          "function": "evidence",
+          "controlling_idea": "What has no service period is recognized at once: an invoice line without a period at finalization, a payment without an invoice when it occurs, and a platform's application fee on a Connect charge immediately.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'If you don't set a period on an invoice line item, Revenue Recognition recognizes the full amount on the invoice line item when the invoice is finalized'; one-time payments: 'By default, Revenue Recognition recognizes these payments immediately when the payment occurs'; Connect destination charges: 'the application_fee_amount is immediately recognized as the revenue'.",
+              "shows": "The documented defaults for data the product does not have.",
+              "source": "https://docs.stripe.com/revenue-recognition/methodology.md (Stripe documentation, n.d., accessed 2026-11); https://docs.stripe.com/revenue-recognition/connect/destination-charges.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A line with a period.",
+            "introduces": "Everything without one.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p18",
+          "function": "evidence",
+          "controlling_idea": "Stripe documents four ways past the default: rules, of which one applies per transaction; CSV imports that add or override a service period, split a payment or bring in another processor's data; standalone selling prices that split a bundled product across its components; and a Performance Obligations API in preview that recognizes a line as fulfillment is reported.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Rules: 'Each transaction can only have one rule applied to it'; 'Rules are typically applied to reports within 24 hours'. Import: 'Import an external payment processor's data with a service period, amount, and currency'; reports 'take approximately 3-4 hours to update after you upload data'. Performance Obligations API: 'Request to join the preview'. Standalone selling prices: 'The standalone selling price (SSP) feature helps businesses allocate revenue across products sold as a bundle'; 'Applying a rule to a product precludes it from being set as a bundle'; 'You can’t apply bundles alongside data imports.'",
+              "shows": "The mechanisms exist, are batch-oriented and are configured by finance, not by the billing integration.",
+              "source": "https://docs.stripe.com/revenue-recognition/rules.md; https://docs.stripe.com/revenue-recognition/data-import.md; https://docs.stripe.com/revenue-recognition/standalone-selling-price.md; https://docs.stripe.com/revenue-recognition/performance-obligations-api.md (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "Defaults that recognize at once.",
+            "introduces": "The documented ways to override them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p19",
+          "function": "analysis",
+          "controlling_idea": "The product's output is reports and exports that appear hours after the activity, with a mapping to the general ledger's account names, which Stripe itself calls a subledger (product-page heading \"A centralised revenue subledger\"; report column \"Stripe subledger account\"); that its totals must still be posted by something else is the chapter's labeled inference.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'new transaction data appears within approximately 3-4 hours after transaction completion'; Data Pipeline syncs 'once every 6 hours'; chart-of-accounts mapping is applied 'to the CSV reports you download'; the report API note: 'Because this feature is in beta, the data fields might change.'",
+              "shows": "Documented outputs and their delay; the inference rests on what the pages describe (reports, mapping) and is marked as inference.",
+              "source": "https://docs.stripe.com/revenue-recognition/data-freshness.md; https://docs.stripe.com/revenue-recognition/chart-of-accounts.md; https://docs.stripe.com/revenue-recognition/api.md (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "How schedules are computed and overridden.",
+            "introduces": "What comes out and where it goes.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "function": "claim",
+          "controlling_idea": "The documentation read stops short of three things: allocating one price by stand-alone selling price beyond a product set up as a bundle (nothing on a contract that spans several lines or invoices), estimating variable consideration, and the 'revenue contracts' its chart of accounts mentions without a page that explains them.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "The methodology page's account descriptions for 'Unbilled deferred revenue' and 'Contract asset' say 'This is only used when working with revenue contracts'; neither Stripe's documentation index (fetched 17 November 2026) nor any of the 38 Revenue Recognition pages read in the verification pass describes revenue contracts. The index is incomplete: the standalone-selling-price page is linked from the activity-logs page and absent from the index.",
+              "shows": "Marks where the public record ends, without turning absence into a statement about the product.",
+              "source": "https://docs.stripe.com/revenue-recognition/methodology.md (Stripe documentation, n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What is documented.",
+            "introduces": "Where the documentation read stops.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "adyen-documented",
+      "heading": "What Adyen Documents: Payments, Settlement and Fees",
+      "controlling_idea": "No Adyen revenue-recognition product or documentation was found; Adyen's reports describe transactions, and Orb, which Adyen has owned since 1 July 2026, documents recognition for Orb's own billing product.",
+      "function": "evidence",
+      "advances_thesis": {
+        "supports": [
+          "S4"
+        ],
+        "how": "States the one-sided comparison plainly and keeps Orb's documentation apart from Adyen's platform."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "A provider that documents a recognition product.",
+        "introduces": "A provider for which none was found.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p21",
+          "function": "evidence",
+          "controlling_idea": "Adyen's documentation describes its reports as information about transactions, and neither its documentation index nor its help center has a page on revenue recognition, deferred revenue or billing, which is an absence in public sources and not a statement by Adyen.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Adyen reports show you information about your transactions'; the Settlement details report 'includes the details of payments that have been settled and paid out to you by Adyen'. The guide 'Closing your fiscal period' works from the balances in the Monthly or Daily finance report.",
+              "shows": "Adyen's reports are cash-side records: payments, settlement, fees.",
+              "source": "https://docs.adyen.com/reporting.md; https://docs.adyen.com/reporting/settlement-reconciliation/transaction-level/settlement-details-report.md; https://docs.adyen.com/reporting/closing-your-fiscal-period.md (Adyen documentation, n.d., accessed 2026-11; 'last modified' stamps are not used as dates, ruling 30)"
+            },
+            {
+              "kind": "fact",
+              "what": "docs.adyen.com/llms.txt, fetched 17 November 2026: 2,573 entries (about 2,600), none with 'revenue recognition', 'deferred', 'billing', 'revenue' or 'Orb' in its title or description. help.adyen.com/sitemap.xml, fetched the same day: 978 English addresses, none on revenue recognition; the two with 'billing' redirect to documentation pages on Adyen's own invoices to merchants.",
+              "shows": "The search behind 'none found', so the reader can repeat it.",
+              "source": "https://docs.adyen.com/llms.txt; https://help.adyen.com/sitemap.xml"
+            }
+          ]
+        },
+        {
+          "id": "p22",
+          "function": "evidence",
+          "controlling_idea": "Orb documents revenue recognition computed from invoices and raw usage, and as of November 2026 that describes Orb's stand-alone product, which collects through Adyen and Stripe as gateways: Adyen's own site mentions revenue recognition only in describing Orb and usage-based billing, has announced an intent to integrate and has published no integrated product.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Orb: 'Orb automatically calculates recognized revenue in a way that accords with ASC606 guidelines'; 'the lineage of revenue from a summary entry → invoice → raw product usage data'. Adyen, 1 July 2026: 'Both transactions officially closed on July 1, 2026'; Adyen, 29 September 2026: 'You'll soon see how we bring this unified Adyen and Orb experience to life across our platform.' Orb: 'Orb integrates with payment gateways like Adyen and Stripe for payment processing'; 'Orb supports Adyen as a payment gateway'. Adyen partner page for Orb: 'finance teams get fine-grained reporting to facilitate revenue recognition'. Adyen, 22 October 2026, 'Usage-based billing, explained': 'Revenue recognition for usage-based billing needs adjustment'.",
+              "shows": "Recognition exists in a company Adyen owns; integration is stated as future.",
+              "source": "https://docs.withorb.com/revenue-reporting/revenue-recognition.md (Orb documentation, n.d., accessed 2026-11); https://www.adyen.com/press-and-media/adyen-closes-talonone-and-orb-acquisitions-announces-leadership-updates (2026-07-01); https://www.adyen.com/knowledge-hub/why-adyen-acquired-orb (2026-09-29); https://docs.withorb.com/invoicing/payments.md; https://docs.withorb.com/integrations-and-exports/adyen.md; https://www.adyen.com/partners/orb (n.d., accessed 2026-11); https://www.adyen.com/knowledge-hub/usage-based-billing (2026-10-22)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Adyen's own documentation.",
+            "introduces": "What its acquired billing company documents.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-to-stop",
+      "heading": "Three Places to Keep the Schedule, and Where Billing Should Stop",
+      "controlling_idea": "The schedule can be derived from payment reports, kept in the billing system or kept in a finance system; the second fits a business whose contracts equal its invoices, the third everything beyond, and in both the billing side owes the same line-level export.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "Answers the second half of the chapter's question: where the billing system should stop, and what it owes finance wherever recognition is done."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The designs in order of where the schedule sits, from furthest from the contract to closest, and then the export that is common to the two workable ones."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "One provider documents a schedule and the other does not.",
+        "introduces": "The design choice that follows for the integrator.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p23",
+          "function": "comparison",
+          "controlling_idea": "The first design computes revenue from payment reports, and it is right only for a business in which every sale is delivered in the month it is paid.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "A payment report has an amount and a payment date and no service period; for Ironworks it yields €1,890 in February and nothing for eleven months.",
+              "shows": "Names the design most teams start with and the condition under which it is not wrong."
+            }
+          ]
+        },
+        {
+          "id": "p24",
+          "function": "comparison",
+          "controlling_idea": "The second design keeps the schedule in the billing system, where it follows every proration, credit note and refund automatically, and it holds as long as each invoice line is one promise delivered evenly over its period.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "The billing system already holds the line, the period and the adjustments; Stripe documents this design, and Orb documents it with usage.",
+              "shows": "Explains why the design is cheap and auditable inside its assumption."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Revenue from payments.",
+            "introduces": "Revenue from invoice lines, inside the billing system.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p25",
+          "function": "comparison",
+          "controlling_idea": "The third design keeps the schedule in a finance system fed by the billing system, and it becomes necessary when a contract and its invoices diverge: a bundle on one line, a negotiated deal, or revenue that arrives through more than one provider.",
+          "evidence": [
+            {
+              "kind": "example",
+              "what": "A year of access and a one-day onboarding workshop sold on one invoice line: the default spreads the whole amount over the year, while the workshop is a separate promise delivered in the first week.",
+              "shows": "A contract the invoice-line assumption gets wrong, with the three options: split the line, apply a rule or import, or keep the schedule in finance."
+            },
+            {
+              "kind": "table",
+              "what": "Trade-off table: the three designs against what each sees, what it gets wrong, lineage for audit, and when it is right.",
+              "shows": "Sets the designs on the same criteria."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A schedule inside the billing system.",
+            "introduces": "A schedule outside it, and the contracts that force it there.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p26",
+          "function": "recommendation",
+          "controlling_idea": "Wherever the schedule lives, the billing side owes finance the same export per invoice line: the amount net of tax, the service period, the product, each later adjustment with its own date and, for usage, the date of use.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Export specification: field, why finance needs it, what breaks without it.",
+              "shows": "Turns the recommendation into a contract an engineer can implement and version."
+            },
+            {
+              "kind": "figure",
+              "what": "Illustration 31-billing-finance-boundary: the billing engine hands a labeled package across a boundary to finance.",
+              "shows": "Shows the hand-off as an interface with named contents."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "Three designs.",
+            "introduces": "The one obligation that is the same in all of them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "On revenue recognition the difference is presence against absence: Stripe documents a product built on its own invoices, and for Adyen no product was found, with Orb's documented separately from Adyen's platform.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S4"
+        ],
+        "how": "Puts the documented facts of the two company sections side by side and says what an integrator does differently on each."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "The designs and the export.",
+        "introduces": "The two providers side by side.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p27",
+          "function": "comparison",
+          "controlling_idea": "Aspect by aspect, Stripe documents a recognition ledger over its own invoices and payments, and Adyen documents transaction reports, with recognition documented only by Orb for Orb.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Where They Differ table: first-party product; source of the schedule; data from elsewhere; output and boundary with the general ledger. Stripe and Adyen cells restate facts cited in the two company sections; the last column is the author's inference.",
+              "shows": "The comparison the book requires, with every cell a cited fact or 'none found'."
+            }
+          ]
+        },
+        {
+          "id": "p28",
+          "function": "recommendation",
+          "controlling_idea": "On Stripe the integrator decides whether its contracts equal its invoices before switching the product on; on Adyen it builds the schedule from its own billing system's invoices and uses Adyen's reports for the cash side only.",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The table.",
+            "introduces": "What to do differently on each provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: The Annual Plan, Month by Month",
+      "controlling_idea": "Worked by the day, Ironworks' €1,890 is €1,729.48 of 2027 revenue and €160.52 of liability at year-end, and Larkfield keeps the schedule in its finance system because more than half of its other revenue never passes through Stripe.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S5"
+        ],
+        "how": "Applies the mechanism and the design choice to ledger numbers."
+      },
+      "flow": {
+        "pattern": "small_to_large",
+        "rationale": "One invoice line first, then the company's whole revenue, then the decision that follows from both."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The comparison of providers.",
+        "introduces": "The worked example on ledger numbers.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p29",
+          "function": "example",
+          "controlling_idea": "Recognized by the day over 365 days, the €1,890 gives €144.99 for February, €160.52 for a 31-day month, €1,729.48 by 31 December 2027 and €160.52 still deferred into January 2028.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Schedule table for the Ironworks plan: period, days, revenue in the period, cumulative revenue, deferred balance (February 2027; March 2027; 31 December 2027; January 2028).",
+              "shows": "The full worked example the acceptance criterion asks the reader to reproduce on another case.",
+              "source": "scenario ledger; the author's arithmetic"
+            }
+          ]
+        },
+        {
+          "id": "p30",
+          "function": "example",
+          "controlling_idea": "Larkfield has two kinds of revenue on two providers (subscriptions billed on Stripe and earned over time, payment fees earned at the moment of each payment on Stripe and on Adyen), so a ledger over what Stripe sees would hold part of it.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "2026: subscriptions €24.5M billed with Stripe Billing; payments revenue €19.8M; Adyen carried 56% of member payment volume and Stripe 44%.",
+              "shows": "Shows 'only for what it sees' with numbers: the Adyen-side fees are not inside Stripe.",
+              "source": "scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "One subscription's schedule.",
+            "introduces": "The rest of Larkfield's revenue and where it is visible.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p31",
+          "function": "recommendation",
+          "controlling_idea": "Priya Raman keeps the schedule in the finance system, and Femke de Graaf's team makes the export a versioned interface with the fields above, tested in each planned API upgrade.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Keel decision K7: one planned API upgrade per provider per half-year, tested against recorded traffic; the Version Cliff of March 2026.",
+              "shows": "Ties the hand-off to an existing Keel decision and to the incident that showed the export was an untested dependency.",
+              "source": "scenario ledger"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Revenue split across two providers.",
+            "introduces": "Larkfield's decision and what the billing side builds.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong",
+      "controlling_idea": "Recognition fails quietly, in four ways: a line with no period, an unpaid invoice that keeps earning, a late change to a closed month and an export that breaks or sees only part of the business.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S5"
+        ],
+        "how": "Gives detection and recovery for the failures the mechanism and the designs imply."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "Ordered from the smallest unit to the largest: a field on a line, the state of an invoice, the state of a period, the export as a whole."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The schedule working as designed.",
+        "introduces": "The ways it goes wrong without an error.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p32",
+          "function": "analysis",
+          "controlling_idea": "A line without a service period is recognized in full on the day it is finalized, so one missing field moves a year of revenue into one month, and the check is a query for recurring products whose lines have no period.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe's documented default for a line with no period (methodology and subscriptions pages).",
+              "shows": "The failure is a documented default, not a bug, which is why nothing alerts.",
+              "source": "https://docs.stripe.com/revenue-recognition/methodology/subscriptions-and-invoicing.md (Stripe documentation, n.d., accessed 2026-11)"
+            }
+          ]
+        },
+        {
+          "id": "p33",
+          "function": "analysis",
+          "controlling_idea": "An invoice that stays open and unpaid keeps being recognized, so collections and recognition have to agree on when a debt is given up.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Unpaid invoices that remain in open status, without changing to void or uncollectible, continue to be recognized as revenue in the Revenue Recognition report.'",
+              "shows": "Recognition follows the invoice's state, which the dunning process owns.",
+              "source": "https://docs.stripe.com/revenue-recognition/data-reconciliation.md (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "A missing period.",
+            "introduces": "A missing decision about an unpaid invoice.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p34",
+          "function": "analysis",
+          "controlling_idea": "A backdated cancellation, a new rule or a late refund that touches a closed month appears as a correction in the current month, and a team that does not expect corrections reads them as errors.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'If the effective period for a new rule overlaps with a closed accounting period, it generates corrections if you retroactively apply the rules to transactions from past (closed) accounting periods.'",
+              "shows": "A vendor documents the behavior; the recovery is to expect and label corrections, or reopen the period deliberately.",
+              "source": "https://docs.stripe.com/revenue-recognition/rules.md (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "State on the invoice.",
+            "introduces": "State on the accounting period.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p35",
+          "function": "analysis",
+          "controlling_idea": "The export itself fails like any integration, by a schema change or by covering one provider only, and the control is a monthly comparison of what the recognition ledger says was invoiced and collected with the provider's own balance report.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "The Version Cliff: subscription revenue reports wrong for 6 days in March 2026.",
+              "shows": "The Larkfield incident is this failure.",
+              "source": "scenario ledger"
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe documents a reconciliation of Revenue Recognition cash and fees against the Balance summary report and warns that the two 'use different timestamps for payments'.",
+              "shows": "The comparison exists as a documented procedure and has a known source of timing differences.",
+              "source": "https://docs.stripe.com/revenue-recognition/data-reconciliation.md (n.d., accessed 2026-11)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Failures inside the schedule.",
+            "introduces": "Failures of the hand-off that feeds it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "Collection, tax and recognition are three readings of the same invoice line, by debtor, by place and by period. Recognition is the one in which time is the entire answer, which is why it needs the two dates a payment report does not carry (the start and end of the service) and why every adjustment needs its own date. The provider can do the reading only for the lines it holds.",
+    "so_what": "An architect who is asked for 'revenue from the payment data' can say what is missing and specify it: per invoice line the net amount, the service period, the product and dated adjustments, plus the usage date. With that export the recognition tool is a replaceable choice; without it no tool gives a number an auditor will accept.",
+    "callback": {
+      "to": "The two February numbers for Ironworks Climbing's €1,890.",
+      "how": "The reader can now say that €1,890 is billings and cash, €144.99 is revenue, €1,745.01 is deferred revenue at the end of February, and that the difference between the reports is the date each keys on."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Before choosing where recognition runs, write the line-level export and make it a versioned interface; then decide, with finance, whether your contracts equal your invoices."
+    },
+    "hand_off": {
+      "to": "merchant-of-record",
+      "relationship": "problem_solution",
+      "carries_over": "The obligations chapters 27 to 31 left with the seller: running the billing engine, registering for and filing tax, answering disputes, and producing the data finance needs.",
+      "introduces": "A model that moves some of them (the indirect tax, the handling of fraud and disputes, the name on the statement) by changing who sells to the customer, and what that costs in money, control and customer data."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The failure modes.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p36",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Established: revenue is recognized when a performance obligation is satisfied, money received before that is a liability, and Stripe documents an invoice-line-based recognition ledger while no Adyen product was found."
+      },
+      {
+        "id": "p37",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Depends on context: whether recognition belongs in the billing system or a finance system, by day or by month, and whether to import other providers' data into Stripe's product.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is settled.",
+          "introduces": "What changes with the business.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p38",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "The author's synthesis: specify the line-level export first and choose the recognition tool second, and never show a payments total under the word revenue.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is established and what depends.",
+          "introduces": "The author's own position.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p39",
+        "function": "synthesis",
+        "controlling_idea": "Recognition is the third reading of one invoice line, after collection and tax, and it is the reading in which time is the whole answer: the three February numbers differ only in which date each one keys on.",
+        "transition_in": {
+          "relationship": "conclusion_summary",
+          "carries_over": "The take-aways.",
+          "introduces": "What the chapter adds to the part, returning to the three numbers.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p40",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "Eight questions let the reader test a revenue number, a billing export or a provider's recognition product.",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The closing argument.",
+          "introduces": "Questions that apply it.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p41",
+        "function": "transition",
+        "controlling_idea": "Chapters 27 to 31 left the seller with a billing engine to run, tax to register and file, disputes to answer and an export to maintain; the next chapter examines the model that moves part of that by letting the provider sell in its own name, and what stays with the business.",
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "The obligations that stay with the seller.",
+          "introduces": "A model that changes who the seller is.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "Subscriptions, billing cycles, proration and who holds the invoice.",
+      "covered_in": [
+        "subscriptions-and-billing-engines"
+      ]
+    },
+    {
+      "topic": "Meters, late and corrected usage events, credits and commitments as billing mechanics.",
+      "covered_in": [
+        "usage-metering-and-rating"
+      ]
+    },
+    {
+      "topic": "The invoice state machine, credit notes as documents, dunning and when an invoice is given up as uncollectible.",
+      "covered_in": [
+        "invoicing-collections-and-dunning"
+      ]
+    },
+    {
+      "topic": "Tax calculation and the tax liability account.",
+      "covered_in": [
+        "billing-and-payment-tax"
+      ]
+    },
+    {
+      "topic": "Posting to the general ledger, the period close, principal versus agent, and Stripe's finance products seen from the enterprise side.",
+      "covered_in": [
+        "accounting-for-architects",
+        "stripe",
+        "payments-to-ledger"
+      ]
+    },
+    {
+      "topic": "A full treatment of IFRS 15 and ASC 606: contract modifications, variable consideration, stand-alone selling prices, costs to obtain a contract."
+    },
+    {
+      "topic": "Whether Larkfield is principal or agent for member payments; the chapter takes its fee as its revenue, as the ledger does."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "The text of ASC 606 in the FASB codification was not read (fasb.org returned 403 to automated requests on 17 November 2026); the joint issue is cited from the boards' joint news release of 28 May 2014 (FASB copy via the Internet Archive, IASB copy on ifrs.org) and the IFRS Foundation's page.",
+    "Stripe's 'revenue contracts' are mentioned in two account descriptions and one settings page; no documentation page describing them was found on 17 November 2026, in the index or among the Revenue Recognition pages read.",
+    "How Stripe Revenue Recognition treats usage-based billing in detail was not researched beyond the Revenue account description and the data-freshness note on legacy metered usage; the chapter uses Orb's documentation for the usage rule and says so.",
+    "Whether and when Orb's revenue reporting will be offered as part of Adyen's platform is unknown; only forward-looking statements were found.",
+    "The absence of an Adyen revenue-recognition product is an absence in public documentation, not a confirmation from Adyen.",
+    "Stripe Revenue Recognition pricing is volatile and is left out of the chapter."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "The chapter is shorter than the typical 35 to 50 paragraphs (41 units, about 4,900 words) because the Adyen side has two paragraphs of evidence and the accounting standard is owned by RECONCILED's accounting-for-architects.",
+      "rejected": [
+        "Padding the Adyen section with Orb's product detail, which describes Orb and belongs to usage-metering-and-rating.",
+        "A 2,000-word chapter, which would drop the worked schedule and the export specification the acceptance criteria test."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The Larkfield scene is a disagreement between two reports at the February 2027 close, not an incident, because the ledger has no revenue-recognition incident; the Version Cliff is used only as the canonical failure of the finance export.",
+      "rejected": [
+        "Inventing a misstatement of Larkfield's 2026 revenue, which would contradict the ledger's figures."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Larkfield's schedule is computed by the day, matching Stripe's documented default, and the by-month figure is shown once as the alternative convention; the €1,890 is treated as net of tax (assumption).",
+      "rejected": [
+        "Month-based figures throughout, which would not match the documented default the chapter quotes."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Larkfield keeps the schedule in its finance system and does not adopt Stripe Revenue Recognition as its book of record, because its payment-fee revenue on Adyen is outside Stripe.",
+      "rejected": [
+        "Adopting the product with CSV imports of Adyen fee revenue: a defensible design, shown in the trade-off table, not chosen for Larkfield."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "A dispute refund example uses a hypothetical ('had Ironworks disputed') so that no new canonical event is added to Ironworks' history.",
+      "rejected": [
+        "A canonical cancellation or dispute by Ironworks."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "_research/brief-billing-and-revenue.md",
+      "contributed": "Part 5 (revenue recognition), sections 1.9 and 1.10 (Adyen before and after Orb), the open questions and research limitations."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "The annual plan, Larkfield's revenue lines and provider split, the Version Cliff, K7, the cast."
+    },
+    {
+      "kind": "internal",
+      "ref": "PLAN.md and journal-spec.json",
+      "contributed": "The chapter contract; intent, thesis and role, copied unchanged."
+    },
+    {
+      "kind": "external",
+      "ref": "https://docs.stripe.com/revenue-recognition/methodology.md and its sibling pages (subscriptions-and-invoicing, refunds-and-disputes, rules, data-import, revenue-settings, accounting-period-control, data-freshness, chart-of-accounts, api, connect, performance-obligations-api, data-reconciliation)",
+      "contributed": "Every statement about Stripe Revenue Recognition; fetched by the writer on 17 November 2026."
+    },
+    {
+      "kind": "external",
+      "ref": "https://www.ifrs.org/issued-standards/list-of-standards/ifrs-15-revenue-from-contracts-with-customers/",
+      "contributed": "The joint issue of IFRS 15 and Topic 606, the five steps, point in time versus over time."
+    },
+    {
+      "kind": "external",
+      "ref": "https://docs.withorb.com/revenue-reporting/revenue-recognition.md",
+      "contributed": "Orb's recognition methodology, usage timing, period locks."
+    },
+    {
+      "kind": "external",
+      "ref": "https://docs.adyen.com/reporting.md; https://docs.adyen.com/llms.txt; Adyen press release of 1 July 2026; Adyen knowledge-hub article of 29 September 2026",
+      "contributed": "What Adyen's reports describe, the search behind 'none found', the Orb closing date and integration status."
+    },
+    {
+      "kind": "external",
+      "ref": "Verification pass, 17 November 2026: https://docs.stripe.com/revenue-recognition/standalone-selling-price.md; https://docs.stripe.com/use-stripe-apps/netsuite/overview.md; https://help.adyen.com/sitemap.xml; https://docs.adyen.com/reporting/closing-your-fiscal-period.md; https://www.adyen.com/partners/orb; https://www.adyen.com/knowledge-hub/usage-based-billing; https://docs.withorb.com/invoicing/payments.md; https://docs.withorb.com/integrations-and-exports/adyen.md; the IASB and FASB joint news release of 28 May 2014 (ifrs.org, and fasb.org via web.archive.org)",
+      "contributed": "Stripe's bundle allocation; the widened search behind 'none found' for Adyen; Orb's Adyen gateway; the FASB's own statement of the joint issue."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation pass (parts 6-8): fields copied from the journal spec and unit-level controlling ideas and evidence brought into line with the verified page and the consistency rulings; no unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 58 claims checked (45 confirmed, 7 corrected, 5 hedged, 0 unsupported and removed or relabeled, 1 unreachable); the claim that Stripe's pages do not describe allocation by stand-alone selling price was corrected, because a Standalone selling prices page (not in the documentation index) documents bundle allocation, so p18 now names four ways past the default and p20 narrows the gap to contracts that span lines or invoices. Also: Adyen search widened to the help center and adyen.com; Orb's documented Adyen gateway added; ASC 606 now cited from the boards' joint release of 28 May 2014; 'last modified' date removed per ruling 30; index size corrected to about 2,600."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes). Notes acted on: the five steps, allocation by stand-alone selling price and multi-promise contracts are named in three-numbers before stripe-documented and where-to-stop use them; subledger, general ledger and amortize are glossed where first used; the comparison in the last failure paragraph is restated. Notes not acted on: slimming the lead-in of the comparison section; moving the journey paragraph before the thesis; moving the worked schedule to follow the mechanism (kept in the book's fixed position); the by-month convention is weighed once, in the deferred-revenue paragraph."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "First version, written from the PLAN contract, the journal spec entry, the billing research brief and the Stripe, Orb, Adyen and IFRS pages fetched on 17 November 2026."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: 'Stripe's pages do not call the product a subledger' overturned (product page heading 'A centralised revenue subledger'; report column 'Stripe subledger account'); p-unit controlling idea updated. Adyen absences re-tested against the documentation full text, sitemaps and domain-restricted web search: hold, scope of search stated. Revenue-contracts absence holds (documentation sitemap and web search added)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('the chapter reads this, as a labeled inference, as a subledg' -> 'Stripe's own product page calls it 'a centralised revenue su')."
+    }
+  ],
+  "length": {
+    "target_words": 4900,
+    "max_words": 5500
+  }
+}

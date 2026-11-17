@@ -1,0 +1,1496 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "platform-onboarding-and-verification",
+  "journal": "payments-platform-architecture",
+  "part": "part-7",
+  "title": "Letting Sellers In: Onboarding and Verification on Platforms",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "What a capability and a verification requirement are, and how each provider reports what is missing and by when: Stripe as lists of requirements with a per-account deadline, Adyen as a per-capability allowed flag with standard deadlines of 30 or 60 days.",
+        "The events that reopen verification after sign-up: changed seller data, changed rules, volume thresholds and periodic reviews.",
+        "The three ways to collect verification data (provider-hosted, embedded components, the platform's own forms over the API) and what each leaves the platform to maintain.",
+        "That neither company publishes a completion rate or a comparison of its onboarding flows; the one public figure is a 2019 Stripe claim about a redesign."
+      ],
+      "believe": [
+        "Verification is a state with deadlines and an owner, not a form completed once.",
+        "Collecting sellers' documents itself is work a platform should take on only when it has also chosen to carry their losses."
+      ],
+      "can_do": [
+        "Diagnose a seller's stopped payouts from requirement and capability state, and say what the platform should have stored and surfaced to prevent it.",
+        "Choose between hosted, embedded and API onboarding for a stated platform, naming what the platform must then keep up to date."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a seller complaint the chapter does not contain, the reader explains it from verification state and names the records and the owner that would have prevented it.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A seller on your platform writes: 'Customers can still pay me, but my payouts stopped on Monday and nobody told me why.' Using only this chapter: what most likely happened, why did payouts stop while payments continued, and what should the platform have had in place?",
+        "expected": "A verification requirement was reopened (changed data, a new rule, a threshold or a periodic review) and its deadline passed. Payouts go first: Stripe documents that it typically disables payouts at the deadline and charges only later, and Adyen's standard deadline is 30 days for payout capabilities against 60 for receiving payments. The platform should mirror each seller's open requirements, deadlines and capability status from the provider, give every deadline an owner, remind the seller through a monitored channel, and show the seller the reason and the provider's link or component to fix it."
+      },
+      {
+        "id": "AC-2",
+        "statement": "Given a proposal to build onboarding forms on the API, the reader names what the platform takes on that a hosted flow would have carried.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "Your product team wants its own sign-up forms for sellers, sending the data to the provider by API, to keep the brand consistent. Using only this chapter, name two things the platform takes on by doing so.",
+        "expected": "Any two of: keeping the forms current when requirements change (Stripe documents that API onboarding needs integration changes and a review at least every six months, while hosted and embedded flows update immediately); handling sellers' identity documents itself; supporting each new country and business type by hand; and, on Stripe, a configuration in which the platform collects requirements only if it also bears seller losses."
+      },
+      {
+        "id": "AC-3",
+        "statement": "The chapter states that no completion rate or comparison of onboarding flows is public for either provider, and presents the one published figure (Stripe, 2019) as a dated vendor claim.",
+        "check": "evidence_is_explained",
+        "method": "rubric",
+        "severity": "blocker"
+      }
+    ],
+    "audience": {
+      "who": "A software engineer or architect at a platform that signs up small businesses as sellers on Stripe Connect or Adyen for Platforms, who has treated seller onboarding as a sign-up form owned by the product team.",
+      "already_knows": [
+        "Forms, redirects, embedded components, webhooks and state machines as general engineering.",
+        "From platform-payment-models: that every seller is an account at a licensed provider, the two vocabularies (connected account; legal entity, account holder, balance account) and who stands behind a seller's losses.",
+        "From payment-compliance-and-regulation: why a regulated provider must know its customers and keep knowing them, and that the result is account state with deadlines that switch capabilities.",
+        "Larkfield, its two providers, the Frozen Studios and Keel decision K6 (meet-larkfield)."
+      ],
+      "does_not_know": [
+        "Capability and verification requirement as the two terms a platform works with; hosted, embedded and API onboarding; beneficial owner; up-front, incremental and staggered collection.",
+        "What each way of collecting data leaves the platform to maintain, and how each provider lets a seller get back to an open requirement.",
+        "That neither provider publishes conversion figures for its onboarding flows."
+      ]
+    }
+  },
+  "thesis": {
+    "question": "How does a platform get thousands of small businesses verified without losing them or its licence partner's trust?",
+    "claim": "By treating verification as a state the provider reopens for the life of every account, not as a sign-up step. To keep sellers, the platform requests only the capabilities a seller needs and lets the provider's hosted or embedded flow collect the documents; to keep the trust of the licensed provider, whose license requires the checks, it mirrors every open requirement and deadline with a named owner, so that the seller hears of a missing document from the platform first and the provider does not have to restrict an account the platform had not noticed.",
+    "disputed_by": "The view that onboarding is a conversion funnel that ends at sign-up, so the platform should own every screen through the API to keep drop-off low, and can leave what happens afterwards to the provider's emails to the seller.",
+    "so_what": "Verification becomes an operated system with an owner, alerts and a seller-facing explanation, not a project that ends at launch: the first thing a neglected requirement breaks is a seller's payout, the first place it shows is the support queue, and because neither provider publishes a completion rate or a comparison of flows the platform has to measure sign-up drop-off on its own flows.",
+    "how_why": "Both providers gate what a seller may do behind capabilities that depend on verification, and both reopen verification after sign-up. Adyen's documentation (n.d., accessed November 2026) names the events that trigger verification, among them a seller changing its data and periodic data reviews, and standard deadlines of 30 days for payout capabilities and 60 for receiving payments; Stripe's (n.d., accessed November 2026) lists requirements as currently due, eventually due and past due against a per-account deadline and says it typically disables payouts first. That is the documented difference: Adyen's deadlines are standard periods a platform can build reminders on, Stripe's must be read per account. Stripe also documents that its hosted and embedded flows pick up new requirements immediately while API onboarding needs integration changes, and that who collects requirements is derived from who bears losses. Neither company publishes a completion rate or a comparison of its flows, so the cost of a hosted flow in lost sign-ups cannot be stated from the public record.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "A capability is a permission the provider switches on when its verification requirements are met, and what a seller must provide follows from the capabilities requested, the country and the business type; requesting only the capabilities a seller needs, and choosing how much to collect up front, are the platform's first controls on how many sellers finish sign-up."
+      },
+      {
+        "id": "S2",
+        "claim": "Verification data can be collected on the provider's hosted pages, in the provider's components embedded in the platform's application, or in the platform's own forms over the API; the three differ in what the platform must keep current, and on Stripe a platform collects requirements itself only in a configuration in which it also bears seller losses."
+      },
+      {
+        "id": "S3",
+        "claim": "The provider reopens verification after sign-up (changed seller data, changed rules, thresholds, periodic reviews), payouts are usually the first capability to stop, and the platform inherits every deadline whether or not it collected the data."
+      },
+      {
+        "id": "S4",
+        "claim": "A platform keeps both the seller and the provider's trust by holding every open requirement and deadline with a named owner, reminding the seller through a channel someone watches, and showing the seller the reason, the date and the provider's link or component that fixes it."
+      },
+      {
+        "id": "S5",
+        "claim": "Neither Stripe nor Adyen publishes conversion figures for its onboarding flows, so a platform has to measure drop-off and time to first payout on its own flows, from signals each provider documents."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Shows the first consequence of the loss assignment: the provider's license requires every seller to be verified continuously, and the platform inherits the deadlines whether or not it collects the data.",
+    "supports": [
+      "P7-2"
+    ]
+  },
+  "flow": {
+    "pattern": "problem_solution",
+    "additional_patterns": [
+      {
+        "pattern": "chronological",
+        "applies_to": "what-is-asked, three-ways-to-collect, after-sign-up: the order of a seller's life, from what is requested through how it is collected to what happens afterwards"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "three-ways-to-collect (three designs, both providers within each) and where-they-differ"
+      }
+    ],
+    "rationale": "The scene and the second section state the problem as two losses. The next three sections answer them in the order a seller meets them: what is asked decides the loss at sign-up, the way of collecting decides who maintains the forms, and the work after sign-up answers the loss that comes later. If collecting came before what is asked, the reader could not judge the cost of own forms, which is the cost of tracking what is asked; if the work after sign-up came first, its dependence on the provider's flow for the seller's way back would be unexplained. Measurement follows the mechanisms because its stages are their signals. The comparison comes after every fact in its table has been cited, the Larkfield example applies the choices in the same order, and the failures are those of the recommended design, so they come last."
+  },
+  "introduction": {
+    "hook": {
+      "type": "vivid_anecdote",
+      "content": "On Monday 11 May 2026 the payouts of Ironworks Climbing stopped. Its three gyms in Manchester were full all week, every payment showed as paid in Larkfield's back office, and for nine days nothing reached the company's bank account. No screen Ravi Shah could open said why."
+    },
+    "bridge": {
+      "from_reader_world": "An engineer thinks of seller onboarding as a sign-up form: collect the fields, send them to the provider, mark the seller as onboarded.",
+      "to_topic": "The provider that holds the license never marks a seller as done: it switches capabilities on and off as requirements are met, reopened and missed, and the platform's product is where the seller feels each switch."
+    },
+    "thesis_statement": {
+      "text": "A platform gets thousands of small businesses verified by treating verification as a state the provider reopens for the life of every account: it requests only the capabilities a seller needs, lets the provider's hosted or embedded flow collect the documents, and mirrors every open requirement and deadline with a named owner, so the seller hears of a missing document from the platform first.",
+      "placement": "KEY POINTS bullet 1 and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p04",
+      "promises": [
+        {
+          "promise": "Start from nine days in which a studio chain was paid by its customers and not by its platform.",
+          "kept_in": [
+            "scene"
+          ]
+        },
+        {
+          "promise": "Name the two ways a platform loses a seller, with the two terms it needs: capability and verification requirement.",
+          "kept_in": [
+            "two-ways-to-lose"
+          ]
+        },
+        {
+          "promise": "Show what decides how much a seller is asked for.",
+          "kept_in": [
+            "what-is-asked"
+          ]
+        },
+        {
+          "promise": "Compare hosted, embedded and API onboarding by what each leaves the platform to maintain.",
+          "kept_in": [
+            "three-ways-to-collect"
+          ]
+        },
+        {
+          "promise": "Say what the platform must do after sign-up: an owner for every deadline and a reason on the seller's screen.",
+          "kept_in": [
+            "after-sign-up"
+          ]
+        },
+        {
+          "promise": "Say what can be measured, and that no provider figures exist.",
+          "kept_in": [
+            "measuring"
+          ]
+        },
+        {
+          "promise": "Set Stripe and Adyen side by side.",
+          "kept_in": [
+            "where-they-differ"
+          ]
+        },
+        {
+          "promise": "Onboard the three-location chain on both providers and list the failures that remain.",
+          "kept_in": [
+            "in-practice",
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "function": "context",
+        "controlling_idea": "For nine days in May 2026 Ironworks Climbing was paid by its customers and not by its platform, and no screen its owner could open said why.",
+        "organization": "narration",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "The Frozen Studios, May 2026: a verification requirement changed; 230 studios missed the deadline because Larkfield's reminder went to an unmonitored address; payouts paused for up to 12 days. New ledger addition: Ironworks Climbing (Ravi Shah, three locations in Manchester, on Stripe Connect) was one of the 230; its payouts were paused from Monday 11 May to Wednesday 20 May 2026, nine days.",
+            "shows": "Puts one seller's face on the incident: payments continued, payouts stopped, and the reason existed only in the provider's record.",
+            "source": "scenario ledger and additions"
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "function": "claim",
+        "controlling_idea": "Because every seller is an account at a licensed provider that must know who the seller is and keep knowing it, verification is a state the provider reopens for the life of the account, and the platform's job is to request little, let the provider's flow collect the documents and hold every open requirement and deadline with a named owner.",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "From platform-payment-models: every seller is an account at a licensed provider with someone standing behind its losses. The provider's license requires the checks (payment-compliance-and-regulation), so the account may take payments and receive payouts only while the provider knows who the seller is.",
+            "shows": "Derives the chapter's claim from the previous chapter's result, as the declared cause-and-effect transition requires."
+          }
+        ],
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "Chapter 33's result that every seller is an account at a licensed provider, with someone standing behind its losses; the nine days of the opening.",
+          "introduces": "What follows: the provider must know the seller and keep knowing it, which makes verification a state with deadlines, and the thesis about what the platform does with it.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "function": "context",
+        "controlling_idea": "This chapter is before the first step of Mila's class pass: Studio Noord could take her €120.00 on 9 March 2027 and be paid on 11 March only because its capabilities at Adyen were active, and they stay active only while its verification does.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's €120.00 ten-class pass at Studio Noord (on Adyen since 2024), Tuesday 9 March 2027; the studio's €117.47 paid out Thursday 11 March.",
+            "shows": "Ties verification to the one payment the book follows: it is the precondition of both the payment and the payout.",
+            "source": "scenario ledger"
+          }
+        ],
+        "transition_in": {
+          "relationship": "place",
+          "carries_over": "The chapter's claim.",
+          "introduces": "Where it sits relative to the recurring payment.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "function": "transition",
+        "controlling_idea": "The chapter goes from the nine days at Ironworks through the two ways to lose a seller, what a seller is asked for, the three ways to collect it, the work after sign-up and what can be measured, to the comparison of the two providers, the onboarding of Ironworks and the failures that remain.",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "Where the chapter sits.",
+          "introduces": "The order of its sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: Nine Days Without a Reason",
+      "controlling_idea": "Seen from the seller's side, the Frozen Studios were a product that showed every payment as paid and held no reason, no date and no way to fix a pause whose cause sat in the provider's record.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S4"
+        ],
+        "how": "Poses the chapter's question through one seller's view of a documented kind of pause, before any mechanism is named."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The nine days of the opening.",
+        "introduces": "What Ravi Shah could and could not see, and what the review found missing.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p05",
+          "function": "context",
+          "controlling_idea": "Ravi Shah could see every payment and one running total, and could not see the open requirement, its deadline or how to meet it, because Larkfield's back office held none of them and its one email had gone to an address nobody read.",
+          "organization": "narration",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger: before Keel the studio back office showed one running total per provider, copied from the provider, with no dates or reasons (13-balances-and-funds-flows); Larkfield's only response to the changed requirement was one batch email to each studio's sign-up address (26-kyc-aml-and-regulation); Aylin Demir's support team heard first. New local detail: Ravi's ticket of Thursday 14 May 2026.",
+              "shows": "The information the seller needed existed at the provider and nowhere in the product he used.",
+              "source": "scenario ledger and additions"
+            },
+            {
+              "kind": "figure",
+              "what": "Conceptual figure: a studio front door with members paying, a pipe from the studio's balance to its bank closed by a valve, and a blank sign on the valve.",
+              "shows": "Fixes the seller's view: money in, nothing out, no reason shown."
+            }
+          ]
+        },
+        {
+          "id": "p06",
+          "function": "analysis",
+          "controlling_idea": "Femke de Graaf's review of the incident from the seller's side found three things missing on Ravi's screen (the reason, the date and a way to fix it) and one thing wrong behind it: the sign-up forms were Larkfield's own, written in 2017, and had no field for what the provider now asked.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Femke de Graaf (joined January 2027) reviews with Aylin Demir, head of studio support. New ledger addition: until Keel, studios on Stripe signed up through Larkfield's own forms, which sent the data to Stripe over the API; the forms dated from Daniel Osei's 2017 integration and gained fields only when a country was launched.",
+              "shows": "Splits the incident into the chapter's two subjects: how verification data is collected, and what the platform does after sign-up.",
+              "source": "scenario ledger and additions"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What the seller could not see.",
+            "introduces": "The review's finding: three things missing on the screen and a home-built form behind them, which order the chapter.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "two-ways-to-lose",
+      "heading": "Two Ways to Lose a Seller",
+      "controlling_idea": "A platform can lose a seller at sign-up, by asking for more than the seller will give, and after sign-up, when the provider restricts an account the platform had not noticed; both follow from capabilities that depend on verification requirements.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S1",
+          "S3"
+        ],
+        "how": "Defines the two terms the chapter owns and states the problem as two losses the later sections each answer."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The two terms come first because both losses are stated in them; the sign-up loss precedes the later one because it happens first in a seller's life."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The review's two findings.",
+        "introduces": "The vocabulary and the general form of the problem: capabilities, requirements and two ways to lose a seller.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p07",
+          "function": "definition",
+          "controlling_idea": "A capability is a named permission on a seller's account, such as taking card payments or receiving payouts, and a verification requirement is one fact or document the provider needs before, or in order to keep, a capability switched on.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (n.d., accessed 2026-11): 'Capabilities represent functionality that you can request for your connected accounts, such as accepting card payments or receiving transferred funds from your platform account. A capability must be active for a connected account to perform actions associated with that capability.' https://docs.stripe.com/connect/account-capabilities.md. Requirements 'describe the account information that Stripe needs in order to enable one or more capabilities for that account' (https://docs.stripe.com/connect/handling-api-verification.md?accounts-namespace=v2).",
+              "shows": "Stripe's own definitions of the two terms.",
+              "source": "Stripe documentation"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen (n.d., accessed 2026-11): 'As required by payment industry regulations, Adyen must verify the users in your platform before you can process payments, pay out their funds, and offer financial products to them.' 'Based on the results of the verification checks, Adyen decides if a user can perform any action on your platform. These actions are known as capabilities.' https://docs.adyen.com/platforms/verification-overview.md",
+              "shows": "Adyen uses the same word for the same thing and names the regulatory reason; the duty itself is owned by payment-compliance-and-regulation and licences-and-safeguarding.",
+              "source": "Adyen documentation"
+            }
+          ]
+        },
+        {
+          "id": "p08",
+          "function": "analysis",
+          "controlling_idea": "The first loss happens at sign-up: every capability requested adds information the seller must provide, and a small business that came for booking software can give up at any question.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (n.d., accessed 2026-11): 'The capabilities you request for a connected account determine the information you’re required to collect for it. To reduce onboarding effort, only request the capabilities that your accounts need. Requesting more capabilities means the onboarding flow must verify more information.' https://docs.stripe.com/connect/account-capabilities.md",
+              "shows": "The provider itself ties the length of sign-up to what the platform requests.",
+              "source": "Stripe documentation"
+            },
+            {
+              "kind": "reasoning",
+              "what": "A seller who abandons sign-up never takes a payment; the platform loses the seller and the provider is unaffected. Industry practice treats this as a funnel; no provider figure for it is public (measuring section).",
+              "shows": "States who carries the first loss without inventing a rate."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Capabilities depend on requirements.",
+            "introduces": "The first consequence: more requested means more asked, and sellers drop out.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p09",
+          "function": "analysis",
+          "controlling_idea": "The second loss happens after sign-up: the provider reopens a requirement, the deadline passes and a capability is switched off, and the seller meets that on the platform's product whether or not the platform was the one collecting the data.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (n.d., accessed 2026-11): 'Stripe typically disables payouts on the account if we don’t receive the information by the `current_deadline`.' https://docs.stripe.com/connect/handling-api-verification.md?accounts-namespace=v1. Adyen (n.d., accessed 2026-11): 'If the user does not resolve the verification issues in a timely manner, their capabilities will be disallowed.' https://docs.adyen.com/platforms/verification-overview.md",
+              "shows": "Both providers document that an unmet requirement switches a capability off.",
+              "source": "Stripe and Adyen documentation"
+            },
+            {
+              "kind": "reasoning",
+              "what": "The seller's payouts are a feature of the platform's product; when they stop, the seller calls the platform. The mechanism of deadlines and capability state is owned by payment-compliance-and-regulation.",
+              "shows": "Why the platform inherits the deadline regardless of who collects."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The loss at sign-up.",
+            "introduces": "The loss afterwards, which the seller meets on the platform's product.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "what-is-asked",
+      "heading": "What a Seller Is Asked For, and What Decides It",
+      "controlling_idea": "What a seller must provide is decided by the capabilities requested, the country and the business type, and the platform controls two of the inputs: which capabilities it requests and how much it collects before the seller may start.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "Shows the platform's first controls on sign-up loss: request little, and choose deliberately between collecting everything first and collecting as needed."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The inputs are named before the two controls, because each control changes one input: the capabilities requested, then the timing of collection."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "The loss at sign-up.",
+        "introduces": "What decides how much is asked, and which of those inputs the platform controls.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p10",
+          "function": "explanation",
+          "controlling_idea": "The list of what a seller must provide is computed from the capabilities requested, the country and the type of business, so it differs between a sole trader and a company and between two countries, and for a company it includes the people who own and control it.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe (n.d., accessed 2026-11): 'Verification requirements for connected accounts vary by account, depending on: Country; Capabilities; Business type (for example, individual, company); Business structure (for example, public corporation, private partnership); The service agreement type between Stripe and the connected account; The risk level.' https://docs.stripe.com/connect/identity-verification.md",
+              "shows": "Stripe's list of inputs.",
+              "source": "Stripe documentation"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen (n.d., accessed 2026-11): 'Your users' legal entity type and operating country determine the required verification information' (https://docs.adyen.com/platforms/onboard-users.md); 'in Belgium, a sole proprietorship is required to have a registration number, while this is not required in the United Kingdom'; for an organization, in general: 'The legal name of the organization; The registration number; The registered address and the principal place of business, if different from their registered address; The ultimate beneficial owners, controllers, and signatories; The bank account for payouts'; UBOs through ownership are 'Individuals who directly or indirectly own 25% or more of the total shares, voting rights or other equity in the organization'. https://docs.adyen.com/platforms/verification-requirements.md",
+              "shows": "Adyen's inputs, one country difference and the general list for a company; beneficial owner is defined in one clause and owned by payment-compliance-and-regulation.",
+              "source": "Adyen documentation"
+            }
+          ]
+        },
+        {
+          "id": "p11",
+          "function": "recommendation",
+          "controlling_idea": "The platform's first control is to request only the capabilities a seller needs, because each one it requests for every seller by default is asked of every seller.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (n.d., accessed 2026-11): 'To reduce onboarding effort, only request the capabilities that your accounts need.' 'For some capabilities, requesting them enables them permanently. Attempting to remove or unrequest a permanent capability returns an error.' https://docs.stripe.com/connect/account-capabilities.md",
+              "shows": "The provider recommends the same control and documents that some requests cannot be undone.",
+              "source": "Stripe documentation"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen (n.d., accessed 2026-11): 'In the design phase, you set the default capabilities for your platform. These capabilities are requested every time you onboard a new user and create an account holder for them.' 'If a user needs a specific capability that is not requested by default, you must request the additional capability. In some cases, this requires more verification.' https://docs.adyen.com/platforms/verification-overview.md",
+              "shows": "On Adyen the default set is a design-time decision applied to every seller.",
+              "source": "Adyen documentation"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The capabilities requested are one input to what is asked.",
+            "introduces": "The control that follows: request few, and add later for the sellers who need more.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p12",
+          "function": "comparison",
+          "controlling_idea": "The second control is timing, collecting everything before the seller starts or only what is due now, and the two providers offer it differently: Stripe leaves the choice to any platform, while Adyen tells platforms to collect up front and reserves collection in stages for payment facilitators.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (n.d., accessed 2026-11): 'Up-front onboarding collects the `eventually_due` requirements for the account, while incremental onboarding only collects the `currently_due` requirements.' Advantages listed for up-front: 'Normally requires only one request for all information', 'Avoids the possibility of payout and processing issues due to missed deadlines', 'Exposes potential risk early when accounts refuse to provide information'; for incremental: 'Accounts can onboard quickly because they don’t have to provide as much information'. https://docs.stripe.com/connect/identity-verification.md",
+              "shows": "Stripe documents both timings and the trade between them.",
+              "source": "Stripe documentation"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen (n.d., accessed 2026-11): 'As a platform, you should collect verification data from your users upfront because the capability to receive payments is automatically requested for them.' 'Only payment facilitators can use staggered verification.' 'When a user is moved to a higher tier, their payouts are temporarily disallowed until they complete additional verification checks.' 'There are four tiers.' https://docs.adyen.com/platforms/verification-overview/verification-types.md",
+              "shows": "Adyen front-loads for general platforms; where it allows stages, the price is a pause in payouts at each step. The tier amounts are not on the page. Payment facilitator is defined in one clause and owned by platform-payment-models.",
+              "source": "Adyen documentation"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The first control, what is requested.",
+            "introduces": "The second control, when it is collected, and how each provider offers it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "three-ways-to-collect",
+      "heading": "Three Ways to Collect the Data: Hosted, Embedded, API",
+      "controlling_idea": "Verification data can be collected on the provider's pages, in the provider's components inside the platform's application, or in the platform's own forms over the API, and what separates them is who keeps the forms current when requirements change and who handles the documents.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S2"
+        ],
+        "how": "Sets out the three designs, each provider's version of them, the link between collecting and bearing losses, and the author's choice."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The three designs are taken from least to most work for the platform, each with both providers, so that the cost of the third is read against the first two; the rule on who may collect follows the API design it restricts, and the table and the recommendation close the comparison."
+      },
+      "transition_in": {
+        "relationship": "sequence",
+        "carries_over": "What is asked of a seller and when.",
+        "introduces": "How it is collected: three designs that differ in whose screen the seller types into.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p13",
+          "function": "explanation",
+          "controlling_idea": "The three ways differ in whose page the seller types into and whose server first receives the documents: the provider's page, the provider's component inside the platform's page, or the platform's own form and server.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe (n.d., accessed 2026-11) lists 'Stripe-hosted onboarding', 'Embedded onboarding' and 'API onboarding' (https://docs.stripe.com/connect/onboarding.md); Adyen (n.d., accessed 2026-11) lists 'Hosted onboarding' and 'API-only onboarding', with Onboarding components for use inside the platform's interface (https://docs.adyen.com/platforms/onboard-users.md).",
+              "shows": "Both providers document the same menu under nearly the same names.",
+              "source": "Stripe and Adyen documentation"
+            },
+            {
+              "kind": "figure",
+              "what": "Structural figure: three lanes from a seller to the provider. Hosted: the seller leaves the platform's application for the provider's page. Embedded: a provider-drawn panel sits inside the platform's page and sends data straight to the provider. API: the seller fills the platform's own form, the platform's server receives the documents and forwards them.",
+              "shows": "Shows where the form and the documents live in each design."
+            }
+          ]
+        },
+        {
+          "id": "p14",
+          "function": "evidence",
+          "controlling_idea": "In hosted onboarding the platform creates the account and sends the seller to the provider's pages by a link, and both providers make that link short-lived or authenticated because it opens the seller's personal data.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (n.d., accessed 2026-11): 'Stripe-hosted onboarding is a web form hosted by Stripe with your brand’s name, color, and icon' (https://docs.stripe.com/connect/onboarding.md). The Account Link: 'You can only use each temporary Account Link URL once, because it grants access to the account holder’s personal information.' 'Don’t email, text, or otherwise send account link URLs outside of your platform application. Instead, provide them to the authenticated account holder within your application.' https://docs.stripe.com/connect/hosted-onboarding.md?accounts-namespace=v2",
+              "shows": "Stripe's hosted flow assumes the seller is logged in to the platform when the link is made.",
+              "source": "Stripe documentation"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen (n.d., accessed 2026-11): 'Hosted onboarding is our recommended solution for collecting the information needed to onboard your users.' Two variants: 'Onboarding on invite' ('All actions are performed in your Customer Area') and 'API-initiated'. 'Your user can securely access the hosted onboarding link with an SMS authentication.' https://docs.adyen.com/platforms/onboard-users.md. Release note of 2026-05-04: with Onboarding on Invite 'you can now choose to automatically send the hosted onboarding link by email instead of copying it manually' (https://docs.adyen.com/release-notes/platforms-and-financial-products.md).",
+              "shows": "Adyen's hosted flow can be run with no integration at all and reaches the seller by a shared or emailed link protected by a text-message code.",
+              "source": "Adyen documentation and release notes"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The first of the three ways.",
+            "introduces": "Each provider's hosted flow and how the seller reaches it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p15",
+          "function": "evidence",
+          "controlling_idea": "In embedded onboarding the provider's form is drawn inside the platform's application; Stripe documents a whole onboarding flow as one component, while Adyen documents components that cover parts of a flow the platform otherwise builds.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (n.d., accessed 2026-11): 'You embed the Account onboarding component directly in your application and your connected accounts go through the onboarding flow without leaving your application'; 'With embedded onboarding, you get a customized onboarding flow and don’t need to update your onboarding integration as compliance requirements change' (https://docs.stripe.com/connect/onboarding.md). 'Stripe uses an AccountSession to express your intent to delegate API access to your connected account' (https://docs.stripe.com/connect/get-started-connect-embedded-components.md?platform=web).",
+              "shows": "The component reads the account's requirements itself, so the platform ships no fields.",
+              "source": "Stripe documentation"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen (n.d., accessed 2026-11): 'We recommend using the Onboarding components in your API-only onboarding flow to reduce engineering efforts and speed up implementation. It is important to note that the Onboarding components only cover certain functionality, and you still need to implement API calls for other parts of your API-only onboarding flow.' https://docs.adyen.com/platforms/onboard-users/components.md",
+              "shows": "Adyen's components reduce an API-only build; they are not documented as a complete flow.",
+              "source": "Adyen documentation"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The seller leaves the platform for the provider's page.",
+            "introduces": "The provider's form inside the platform's page, complete at Stripe and partial at Adyen.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p16",
+          "function": "evidence",
+          "controlling_idea": "In API onboarding the platform builds the forms and takes on everything the provider's flow carried: fields per country and business type, localization, error handling, the documents themselves, and keeping all of it current when requirements change.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (n.d., accessed 2026-11): with API onboarding you 'build an onboarding flow and handle identity verification, localization, and error handling for each country your connected accounts onboard in'; 'You must plan on reviewing and updating onboarding requirements at least every 6 months.' Table row 'Automatic updates for new compliance requirements': 'Immediate' for hosted and embedded, 'Requires integration changes' for API; new countries without integration changes: supported for hosted and embedded, not for API. 'We don’t recommend this option unless you’re committed to the operational complexity required to build and maintain an API onboarding flow.' https://docs.stripe.com/connect/onboarding.md",
+              "shows": "The provider states the standing cost of own forms: a review at least every six months, and code changes for every new requirement and country.",
+              "source": "Stripe documentation"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen (n.d., accessed 2026-11): 'API-only onboarding: Build your own UI and collect required user data. You make API requests to create resources and submit the user data to Adyen. This onboarding type gives you complete control over the user journey within your platform's environment.' https://docs.adyen.com/platforms/onboard-users.md",
+              "shows": "Adyen names the benefit (control) and publishes no review interval.",
+              "source": "Adyen documentation"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The provider's form, hosted or embedded.",
+            "introduces": "The platform's own form, and the list of what it now maintains.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p17",
+          "function": "explanation",
+          "controlling_idea": "On Stripe the party that collects requirements is not chosen freely: it is derived from who bears seller losses, so a platform collects them itself only in a configuration in which it also carries the losses, and even then some requirements can be met only through Stripe's own interfaces.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (n.d., accessed 2026-11): 'In most configurations, Stripe is responsible for collecting KYC requirements from your connected accounts. Your platform is responsible only when you set `defaults.responsibilities.losses_collector` to `application` and `dashboard` to `none`.' 'Configure platform responsibility for requirements collection only if you’re prepared to manage the operational complexity required to verify requirement information and maintain compliance with any requirement updates.' https://docs.stripe.com/connect/accounts-v2/connected-account-configuration.md",
+              "shows": "Collecting is coupled to loss bearing in Stripe's account configuration.",
+              "source": "Stripe documentation"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe (n.d., accessed 2026-11): 'Stripe risk reviews of a connected account can add extra requirements, which you can’t provide using the API. You can take action in your Dashboard, or the connected account can provide them through a Connect embedded component, Stripe-hosted onboarding, or a remediation link.' https://docs.stripe.com/connect/handling-api-verification.md?accounts-namespace=v2",
+              "shows": "A platform with only its own forms has no path for these requirements.",
+              "source": "Stripe documentation"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen: the onboarding pages read (https://docs.adyen.com/platforms/onboard-users.md, https://docs.adyen.com/platforms/onboard-users/components.md, n.d., accessed 2026-11) tie the choice between hosted and API-only onboarding to no liability setting.",
+              "shows": "The coupling is documented for Stripe only; nothing is inferred about Adyen.",
+              "source": "Adyen documentation"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The platform's own forms.",
+            "introduces": "Who is allowed to collect at all on Stripe, and the requirements own forms cannot satisfy.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p18",
+          "function": "comparison",
+          "controlling_idea": "Set side by side, the three ways trade the platform's control of the screens against the work of keeping forms current and handling documents.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows: hosted, embedded, API. Columns: what the seller sees; who keeps the fields current; who first receives the documents; what the platform still builds; when it is right.",
+              "shows": "Every cell restates a fact of the four preceding paragraphs or is the author's judgement in the last column."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The three ways and the rule on who collects.",
+            "introduces": "The trade-offs in one table.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p19",
+          "function": "recommendation",
+          "controlling_idea": "I would let the provider's flow collect the documents, embedded where the provider offers a complete component and hosted otherwise, and build own forms only when the platform has chosen to carry seller losses and can staff the reviews, since nothing public shows that own forms keep more sellers.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "The cost of own forms is documented (the review at least every six months, integration changes per requirement and country, the documents). The benefit claimed for them, lower drop-off, has no public figure from either provider (measuring section). Conditions under which the judgement changes: a seller population the provider's flow does not cover, or a platform that has measured a difference on its own sellers.",
+              "shows": "A recommendation with its reasoning and the conditions under which it does not hold, tied to the thesis's disputed view."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The trade-offs.",
+            "introduces": "The author's choice and the conditions that would change it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "after-sign-up",
+      "heading": "After Sign-Up: An Owner for Every Deadline, a Reason for Every Seller",
+      "controlling_idea": "Because the provider reopens verification for the life of the account and payouts usually stop first, the platform has to hold every open requirement and deadline with a named owner, remind the seller by a channel someone watches, and show the seller the reason, the date and the provider's own way to fix it.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S4"
+        ],
+        "how": "Turns the continuing state established in payment-compliance-and-regulation into the platform's operating duties and the seller's screen."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "The reopening events and the order in which capabilities stop state the problem; the record with an owner, the channel and the seller's screen answer it in the order in which a requirement travels from provider to platform to seller."
+      },
+      "transition_in": {
+        "relationship": "time",
+        "carries_over": "Collection at sign-up.",
+        "introduces": "What happens for the rest of the account's life, taken as given from the compliance chapter.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p20",
+          "function": "explanation",
+          "controlling_idea": "Four kinds of event reopen verification after sign-up: the seller changes its data, the rules change, a threshold of time or volume is crossed, or the provider runs a periodic review; none of them is triggered by anything the platform does.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen (n.d., accessed 2026-11): verification is triggered by 'Requesting capabilities for your user', 'When users change their data' and 'Periodic data reviews required by Adyen' (https://docs.adyen.com/platforms/verification-overview.md). Stripe (n.d., accessed 2026-11): 'Stripe frequently updates KYC requirements, often due to changes implemented by financial regulators, card networks, and other financial institutions' (https://docs.stripe.com/connect/handle-verification-updates.md?accounts-namespace=v1); 'At certain variable thresholds—usually when a specified amount of time has passed or volume of charges have been made—you might need to collect and verify additional information' (https://docs.stripe.com/connect/identity-verification.md).",
+              "shows": "The four events, each documented by at least one provider; the state model behind them is owned by payment-compliance-and-regulation.",
+              "source": "Stripe and Adyen documentation"
+            }
+          ]
+        },
+        {
+          "id": "p21",
+          "function": "evidence",
+          "controlling_idea": "When a deadline passes, payouts are usually the first capability to stop and payments stop later, so the seller's first symptom is money coming in and none going out.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (n.d., accessed 2026-11): 'Stripe typically disables payouts on the account if we don’t receive the information by the `current_deadline`. However, other consequences might apply in some situations. For example, if payouts are already disabled and the account is unresponsive to our inquiries, Stripe might also disable the ability to process charges.' https://docs.stripe.com/connect/handling-api-verification.md?accounts-namespace=v1",
+              "shows": "Stripe documents the order as typical, with exceptions.",
+              "source": "Stripe documentation"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen (n.d., accessed 2026-11): standard verification deadlines of a '30-day period' for `sendToTransferInstrument` (payouts) and other outgoing capabilities and a '60-day period' for `receivePayments` and `receiveFromPlatformPayments`; 'Users are allowed to continue using the capabilities while the deadline is active'; 'a standard deadline could be shortened or removed in specific situations'. https://docs.adyen.com/platforms/verification-overview.md",
+              "shows": "On Adyen's standard periods payouts stop 30 days before payments would.",
+              "source": "Adyen documentation"
+            },
+            {
+              "kind": "figure",
+              "what": "Timeline figure for Adyen's standard periods: a requirement opens at day 0; payouts stop at day 30; payments stop at day 60; a person labeled owner and a reminder bell stand before day 30.",
+              "shows": "Shows why the seller meets a missed requirement as a stopped payout first."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "A reopened requirement carries a deadline.",
+            "introduces": "What stops when it passes, and in which order.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p22",
+          "function": "recommendation",
+          "controlling_idea": "The platform therefore holds each seller's open requirements, deadlines and capability status from the day the account is created, with a named person who owns every open deadline, whether or not the platform collects the data.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (n.d., accessed 2026-11): 'Responsible platforms must also monitor their connected accounts’ requirement statuses and handle any updates in a timely manner.' https://docs.stripe.com/connect/handling-api-verification.md?accounts-namespace=v2",
+              "shows": "For a collecting platform the monitoring is a stated duty; for the others it is the author's recommendation, because the seller's stopped payout arrives at the platform's support desk either way.",
+              "source": "Stripe documentation"
+            },
+            {
+              "kind": "reasoning",
+              "what": "The record's fields and its daily re-read against the provider are set out in payment-compliance-and-regulation (the mirror; Keel decision K6). This chapter adds two points: it starts at account creation, and an owner is a person with a list, not a team mailbox.",
+              "shows": "Points to the owning chapter and states only what onboarding adds."
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "Payouts stop first and the seller calls the platform.",
+            "introduces": "The platform's answer: the state held from day one, with an owner.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p23",
+          "function": "recommendation",
+          "controlling_idea": "A reminder has to travel by a channel someone watches, which for a small business is the product its staff open every day and not the email address typed at sign-up, and it has to reach the person who can act, who may be an owner or director and not the user of the back office.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "The Frozen Studios: Larkfield's reminder went to an unmonitored address and 230 studios missed the deadline (ledger).",
+              "shows": "The failure of the sign-up address as the only channel.",
+              "source": "scenario ledger"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen (n.d., accessed 2026-11): in hosted onboarding a user 'can select Invite decision-maker to ask the decision-maker to complete their own verification'; 'Adyen sends an email to the decision-maker with a link to provide their information.' https://docs.adyen.com/platforms/onboard-users.md",
+              "shows": "A provider flow built on the fact that the person who must act is often not the person filling in the form.",
+              "source": "Adyen documentation"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The record and its owner inside the platform.",
+            "introduces": "How the open requirement reaches the seller, and which person at the seller.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p24",
+          "function": "explanation",
+          "controlling_idea": "What the seller needs on the screen is the reason, the date and one action that leads into the provider's own flow, and both providers supply that action so the platform does not have to rebuild the form for each requirement.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (n.d., accessed 2026-11): the Notification banner component 'lists open tasks that can affect a connected account’s status or capabilities' (https://docs.stripe.com/connect/supported-embedded-components/notification-banner.md); 'Send a connected account back through onboarding when it has any `currently_due` or `eventually_due` requirements. You don’t need to identify the specific requirements, because the onboarding interface knows what information it needs to collect.' (https://docs.stripe.com/connect/hosted-onboarding.md?accounts-namespace=v2)",
+              "shows": "On Stripe the platform shows a banner or sends the seller back into onboarding; the flow works out the fields.",
+              "source": "Stripe documentation"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen (n.d., accessed 2026-11): an invalid capability carries 'the `verificationErrors`, `subErrors`, and `remediatingActions` arrays' (https://docs.adyen.com/platforms/verification-overview/capabilities.md); the 'View Verification Status component ... automatically creates a hosted onboarding link, redirects your user to the Adyen-hosted page to provide their information, and shows their verification status' (https://docs.adyen.com/platforms/onboard-users.md); a periodic review arrives as error 3_10 with a deadline and is closed by a call to `/legalEntities/{id}/confirmDataReview` (https://docs.adyen.com/platforms/verification-overview/data-review-process.md).",
+              "shows": "On Adyen the reason is machine-readable and the action is a fresh hosted link or a confirmation call.",
+              "source": "Adyen documentation"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The reminder reaches the right person.",
+            "introduces": "What that person sees and can do.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "measuring",
+      "heading": "Measuring Onboarding: Where the Evidence Stops",
+      "controlling_idea": "Neither provider publishes conversion figures for its onboarding flows, so the platform measures its own, from signals each provider documents, and counts the work after sign-up as well as the funnel before it.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "States the limit of the public record and replaces the missing provider figures with a measurement the platform can build."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "What the providers document about collecting and keeping verification.",
+        "introduces": "What they do not publish: how many sellers finish.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p25",
+          "function": "claim",
+          "controlling_idea": "No public source gives a completion or drop-off rate for either provider's hosted, embedded or API onboarding, or a comparison between them; the one public figure is Stripe's relative, seven-year-old claim about a redesign. So the cost of a hosted flow in lost sign-ups, and the gain claimed for own forms, cannot be stated from the public record.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Searched: the Stripe Connect onboarding pages and the Adyen for Platforms onboarding and verification pages cited in this chapter (n.d., accessed 2026-11), and the release notes; none gives a completion or drop-off rate. Adyen's page says only that scanning an ID document 'improves verification pass rates', without a number (https://docs.adyen.com/platforms/onboard-users.md). Found in the verification pass: a Stripe blog post of 2019-06-24 (https://stripe.com/blog/connect-express-onboarding) says a redesign of Express onboarding 'drove a 5.3% average increase in conversion rates' and quotes one customer on 17% (evidence age 7 years).",
+              "shows": "No completion rate is public; the one figure is a vendor's relative claim about a redesign, attributed and flagged for age, and no invented percentage appears.",
+              "source": "Stripe and Adyen documentation"
+            }
+          ]
+        },
+        {
+          "id": "p26",
+          "function": "process",
+          "controlling_idea": "Each provider documents a dashboard of the platform's own sellers (Stripe's for hosted and embedded onboarding only, Adyen's up to verification), so a platform still builds the measurement from seven stages, each marked by a signal it already receives, provided it never counts a seller as onboarded because a redirect came back.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows: account created; flow opened; flow left; information submitted; capability active; first payment; first payout. Columns: the signal on Stripe; the signal on Adyen; what the stage tells you.",
+              "shows": "Each signal is a documented object state or event, or the platform's own record."
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe (n.d., accessed 2026-11) on the return URL: 'It doesn’t mean that all information has been collected, or that there are no outstanding requirements on the account. It only means the flow was entered and exited properly.' 'Alternatively, listen to the `v2.core.account[requirements].updated` event sent to your webhook endpoint and cache the state of the account in your application.' https://docs.stripe.com/connect/hosted-onboarding.md?accounts-namespace=v2. Adyen (n.d., accessed 2026-11): 'Adyen sends all verification-related updates through webhooks' (https://docs.adyen.com/platforms/verification-overview.md).",
+              "shows": "The redirect is the stage 'flow left', not completion; the capability state is the stage that counts.",
+              "source": "Stripe and Adyen documentation"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "No provider figures.",
+            "introduces": "A funnel the platform can build itself, stage by stage.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p27",
+          "function": "recommendation",
+          "controlling_idea": "I would report two numbers per country, business type and collection method (the share of started sign-ups that reach a first payout, and the days it takes) and a third for the life after sign-up: sellers with an open requirement, by days left to the deadline.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "A first payout is the first moment the seller has what it came for and both capabilities have been exercised. Segments matter because requirements differ by country and business type (what-is-asked). The third number is the early warning the Frozen Studios lacked. Only a comparison on the platform's own sellers can show whether one way of collecting keeps more of them.",
+              "shows": "Ties the metric to the chapter's two losses and keeps the claim within what can be supported."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The stages.",
+            "introduces": "Which numbers to report from them, and the one that covers the second loss.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "The two providers offer the same three ways to collect and the same continuing state, and differ in how complete the embedded option is, whether collecting is tied to bearing losses, how much is collected up front, how deadlines are published and how a seller is brought back.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S3",
+          "S5"
+        ],
+        "how": "Collects the documented differences that change what an integrator builds on each provider."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "The mechanisms of the four preceding sections.",
+        "introduces": "The two providers aspect by aspect.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p28",
+          "function": "comparison",
+          "controlling_idea": "Aspect by aspect, the documented differences are in the completeness of the embedded flow, the tie between collecting and loss bearing, the timing of collection, the form of deadlines, the way back for a seller and the platform's own switch; on conversion neither publishes a completion rate and each documents a dashboard of the platform's own sellers.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows: ways to collect; who may collect; how much up front; deadlines and what stops first; bringing a seller back; the platform's own switch; published conversion figures. Columns: Stripe, Adyen, what the difference suggests (the author's inference).",
+              "shows": "Every Stripe and Adyen cell is a fact cited in the chapter or 'Not public'; the conversion row states what each provider does document."
+            },
+            {
+              "kind": "fact",
+              "what": "Two cells not cited earlier. Stripe (n.d., accessed 2026-11): where the platform is responsible for negative balances 'You can pause payments or payouts for your connected accounts'; where Stripe is, 'You can’t pause payments or payouts for your connected accounts' (https://docs.stripe.com/connect/risk-management.md). Adyen (n.d., accessed 2026-11): the `enabled` setting 'allows you to manage your users’ access to capabilities. Changing this setting does not trigger verification checks'; 'The capability can only be used when it is both allowed and enabled' (https://docs.adyen.com/platforms/verification-overview/capabilities.md).",
+              "shows": "The platform's own switch on each provider.",
+              "source": "Stripe and Adyen documentation"
+            }
+          ]
+        },
+        {
+          "id": "p29",
+          "function": "recommendation",
+          "controlling_idea": "On Stripe an integrator should settle who bears losses before designing onboarding and read each account's deadline as data; on Adyen it should plan for collection up front, build reminders on the 30- and 60-day periods and expect to build more of an in-application flow itself.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Follows from the table rows: collecting is derived from loss bearing on Stripe (platform-payment-models decides it); Stripe's deadline is per account, with a support article giving 'typically' 14 days to keep payouts and 28 to keep payments for updated requirements on Custom accounts (https://support.stripe.com/questions/custom-connected-account-onboarding-requirements, n.d., accessed 2026-11), which are typical and not fixed; Adyen's are standard but can be 'shortened or removed'; Adyen's components 'only cover certain functionality'.",
+              "shows": "Turns the differences into what to do on each provider."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The table.",
+            "introduces": "What an integrator does differently on each.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: Onboarding Ironworks Climbing, and Keeping It Verified",
+      "controlling_idea": "Onboarded under Keel, Ironworks Climbing is one company with three locations: one seller to verify, three capabilities requested, the provider's component collecting the data inside Larkfield's back office, and a record with an owner that would have turned the nine days of May 2026 into a banner with a date.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S1",
+          "S2",
+          "S4"
+        ],
+        "how": "Works the chapter's choices through one seller with ledger facts, on Stripe as it is and on Adyen as it would be."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The example follows the seller's life: who it is, how its account is shaped, how its data is collected, and what happens when a requirement reopens."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The comparison of the two providers.",
+        "introduces": "One seller taken through the chapter's choices with Larkfield's facts.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p30",
+          "function": "context",
+          "controlling_idea": "Ironworks Climbing has three locations and is one company, so there is one seller to verify: the company, the people who own and control it, and its bank account; the three gyms are Larkfield's records, not three verifications.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger: Ravi Shah, owner of Ironworks Climbing, three locations in Manchester, on Stripe Connect. New local detail: one private limited company of which Ravi Shah is the owner and a director.",
+              "shows": "The unit of verification is the legal entity, which is the first thing a platform with multi-location sellers gets wrong.",
+              "source": "scenario ledger and additions"
+            }
+          ]
+        },
+        {
+          "id": "p31",
+          "function": "comparison",
+          "controlling_idea": "On Stripe the company is one connected account for which Larkfield requests three capabilities (card payments, Bacs Direct Debit and payouts; the account also needs the capability to receive transfers, because Larkfield uses destination charges); had it been on Adyen it would be one legal entity with one account holder, a balance account with a verified bank account, and three stores.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe (n.d., accessed 2026-11): capabilities `card_payments` and `bacs_debit_payments`; 'Adding the `merchant` configuration to an `Account` automatically requests the `merchant` configuration’s `stripe_balance.payouts` capability' (https://docs.stripe.com/connect/account-capabilities.md). Ledger: Bacs Direct Debit carries UK memberships (5% of online volume).",
+              "shows": "The three capabilities are the ones a UK studio's payment methods need, and no more.",
+              "source": "Stripe documentation; scenario ledger"
+            },
+            {
+              "kind": "fact",
+              "what": "Adyen (n.d., accessed 2026-11), resources belonging to each user: 'One or more stores ... representing the physical locations of your user's businesses'; 'At least one account holder for each country your user operates in'; 'For each account holder, at least one balance account'; 'For each balance account, a transfer instrument (verified bank account)'; 'A legal entity in each country your user operates in'. https://docs.adyen.com/platforms/account-structure-resources/platform-structure.md",
+              "shows": "On Adyen the three locations are three stores under one verified legal entity.",
+              "source": "Adyen documentation"
+            },
+            {
+              "kind": "figure",
+              "what": "Structural figure: one company building with three small gyms. Left, Provider A (Stripe): one account box holding three capability switches. Right, Provider B (Adyen): one legal-entity card linked to one account holder, one balance account with a bank, and three store icons.",
+              "shows": "Shows the same seller in the two account structures."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "One seller, three locations.",
+            "introduces": "How that seller is shaped as accounts and capabilities on each provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p32",
+          "function": "analysis",
+          "controlling_idea": "Larkfield carries its studios' losses and so may collect verification data itself on Stripe, and from 2017 it did, with its own forms; under Keel it keeps that responsibility and gives up the forms, placing Stripe's onboarding component in the back office, as Adyen's hosted pages have done for its Dutch and German studios since 2024.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger: under Larkfield's terms a loss the studio's balance cannot cover falls on Larkfield; on Stripe Larkfield is the party that collects verification information (26-kyc-aml-and-regulation). New ledger additions: own forms over the API from 2017, extended by hand at each country launch and never reviewed on a schedule; nine years at Stripe's documented interval is eighteen reviews; Adyen studios onboard through Adyen's hosted onboarding since 2024; under K6 the Stripe forms are replaced in 2027 by Stripe's embedded onboarding and notification components.",
+              "shows": "Applies the section on collecting: eligible to collect is not obliged to build forms.",
+              "source": "scenario ledger and additions"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe (n.d., accessed 2026-11): 'You must plan on reviewing and updating onboarding requirements at least every 6 months.' https://docs.stripe.com/connect/onboarding.md",
+              "shows": "The interval behind the count of eighteen.",
+              "source": "Stripe documentation"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The account and its capabilities.",
+            "introduces": "How the data to activate them is collected, before and under Keel.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p33",
+          "function": "example",
+          "controlling_idea": "Replayed under K6 from Ravi's side, the changed requirement of 2026 appears in the back office on the day it is announced, with the reason, the date and one button that opens the provider's component, while Jonas Weber's list shows Ironworks as one of the open studios until it is cleared.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger: K6; Jonas Weber owns every open deadline; studio support is alerted 14 and 3 days before one (illustrative assumption, 26-kyc-aml-and-regulation); 230 studios were paused. Author's arithmetic: Stripe carries 1,100 UK + 700 US + 650 Belgian + 1,140 older Dutch and German studios = 3,590, so 230 is 6.4% of them.",
+              "shows": "Shows the seller's screen and the owner's list for the same requirement, with ledger numbers.",
+              "source": "scenario ledger"
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe (n.d., accessed 2026-11): 'To avoid disruption of your connected accounts’ capabilities, collect information for future requirements before the `future_requirements.current_deadline`'; hosted and embedded flows collect them when `future_requirements` is set to `include` (https://docs.stripe.com/connect/handle-verification-updates.md?accounts-namespace=v1).",
+              "shows": "The provider behavior the replay relies on is documented.",
+              "source": "Stripe documentation"
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "Sign-up under Keel.",
+            "introduces": "The same seller months later, when a requirement reopens.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p34",
+          "function": "analysis",
+          "controlling_idea": "Larkfield now reports sign-up by country and business type as the share reaching a first payout and the days it took, and the open requirements by days to deadline, and it has no figure yet for whether the provider's component keeps more studios than its own forms did.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "New local detail: the three reports under K6; for the 50 largest studios, which hold a verified account at both providers (K8, 10-routing-and-orchestration), there are two verification records each. No outcome figures are given.",
+              "shows": "Applies the measuring section and states honestly that the comparison has not been made.",
+              "source": "scenario ledger and additions"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The replayed incident.",
+            "introduces": "What Larkfield measures, and what it does not yet know.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong",
+      "controlling_idea": "Three failures remain with a provider-run flow and a mirrored record: a returned redirect taken for a finished sign-up, a reminder or link that reaches nobody who can act, and a requirement that the platform's own interface cannot satisfy.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S4"
+        ],
+        "how": "Names the residual failures of the recommended design, with detection and recovery for each."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The onboarding as designed.",
+        "introduces": "The ways it still fails.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p35",
+          "function": "analysis",
+          "controlling_idea": "The first failure is marking a seller as onboarded because the browser came back from the provider's flow, when the seller saved for later, the link had expired, or a requirement is still under review.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (n.d., accessed 2026-11): the account is redirected to the refresh URL when 'The link is expired (a few minutes went by since the link was created)' or 'The link was shared in a third-party application such as a messaging client that attempts to access the URL to preview it'; the return URL is reached 'when they complete the onboarding flow or click Save for later at any point in the flow'. https://docs.stripe.com/connect/hosted-onboarding.md?accounts-namespace=v2",
+              "shows": "A redirect carries no state; the account's capabilities do.",
+              "source": "Stripe documentation"
+            }
+          ]
+        },
+        {
+          "id": "p36",
+          "function": "analysis",
+          "controlling_idea": "The second failure is a reminder or link that reaches nobody who can act: an address from sign-up, a link pasted into a chat, or a back-office user who is not the director the provider needs to hear from.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "The Frozen Studios (ledger): the reminder went to an unmonitored address.",
+              "shows": "The canonical case.",
+              "source": "scenario ledger"
+            },
+            {
+              "kind": "fact",
+              "what": "The two providers' documented positions differ: Stripe says not to send Account Links outside the platform application (https://docs.stripe.com/connect/hosted-onboarding.md?accounts-namespace=v2); Adyen's invite flow can email the hosted onboarding link and protects it with SMS authentication (https://docs.adyen.com/platforms/onboard-users.md; release note 2026-05-04).",
+              "shows": "Detection is the same on both: an open requirement whose seller has not opened the flow within days of the reminder goes to a person.",
+              "source": "Stripe and Adyen documentation"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "A redirect taken for completion.",
+            "introduces": "A message that never reaches the person who must act.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p37",
+          "function": "analysis",
+          "controlling_idea": "The third failure is a requirement the platform cannot satisfy on the seller's behalf: a risk review that only the provider's interface accepts, or a rejection that is final, for which the platform needs a route into the provider's interface and a person who owns the case.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe (n.d., accessed 2026-11): risk-review requirements 'you can’t provide using the API' (https://docs.stripe.com/connect/handling-api-verification.md?accounts-namespace=v2). Adyen (n.d., accessed 2026-11): the `rejected` status 'is final and any errors cannot be resolved by updating data or uploading documents' (https://docs.adyen.com/platforms/verification-overview/capabilities.md). Adyen: 'Data changes to the legal entity of the account holder do not trigger webhooks' (https://docs.adyen.com/platforms/verification-overview.md), so the record is re-read after every change (payment-compliance-and-regulation).",
+              "shows": "Some states cannot be cleared by resubmitting a form; the platform's design must leave a path and an owner for them.",
+              "source": "Stripe and Adyen documentation"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Messages that do not arrive.",
+            "introduces": "Requirements that the platform's own interface cannot meet.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "The choice of how to collect verification data and the duty to keep a seller verified look like two topics and are one: both are decided by where the current requirement lives. A provider-run flow reads the requirement from the provider's record each time it opens; an own form holds a copy made on the day it was written; a seller's screen with no requirement on it holds nothing. The Frozen Studios failed on both counts at once, with a 2017 form that could not ask the new question and a back office that could not show it.",
+    "so_what": "A platform team stops treating onboarding as a launch project owned by product and runs it as a system: a default set of capabilities kept small, the provider's flow as the collector, a record of open requirements with a named owner, a seller-facing reason, and its own conversion and time-to-first-payout numbers, since no provider will supply them.",
+    "callback": {
+      "to": "Ravi Shah's nine days without payouts and without a reason.",
+      "how": "Under K6 the same requirement is a banner with a date and a button on the day it is announced, and a line on Jonas Weber's list until it clears; the nine days become a task of a few minutes."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "For your own platform, write down the default capabilities you request and why each is there, who keeps your sign-up fields current, where a seller sees an open requirement and its date, and the name of the person who owns every open deadline."
+    },
+    "hand_off": {
+      "to": "splits-balances-and-platform-payouts",
+      "relationship": "sequence",
+      "carries_over": "A verified seller whose capabilities to receive payments and payouts are active.",
+      "introduces": "The first payment to that seller: how it is divided among three parties, when each is paid, and what a reversal after payout does to the division."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The failure modes.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p38",
+        "function": "synthesis",
+        "controlling_idea": "Established: capabilities depend on requirements that both providers reopen after sign-up, payouts usually stop first, hosted and embedded flows follow requirement changes while own forms need maintenance, and neither provider publishes conversion figures.",
+        "form": "list"
+      },
+      {
+        "id": "p39",
+        "function": "synthesis",
+        "controlling_idea": "Depends on context: how much to collect up front, whether embedded or hosted fits, and whether own forms are ever justified depend on the provider, on who bears seller losses and on whether sellers work inside the platform's application.",
+        "form": "list",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is settled.",
+          "introduces": "What changes with the situation.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p40",
+        "function": "recommendation",
+        "controlling_idea": "The author's synthesis: collecting and keeping are one question of where the current requirement lives, so let the provider's flow hold the form, hold the deadline yourself with a named owner, and measure your own sign-up, which turns Ravi Shah's nine days into a banner with a date.",
+        "form": "list",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is established and what depends.",
+          "introduces": "The author's own position, returning to the nine days of the opening.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p41",
+        "function": "recommendation",
+        "controlling_idea": "Eight questions let the reader test a platform's onboarding or a provider's onboarding product.",
+        "form": "list",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The take-aways.",
+          "introduces": "Questions that apply them.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p42",
+        "function": "transition",
+        "controlling_idea": "With a seller verified and its capabilities to receive payments and payouts active, the next chapter follows the first payment to it: how it is divided among platform, seller and provider, when each is paid, and what a reversal after payout does to the division.",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "A verified seller with active capabilities.",
+          "introduces": "The first payment to that seller and its division.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "Why a regulated provider must verify its customers: KYC and KYB duties, beneficial ownership rules, sanctions screening, transaction monitoring, and the model of requirements, deadlines and capabilities as account state.",
+      "covered_in": [
+        "payment-compliance-and-regulation"
+      ]
+    },
+    {
+      "topic": "Who the merchant is, account configurations and charge types, and who bears seller losses.",
+      "covered_in": [
+        "platform-payment-models"
+      ]
+    },
+    {
+      "topic": "Licenses, safeguarding and why the provider and not the platform holds seller funds.",
+      "covered_in": [
+        "licences-and-safeguarding"
+      ]
+    },
+    {
+      "topic": "Splits, seller balances, payout schedules and what a refund after payout does.",
+      "covered_in": [
+        "splits-balances-and-platform-payouts"
+      ]
+    },
+    {
+      "topic": "Checking a changed bank account before a payout, and payout returns.",
+      "covered_in": [
+        "payouts-and-money-movement"
+      ]
+    },
+    {
+      "topic": "Merchant risk scores, reserves and deposits a provider sets on a seller.",
+      "covered_in": [
+        "payment-fraud-and-risk",
+        "balances-and-funds-flows"
+      ]
+    },
+    {
+      "topic": "Extra verification for accounts, cards and financing offered to sellers.",
+      "covered_in": [
+        "embedded-finance"
+      ]
+    },
+    {
+      "topic": "Field-by-field verification requirements per country: they change, and each provider publishes a tool for them."
+    },
+    {
+      "topic": "User-interface design of sign-up forms and copywriting for reminders."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "Neither provider publishes a completion rate for hosted, embedded or API onboarding, or a comparison between them. Stripe published one relative figure in 2019 (5.3% average increase after a redesign of Express onboarding), and both document a dashboard of the platform's own sellers (Stripe onboarding insights; Adyen KYC verification insights).",
+    "Adyen's staggered-verification tier amounts are not on the page read; the chapter says there are four tiers and gives no amounts.",
+    "Whether Adyen ties the choice of hosted or API-only onboarding to who bears seller losses is not stated in the pages read; the table says only that no such tie is documented there.",
+    "How long an Adyen hosted onboarding link stays valid was not found in the pages read and is not stated.",
+    "Stripe's 'typically disables payouts' sentence is on the Accounts v1 variant of the verification page; the v2 variant says an entry lists 'the affected capabilities'. The chapter cites the v1 page for the order."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "Length is set at about 6,100 words by the checker's count, which includes four tables and the source list (about 5,650 before Sources): above the 4,000 to 5,500 aim and under the 6,500 limit. The 42 units each carry documented evidence from both providers, and the draft was cut twice from 6,600.",
+      "rejected": [
+        "Dropping the measurement section or the trade-off table to reach 5,500, which would remove the evidence behind acceptance criteria AC-2 and AC-3."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Under consistency ruling 2 the model of verification as continuing state (requirement lists, deadlines, capability flags, the mirror and its daily re-read) is taken as given from payment-compliance-and-regulation. This chapter defines capability and verification requirement in one paragraph, because PLAN gives it those terms, and spends its space on requesting capabilities, the three ways to collect, the owner, the channel, the seller's screen and measurement.",
+      "rejected": [
+        "Re-teaching the requirement lists and capability flags field by field.",
+        "Repeating the form, pass-through and mirror designs of chapter 26."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The seller's side of the Frozen Studios is told through Ironworks Climbing, which becomes one of the 230 (new ledger fact: payouts paused Monday 11 May to Wednesday 20 May 2026).",
+      "rejected": [
+        "An unnamed studio, which would give the seller's view no face.",
+        "Studio Noord, which is on Adyen while the Frozen Studios were on Stripe Connect (chapter 26's ledger addition)."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Larkfield's pre-Keel Stripe onboarding is its own forms over the API (2017), which makes the incident an example of the API design's documented maintenance cost; under K6 it moves to Stripe's embedded components.",
+      "rejected": [
+        "Leaving the collection method unstated, which would leave the In Practice section with nothing to decide."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "No conversion percentages appear anywhere, not even as labeled assumptions; the measuring section gives stages and signals only.",
+      "rejected": [
+        "An illustrative funnel with invented percentages, which a reader could mistake for provider data and which acceptance criterion AC-3 guards against."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The trade-off table and the author's recommendation sit at the end of the section on the three ways to collect instead of in a separate Trade-offs section.",
+      "rejected": [
+        "A separate two-paragraph section, which would split the comparison from the facts it compares."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Member payments at Ironworks are in pounds, so the example uses days, counts and shares and no money amount for Ironworks.",
+      "rejected": [
+        "Inventing a daily volume in pounds for one studio chain."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Verification pass: the chapter now cites Stripe's 2019 claim of a 5.3% average increase in conversion as an attributed vendor claim with its evidence age, and names both providers' onboarding dashboards. This narrows the earlier decision that no conversion percentage appears anywhere: no invented or illustrative percentage appears, and the one vendor figure is not presented as a completion rate.",
+      "rejected": [
+        "Keeping 'neither publishes a conversion figure for any onboarding flow', which the Stripe post contradicts.",
+        "Mentioning the Stripe post without its number, which would hide what the source says."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "PLAN.md, contract 34",
+      "contributed": "The question, the coverage list, the Larkfield thread and the owned terms."
+    },
+    {
+      "kind": "internal",
+      "ref": "journal-spec.json, entry platform-onboarding-and-verification",
+      "contributed": "Intent, acceptance criteria, thesis and role, copied unchanged; the neighbours' transitions."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-platforms-and-embedded-finance.md",
+      "contributed": "Part 2 (capabilities and requirements as state; hosted, embedded and API onboarding), sections 1.3, 1.5 and 1.6, and the open questions."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-fraud-risk-and-compliance.md",
+      "contributed": "Sections 2.2 and 2.3 (how each provider exposes compliance to customers) and the open questions."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md and _research/consistency-issues.md",
+      "contributed": "The Frozen Studios, K6, the cast, chapter 26's additions; ruling 2 on ownership of verification as state."
+    },
+    {
+      "kind": "external",
+      "ref": "Stripe documentation, Connect onboarding, capabilities, verification, hosted and API onboarding, embedded components, risk management (docs.stripe.com, n.d., fetched 2026-11-17)",
+      "contributed": "Every Stripe fact and quotation in the evidence."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen documentation, Adyen for Platforms verification overview, capabilities, verification types, data review, onboarding, components, verification requirements, platform structure, and release notes of 2026-05-04 (docs.adyen.com, fetched 2026-11-17)",
+      "contributed": "Every Adyen fact and quotation in the evidence."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation pass (parts 6-8): fields copied from the journal spec and unit-level controlling ideas and evidence brought into line with the verified page and the consistency rulings; no unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 84 claims checked (75 confirmed, 5 corrected, 4 hedged, 0 unsupported and removed or relabeled, 0 unreachable; one further source URL replaced); 'neither provider publishes a conversion figure for any onboarding flow' corrected to 'no completion rate or comparison of flows', with Stripe's 2019 figure, both providers' onboarding dashboards and Stripe's announced KYC Refresh (ruling 36) added. No unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes). Notes acted on in the draft: 'who bears seller losses' and 'payment facilitator' are glossed where first used; the failure paragraph on reminders is limited to links and the wrong recipient and points back to the section on channels; the Larkfield measurement paragraph is kept to what is not yet known. Not acted on: the rule on who may collect stays after the API design it restricts; the trade-off table (three designs) and the provider table (two providers) stay separate; measurement stays before the comparison because its last row is the comparison's last row."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "First version, written from the PLAN contract, the journal spec entry and the research briefs; every quotation re-read on the provider's page."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('That neither company publishes conversion figures for its on' -> 'That neither company publishes a completion rate or a compar')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('The chapter states that no public conversion figures exist f' -> 'The chapter states that no completion rate or comparison of ')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('because neither provider publishes conversion figures the pl' -> 'because neither provider publishes a completion rate or a co')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('Neither company publishes conversion figures for its flows, ' -> 'Neither company publishes a completion rate or a comparison ')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: completion-rate, liability-rule and deadline-length absences re-tested (Adyen documentation full text, both sites, domain-restricted web search): hold; the scope of the search is restated in the evidence paragraph."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Sweep of rulings 46 to 48: the deadline row and the advice after the table no longer say that Stripe publishes no standard deadline length; they give the typical 14 and 28 days for Custom accounts from Stripe's support article, as chapter 26 does (48g). One source added; p29 evidence aligned; two connective phrases trimmed to stay within the word limit."
+    }
+  ],
+  "length": {
+    "target_words": 6000,
+    "max_words": 6300
+  }
+}

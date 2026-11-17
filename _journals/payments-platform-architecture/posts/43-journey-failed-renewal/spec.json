@@ -1,0 +1,1227 @@
+{
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "journey-failed-renewal",
+  "journal": "payments-platform-architecture",
+  "part": "part-9",
+  "title": "Journey 2: A Membership Renewal That Fails, and Comes Back",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "The steps of a renewal with the customer absent: the scheduled charge as a merchant-initiated transaction on a stored card, the decline with its code, the decision whether a retry is allowed, the notice to the member, the retry, the recovery, and the branch where recovery fails and the membership lapses; for each, the party, the record, the promise and the failure, with the chapter that owns it.",
+        "The canonical dates: Mila's €49.00 monthly membership at Studio Noord renews on the 1st; on 1 April 2027 the charge is declined for insufficient funds; the retry on 4 April succeeds; the €49 collected on 4 April pays for the period that began on 1 April.",
+        "What the rules and documentation say as of November 2026: Visa sorts decline codes into those a merchant must never resubmit and those it may reattempt within a limit (20 attempts in 30 days in the rules of 24 October 2026; Adyen's page says 15), and requires written notice and at least 7 calendar days to pay by other means after a declined merchant-initiated authorization; Stripe Billing retries an invoice (Smart Retries, by default up to 8 attempts in 2 weeks, with retries suspended on listed hard decline codes until a new payment method appears); Adyen documents a retry feature for payments (Auto Rescue, default window one calendar month) and no invoice or subscription object.",
+        "Where the public record stops: each company has described its retry model once (Stripe in a 2024 post, 'more than 500 attributes'; Adyen in a 2020 post, a contextual bandit with 'about 6% more orders than the baseline'), and neither publishes the current model, its inputs or the timing it would choose for a given decline; the customer figure Adyen publishes for Auto Rescue has no baseline."
+      ],
+      "believe": [
+        "A decline is information about what to do next, not the end of the attempt.",
+        "The debt for a billing period and the payment attempts against it are two records, and something has to own the first."
+      ],
+      "can_do": [
+        "Write a retry policy that separates declines that must never be retried, declines that are a matter of timing and declines that need a new credential, and that stays inside the network's limits.",
+        "Say, for their own provider, which system holds 'still owed for this period' and what state the customer is in while it is owed."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a renewal job that retries every decline the same way, the reader separates the declines by what they call for and says what the job should do with each.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A language-learning app renews 20,000 monthly card subscriptions on the 1st. Its job retries every declined card once a day for 30 days and emails 'your payment failed' after each failed attempt. This month's declines include 'insufficient funds', 'lost card' and 'expired card'. Using only this chapter: what is wrong with the job, and what should it do with each of the three?",
+        "expected": "It treats every decline as the same event. 'Lost card' is in the class the network says must never be resubmitted for that card; retrying it earns fees and nothing else, so stop and ask the customer for a new payment method. 'Insufficient funds' is a matter of timing: a retry is allowed within the network's limit (Visa: 20 attempts in 30 days in its October 2026 rules, 15 on Adyen's page), so retry a few times on chosen days, not daily without thought. 'Expired card' needs a new credential, which an account updater or a network token's lifecycle update may supply without the customer; a plain retry of the old details will not. One written notice with a way to pay otherwise, and at least 7 days to do so under Visa's rule for declined merchant-initiated charges, replaces thirty emails. Between the decline and the recovery the subscription needs a defined state with a defined end."
+      },
+      {
+        "id": "AC-2",
+        "statement": "The reader can say which system holds the debt for the period on each provider and what the integrator must build on each.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "One studio's memberships are charged through Stripe Billing subscriptions; another's are charged by the platform's own renewal job through Adyen. In both, a €49 renewal is declined on the 1st. Using only this chapter: in each case, which system knows that €49 is still owed for the month, what retries it, and what does the platform have to build itself?",
+        "expected": "On Stripe Billing the invoice for the period is the debt: it stays open, the subscription becomes past due, and Stripe's retries (Smart Retries or a custom schedule) run against the invoice, so a new card or another payment can settle the same debt; the platform configures the retry window and what happens when retries run out, and listens for the invoice events. On Adyen there is no invoice or subscription object in the documentation: the platform's renewal job submits a merchant-initiated payment on a stored token, the platform's own records hold the debt and the membership state, and the platform schedules the retries, or lets Adyen's Auto Rescue retry the payment within its window and report by webhook against the platform's reference for that billing cycle."
+      },
+      {
+        "id": "AC-3",
+        "statement": "Given the branch where no retry succeeds, the reader can say what state the membership, the debt and the member's access end in, and that the outcome is a setting or a decision, not something the payment record supplies.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "Suppose every retry of a €49 renewal fails through the end of the retry window. Using only this chapter: what must be decided about the membership, the amount owed and the member's access, and who or what makes each decision on Stripe Billing and on an Adyen integration?",
+        "expected": "Three things: whether the membership is canceled, paused or left unpaid; whether the €49 stays owed or is written off; and from which day the member loses access. On Stripe Billing the first two follow from the account's settings for exhausted retries (the subscription is canceled, marked unpaid, left past due or paused, and the invoice stays open or is marked uncollectible). On an Adyen integration all three are the platform's own rules in its own records. In neither case does a payment record say it: the last record a payment system holds is a declined attempt."
+      }
+    ],
+    "audience": {
+      "who": "A software engineer or architect who is new to payments and has read Journey 1.",
+      "already_knows": [
+        "APIs, queues, retries, idempotency as a general idea",
+        "Journey 1's step table and twelve steps",
+        "The mechanisms of Parts I to VIII by name, or can follow a link to them"
+      ],
+      "does_not_know": [
+        "How those mechanisms hand over to each other on a renewal that is declined",
+        "Which system holds the debt on each provider"
+      ]
+    }
+  },
+  "thesis": {
+    "question": "When Mila's €49 renewal is declined on 1 April 2027, who decides whether and when to try again, and which system holds the state of her membership until the money arrives?",
+    "claim": "A declined renewal is an open debt with a clock, not a failed payment. The decline code decides whether a retry is allowed at all, the card network caps how many, and the state of Mila's membership between the decline on 1 April and the successful retry on 4 April has to be held by the billing side, because no payment record contains it. Where that debt lives depends on the provider: Stripe Billing retries an invoice it owns, while on Adyen, Studio Noord's provider, the provider can retry a payment and Larkfield's renewal job owns the schedule, the membership state and the notice to Mila.",
+    "disputed_by": "The view that recovery is the provider's job: the renewal failed, the provider's retry feature (or a daily retry of the same charge) will collect it when it can, and the merchant needs only an 'unpaid' flag and a reminder email, not a record of a debt.",
+    "so_what": "A team that accepts this classifies a decline before scheduling anything, keeps one record of the debt per billing period against which all attempts are counted, and gives the member a defined state while the debt is open. Larkfield saw what an undefined in-between state costs on 1 October 2026, when 7,900 renewals were delayed to the next day by a rate limit and dunning emails went to members who had done nothing wrong; Keel's K5 paces renewals over 18 hours and ties retries to decline codes.",
+    "how_why": "A merchant-initiated charge has no customer present, so nothing can be asked of Mila at the moment of decline: such payments fall outside strong customer authentication, with no challenge and no liability shift. What remains is the issuer's code. Visa's rules of 24 October 2026 sort codes into those a merchant must never resubmit and those it may reattempt, up to 20 times in 30 days (Adyen's page still says 15), charge fees for excess retries, and require written notice and at least 7 calendar days to pay by other means. Insufficient funds is a matter of timing; a reissued card is a credential problem that an account updater or a network token's lifecycle update solves and a retry does not. Stripe Billing, as documented in 2026, attaches retries to the invoice (by default up to 8 in 2 weeks, suspended on listed hard decline codes until a new payment method appears) and moves the subscription to past due and then to a configured end state. Adyen documents a payment-level retry feature, Auto Rescue, and no invoice or subscription object, so the scheduler and the debt are the integrator's. Neither company publishes the timing its retry model would choose for a given decline, so the walkthrough attributes the choice of 4 April to Larkfield's own schedule and to nothing inside a provider.",
+    "supporting_claims": [
+      {
+        "id": "C1",
+        "claim": "A renewal with the customer absent replaces checkout, authentication and a first-time approval with a recorded debt, a flagged request and a decline code, and each step hands the next only a reference and its own result."
+      },
+      {
+        "id": "C2",
+        "claim": "The decline code decides whether a retry is allowed at all and the card network caps how many: Visa separates codes a merchant must never resubmit from codes it may reattempt up to 20 times in 30 days, and a credential problem is solved by an updater or a network token, not by a retry."
+      },
+      {
+        "id": "C3",
+        "claim": "Between the decline and the recovery the membership's state is held by a record of the period's debt on the billing side, against which every attempt is counted, because no payment record contains it."
+      },
+      {
+        "id": "C4",
+        "claim": "Where the debt lives depends on the provider: Stripe Billing retries an invoice it owns, while on Adyen the provider can retry a payment and the integrator owns the schedule, the membership state and the notice."
+      },
+      {
+        "id": "C5",
+        "claim": "When recovery fails, what the membership, the debt and the member's access become is a setting or a decision on the billing side, not something a payment record supplies."
+      },
+      {
+        "id": "C6",
+        "claim": "Neither company publishes how its retry timing is chosen beyond two example signals (Stripe) and the words 'smart logic' (Adyen), so the choice of the retry day in this walkthrough is Larkfield's own."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Follows one renewal through decline, classification, notice, retry and recovery, and through the branch where it lapses, on Adyen with Larkfield's renewal job and on Stripe Billing; it shows the hand-off between the billing clock and the payment attempt, which Journey 1 did not have.",
+    "supports": [
+      "P9-2",
+      "P9-5"
+    ]
+  },
+  "flow": {
+    "pattern": "chronological",
+    "additional_patterns": [
+      {
+        "pattern": "comparison",
+        "applies_to": "on-stripe-billing: the same steps read a second time with the debt on the provider's side"
+      },
+      {
+        "pattern": "large_to_small",
+        "applies_to": "steps before charge, decide and recover: the whole path as one table before the three sections that walk it"
+      }
+    ],
+    "rationale": "A journey is read in the order the payment meets its steps: the scene on 1 April, the map of eleven steps, then the steps in three groups in date order. The Stripe Billing reading comes after the whole Adyen walk, because it re-reads rows the reader must already have seen once; putting it inline would interrupt every hand-off with a second vocabulary. The lapse branch comes last because it starts from the same steps and needs both providers' records to say how the debt ends; placed before the recovery it would describe an ending before the reader has seen what a kept debt looks like."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "On Thursday 1 April 2027 Larkfield's renewal job charges Mila Janssen's stored card €49.00 for her April membership at Studio Noord. Her bank refuses: not enough money in the account. Mila is not there; she does not see a screen, and no screen asks her anything. Three days later the money arrives. In between she walks into the studio and is let in. Which system decided that, and which decided to try again?"
+    },
+    "bridge": {
+      "from_reader_world": "An engineer sees a declined charge as a failed request: log it, retry it on a timer, flag the account as unpaid until it goes through.",
+      "to_topic": "The decline is an instruction with a code, the retry is limited by the card network, and the member's state while the money is owed has to live in a record that no payment system keeps."
+    },
+    "thesis_statement": {
+      "text": "A declined renewal is an open debt with a clock, not a failed payment: the decline code decides whether a retry is allowed, the card network caps how many, and the state of the membership in between has to be held by the billing side, which is Stripe's invoice on Stripe Billing and the merchant's own record on Adyen.",
+      "placement": "KEY POINTS bullets 1 and 3, and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p04",
+      "promises": [
+        {
+          "promise": "Set the scene on 1 April 2027 and say what the same morning cost six months earlier.",
+          "kept_in": [
+            "scene"
+          ]
+        },
+        {
+          "promise": "Lay the renewal out as eleven steps in one table and one figure.",
+          "kept_in": [
+            "steps"
+          ]
+        },
+        {
+          "promise": "Walk the steps in three groups: the charge, the decision after the decline, the recovery on 4 April.",
+          "kept_in": [
+            "charge",
+            "decide",
+            "recover"
+          ]
+        },
+        {
+          "promise": "Read the same renewal on Stripe Billing and say where the public record stops.",
+          "kept_in": [
+            "on-stripe-billing"
+          ]
+        },
+        {
+          "promise": "Follow the branch where no retry succeeds and the membership lapses.",
+          "kept_in": [
+            "lapse"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "At some hour on Thursday 1 April 2027 Mila's bank refuses a €49.00 charge that nobody is present to see, and the question of what happens next has no one at a checkout to answer it.",
+        "function": "context",
+        "organization": "narration",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's membership renewal: €49.00 monthly at Studio Noord, renewed on the 1st as a merchant-initiated card payment; on 1 April 2027 declined for insufficient funds; retried on 4 April and approved (ledger).",
+            "shows": "The decline happens with no customer present, so whatever decides the next step has to be a system and a rule, not a person at a screen.",
+            "source": "_research/scenario-ledger.md"
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "A declined renewal is an open debt with a clock, not a failed payment: the decline code decides whether a retry is allowed, the card network caps how many, and the membership's state in between is held on the billing side, in a different place on each provider.",
+        "function": "claim",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The refusal that nobody saw.",
+          "introduces": "The chapter's thesis: the decline is information, the debt stays open, and its holder differs by provider.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "Journey 1 followed a payment Mila started herself and that was approved the first time; this journey keeps the member and the stored card and removes both of those things, so a decline code, a schedule and a notice take the place of authentication and approval.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Journey 1 (journey-card-payment): Mila's €120.00 class pass of 9 March 2027, twelve steps, approved at 19:42 with Mila present. This journey: the €49.00 membership set up on 12 January 2027, charged on the 1st with Mila absent (ledger).",
+            "shows": "Places the renewal on the payment's journey as a variation of a path the reader has already walked, with two things taken away.",
+            "source": "_research/scenario-ledger.md"
+          }
+        ],
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "Journey 1's twelve steps on a payment that Mila started herself and that was approved the first time.",
+          "introduces": "The same member and the same stored card with two things removed: Mila is not present when the charge is made, and the issuer says no.",
+          "form": "paragraph",
+          "placement": "both"
+        }
+      },
+      {
+        "id": "p04",
+        "controlling_idea": "The chapter sets the scene on 1 April, lays out the renewal as eleven steps, walks them in three groups (the charge, the decision after the decline, the recovery on 4 April), reads the same renewal on Stripe Billing, follows the branch where the money never comes, and ends with what to take away.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "Where the journey sits.",
+          "introduces": "The order of the sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: Thursday 1 April 2027",
+      "controlling_idea": "On 1 April 2027 Mila's renewal is one of hundreds of thousands that Larkfield's own renewal job sends, and six months earlier the same job had no defined state for a renewal that was owed and not yet paid.",
+      "function": "context",
+      "advances_thesis": {
+        "supports": [
+          "C1",
+          "C3"
+        ],
+        "how": "Shows the cost of an undefined in-between state before any step is walked, and poses the two questions the thesis answers."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The renewal of 1 April 2027 is set against the same job six months earlier, and the two questions come out of the difference; if the October case came first the reader would meet an incident before knowing whose renewal the chapter follows."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The claim that a declined renewal is an open debt with a clock.",
+        "introduces": "The day and the company on which the claim is walked.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p05",
+          "controlling_idea": "Mila's renewal belongs to the first-of-month wave that Larkfield's renewal job now spreads over 18 hours, and it is charged through Adyen because Studio Noord is on Adyen.",
+          "function": "context",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger: the membership was set up on 12 January 2027 with a typed Visa debit card and a 3-D Secure challenge; about 940,000 renewals a month, 38% of them in the wave on the 1st; under K5 the job paces the wave over 18 hours; Studio Noord is on Adyen and its stored-card renewals stay with the provider that holds the card.",
+              "shows": "Fixes the parties before the walk: Larkfield's job is the billing engine, Adyen is the provider, Mila is absent.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ]
+        },
+        {
+          "id": "p06",
+          "controlling_idea": "Before Keel the same decline would have left Mila with nothing but an unpaid flag, and on 1 October 2026 that flag could not tell a declined card from a card nobody had charged yet.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "The Renewal Wave of 1 October 2026: the job hit a provider rate limit, 7,900 renewals were delayed to the next day and dunning emails went to members who had done nothing wrong; before Keel the membership state was a paid/unpaid flag from the latest payment, with no record of the period's debt (ledger, additions of chapters 27 and 29).",
+              "shows": "An in-between state that nothing defines is read as failure by whatever job looks at it next.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The paced, recorded renewal of April 2027.",
+            "introduces": "The same job six months earlier, with no record between 'due' and 'paid'.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p07",
+          "controlling_idea": "Femke de Graaf reads the renewal as two questions: who decides whether and when to try again, and which system holds the membership until the money arrives.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Femke de Graaf, Head of Payments Engineering since January 2027, leads Keel; K5 ties retries to decline codes and the Keel period record holds the debt (ledger).",
+              "shows": "The two questions are the chapter's thesis question split in two, and each is answered by a different group of steps.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The October emails.",
+            "introduces": "The two questions the incident leaves, which the walk answers.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "steps",
+      "heading": "The Renewal in Eleven Steps",
+      "controlling_idea": "The renewal is eleven steps across four parties on two clocks, and each step hands the next a record that promises only what that step knows.",
+      "function": "description",
+      "advances_thesis": {
+        "supports": [
+          "C1"
+        ],
+        "how": "Gives the whole path at once, in the table Journey 1 introduced, so that each later section can lead with a hand-off and point to the chapter that owns the mechanism."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "What differs from Journey 1 comes first because it tells the reader which rows of the table are new; the table comes before the figure because the figure draws the table's rows on a time axis and cannot be read without them."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Femke's two questions.",
+        "introduces": "The complete path on which both are answered.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p08",
+          "controlling_idea": "Compared with Journey 1, the renewal has no checkout, no risk screen the member can see and no authentication, and it gains three steps that Journey 1 did not have: a classification, a held state and a notice.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Journey 1's twelve steps (checkout, tokenization, risk scoring, authentication, authorization, capture, clearing, settlement, ledger entries, split, payout, reconciliation) set against this journey's eleven; the steps after an approval are Journey 1's and get one row here.",
+              "shows": "Tells the reader which rows are new and which they have already walked, so the chapter spends its space on the new ones.",
+              "source": "journal-spec.json (part-9, P9-1)"
+            }
+          ]
+        },
+        {
+          "id": "p09",
+          "controlling_idea": "The step table names, for each of the eleven steps, the party that acts, the record it produces, the promise that record makes and the failure that occurs where it is handed on.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Step table with the columns Step | Party or system | Message or record | Promise made | What can fail here → chapter. Rows: 1 period opens (period record open, €49.00); 2 attempt recorded (attempt row pending, key ending :2027-04:1); 3 request flagged and credential swapped (ContAuth, Subscription, network token); 4 issuer answers (Refused, reason 12, raw 51); 5 decline classified (Visa Category 2); 6 state held (record open, membership past_due with access); 7 member told (email); 8 second attempt (key ending :2027-04:2); 9 approval confirmed (Authorised, AUTHORISATION webhook); 10 debt closed (period record paid; €47.82 and €1.18 in the ledger); 11 money moves (Journey 1's later steps).",
+              "shows": "Every failure in the last column sits between two rows, not inside one, and every row points to the chapter that owns its mechanism.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The steps that are new.",
+            "introduces": "All eleven in the table Journey 1 set up.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "controlling_idea": "Drawn over time, the renewal runs on two clocks: the debt for April is open for three days without a break, while the two payment attempts are events of a few seconds each.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "figure",
+              "what": "Sequence-style figure: lanes for the booking app, the payment service, the provider, the issuer and the member; attempt 1 on 1 April returning a decline, the email to the member, attempt 2 on 4 April returning an approval, with a bar for the open debt spanning the two dates.",
+              "shows": "Makes visible that nothing in the payment lanes exists between the two attempts; only the billing lane holds anything on 2 and 3 April."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The table's rows.",
+            "introduces": "The same rows on a time axis, where the gap between the attempts shows.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "charge",
+      "heading": "From the Billing Clock to the Issuer: A Charge With Nobody Present",
+      "controlling_idea": "In steps 1 to 4 the billing clock hands a debt to the payment service, the payment service hands a flagged request to the provider, and the issuer hands back a refusal, each record carrying forward only a reference and its own result.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "C1"
+        ],
+        "how": "Walks the hand-offs that replace checkout and authentication, and shows that the refusal arrives with a code and nothing else."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The steps in the order the renewal meets them on 1 April: the debt is recorded, the attempt is recorded, the request is flagged, the credential is swapped, the issuer answers. Each record is the input of the next, so no step can be explained before the one that hands to it."
+      },
+      "transition_in": {
+        "relationship": "sequence",
+        "carries_over": "The map of eleven steps.",
+        "introduces": "The first four, from the clock to the refusal.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p11",
+          "controlling_idea": "The first hand-off is from the calendar to a record: before any charge is sent, the booking app writes that €49.00 is owed once for April 2027.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Keel period record (ledger, addition of chapter 27): one row per membership and billing period, written before the first attempt, with the amount due and a state of open, paid or void; chapter 29 adds uncollectible and one child row per attempt.",
+              "shows": "The debt exists before the payment and independently of it, which is what lets a second attempt be an attempt at the same thing.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ]
+        },
+        {
+          "id": "p12",
+          "controlling_idea": "The second hand-off turns the debt into a request that can be repeated safely: the payment service stores an attempt row and an idempotency key built from the membership, the period and the attempt number before it sends anything.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "K1 (ledger, addition of chapter 18): keys of the form renewal:<membership id>:<billing period>:<attempt number>; the row is written with state pending before the first send; the Larkfield payment ID travels as Adyen's reference (addition of chapter 17). The Double Charge of 1 November 2026: 1,840 members charged twice after timeouts were retried under new keys.",
+              "shows": "A timeout at this hand-off is an unknown outcome that the same key resolves; without the stored key it becomes a second payment.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The period record.",
+            "introduces": "The attempt made against it, and what protects that attempt.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p13",
+          "controlling_idea": "The third hand-off tells the provider and the network that the merchant, not the cardholder, is asking, which removes the challenge and with it the liability shift.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen: a merchant-started charge on a stored token carries shopperInteraction ContAuth and a recurringProcessingModel such as Subscription. Stripe: an MIT is 'a transaction that you initiate without direct participation of your customer, based on a prior agreement with that customer authorizing you to store and use their credentials'; Stripe and the network classify it. Chapter 25: such payments fall outside strong customer authentication once the set-up was authenticated, with no challenge and no liability shift.",
+              "shows": "Nothing can be asked of Mila at the moment of the charge, and a fraud dispute on a renewal stays with the studio.",
+              "source": "Adyen documentation, Make token payments, https://docs.adyen.com/online-payments/tokenization/make-token-payments (n.d., accessed November 2026); Stripe documentation, Customer-Initiated Transactions (CIT) and Merchant-Initiated Transactions (MIT), https://docs.stripe.com/payments/cits-and-mits (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The stored attempt.",
+            "introduces": "The label the request carries when it leaves Larkfield.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p14",
+          "controlling_idea": "On the way to the network Adyen swaps Larkfield's provider token for a network token, so the credential that reaches Mila's bank is the network's current one for her card.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen documentation: with tokens it manages, 'we automatically swap that for a network token'; 'if the shopper receives a new card because the old one expired or was lost, the network token remains the same.' Ledger (addition of chapter 23): Adyen has managed network tokens for Larkfield's stored cards since 2024 (illustration); Lotte Smit's renewal of 1 March 2027 was approved at the first attempt after her card was reissued.",
+              "shows": "A reissued card would not have produced this decline; the step removes one cause before the issuer is asked.",
+              "source": "Adyen documentation, Network tokenization, https://docs.adyen.com/online-payments/network-tokenization (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The flagged request.",
+            "introduces": "The credential it carries by the time it reaches the network.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p15",
+          "controlling_idea": "The issuer's answer is a refusal with a code, and the provider passes it on as three separate facts: its own reason, the network's raw code and the retry rule that goes with the code.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Ledger (addition of chapter 2): Visa response code 51 (Not sufficient funds), a Category 2 decline, reported by Adyen as refusal reason 12 'Not enough balance'. Adyen's refusal-reasons page lists reason 12; the raw response has to be enabled.",
+              "shows": "A decline is an answer: no hold, no money, and one code that the next step can act on, unlike a timeout, which says nothing.",
+              "source": "Adyen documentation, Refusal reasons, https://docs.adyen.com/development-resources/refusal-reasons (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The request that reached the issuer.",
+            "introduces": "What came back.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "decide",
+      "heading": "The Decline as an Instruction: Classify, Hold the State, Tell the Member",
+      "controlling_idea": "In steps 5 to 7 the decline code decides whether a retry is allowed, the network's rule caps how many, Larkfield's schedule chooses the day, the period record holds Mila's membership meanwhile, and one written notice goes to her.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "C2",
+          "C3"
+        ],
+        "how": "Answers both of Femke's questions on the Adyen side: the code and the network decide whether, Larkfield's job decides when, and the billing record holds the state."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "Whether a retry is allowed comes first, because the other steps depend on it; then the case where a retry cannot help; then who picks the day; then what the member is while she waits; then what she is told. The notice comes last because it reports the three decisions before it."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "The refusal with code 51.",
+        "introduces": "What Larkfield does with it before anything is sent again.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p16",
+          "controlling_idea": "The code sorts the decline into one of three kinds (never retry, retry later, get a new credential), and Visa's rules attach a limit to the kinds that may be retried.",
+          "function": "analysis",
+          "organization": "classification",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Three kinds of decline with what the job does: never (Visa Category 1, for example 41 lost card, 43 stolen card, 46 closed account: 'a Merchant must never resubmit an Authorization Request or Account Verification for the same Payment Credential'); timing (Category 2, for example 51 not sufficient funds: 'Reattempt permitted (up to 20 attempts in 30 days)'); credential (Category 3, for example 54 expired card: the same limit, after the data is corrected). Adyen's mapping page says 'up to 15 times in a 30-day period' and names an 'excessive retry fee'. 'Soft' and 'hard' decline are industry shorthand, not network terms.",
+              "shows": "Mila's code 51 is in the class where time can change the answer; a job that retries every decline the same way pays fees on the first class and wastes attempts on the third.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf; Adyen documentation, Mapping to Visa system integrity fee categories, https://docs.adyen.com/development-resources/raw-acquirer-responses/visa-integrity-fees (n.d., accessed November 2026)"
+            }
+          ]
+        },
+        {
+          "id": "p17",
+          "controlling_idea": "A decline that calls for a new credential is repaired by the network or by the member, not by a retry of the same details.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen's Real Time Account Updater: 'When you submit a payment that is refused, our Real Time Account Updater instantly checks for updated card details. If there is an update, we immediately retry the payment with the updated card details.' Stripe: it 'automatically attempts to update saved card details whenever a customer receives a new card', and 'It isn’t possible to identify cards that support automatic updates.' A network token stays valid through a reissue (chapter 23).",
+              "shows": "The repair happens before or inside the attempt when it happens at all, and it cannot be relied on for a given card, so the fallback is always a request to the member.",
+              "source": "Adyen documentation, Real Time Account Updater, https://docs.adyen.com/online-payments/account-updater/real-time-account-updater (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The decline that time can cure.",
+            "introduces": "The decline that only a new credential can cure.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p18",
+          "controlling_idea": "Although a provider could run the schedule, the days of the next attempts (days 3, 7 and 12, inside a 14-day window) are chosen by Larkfield's own policy, so 4 April is Larkfield's choice and nothing inside a provider made it.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield's member-renewal collection policy (ledger, addition of chapter 29; illustrative): card soft decline, email on the first failure and retries on days 3, 7 and 12; the providers' scheduled retries (Smart Retries, Auto Rescue) are not used for member renewals; K5 ties the schedule to decline codes.",
+              "shows": "One debt has one scheduler, and it is the system that holds the debt; the choice of day is a business rule that can be tested, not a provider's model.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "Whether a retry is allowed.",
+            "introduces": "Who picks its day.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p19",
+          "controlling_idea": "Between 1 and 4 April the only place that says what Mila is, is the period record: open, with one declined attempt, inside its retry window, which the booking app reads as past due with access.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger (addition of chapter 27): a membership whose period record is open inside its retry window is past_due and keeps access; Mila can check in between 1 and 4 April 2027. The payment record store holds one row for the attempt, closed as declined (addition of chapter 8).",
+              "shows": "No payment record contains the state: the only payment record is a refusal that is finished. The state has to be owned by the billing side.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "A retry scheduled three days out.",
+            "introduces": "What the member is during those three days, and which record says so.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "controlling_idea": "Mila is told once, in writing, on the day of the decline, with the date of the next attempt and a way to pay otherwise, which is also what Visa's rule for a declined merchant-initiated charge asks for.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa Core Rules, stored-credential requirements: 'If an Authorization Request for a Merchant-initiated Transaction with a Stored Credential is declined, the Merchant must notify the Cardholder in writing and allow the Cardholder at least 7 calendar days to pay by other means.' Ledger (additions of chapters 2 and 29): Larkfield emails Mila the same day; a failure message is sent only for a declined attempt row on an open record.",
+              "shows": "The notice is triggered by a failed attempt, never by the absence of a payment, and it is a network requirement as well as a courtesy.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The state held for the member.",
+            "introduces": "What she is told about it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "recover",
+      "heading": "Sunday 4 April: A Second Attempt, Not a Retried Payment",
+      "controlling_idea": "In steps 8 to 11 a new payment with its own key is approved, a webhook confirms it, and the period record, not the payment of 1 April, becomes paid; the money then follows Journey 1's path.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "C3"
+        ],
+        "how": "Shows the recovery as a second payment closing the same debt, and the debt record as the one place where 'April is paid once' is enforced."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The attempt, its confirmation, the closing of the debt and where the money goes next, then the two ways the closing hand-off breaks; the failures come last because each is a failure of a step the reader must first have seen work."
+      },
+      "transition_in": {
+        "relationship": "time",
+        "carries_over": "The schedule, the held state and the notice.",
+        "introduces": "Day 3, when the schedule fires.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p21",
+          "controlling_idea": "The attempt of 4 April is a new business event with a new key, because under the old key Adyen would have answered with the refusal of 1 April without asking the bank again.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen: 'If the Adyen payments platform already processed the request, the response to the first attempt will be returned without duplication', and keys 'are valid for a period of 7 to 14 days after first submission.' Ledger (K1; additions of chapters 2 and 18): the first attempt's key ends in :2027-04:1, the second in :2027-04:2; chapter 18 reads Adyen's sentence as including a refusal.",
+              "shows": "The key has to be fine enough to let a deliberate new attempt through and coarse enough to stop a repeat of the same one.",
+              "source": "Adyen documentation, API idempotency, https://docs.adyen.com/development-resources/api-idempotency (n.d., accessed November 2026)"
+            }
+          ]
+        },
+        {
+          "id": "p22",
+          "controlling_idea": "The approval reaches Larkfield twice, as a result code and as a webhook, and the payment record moves to paid on the webhook.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger (addition of chapter 8): on Adyen with automatic capture a row becomes paid on the AUTHORISATION webhook with success true; paid means the provider has confirmed the capture, never settled. Adyen's Checkout API has no endpoint that returns a payment by its identifier (ruling 12), so the confirming record is the webhook and later the settlement report (K2).",
+              "shows": "The approval is the issuer's promise to honor a €49.00 claim; it is the same fifth step as in Journey 1 and promises no more than it did there.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The second request.",
+            "introduces": "Its answer and the record that confirms it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p23",
+          "controlling_idea": "The successful payment closes the debt for the period that began on 1 April: the period record becomes paid, the membership becomes active, the next renewal stays on 1 May, and the ledger gets €47.82 for the studio and €1.18 for Larkfield.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "statistic",
+              "what": "Ledger: Larkfield's fee on an online card payment is 1.9% + €0.25, so on €49.00 it is €1.18 and the studio receives €47.82 (the same figures as Lotte Smit's renewal, addition of chapter 23). K3: every movement is a ledger entry. The €49 collected on 4 April pays for the period that began on 1 April (journal-spec entry).",
+              "shows": "The date of the money and the period it pays for are different facts: the billing period did not move, and a system that re-anchored the membership to the 4th would shorten or lengthen what Mila bought.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The confirmed payment.",
+            "introduces": "Its effect on the debt, the membership and the books.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p25",
+          "controlling_idea": "From here the €49.00 follows Journey 1's rows for clearing, settlement, payout and reconciliation, and it stays open to a dispute until about 2 August 2027, with no liability shift to protect the studio.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Studio Noord's Adyen account pays out two business days after the sales day (ledger, addition of chapter 3), so a Sunday 4 April sale is in the payout of Tuesday 6 April (illustration). The basic card dispute window is about 120 days (4 April + 120 days = 2 August 2027; the author's arithmetic). Chapter 25's loss table: renewals are merchant-initiated and the studio carries a fraud dispute.",
+              "shows": "The recovery ends the billing story and starts the ordinary payment story; the payment record has to stay open long after the debt record is closed.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The debt closed and the ledger entries.",
+            "introduces": "What happens to the money next, on a path the reader already knows.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p24",
+          "controlling_idea": "Two things can break this hand-off: the member pays through the link while the scheduled attempt is in flight, or the webhook never arrives.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Chapter 29: the guard belongs on the debt record, which accepts one successful attempt and refunds a second. K2: a job sweeps everything still pending; on Adyen the sweep waits for the webhook and, failing that, the settlement report.",
+              "shows": "Both failures sit between the payment and the billing record, and both are caught by the record of the debt, not by either payment.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The recovery that worked, followed to the payout.",
+            "introduces": "The two ways the closing hand-off fails.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "on-stripe-billing",
+      "heading": "The Same Renewal on Stripe Billing: An Invoice the Provider Owns",
+      "controlling_idea": "On Stripe Billing the debt is an invoice Stripe holds and retries, while on Adyen the provider can retry a payment and the debt stays with the merchant; each company has one blog post on its retry model (2024, 2020) and neither documents the model now running.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "C4",
+          "C6"
+        ],
+        "how": "Reads the same eleven steps a second time with the debt on the provider's side, sets the three arrangements side by side, and marks where the public record ends."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "Stripe Billing's records for the decline, then its retries, then Adyen's own retry feature, so that all three arrangements have been met before the table sets them side by side; the limit of what either company publishes comes last because it applies to both provider-run schedules and would undercut the descriptions if it came first."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The renewal on Adyen with Larkfield's own job, where every record of the debt is Larkfield's.",
+        "introduces": "The same renewal where the provider holds the debt.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p26",
+          "controlling_idea": "Had Mila's membership been a Stripe Billing subscription, the debt for April would have been an invoice in Stripe, and the decline would have left that invoice open and the subscription past due.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: 'Stripe generates an invoice for every subscription billing period' (chapter 27); 'a failed renewal payment makes the subscription past_due'; a card error leaves the PaymentIntent requires_payment_method and the invoice open; the invoice.payment_failed event carries attempt_count and the invoice carries next_payment_attempt. Larkfield uses Stripe Billing for its own studio plans, not for member renewals (ledger).",
+              "shows": "Steps 1, 6 and 10 of the table are Stripe's records in this arrangement: the integrator mirrors them instead of writing them.",
+              "source": "Stripe documentation, How subscriptions work, https://docs.stripe.com/billing/subscriptions/overview (n.d., accessed November 2026)"
+            }
+          ]
+        },
+        {
+          "id": "p27",
+          "controlling_idea": "Stripe's retries run against the invoice, so a new card saved in the right place pays the same debt, and a listed hard decline suspends the retries until a new payment method appears.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'For new Stripe accounts, Stripe enables Smart Retries by default and configures it for up to 8 retries within 2 weeks.' Hard decline codes include lost_card, stolen_card, pickup_card and incorrect_number; 'Retries continue to be scheduled, and attempt_count continues to increment, but retries only execute after detecting a new payment method.' Failed-payment emails 'include a link to a page where the customer can update their payment method'. insufficient_funds is not on the hard-decline list.",
+              "shows": "Classification, schedule and notice (steps 5, 7 and 8) are settings here; the integrator's work is to choose them and to listen for the invoice events.",
+              "source": "Stripe documentation, Automate payment retries, https://docs.stripe.com/billing/revenue-recovery/smart-retries (n.d., accessed November 2026); Stripe documentation, Automate customer emails, https://docs.stripe.com/billing/revenue-recovery/customer-emails (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The open invoice.",
+            "introduces": "What Stripe then does with it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p29",
+          "controlling_idea": "Adyen has a retry feature of its own, Auto Rescue, which retries a refused payment inside a window and reports by webhook against a reference the merchant supplies, so the merchant still holds the debt and must cancel the rescue when the debt is settled another way.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: Auto Rescue 'automatically retries refused or charged back shopper-not-present transactions such as subscription renewals' (n.d., accessed November 2026); at account level 'a rescue window of one calendar month is used', per payment 'between 1 and 48 days'; merchantOrderReference 'should represent a specific billing cycle or subscription'; retry.rescueReference can be used to cancel 'if, for example, the shopper provides you with a new payment details, or cancels their subscription'.",
+              "shows": "The provider retries what it can see, a payment; the tie to the period and the knowledge that the debt is closed remain the merchant's.",
+              "source": "Adyen documentation, Auto Rescue for card payments, https://docs.adyen.com/online-payments/auto-rescue/cards (n.d., accessed November 2026); Adyen documentation, Auto Rescue, https://docs.adyen.com/online-payments/auto-rescue (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Stripe's retries of an invoice it holds.",
+            "introduces": "Adyen's provider-run retry, which retries a payment.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p28",
+          "controlling_idea": "Set side by side, the three arrangements differ in who holds the debt, who schedules, what is retried and what the integrator must build.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Comparison table with columns: Question | Adyen with your own renewal job (Larkfield) | Adyen with Auto Rescue | Stripe Billing. Rows: what records that €49 is still owed; what the member's state is read from; who schedules the next attempt; what is retried; what ties an attempt to the period; who tells the member; what you build.",
+              "shows": "The row 'what records that €49 is still owed' has the provider's name in only one column; in the other two it is the merchant's own record.",
+              "source": "Stripe documentation, Automate payment retries, https://docs.stripe.com/billing/revenue-recovery/smart-retries (n.d., accessed November 2026); Adyen documentation, Auto Rescue for card payments, https://docs.adyen.com/online-payments/auto-rescue/cards (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "Larkfield's own job, Stripe Billing and Auto Rescue, each now described.",
+            "introduces": "All three arrangements in one table.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p30",
+          "controlling_idea": "The public record stops at the timing: Stripe names two example signals, Adyen says 'smart logic' and 'optimal times', each has one blog post on its model (Stripe, 23 January 2024: 'more than 500 attributes'; Adyen, 3 December 2020: a contextual bandit, 'about 6% more orders than the baseline' in one experiment), and neither documents the model now running or a recovery rate with a stated basis.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe's two example signals: 'The number of different devices that have presented a given payment method in the last N hours' and 'The best time to pay (payments made for debit cards in certain countries might be slightly more successful at 12:01 am in local time zones)'. Adyen: 'It uses smart logic to decide which payments can succeed when retried later, and performs these retries at optimal times' (n.d., accessed November 2026). Adyen's knowledge-hub guide of 16 June 2026 gives one customer's Auto Rescue recovery figure with no baseline (ruling 37); documentation pages are not dated from their front matter (ruling 30).",
+              "shows": "A provider-run schedule cannot be inspected or compared from public sources, which is why this walkthrough attributes 4 April to Larkfield's own schedule.",
+              "source": "Stripe documentation, Automate payment retries, https://docs.stripe.com/billing/revenue-recovery/smart-retries (n.d., accessed November 2026); Adyen documentation, Auto Rescue, https://docs.adyen.com/online-payments/auto-rescue (n.d., accessed November 2026); Adyen knowledge hub, Recurring payments: A guide for enterprise businesses, https://www.adyen.com/knowledge-hub/recurring-payments (16 June 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What each arrangement leaves to a provider's schedule.",
+            "introduces": "What neither provider documents about that schedule.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "lapse",
+      "heading": "The Branch Where the Money Never Comes",
+      "controlling_idea": "When every retry fails, the membership, the debt and the member's access each need an end, and each end is a rule on the billing side or a provider setting, because the last record a payment system holds is a declined attempt.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "C5"
+        ],
+        "how": "Follows the same debt to the end of its clock and shows that nothing in the payment records says how it ends."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The failed attempts in date order to the end of the window, then the three decisions that the end forces, then how each is made on the two providers. The decisions cannot be named before the reader has seen the window run out, and the Stripe settings are read against the three decisions, not the other way round."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The renewal that came back on day 3.",
+        "introduces": "The same renewal when no attempt succeeds.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p31",
+          "controlling_idea": "Replayed with every attempt refused, Mila's renewal is four attempts in thirteen days, a pause on day 14 and an ended membership on day 30.",
+          "function": "example",
+          "organization": "narration",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Timeline under Larkfield's policy (ledger, addition of chapter 29; illustrative): 1 April attempt 1; 4 April attempt 2 (day 3); 8 April attempt 3 (day 7); 13 April attempt 4 (day 12); 15 April (day 14) membership paused, period record still open; 1 May (day 30) period record marked uncollectible, membership ended. Four attempts, against Visa's limit of 20 in 30 days.",
+              "shows": "The clock on the debt is short and deliberate: the policy stops far inside the network's limit, because the limit is a ceiling and not a plan.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ]
+        },
+        {
+          "id": "p32",
+          "controlling_idea": "The end of the window forces three decisions (what the membership becomes, whether the €49.00 stays owed, and from which day Mila loses access), and on an Adyen integration all three are the platform's own rules in its own records.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "At the end of the branch the payment record store holds four attempt rows closed as declined; Adyen's documentation describes no invoice or subscription object (chapter 27). Larkfield's answers: paused on day 14, uncollectible and ended on day 30, access kept for 14 days.",
+              "shows": "A payment record can say that an attempt failed; it cannot say that a customer has left or that a debt has been given up.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The last failed attempt.",
+            "introduces": "The three things that now have to be decided, and who decides them on Adyen.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p33",
+          "controlling_idea": "On Stripe Billing the same three decisions are account settings: the subscription is canceled, marked unpaid, left past due or paused, and the invoice stays open or is marked uncollectible.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'If recovery fails, the subscription transitions according to your settings', with the options cancel, mark as unpaid, leave past-due, pause; 'An invoice that Stripe marks uncollectible after ending payment retries remains outstanding'; 'Revoke access to your product when the subscription is unpaid'. Access is the integrator's code in every case.",
+              "shows": "Stripe supplies the states but someone still has to choose among them, and a default nobody chose is a decision made by accident.",
+              "source": "Stripe documentation, Automate payment retries, https://docs.stripe.com/billing/revenue-recovery/smart-retries (n.d., accessed November 2026); Stripe documentation, How subscriptions work, https://docs.stripe.com/billing/subscriptions/overview (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Three rules in the platform's own records.",
+            "introduces": "The same three as settings in the provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "Across the eleven steps and the lapse branch, every record a payment system produced was finished within seconds: a refusal, a refusal, an approval. What lasted for three days, or thirty, was the record of April's debt, and each hand-off worked because the next step read that record and not the last payment's result.",
+    "so_what": "A team that treats a decline as a failed request builds a loop; a team that treats it as an open debt builds a record with a state, a clock and an end, classifies before it schedules, and can say for each provider who holds 'still owed'.",
+    "callback": {
+      "to": "The refusal of 1 April that nobody was present to see.",
+      "how": "The reader can now say who was present: the period record, which held Mila's membership while no payment record held anything."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Classify the decline before scheduling anything; keep one record of the debt per billing period and count every attempt against it; give the member a defined state with a defined end; and name, per provider, the system that holds the debt."
+    },
+    "hand_off": {
+      "to": "journey-platform-payment",
+      "relationship": "elaboration",
+      "carries_over": "From this journey, the lesson that a payment's state can stay open after the first answer; from Journey 1, the pass of 9 March with its split and payout.",
+      "introduces": "The third party in every Larkfield payment, seen from the platform's side: the split and the studio's balance, and then money that goes backward, an €84 refund a week after the payout."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The branch that ends without money.",
+      "introduces": "What holds across both branches, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p34",
+        "form": "list",
+        "controlling_idea": "Established: Visa's rules sort declines into never-resubmit and reattempt-within-a-limit and require written notice after a declined merchant-initiated charge; Stripe Billing retries an invoice it holds; Adyen documents a payment-level retry and no invoice or subscription object.",
+        "function": "synthesis"
+      },
+      {
+        "id": "p35",
+        "form": "list",
+        "controlling_idea": "Depends on context: who should schedule retries, how long the window should be, and whether the member keeps access while the debt is open.",
+        "function": "synthesis",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What the rules and the documentation fix.",
+          "introduces": "What changes with where the debt lives and what access costs.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p36",
+        "form": "list",
+        "controlling_idea": "The author's synthesis: the renewal went wrong or right at the record between the billing clock and the payment attempt, so that record is the first thing I would build and the first I would review.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "conclusion_summary",
+          "carries_over": "The settled and the conditional.",
+          "introduces": "The author's own position.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p37",
+        "form": "list",
+        "controlling_idea": "Six questions let a reader walk their own failed renewal through the same hand-offs.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "elaboration",
+          "carries_over": "The author's position.",
+          "introduces": "Questions that test a reader's own system against it.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p38",
+        "controlling_idea": "This journey had two parties to the money and none of it went backward; the next takes Mila's class pass, adds the platform as a third party and reverses part of the payment after the studio has been paid.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "A payment whose state stayed open after the first answer.",
+          "introduces": "The next journey: three parties and a refund after payout.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "How authorization, response codes and validity windows work.",
+      "covered_in": [
+        "payment-authorization"
+      ]
+    },
+    {
+      "topic": "Approval-rate counting, provider optimization inside the call and how to test a retry schedule.",
+      "covered_in": [
+        "authorization-optimization"
+      ]
+    },
+    {
+      "topic": "Idempotency keys, retention windows and unknown outcomes.",
+      "covered_in": [
+        "idempotency-and-retries"
+      ]
+    },
+    {
+      "topic": "Network tokens, token requestors, fees and portability.",
+      "covered_in": [
+        "network-tokens"
+      ]
+    },
+    {
+      "topic": "The billing engine, proration, billing modes and who holds the invoice as a mechanism (ruling 6).",
+      "covered_in": [
+        "subscriptions-and-billing-engines"
+      ]
+    },
+    {
+      "topic": "Invoice states, credit notes, direct debit dunning and cash application.",
+      "covered_in": [
+        "invoicing-collections-and-dunning"
+      ]
+    },
+    {
+      "topic": "Strong customer authentication and liability shift.",
+      "covered_in": [
+        "three-d-secure-and-sca"
+      ]
+    },
+    {
+      "topic": "Clearing, settlement, payout and reconciliation of the recovered payment.",
+      "covered_in": [
+        "journey-card-payment",
+        "clearing-and-settlement"
+      ]
+    },
+    {
+      "topic": "Revenue recognition of the membership fee.",
+      "covered_in": [
+        "billing-revenue-recognition"
+      ]
+    },
+    {
+      "topic": "A 'Stripe and Adyen: Where They Differ' section: journeys show both providers inline (style guide)."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "Journey 1 (journey-card-payment) was not yet written when this page was drafted; references to its twelve steps and its table follow the journal spec and should be checked against the page once it exists.",
+    "Mastercard's rules for declined merchant-initiated charges were not readable (ruling 17); the notice rule and the reattempt limit are cited for Visa only.",
+    "Whether Adyen's idempotency layer replays a refusal as 'the response to the first attempt' is chapter 18's reading of the documentation, not a tested fact."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "The Stripe side is shown as the same membership had it been a Stripe Billing subscription, in its own section after the Adyen walk, because Larkfield's member renewals run on its own job on both providers (ledger) and the journal spec's role names 'on Stripe Billing'.",
+      "rejected": [
+        "A second full step table for Stripe",
+        "Using a studio's €89 plan as the Stripe example (a different payer and seller)"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The steps after the approval (capture, clearing, settlement, payout, reconciliation) get one row and one paragraph that point to Journey 1.",
+      "rejected": [
+        "Repeating Journey 1's rows 6 to 12"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "A short Questions to Ask list is kept in the conclusion, as in the chapters, because the intent's can_do items are review tasks.",
+      "rejected": [
+        "Ending on the three tiers only"
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The public-record limit (retry timing) is one paragraph at the end of the provider comparison, not a section.",
+      "rejected": [
+        "A separate 'Where the evidence stops' section"
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "PLAN.md",
+      "contributed": "The chapter contract for folder 43."
+    },
+    {
+      "kind": "internal",
+      "ref": "journal-spec.json",
+      "contributed": "Intent, acceptance criteria, thesis, role and transition, copied unchanged; the neighbours' entries."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "Mila's renewal, K1, K2, K3, K5, the period record, the collection policy, fees."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/consistency-issues.md",
+      "contributed": "Rulings 6, 10, 12, 13, 15, 17, 19, 22."
+    },
+    {
+      "kind": "internal",
+      "ref": "posts/02-authorization, 09-authorization-optimization, 18-idempotency-and-retries, 23-network-tokens, 27-subscriptions-and-billing-engines, 29-invoicing-collections-and-dunning (index.md)",
+      "contributed": "The mechanisms this journey walks through and their provider facts."
+    },
+    {
+      "kind": "external",
+      "ref": "Visa Core Rules and Visa Product and Service Rules, 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf",
+      "contributed": "Table 7-2 (decline categories, reattempt limit) and the stored-credential notice rule; re-read 17 November 2026."
+    },
+    {
+      "kind": "external",
+      "ref": "Stripe documentation, Automate payment retries, https://docs.stripe.com/billing/revenue-recovery/smart-retries (n.d., accessed November 2026)",
+      "contributed": "Smart Retries default, hard decline codes, end states; re-fetched 17 November 2026."
+    },
+    {
+      "kind": "external",
+      "ref": "Stripe documentation, How subscriptions work, https://docs.stripe.com/billing/subscriptions/overview (n.d., accessed November 2026)",
+      "contributed": "past_due, unpaid, uncollectible invoices; re-fetched 17 November 2026."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen documentation, Auto Rescue for card payments, https://docs.adyen.com/online-payments/auto-rescue/cards (n.d., accessed November 2026)",
+      "contributed": "Auto Rescue enablement, window, references, cancellation; re-fetched 17 November 2026."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen documentation, Mapping to Visa system integrity fee categories, https://docs.adyen.com/development-resources/raw-acquirer-responses/visa-integrity-fees (n.d., accessed November 2026)",
+      "contributed": "Adyen's '15 times' statement and the excessive retry fee."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen documentation, Real Time Account Updater, https://docs.adyen.com/online-payments/account-updater/real-time-account-updater (n.d., accessed November 2026)",
+      "contributed": "The update and retry inside a refused payment."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 43 claims checked (32 confirmed, 9 corrected, 2 hedged, 0 unsupported and removed or relabeled, 0 unreachable; Mastercard's rules not re-fetched and not cited); every date taken from Adyen documentation front matter (“last modified” 2019, 2020, 2023, 2026) and the evidence-age flags built on them were removed under ruling 30, and the claim that neither provider publishes a recovery rate was corrected under ruling 37 (Adyen's one-customer Auto Rescue figure of 16 June 2026). Evidence and source fields updated to match; no unit added, dropped or reordered. Copied intent fields left for the author."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "After the flow rubric: Auto Rescue (p29) moved before the comparison table (p28); the payout and dispute-window paragraph (p25) moved before the failures (p24); p18 names the full schedule and the provider-run option; section flow patterns for scene and steps corrected; rationales say what would break."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "First version, written from PLAN.md, the journal spec, the ledger and the six chapters this journey walks through."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation after verification (parts-9-10): intent, thesis and role re-synced with the corrected journal-spec entry. No unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: statements of absence re-tested with a wide search (docs.adyen.com and help.adyen.com sitemaps, adyen.com, Orb documentation). Narrowed: 'Orb is not documented as part of Adyen's platform' (Orb's documentation has a page on Adyen as a payment gateway; Adyen's documentation has no page on Orb; ruling 39b). Holds: no invoice or subscription object in Adyen's documentation. One source added; units unchanged."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Part VI audit applied: 'neither publishes a model or its inputs' narrowed in the key point and the provider-comparison paragraph to match chapter 29 (Stripe blog post on Smart Retries, 23 January 2024; Adyen post on Auto Rescue's contextual bandit, 3 December 2020, with evidence-age flag); what remains unpublished is the model now running and a recovery rate with a stated basis. Two sources reused from chapter 29. The locked sentences intent.know[…] and thesis supporting claim ('neither company publishes how its retry timing is chosen beyond two example signals … and the words smart logic') are now too strong and were reported, not edited."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('neither company publishes how its retry timing is chosen bey' -> 'each company has described its retry model once (Stripe in a')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('Neither company publishes how its retry timing is chosen, so' -> 'Neither company publishes the timing its retry model would c')."
+    }
+  ],
+  "length": {
+    "target_words": 4600,
+    "max_words": 6500
+  }
+}

@@ -1,0 +1,1575 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "how-payments-got-complicated",
+  "journal": "payments-platform-architecture",
+  "part": "preface",
+  "title": "From Cash to Code: How Paying Got This Complicated",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "The steps by which payment moved from cash settled on the spot to today's layered infrastructure, and the concept each step introduced: credit and the record of a debt, the check and clearing, the card and its guarantee, the card network and its four parties, authorization at a distance, the payment provider, stored credentials and recurring charges, and the platform that stands between payer and seller.",
+        "For each step, both sides of it: what it made possible that could not happen before (a sale to a customer with no money until payday, to a stranger, to someone far away, to someone not present at all, by a seller too small to arrange card acceptance), and what it cost (a new party, a new delay, a new copy of a record or a new way to be cheated)."
+      ],
+      "believe": [
+        "Each step was a good bargain for buyer and seller alike: it opened trade that the earlier way of paying could not carry, and its cost was accepted for that reason. No step was ever removed, so today's complexity is the sum of those bargains, not a design.",
+        "Given those layers, the failure patterns of the next page are what one should expect, not signs of careless engineering."
+      ],
+      "can_do": [
+        "Given a term from a later chapter (clearing, acquirer, authorization, chargeback, token, payment facilitator), say which step of the walk introduced it and what limit it answered.",
+        "Given a failure pattern's name, say which layer makes it possible."
+      ]
+    },
+    "audience": {
+      "who": "A software engineer or architect who is new to payments and has just read the introduction: they have the claim that an API's answer is the first of several promises, and no payments vocabulary yet.",
+      "already_knows": [
+        "APIs, webhooks, retries, databases and what a ledger-like record is in software.",
+        "From the introduction: the book's claim, that Larkfield is a fictional platform, and Mila's €120 class pass in outline.",
+        "Everyday paying: cash, a bank account, a card, a subscription, buying through an app."
+      ],
+      "does_not_know": [
+        "Payments terms: ledger and reconciliation in the money sense, clearing, settlement, issuer, acquirer, card network, authorization, interchange, chargeback, token, payment facilitator, payout.",
+        "Why there are so many parties, and that the approval and the money travel separately."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "A reader new to payments can say, for a concept the page introduces, which step brought it in and what limit of the earlier way of paying it answered.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "Using only this page: when a shop accepts a card from a stranger, why does it need an 'authorization', and what earlier way of paying did not need one?",
+        "expected": "The shop cannot know the stranger or the stranger's bank, so before handing over the goods it asks, through the network, whether the cardholder's bank will stand behind the payment; that answer is the authorization, a promise made in seconds while the money moves days later. Cash needed none because payment and goods changed hands at the same moment, and shop credit needed none because the shopkeeper knew the customer."
+      },
+      {
+        "id": "AC-2",
+        "statement": "A reader can connect a failure pattern to the layer that makes it possible.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "Using only this page: paying a shop twice for one purchase is impossible with cash handed over a counter. Which later steps made it possible, and why?",
+        "expected": "Paying at a distance through messages: the request and its answer travel separately from the money, so an answer can be lost and the request sent again, and the money moves later on someone else's record. The page ties this to the pattern it names for it (the Double Charge)."
+      },
+      {
+        "id": "AC-3",
+        "statement": "Every dated fact on the page has a source the style guide accepts, the page says once that it is a simplified account that follows the ideas, and it attributes no motives to companies or networks.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      },
+      {
+        "id": "AC-4",
+        "statement": "Every term is given in plain words before it is named, and no step uses a concept a later step introduces.",
+        "check": "known_before_new",
+        "method": "rubric",
+        "severity": "major"
+      },
+      {
+        "id": "AC-5",
+        "statement": "A reader can say, for a step of the walk, what it made possible for the seller and for the buyer as well as what it cost.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "Using only this page: when a shopkeeper sells bread on a promise to be paid on payday, who gains what, and who risks what?",
+        "expected": "The buyer gets bread now that they could not otherwise buy until payday; the shopkeeper makes a sale and keeps a customer who might otherwise go elsewhere or go without. The shopkeeper carries the risk that the customer never pays and that the notebook is wrong."
+      }
+    ]
+  },
+  "thesis": {
+    "question": "How did paying for something, which was once settled on the spot with cash, come to involve so many parties, records and delays?",
+    "claim": "Paying became complicated one good bargain at a time: each new way to pay (credit at the shop, the check, the card, the card network, payment at a distance, the stored card, the platform) made possible a sale that could not happen before, to the gain of buyer and seller alike, and paid for it with a promise, a party to keep it, a record of it and a delay before it is kept; no earlier step was ever taken away, so a payment today carries all of them at once.",
+    "disputed_by": "The view that payment systems are complicated because they are old, badly designed or protected by incumbents, so that a clean redesign, or a new technology, would make paying simple again.",
+    "so_what": "A reader who sees each step as a bargain that both sides wanted stops looking for the one simplification that removes them, expects a failure wherever a promise and its keeping are separated, and reads the sixteen patterns of the next page as the price of what the steps made possible.",
+    "how_why": "With cash, goods and payment change hands at once and nothing is left open, but only people who are in the same place and have the money now can trade. Every later step lets more people trade (the customer who is paid next week, the stranger, the buyer far away, the subscriber who is not there, the seller too small to deal with a bank) by separating goods and payment a little further, in distance, in time or in who is involved. Each separation is bridged by a promise that someone records and someone else must later honor. A promise can be forgotten, made twice, broken or forged, and each step added its own way for that to happen; the dates and institutions on the page are a small set of sourced anchors, and the account is a simplification that follows the ideas.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "With cash, goods and money change hands at once and nothing is left open; the first step away from it, a shop selling on a promise, already has what every later system has: a sale that both sides gain from, a promise, a record of it, trust, and someone who loses if the promise is broken."
+      },
+      {
+        "id": "S2",
+        "claim": "Each later way of paying (the check, the card, the card network, payment at a distance, the stored card, the platform) made possible a sale that could not happen before, to the gain of buyer and seller alike, and paid for it with a promise, a party to keep it, a record of it and a delay before it is kept."
+      },
+      {
+        "id": "S3",
+        "claim": "Each addition brought its own way to go wrong: a new party to depend on, a new delay, a new copy of a record or a new way to be cheated."
+      },
+      {
+        "id": "S4",
+        "claim": "No step was ever removed, so one payment today carries all of them at once, and the failures the next page names are the price of what the steps made possible."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Explains, before the failure patterns are named, where the parties, records and delays behind a payment came from, what each of them made possible and what it cost, and introduces in plain words the vocabulary Part I then teaches properly.",
+    "supports": [
+      "PF-1"
+    ]
+  },
+  "flow": {
+    "pattern": "prerequisite_order",
+    "additional_patterns": [
+      {
+        "pattern": "chronological",
+        "applies_to": "cash to today: the steps are in the order the ideas accumulated, which is roughly the order of the dates; where a step's parts overlap in time (mail order and the internet, the provider and the standards) they are placed where the reader needs the concept"
+      },
+      {
+        "pattern": "problem_solution",
+        "applies_to": "inside each step: the limit, the addition and its name, the cost, the answer to the running question"
+      }
+    ],
+    "rationale": "Each step uses only concepts that earlier steps introduced: the ledger before clearing, clearing and settlement before the card network reuses them, the issuer before the acquirer, authorization before the chargeback that undoes it, the provider before the token it issues, the token and the provider before the platform that is built on both. Moving the network before the check would leave 'the money follows later by clearing and settlement' unexplained; moving the platform before the stored card would describe balances held for sellers before the reader knows a provider exists. Cash and the village shop come first because they set the baseline and plant the idea of a recorded promise before any institution appears, and today's payment comes last because it is the sum the conclusion counts."
+  },
+  "introduction": {
+    "hook": {
+      "type": "intriguing_example",
+      "content": "Hand a baker a coin and take the bread, and the payment is over before you reach the door. When Mila Janssen taps 'Pay' for a €120 class pass in the introduction, the screen says 'Payment successful' in two seconds and no money has moved; the studio is paid two days later, and the payment can be undone for months."
+    },
+    "bridge": {
+      "from_reader_world": "Everyone has paid with cash, a card and an app, and an engineer has seen that a payment API returns in a second or two.",
+      "to_topic": "The two acts look alike and are not: between the coin and the tap lie other ways of paying, each of which let someone buy or sell who could not before, and the page walks through them in the order they were added."
+    },
+    "thesis_statement": {
+      "text": "Every new way of paying let someone buy or sell who could not before (the family before payday, the seller in another town, the shop facing a stranger, the buyer at home), and the price each time was a promise, someone to keep it, a record of it and a wait for the money; none was ever retired, so one tap in an app today rests on all of them.",
+      "placement": "KEY POINTS callout (bullets 1 and 2, in concrete words: the notebook, the check, the card, the wait for the money) and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "Paragraph p03, with the IN THIS SECTION and KEY POINTS callouts",
+      "promises": [
+        {
+          "promise": "The walk starts with cash and with the first complication of it, a village shop that sells on a promise.",
+          "kept_in": [
+            "cash",
+            "shop-credit"
+          ]
+        },
+        {
+          "promise": "It continues through the check, the card and the card network.",
+          "kept_in": [
+            "check",
+            "card",
+            "card-network"
+          ]
+        },
+        {
+          "promise": "Then paying at a distance, the stored card and the platform.",
+          "kept_in": [
+            "distance",
+            "stored-card",
+            "platform"
+          ]
+        },
+        {
+          "promise": "It ends on today's payment, shown in the book's fictional case, with one question answered at every step: when is it really paid, and who is on the hook until then?",
+          "kept_in": [
+            "today"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "Paying a baker with a coin is over at once, while Mila's tap in an app shows success in two seconds although no money has moved and the payment stays open for months.",
+        "function": "context",
+        "organization": "illustration",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "A coin for a loaf (illustration); Mila's €120 class pass from the introduction (fictional; scenario ledger).",
+            "shows": "Sets the simplest and the present form of paying side by side, so the reader asks what lies between them."
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "What lies between the two is a series of ways of paying, each a bargain that let someone buy or sell who could not before, paid for with a promise and a wait, and none ever retired, told here as a simplified account that follows the ideas and not the full history.",
+        "function": "claim",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The coin and the tap, which look alike and are not.",
+          "introduces": "The claim that explains the difference, and the declaration that the account is simplified, with few sourced dates and no motives attributed.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "The page takes nine steps, from cash to today, tells each as a limit, an addition with its name, what it made possible for buyer and seller and what it cost, and answers one question at every step: when is it really paid, and who is on the hook until then?",
+        "function": "transition",
+        "evidence": [
+          {
+            "kind": "figure",
+            "what": "Figure: one coin-for-bread exchange at the bottom and a layer stacked on it for each later step, up to today's app payment.",
+            "shows": "Shows the accumulation the page argues for before the steps are told one by one."
+          }
+        ],
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The claim and the simplification.",
+          "introduces": "The route, the shape of each step and the question that is asked at each.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "cash",
+      "heading": "Cash: Paid on the Spot",
+      "controlling_idea": "With cash, goods and money change hands in the same moment, so no promise, record or third party is needed, and that simplicity holds only while buyer and seller are in the same place with the money in hand.",
+      "function": "description",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "Sets the baseline in which nothing is left open, and names the three limits (presence, money in hand, carrying it) that the later steps remove."
+      },
+      "flow": {
+        "pattern": "large_to_small",
+        "rationale": "The complete case first, then its conditions, then the answer to the running question; the conditions would mean nothing before the reader has seen what they protect."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The roadmap's first stop: the form of paying everyone understands.",
+        "introduces": "What makes cash simple, stated exactly, so that each later step can be measured against it.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p04",
+          "controlling_idea": "When a customer hands a coin to a baker and takes the bread, the payment is complete in that moment: nobody has promised anything, nobody needs a record, and no one stands between them.",
+          "function": "description",
+          "organization": "illustration",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "An illustration, labeled as one: a customer buys a loaf for a coin at a baker's counter.",
+              "shows": "Shows the one case in which paying and being paid are the same moment, which is the baseline for the whole walk."
+            }
+          ]
+        },
+        {
+          "id": "p05",
+          "controlling_idea": "Cash lets two strangers trade without trusting each other: the seller needs to know nothing about the buyer, and the buyer leaves owing nothing.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stated as common experience, for the buyer and for the seller in turn; no dated fact.",
+              "shows": "Shows the gain that made the step a bargain both sides wanted, before its price is named."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What this step added.",
+            "introduces": "What it made possible for the buyer and for the seller.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p06",
+          "controlling_idea": "Cash is simple only under three conditions (both people are in the same place, the buyer has the money now, and someone carries and guards it), and the steps that follow begin where one of those conditions did not hold.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Cash can be lost, stolen or forged, and it cannot be handed over at a distance or before it has been earned (common experience, stated as such).",
+              "shows": "Shows that the simple case has limits of its own, so leaving it was a reasonable thing to do."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What the step made possible for both sides.",
+            "introduces": "The price of it: the three conditions it depends on, which the later steps relax one at a time.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p07",
+          "controlling_idea": "At this step the answer to the page's question is: at once, and nobody is on the hook.",
+          "function": "analysis",
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The cash exchange and its three conditions.",
+            "introduces": "The step's answer to the running question, longer than the one before.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "shop-credit",
+      "heading": "The Village Shop: A Promise in a Notebook",
+      "controlling_idea": "Even between neighbors paying was never quite simple: a shop that hands over goods before payday creates a debt, a record of it, a need for trust and a customer who might not pay.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "Shows that the first separation of goods from money, with no technology at all, already needs a promise, a record and someone who carries the risk."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "The limit of the earlier way of paying comes first, then what was added and its name, then what it made possible for both sides, then what the addition cost, then the answer to the running question. The notebook cannot be named before the reader has seen the promise it records."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "Cash settles everything at once, but only if the buyer has the money now.",
+        "introduces": "The oldest way around that condition: goods today, money on payday.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p08",
+          "controlling_idea": "A customer who is paid at the end of the month needs bread in the middle of it, so a shopkeeper who knows the family hands over the goods on a promise to pay on payday.",
+          "function": "context",
+          "organization": "illustration",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "An illustration, labeled as one and as common practice rather than a fact about a time and place: a village shop that sells 'on the book' until payday.",
+              "shows": "Shows the need (no money yet) that separates the goods from the payment for the first time."
+            }
+          ]
+        },
+        {
+          "id": "p09",
+          "controlling_idea": "The shopkeeper writes each promise in a notebook, and that list of who owes what is a ledger, the kind of record every later payment system also keeps.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "example",
+              "what": "The notebook: one line per purchase, a line when the debt is paid; the book's term for such a record is the ledger, taught in the payment-ledgers chapter.",
+              "shows": "Gives the reader the term in plain words before the chapter that owns it."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Goods handed over on a promise.",
+            "introduces": "What the promise requires: a written record, named as the ledger.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "controlling_idea": "The promise is a good bargain for both sides: the family eats before payday, and the shopkeeper makes a sale today and keeps a customer who might otherwise go without or go to another shop.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stated as common experience, for the buyer and for the seller in turn; no dated fact.",
+              "shows": "Shows the gain that made the step a bargain both sides wanted, before its price is named."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What this step added.",
+            "introduces": "What it made possible for the buyer and for the seller.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "controlling_idea": "The promise costs the shopkeeper two things: the customer may never pay, and the notebook and the customer's memory may disagree, so the two accounts have to be compared, which the book calls reconciliation.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "The shopkeeper has handed over the goods and holds only a line in a book; a missed line or a line written twice changes what is owed.",
+              "shows": "Shows the two ways a recorded promise fails (it is broken, or it is recorded wrongly), which recur at every later step."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What the step made possible for both sides.",
+            "introduces": "The price of it: what they cost: the risk of non-payment and two records that can disagree.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p12",
+          "controlling_idea": "At this step the answer to the page's question is: on payday, if the customer comes; until then the shopkeeper is on the hook, with a notebook as the only proof.",
+          "function": "analysis",
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The debt, the notebook and its two risks.",
+            "introduces": "The step's answer to the running question, longer than the one before.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "check",
+      "heading": "The Check: A Promise on Paper, Carried Between Banks",
+      "controlling_idea": "The check let people pay beyond the circle of those who kept a notebook for them, and at a distance, by turning the promise into a written order on a bank; the price was two banks in the middle, days of waiting and a paper that could come back unpaid.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S3"
+        ],
+        "how": "First step in which institutions stand between payer and payee: introduces clearing and settlement and the delay between receiving a payment and having the money."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "The limit of the earlier way of paying comes first, then what was added and its name, then what it made possible for both sides, then what the addition cost, then the answer to the running question. Clearing and settlement are defined here because every later step reuses them."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "Shop credit works only where the shopkeeper knows the customer.",
+        "introduces": "A promise a stranger can accept because a bank stands behind the account it is drawn on.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p13",
+          "controlling_idea": "A notebook works only between people who know each other and cash is risky to carry in large sums, so people who kept their money in a bank began to pay with a written order telling their bank to pay a named person: a check.",
+          "function": "context",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stated as common practice: a seller in another town has no notebook entry for the buyer, and carrying cash there is a risk.",
+              "shows": "Names the limit (acquaintance and distance) that the check removes."
+            }
+          ]
+        },
+        {
+          "id": "p14",
+          "controlling_idea": "A check is paid only after the seller's bank has collected it from the buyer's bank; banks exchange such claims in batches, which is called clearing, and pay each other the difference, which is called settlement.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "Federal Reserve History, 'Check Payments' (28 September 2023): before the Federal Reserve, 'Banks also exchanged checks locally through institutions known as clearinghouses', and otherwise sent them 'through correspondent bank'. The Clearing House, 'Our History' (n.d., accessed November 2026): the New York banks' association 'dates back to 1853'.",
+              "shows": "Supports that exchanging checks between banks was organized through clearing houses, and gives one sourced anchor date.",
+              "source": "https://www.federalreservehistory.org/essays/check-payments ; https://www.theclearinghouse.org/about/history"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "A written order on the buyer's bank.",
+            "introduces": "What has to happen between the two banks before the seller has money: clearing, then settlement.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p15",
+          "controlling_idea": "With a check a buyer can trade with a seller in another town without carrying cash, and the seller wins a sale that could not have been paid in coins.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stated as common experience, for the buyer and for the seller in turn; no dated fact.",
+              "shows": "Shows the gain that made the step a bargain both sides wanted, before its price is named."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What this step added.",
+            "introduces": "What it made possible for the buyer and for the seller.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p16",
+          "controlling_idea": "The check added two banks and days of waiting between handing over the goods and having the money, and it could come back unpaid if the account was empty, because the paper was a claim on money and not money.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Federal Reserve History (2023) on collection through chains of correspondent banks: 'a check wound its way through a series of banks based on their correspondent relationships'.",
+              "shows": "Shows that the route between two banks could be long and slow, which is the delay the step added.",
+              "source": "https://www.federalreservehistory.org/essays/check-payments"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What the step made possible for both sides.",
+            "introduces": "The price of it: what the mechanism cost: parties in the middle, a delay, and the bounced check.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p17",
+          "controlling_idea": "At this step the answer to the page's question is: when the buyer's bank has honored the check, days later; until then the seller is on the hook, holding paper.",
+          "function": "analysis",
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The two banks, the delay and the check that can bounce.",
+            "introduces": "The step's answer to the running question, longer than the one before.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "card",
+      "heading": "The Card: Someone Else Guarantees the Shop Is Paid",
+      "controlling_idea": "The payment card moved the risk of an unknown customer from the shop to a company that pays the shop and collects from the customer later, in exchange for a fee and for the shop joining that company's scheme.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S3"
+        ],
+        "how": "Introduces the guarantee by a third party, the issuer and the fee the shop pays for being paid for certain."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "The limit of the earlier way of paying comes first, then what was added and its name, then what it made possible for both sides, then what the addition cost, then the answer to the running question. The fee comes after the guarantee because it is the price of it."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "A check from a stranger may bounce, and the seller finds out days later.",
+        "introduces": "A third party that promises the shop it will be paid, whatever the customer later does.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p18",
+          "controlling_idea": "A shop cannot tell whether a stranger's check is good until days after the goods have left, so many shops took checks only from people they knew.",
+          "function": "context",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Follows from the check step: the seller carries the risk until the buyer's bank pays (stated as common practice).",
+              "shows": "Names the limit the card removes: the shop carrying the risk of an unknown customer."
+            }
+          ]
+        },
+        {
+          "id": "p19",
+          "controlling_idea": "A card is a promise by a third party: a company gives its customer a card, pays the shops that accept it, and collects from the customer afterwards; the bank or company that gives out the card and stands behind it is the issuer.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "Diners Club's history page (n.d., accessed November 2026) dates its card to 1950 and calls it 'the world's first multipurpose charge card' (the company's own description). Visa's history page (n.d., accessed November 2026): '1958 Bank of America launches BankAmericard, the first card with a \"revolving credit\" feature' (Visa's own description).",
+              "shows": "Two anchors from the institutions' own pages for the charge card (balance paid in full) and the credit card (balance paid over time).",
+              "source": "https://www.dinersclub.com/about-us/history/ ; https://usa.visa.com/about-visa/our_business/history-of-visa.html"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The shop's risk with strangers.",
+            "introduces": "The party that takes that risk over, named as the issuer, with two sourced anchor dates.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "controlling_idea": "With a card the shop can sell to a stranger and still count on being paid, and the customer can buy without cash and pay later.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stated as common experience, for the buyer and for the seller in turn; no dated fact.",
+              "shows": "Shows the gain that made the step a bargain both sides wanted, before its price is named."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What this step added.",
+            "introduces": "What it made possible for the buyer and for the seller.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p21",
+          "controlling_idea": "The guarantee has a price on both sides: the shop receives a little less than the price, the card company now carries the customers who do not pay, and the card works only in shops that have signed up with that company.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Common arrangement, stated as such: the shop is paid the price less a fee; how card payments are priced is the subject of the payment-economics chapter.",
+              "shows": "Shows the new party and the new cost, and sets up the limit (one company's shops) that the network removes."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What the step made possible for both sides.",
+            "introduces": "The price of it: what that costs: a fee, a party that must be trusted to pay, and a card that works in few places.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p22",
+          "controlling_idea": "At this step the answer to the page's question is: for the shop, when the card company pays it, and that is now certain if the shop followed the rules; the card company is on the hook for the customer until the monthly bill is paid.",
+          "function": "analysis",
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The guarantee and its price.",
+            "introduces": "The step's answer to the running question, longer than the one before.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "card-network",
+      "heading": "The Network: Two Banks, Shared Rules and an Answer in Seconds",
+      "controlling_idea": "Card networks let a card from any member bank work at any member bank's shop, which needed two banks per payment, shared rules and an approval that travels as a message in seconds while the money follows days later.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S3"
+        ],
+        "how": "Introduces the acquirer, the card network, authorization and interchange, and the separation of the answer from the money on which most later failures rest."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "The limit of the earlier way of paying comes first, then what was added and its name, then what it made possible for both sides, then what the addition cost, then the answer to the running question. The acquirer comes before authorization because the question is asked between the two banks; interchange comes after it because it is paid when the money moves."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "A card works only in the shops its own issuer has signed up.",
+        "introduces": "A system that many banks join, so the customer's bank and the shop's bank can be different banks.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p23",
+          "controlling_idea": "A card issued by one bank was of little use in a town where that bank had signed no shops, and no single bank could sign every shop and every customer.",
+          "function": "context",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Follows from the card step: acceptance is limited to one company's shops.",
+              "shows": "Names the limit the network removes."
+            }
+          ]
+        },
+        {
+          "id": "p24",
+          "controlling_idea": "In a card network the customer's bank and the shop's bank are two different members of one system with shared rules; the shop's bank is the acquirer, and the network itself issues no cards and holds no accounts.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "Visa's history page (n.d., accessed November 2026): '1976 BankAmericard becomes Visa'. Visa's Form 10-K for fiscal 2026 (5 November 2026), as quoted in journey-of-a-payment: the 'four-party' model, and 'Visa is not a financial institution. We do not issue cards, extend credit or set rates and fees'.",
+              "shows": "Supports that the network is a system between banks and not a bank, in the network's own words.",
+              "source": "https://usa.visa.com/about-visa/our_business/history-of-visa.html ; https://www.sec.gov/Archives/edgar/data/1403161/000140316126000134/v-20260930.htm"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "One bank cannot sign everyone.",
+            "introduces": "The network and the second bank, the acquirer; the four-party model.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p25",
+          "controlling_idea": "Because the shop knows neither the customer nor the customer's bank, it asks through the network, before handing over the goods, whether the issuer will stand behind this payment, and the issuer's answer, given in seconds, is the authorization.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "Stripe's explainer 'ISO 8583: The message standard behind card authorisations' (updated 18 September 2026): the standard was 'Published in 1987' and 'defines the structure of messages between acquirers and card issuers during a transaction'.",
+              "shows": "Supports that the approval is a standardized message between the two banks, with one anchor date.",
+              "source": "https://stripe.com/en-nl/resources/more/iso-8583"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Two banks that do not know each other's customers.",
+            "introduces": "The question asked before the goods are handed over, and its name.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p26",
+          "controlling_idea": "The authorization moves no money: the money follows a day or more later through the clearing and settlement the check introduced, and part of the shop's fee is passed to the issuer as interchange.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "Mastercard's Form 10-K for 2025, as quoted in journey-of-a-payment: routing for approval, then exchange of information, then exchange of funds; interchange is taught in payment-economics.",
+              "shows": "Shows the fixed order message, record, money that chapter 1 teaches.",
+              "source": "https://www.sec.gov/Archives/edgar/data/1141391/000114139126000013/ma-20251231.htm"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "An answer that arrives in seconds.",
+            "introduces": "What the answer is not: the money, which follows later by clearing and settlement, with the fee shared as interchange.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p27",
+          "controlling_idea": "With a network the customer has one card that works in any member's shop and the shop can take a card from any member bank, so a stranger can walk out with the goods seconds after asking.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stated as common experience, for the buyer and for the seller in turn; no dated fact.",
+              "shows": "Shows the gain that made the step a bargain both sides wanted, before its price is named."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What this step added.",
+            "introduces": "What it made possible for the buyer and for the seller.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p28",
+          "controlling_idea": "The network's cost is that the answer and the money now travel separately between parties that cannot see each other: an approval can be taken for the money, an answer can be lost on the way, and the banks settle in daily totals in which one payment cannot be seen.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "A shop holds an approval and no money; a lost reply leaves the shop not knowing whether the issuer said yes; a daily net amount covers thousands of payments.",
+              "shows": "Ties the step to what the next page names the Phantom Payment and the Black-Box Balance, and prepares the Double Charge."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What the step made possible for both sides.",
+            "introduces": "The price of it: three new ways to go wrong that this separation creates.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p29",
+          "controlling_idea": "At this step the answer to the page's question is: promised in seconds, moved between the banks a day or more later, and paid to the shop after that; the issuer is on the hook to the acquirer, and the acquirer to the shop.",
+          "function": "analysis",
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The split between the answer and the money.",
+            "introduces": "The step's answer to the running question, longer than the one before.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "distance",
+      "heading": "Paying at a Distance: A Number Instead of a Card",
+      "controlling_idea": "Paying by mail, telephone and then the internet replaced the card in the customer's hand with a typed number, which let anyone who knew the number pay with it and brought the right to take money back, rules for card data and the payment provider.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S3"
+        ],
+        "how": "Introduces the chargeback, card data as something to protect and the payment provider, and shows why a payment can be made twice once software sends the request."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "The limit of the earlier way of paying comes first, then what was added and its name, then what it made possible for both sides, then what the addition cost, then the answer to the running question. The section holds two limits: first that only a number travels (answered by the chargeback and the rules for card data), then that the shop is now software (answered by the provider); the first pair comes before the provider because it is part of what a provider takes on for a shop."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "The network still assumes a customer at the counter holding the card.",
+        "introduces": "What changes when only the card's number travels.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p30",
+          "controlling_idea": "A customer who orders from home cannot hand over a card, so the shop receives only the number printed on it, and the shop can no longer check that the person paying is the person the card belongs to.",
+          "function": "context",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stated as common practice for orders by mail, telephone and the internet: the number, not the card, reaches the seller.",
+              "shows": "Names the limit (presence) that is removed and the check that is lost with it."
+            }
+          ]
+        },
+        {
+          "id": "p34",
+          "controlling_idea": "Paying with a number lets a shop sell to customers anywhere at any hour and lets customers buy from home, from shops they will never visit.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stated as common experience, for the buyer and for the seller in turn; no dated fact.",
+              "shows": "Shows the gain that made the step a bargain both sides wanted, before its price is named."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Only the card's number travels to the shop.",
+            "introduces": "What that made possible for the seller and for the buyer, before its price.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p31",
+          "controlling_idea": "Because a number can be copied, the cardholder can tell their bank that a payment was not theirs, and the bank can take the money back from the shop weeks or months later, which is a chargeback, the forced end of what the book calls a dispute, and with no card or person checked the loss commonly stays with the shop.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Visa's rules (Product and Service Rules, edition of 24 October 2026), as cited in refunds-reversals-and-disputes: 120 days from processing for most disputes.",
+              "shows": "Gives the length of time a payment stays reversible, from the network's own rule.",
+              "source": "https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What paying with a number made possible for both sides.",
+            "introduces": "The price, beginning with a number that can be copied: the cardholder's remedy and its name; the time it stays open.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p32",
+          "controlling_idea": "Since the number alone can pay, everyone who stores or passes it on has to protect it, under a security standard of the card industry, and in Europe the law has the customer's bank check the payer with two independent proofs for most online payments.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "PCI Security Standards Council, 'About us' (n.d., accessed November 2026): 'The Council was founded in 2006 by American Express, Discover, JCB International, MasterCard and Visa Inc.' Directive (EU) 2015/2366 of 25 November 2015, Article 4(30): strong customer authentication is 'based on the use of two or more elements categorised as knowledge ..., possession ... and inherence'.",
+              "shows": "Two anchors from a standards body and an official legal text for the protections this step added.",
+              "source": "https://www.pcisecuritystandards.org/about_us/ ; http://publications.europa.eu/resource/celex/32015L2366"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "A number that can be copied and used.",
+            "introduces": "Two protections added on top: rules for whoever touches the number, and a second check of the payer.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p33",
+          "controlling_idea": "An online shop is software and has no bank counter to go to, so a new kind of company connects the shop's software to an acquirer and the networks through one programming interface: the payment provider, and with such a provider a small online shop can often start taking payments without arranging anything with a bank itself.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "Adyen's 'About' page (n.d., accessed November 2026): 'We were founded in Amsterdam in 2006.' Stripe's annual letter for 2023 (13 March 2024): 'when Stripe launched in 2011'. Where a provider can stand in the chain is taught in journey-of-a-payment.",
+              "shows": "Anchors the provider step with the two companies the book follows, from their own publications, without saying why they were founded.",
+              "source": "https://www.adyen.com/about ; https://stripe.com/annual-updates/2023"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "A shop that is software, with card data it must not mishandle.",
+            "introduces": "The company that stands between the shop's software and the acquirer.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p35",
+          "controlling_idea": "Distance made new failures possible: stolen numbers can be tried against any shop's checkout, money can be taken back long after the sale, card numbers end up in places never meant to hold them, and software that gets no answer sends the request again and charges twice.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "A clerk who hears nothing asks again aloud; a program that times out re-sends the request, and the issuer may approve both. A request and its answer travel apart from the money, so neither side can tell from the silence what happened.",
+              "shows": "Explains why paying twice, impossible over a counter, becomes possible here (the Double Charge), and ties the step to the Open Till, the Orphaned Refund, the Card in the Log and the Single Rail."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The remedy, the protections and the provider this step added.",
+            "introduces": "The price of it: the failures this step opened, in the terms the next page names.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p36",
+          "controlling_idea": "At this step the answer to the page's question is: as in the network step, and then only provisionally: for about 120 days the cardholder's bank can take it back, and the shop, not the bank, usually carries a payment the cardholder denies.",
+          "function": "analysis",
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The failures distance made possible.",
+            "introduces": "The step's answer to the running question, longer than the one before.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "stored-card",
+      "heading": "The Stored Card: Charging When the Customer Is Not There",
+      "controlling_idea": "Storing the card let a shop charge again without the customer present, which made subscriptions possible and made a stand-in for the card number necessary; the cost is a payment nobody is there to repair and a store of cards that belongs to one provider.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S3"
+        ],
+        "how": "Introduces the token and the recurring charge, and the absence of the payer at the moment of payment."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "The limit of the earlier way of paying comes first, then what was added and its name, then what it made possible for both sides, then what the addition cost, then the answer to the running question. The token is named only after the reader knows why a card number cannot simply be kept."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "At a distance the customer still types the number for every purchase.",
+        "introduces": "Keeping the card so that the next payment needs no customer at all.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p37",
+          "controlling_idea": "A membership that is paid every month would need the customer to come back and type the card number every month, and many would forget.",
+          "function": "context",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stated as common practice for memberships and other repeated purchases.",
+              "shows": "Names the limit (the payer must act each time) that the stored card removes."
+            }
+          ]
+        },
+        {
+          "id": "p38",
+          "controlling_idea": "The card is therefore kept on file, and because a stored card number is dangerous, the provider keeps the number and gives the shop a stand-in that is useless to a thief, called a token, which the shop's software charges on a schedule.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "example",
+              "what": "A token as a reference that only the provider can turn back into a card number; taught in tokenization-vaulting-and-pci, with the scheduled charge in subscriptions-and-billing-engines.",
+              "shows": "Gives the term in plain words and links both owning chapters."
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "A customer who must return every month.",
+            "introduces": "The stored card, held as a token, charged on a schedule.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p39",
+          "controlling_idea": "The stored card spares the customer the retyping and the remembering, and gives the seller income that returns every month, which is what makes a subscription possible.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stated as common experience, for the buyer and for the seller in turn; no dated fact.",
+              "shows": "Shows the gain that made the step a bargain both sides wanted, before its price is named."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What this step added.",
+            "introduces": "What it made possible for the buyer and for the seller.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p40",
+          "controlling_idea": "A charge made in the customer's absence fails with nobody there to fix it (cards expire, accounts run empty), the stored cards exist only as one provider's tokens, and a shop that renews everyone on the same day sends a month of payments in one hour.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "A declined renewal has to be retried and the customer reminded (invoicing-collections-and-dunning); tokens issued by one provider mean nothing to another; renewals anchored to the first day of the month arrive together.",
+              "shows": "Ties the step to the Vault Hostage and the First of the Month."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What the step made possible for both sides.",
+            "introduces": "The price of it: what the absence of the payer costs.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p41",
+          "controlling_idea": "At this step the answer to the page's question is: as before, but the promise is now asked for by a program on a date, and when it is refused the shop has delivered a month of service and is on the hook for collecting it.",
+          "function": "analysis",
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The scheduled charge and its failures.",
+            "introduces": "The step's answer to the running question, longer than the one before.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "platform",
+      "heading": "The Platform: Someone Stands Between Payer and Seller",
+      "controlling_idea": "Platforms let thousands of small sellers take card payments without each signing with a bank, by putting a company between payer and seller that collects, holds and passes on the money, and that company takes on verifying the sellers, paying them and the question of whose money it holds.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S3"
+        ],
+        "how": "Introduces the payment facilitator, the balance and the payout, and the regulated role of holding other people's money."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "The limit of the earlier way of paying comes first, then what was added and its name, then what it made possible for both sides, then what the addition cost, then the answer to the running question. The facilitator is defined before balances and payouts because they are what it does with the sellers' money."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "Every shop so far has its own agreement with an acquirer or a provider.",
+        "introduces": "A company that brings many small sellers in under one agreement and stands between them and their payers.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p42",
+          "controlling_idea": "A yoga teacher or a small studio sells through someone else's software and has neither the time nor the standing to sign a card-acceptance agreement of their own.",
+          "function": "context",
+          "organization": "illustration",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "An illustration, labeled as one: a small studio that takes bookings through a software platform.",
+              "shows": "Names the limit (each seller needs its own agreement) that the platform removes."
+            }
+          ]
+        },
+        {
+          "id": "p43",
+          "controlling_idea": "Card network rules allow one company to sign up many small sellers under a single agreement with an acquirer, and such a company is a payment facilitator.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Visa's rules (Glossary, edition of 24 October 2026), as quoted in journey-of-a-payment and platform-payment-models: a Payment Facilitator is 'An entity that contracts with an Acquirer to deposit Transactions, receive settlement from, or contract with an Acquirer on behalf of a Sponsored Merchant'.",
+              "shows": "Gives the term from the rule that defines it, after the plain words.",
+              "source": "https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "Small sellers without agreements of their own.",
+            "introduces": "The arrangement that covers them, in the network's own definition.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p44",
+          "controlling_idea": "Money collected for many sellers arrives together, is kept as a running amount per seller, the seller's balance, and is sent on to each seller's bank account later, and that last transfer is a payout.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "example",
+              "what": "Per-seller balances and payouts as taught in balances-and-funds-flows and payouts-and-money-movement.",
+              "shows": "Introduces one more delay and one more record between the payer and the seller."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "Many sellers under one agreement.",
+            "introduces": "What happens to their money: collected together, tracked per seller, paid out later.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p45",
+          "controlling_idea": "Through a platform a seller too small to deal with a bank can take card payments after filling in a form, and buyers can pay such a seller the way they pay a large shop.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stated as common experience, for the buyer and for the seller in turn; no dated fact.",
+              "shows": "Shows the gain that made the step a bargain both sides wanted, before its price is named."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What this step added.",
+            "introduces": "What it made possible for the buyer and for the seller.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p46",
+          "controlling_idea": "Whoever stands in the middle must know who its sellers are and keep checking, may need a license to hold their money, and adds a transfer that can fail, so a seller can be paid late, frozen or not at all while every card payment succeeded.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "Directive (EU) 2015/2366 (PSD2), Article 10, as cited in licences-and-safeguarding: funds a payment institution receives for others must be safeguarded. Verification as a continuing duty is taught in platform-onboarding-and-verification.",
+              "shows": "Supports that holding other people's money is a regulated role, and ties the step to the Frozen Seller, the Stranded Payout and the Accidental Bank.",
+              "source": "http://publications.europa.eu/resource/celex/32015L2366"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What the step made possible for both sides.",
+            "introduces": "The price of it: what the party in the middle takes on, and what can now go wrong for the seller.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p47",
+          "controlling_idea": "At this step the answer to the page's question is: for the payer, at the approval; for the seller, only when the payout reaches their bank account, and until then whoever holds the balance is on the hook to the seller.",
+          "function": "analysis",
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "What the party in the middle takes on.",
+            "introduces": "The step's answer to the running question, longer than the one before.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "today",
+      "heading": "Today: Every Step at Once, and One More Record",
+      "controlling_idea": "A payment today carries every earlier step at once, and the business's own software adds one more record of it, built from an answer, later notifications and reports that can each be late, missing or repeated.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S4",
+          "S3"
+        ],
+        "how": "Shows the steps together in one present-day payment (the book's fictional case) and adds the integrator's own record, where the failure patterns are decided."
+      },
+      "flow": {
+        "pattern": "large_to_small",
+        "rationale": "The claim that nothing was removed comes first, then one payment that shows it, with its parties and promises counted, then how the software that started the payment learns the outcome, then how its own record goes wrong; the example sits next to the claim it proves, and the two paragraphs about the software's record are adjacent."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "Eight steps, each of which added to the one before and removed nothing.",
+        "introduces": "The present: all of them behind one call, seen from the software that makes the call.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p48",
+          "controlling_idea": "None of the earlier ways of paying was retired when the next one arrived, so a payment made in an app today rests on the debt and the ledger, clearing and settlement, the issuer's guarantee, the network, the chargeback, the token and, often, a platform.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Each step is still in use for what it answered: strangers, distance, absence, small sellers.",
+              "shows": "States the accumulation that the thesis claims, before the case shows it."
+            }
+          ]
+        },
+        {
+          "id": "p49",
+          "controlling_idea": "At Larkfield, the fictional studio-software platform this book follows, Mila's €120 class pass shows all of them together: an approval at 19:42 on Tuesday 9 March 2027, seven parties, five promises made in turn, a payout of €117.47 to the studio on Thursday 11 March and a right to dispute until about 7 July.",
+          "function": "example",
+          "organization": "illustration",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Scenario ledger and journey-of-a-payment: Mila Janssen, her phone's wallet, her Dutch bank (issuer), Visa, Adyen, Studio Noord, Larkfield; fee €2.53; studio receives €117.47 on Thursday 11 March 2027; dispute window to about 7 July 2027. Fictional.",
+              "shows": "Shows that the simple act of buying a pass has every earlier step behind it, with the book's fixed figures.",
+              "source": "_research/scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The claim that every step is still present.",
+            "introduces": "One present-day payment in which every step can be pointed to, with its parties and promises counted.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p50",
+          "controlling_idea": "The business's software learns what happened to a payment in three installments (the answer to its call, notifications sent later and reports that list what actually moved) and keeps its own record from them, for cards and for methods that are not cards.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "example",
+              "what": "The provider's answer, webhooks and settlement reports as taught in payment-state-machines, payment-webhooks-and-events and payment-reconciliation-and-reporting; other payment methods, which behave more like the check than like the card, in local-payment-methods.",
+              "shows": "Names today's addition (one more copy of the record) and links the chapters that own it."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "One payment with seven parties and five promises, started by a platform's software.",
+            "introduces": "How that software learns what each party did: an answer, later notifications and reports, from which it keeps a record of its own; and that some payments are not cards.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p51",
+          "controlling_idea": "Together the steps let almost anyone buy from almost anyone, anywhere and at any hour, so a three-person studio can sell to a member it has never met and be paid two days later.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stated as common experience, for the buyer and for the seller in turn; no dated fact.",
+              "shows": "Shows the gain that made the step a bargain both sides wanted, before its price is named."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What this step added.",
+            "introduces": "What it made possible for the buyer and for the seller.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p52",
+          "controlling_idea": "The software's own record is one more copy that can disagree with the others: a notification can arrive late, twice or not at all, the provider's interface changes over time, and a method that is not a card does not follow the card's steps.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "A record marked paid at the approval is a copy of a promise; it is corrected only by the later notifications and reports.",
+              "shows": "Ties today's step to the Trusted Doorbell, the Version Cliff, A Card by Any Other Name and the Borrowed Blueprint."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What the step made possible for both sides.",
+            "introduces": "The price of it: how that record comes to disagree with the others, which is the shop notebook's problem again: reconciliation.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p53",
+          "controlling_idea": "At this step the answer to the page's question is: in installments: promised in seconds, moved between banks in a day or two, paid out after that and final only when the dispute window has closed, with a different party on the hook at each stage.",
+          "function": "analysis",
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "Today's record and how it can disagree.",
+            "introduces": "The step's answer to the running question, longer than the one before.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What the Steps Add Up To",
+    "synthesis": "Read together, the steps show one movement that no single step shows: each moved the keeping of the promise further from the making of it, in distance, in time and in the number of hands, and the answer to 'when is it paid?' grew from 'now' to four installments with a different party on the hook at each.",
+    "so_what": "The steps answer limits that still exist, and each bought trade that both sides wanted (strangers, distance, absence, small sellers), so no redesign or new technology removes them; a builder should expect a failure wherever a promise and its keeping are separated, and design for that gap.",
+    "callback": {
+      "to": "The coin handed to the baker, and Mila's tap.",
+      "how": "The reader can now count what stands behind the tap that did not stand behind the coin: seven parties, five promises and a dispute window of about 120 days."
+    },
+    "takeaway": {
+      "type": "broader_implications",
+      "content": "The failure patterns of the next page are the price of what these steps made possible, not signs of careless engineering: each one is a promise from one of these steps that some system recorded as the truth."
+    },
+    "hand_off": {
+      "to": "where-payment-systems-go-wrong",
+      "relationship": "cause_effect",
+      "carries_over": "The layers of the previous page: each way of paying added a promise, a party, a record and a delay, and none was removed; together with the introduction's claim that a payment failure is a promise some system recorded as the truth, and its rule that Larkfield is illustration and never evidence about a provider.",
+      "introduces": "What those layers make possible: sixteen recurring failure patterns, each unpacked with a typical quote, what it looks like, why it happens, what it costs, a Larkfield illustration, a remedy direction and the chapters that address it; then the chains the patterns form and how to use them in a review."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "Nine steps and nine answers to one question.",
+      "introduces": "The steps side by side in one table, then what they add up to.",
+      "form": "sentence",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p54",
+        "controlling_idea": "Set side by side, the nine steps each made a kind of sale possible and each added a concept, a party or a delay and a way to go wrong, and the last column of the table is the vocabulary of the next page.",
+        "function": "synthesis",
+        "evidence": [
+          {
+            "kind": "table",
+            "what": "Nine rows (cash, shop credit, check, card, card network, paying at a distance, stored card, platform, today) with columns: Step, What it made possible, What it added, New party or delay, What can now go wrong; the last column uses the sixteen pattern names exactly where one applies and plain words where none does.",
+            "shows": "Lets the reader find, for any term or pattern name, the step that introduced it.",
+            "source": "Style guide's pattern table (_research/style-guide.md)"
+          }
+        ]
+      },
+      {
+        "id": "p55",
+        "controlling_idea": "Behind the act that began as a coin for a loaf there now stand seven parties, five promises and a dispute window of about 120 days, because every step moved the keeping of the promise further from the making of it.",
+        "function": "synthesis",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's class pass as told in journey-of-a-payment: seven roles in the cast table; five promises in the timeline table (issuer, merchant, acquirer, network, provider); about 120 days.",
+            "shows": "Makes the accumulation countable with figures the book fixes."
+          }
+        ],
+        "transition_in": {
+          "relationship": "elaboration",
+          "carries_over": "The table of steps.",
+          "introduces": "The count behind one present-day payment, and the single movement the steps share.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p56",
+        "controlling_idea": "The complexity is the price of all the trade these steps opened, not a mistake: each step answers a limit that still exists, so no clean redesign or new technology makes paying simple again, and a failure should be expected wherever a promise and its keeping are separated.",
+        "function": "refutation",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "Strangers, distance, absent payers and small sellers have not gone away; a new way to pay has to answer each of them or leave them to someone else.",
+            "shows": "Answers the disputing view named in the thesis without forecasting."
+          }
+        ],
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "Seven parties, five promises, 120 days.",
+          "introduces": "Why the steps stay, against the view that the complexity is a design mistake, and what a builder should expect.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p57",
+        "controlling_idea": "The next page names the sixteen ways these promises fail, and after this walk each of them reads as a promise from one of these steps that some system recorded as the truth.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "Failures are to be expected where a promise and its keeping are apart.",
+          "introduces": "The sixteen named patterns of the next page, as the price of these steps.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "A history of payments: events, founders and firsts that introduce no concept the book uses are left out."
+    },
+    {
+      "topic": "Teaching any mechanism properly: each concept gets plain words, its name and a link.",
+      "covered_in": [
+        "journey-of-a-payment",
+        "payment-authorization",
+        "clearing-and-settlement",
+        "refunds-reversals-and-disputes",
+        "payment-economics"
+      ]
+    },
+    {
+      "topic": "The failure patterns themselves: the page uses their names in the tally and the costs, and explains none.",
+      "covered_in": [
+        "where-payment-systems-go-wrong"
+      ]
+    },
+    {
+      "topic": "Larkfield as a company; it appears only at the last step as today's case.",
+      "covered_in": [
+        "meet-larkfield"
+      ]
+    },
+    {
+      "topic": "How Stripe and Adyen differ; the page has no 'Where They Differ' section and gives only their founding and launch years.",
+      "covered_in": [
+        "case-stripe",
+        "case-adyen"
+      ]
+    },
+    {
+      "topic": "What is changing now (instant payments, stablecoins, agents).",
+      "covered_in": [
+        "payments-what-is-moving"
+      ]
+    },
+    {
+      "topic": "Why any company, bank or network did what it did: no motives are attributed."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "Mastercard's own history pages returned HTTP 403, so the founding of the second large bank-card association is not dated on the page; if the author wants it, a readable primary source is needed.",
+    "Electronic authorization before 1987 (telephone approvals, the networks' first electronic systems) is not dated: no primary source was readable in this session."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "Nine steps: cash, shop credit, check, card, card network, paying at a distance, stored card, platform, today. The charge card and the credit card are one step (one concept: a third party's guarantee); authorization belongs to the network step and the payment provider to the distance step, as the PLAN contract groups them.",
+      "rejected": [
+        "A separate step for the payment provider (it adds a party but its need is the distance step's).",
+        "A separate step for chip cards and contactless payment (no concept the tally needs).",
+        "Ten or more steps, which the field-evolution skill warns reads as a history."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The running question is 'When is it really paid, and who is on the hook until then?', answered in one short closing paragraph of every step that begins with the question in bold.",
+      "rejected": [
+        "Answering it only in the tally table.",
+        "Folding the answer into the cost paragraph, where a skim reader would miss that it grows."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Shape and length follow the field-evolution skill, not the chapter format: IN THIS SECTION and KEY POINTS callouts, no failure-pattern callout, no 'Where They Differ' section, no three-tier take-away, two illustration placeholders, 2,500 to 3,500 words.",
+      "rejected": [
+        "The chapter body order of the style guide."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Ten anchor dates, each from a page fetched on 17 November 2026: 1853 (The Clearing House), 1950 (Diners Club), 1958 and 1976 (Visa), 1987 (ISO 8583, via Stripe's explainer; ISO's catalogue page returned 403), 2006 (PCI SSC; Adyen), 2011 (Stripe), 2015 (PSD2), plus the Federal Reserve History essay of 2023 for how checks were collected.",
+      "rejected": [
+        "Dating the Interbank Card Association (Mastercard's pages returned 403).",
+        "Dating PCI DSS version 1.0 (not stated on the council pages fetched).",
+        "Wikipedia or secondary histories for any date."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": ".claude/skills/field-evolution/SKILL.md",
+      "contributed": "The page's purpose, shape (need, concept, cost), evidence rules and checks."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/PLAN.md",
+      "contributed": "The page contract and the candidate steps; the chapters that own each concept."
+    },
+    {
+      "kind": "internal",
+      "ref": "_journals/payments-platform-architecture/journal-spec.json",
+      "contributed": "Intent, acceptance criteria, thesis, role and the transition into the next page, copied unchanged."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/style-guide.md",
+      "contributed": "Voice, evidence discipline, the sixteen pattern names, valid permalinks, the figure format."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "Mila's class pass: amounts, dates and parties."
+    },
+    {
+      "kind": "internal",
+      "ref": "journey-of-a-payment",
+      "contributed": "The four-party model, the six steps and five promises, the cast of Mila's payment, the Visa and Mastercard quotations reused by link."
+    },
+    {
+      "kind": "external",
+      "ref": "Federal Reserve History, 'Check Payments', 28 September 2023",
+      "contributed": "Clearinghouses, correspondent banks and the slow routing of checks."
+    },
+    {
+      "kind": "external",
+      "ref": "The Clearing House, 'Our History', n.d., accessed 2026-11",
+      "contributed": "1853."
+    },
+    {
+      "kind": "external",
+      "ref": "Diners Club International, 'Our History', n.d., accessed 2026-11",
+      "contributed": "1950 and the charge card."
+    },
+    {
+      "kind": "external",
+      "ref": "Visa, 'History of Visa', n.d., accessed 2026-11",
+      "contributed": "1958 BankAmericard; 1976 renamed Visa."
+    },
+    {
+      "kind": "external",
+      "ref": "Stripe, 'ISO 8583: The message standard behind card authorisations', updated 18 September 2026",
+      "contributed": "1987 and what the message standard does."
+    },
+    {
+      "kind": "external",
+      "ref": "PCI Security Standards Council, 'About us', n.d., accessed 2026-11",
+      "contributed": "Founded 2006 by five card brands."
+    },
+    {
+      "kind": "external",
+      "ref": "Directive (EU) 2015/2366 (PSD2), Official Journal, 23 December 2015",
+      "contributed": "The definition of strong customer authentication; safeguarding (Article 10)."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen, 'About', n.d., accessed 2026-11; Stripe annual letter 2023, 13 March 2024",
+      "contributed": "Founded 2006; launched 2011."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "First draft of the spec, written with the field-evolution and spec-creator skills from the PLAN contract; intent, thesis and role copied from the journal spec."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "After the first flow rubric (sound with notes): in the last step the Larkfield example moved next to the claim it proves and now counts the five promises; 'dispute' and 'balance' named where first used; the cash section's claim about later steps softened; the check section's claim aligned with the card section; the distance section's two limits declared."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Second flow rubric (sound with notes): the chargeback paragraph now says why the card step's guarantee does not cover a shop paid by a typed number. Notes not acted on, for the author: the distance step holds two limits (the typed number, the shop as software) and could be split into two steps, which would make ten; methods that are not cards are mentioned only at the last step."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Author's revision after reading the page: intent, criteria (new AC-5), thesis and role copied again from the changed journal-spec entry; every step gains a paragraph on what it made possible for buyer and seller, placed before its cost; the key points, lead and headings use concrete words and 'step' or 'way of paying' in place of 'layer'; the closing table gains a 'What it made possible' column and the closing says the complexity is the price of that trade, not a mistake; nine steps and their order unchanged; max_words 4,200. Status stays accepted on the author's instruction; the order of steps did not change, so the flow rubric was not rerun."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 38 claims checked (24 confirmed, 2 corrected, 12 hedged, 0 unsupported and removed or relabeled, 0 unreachable); the Visa history source address had moved and was replaced, The Clearing House is no longer called a New York association (its page does not say so), and twelve generalizations about how people paid or what card companies, banks and shops did were weakened to common practice. No unit added, dropped or reordered."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Distance step: the paragraph on what the step made possible moved up to follow the opening paragraph, so the gain comes before the price, as in every other step (field-evolution skill)."
+    }
+  ],
+  "length": {
+    "target_words": 4000,
+    "max_words": 4200
+  }
+}

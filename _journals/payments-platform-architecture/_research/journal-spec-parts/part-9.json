@@ -1,0 +1,494 @@
+{
+  "id": "part-9",
+  "title": "Part IX — JOURNEYS: One Payment, End to End",
+  "detail": "full",
+  "intent": {
+    "outcome": {
+      "know": [
+        "The four journeys and what each one follows: Mila's €120 class pass from her tap at 19:42 on 9 March 2027 to Studio Noord's payout on 11 March; her €49 membership renewal, declined on 1 April 2027 and collected on 4 April; the same pass as a platform payment split three ways, with an €84 refund on 18 March after the studio was paid; and Bram de Wit's €120 payment of 2 February 2027, charged back on 24 February.",
+        "For every step of each journey: the party or system that acts, the message or record it produces, the promise that record makes, the failure that can occur there and the chapter of Parts I to VIII that owns the mechanism.",
+        "Where the same step is a different record on Adyen (Studio Noord's provider) and on Stripe: a result code and webhooks keyed by a reference against a fetchable object; a payment retried by the provider against an invoice retried by the billing engine; chargeback logic declared on the payment against a charge type; a provisional chargeback reversal against a single dispute status."
+      ],
+      "believe": [
+        "Each mechanism can do its job and the payment can still go wrong, because the failures occur where one mechanism hands to the next.",
+        "A success message reports the promise of the step that sent it; whether the promise was kept is reported later, by a different record, usually on a different channel.",
+        "A payment record has to stay open for as long as the slowest party can still change it, which for a card payment is the dispute window, not the payout."
+      ],
+      "can_do": [
+        "Walk one payment, renewal, refund or dispute of their own system through a step table with the columns party or system, message or record, promise made, and what can fail here, and mark the hand-offs where no later record checks the earlier promise.",
+        "Take an incident report and name the hand-off at which a promise was taken for a fact, and the record that would have shown the difference.",
+        "Say, for a step of any of the four journeys, which record an integration should wait for on Adyen and which on Stripe."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Every supporting claim of the part thesis is argued by at least one journey, and every journey supports at least one.",
+        "check": "children_cover_parent_thesis",
+        "method": "deterministic",
+        "severity": "blocker"
+      },
+      {
+        "id": "AC-2",
+        "statement": "Each journey's closing hand-off expresses the relationship its successor declares in transition_in.",
+        "check": "transition_expresses_declared_relationship",
+        "method": "rubric",
+        "severity": "major"
+      },
+      {
+        "id": "AC-3",
+        "statement": "Given a platform the part does not contain, a reader who has read only Part IX names, for three described problems, the hand-off at which a promise was taken for a fact and the record that would have shown the difference, before blaming the provider or any one system.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A food-delivery platform takes card payments for restaurants and pays each restaurant the next day. In one month it finds: (i) an order its app showed as 'paid' whose capture (the instruction to collect an approved amount) was rejected two days later; (ii) a €30 order refunded to the customer a week after the restaurant had been paid for it, with nobody able to say whose money paid the refund; (iii) a chargeback (the customer's bank taking a payment back) on an order from six weeks earlier, which its records had long marked complete. Using only Part IX: for each, which hand-off was mistaken for a finished fact, and which record or decision would have caught it or prepared for it?",
+        "expected": "(i) The app took the provider's acceptance of the authorization, or of the capture request, for the money: a capture can be rejected by the card scheme days after it was accepted, and the provider reports that in a later event or report, so the payment should stay unfinished until the settlement record and the payout match it, with a sweep of everything still pending. (ii) The split at payment time was treated as the end of the platform's part: the refund is debited from a balance that the payout already emptied, and the platform's account model decides whether the restaurant's or the platform's balance goes short and who stands behind it; the platform needed a decision on the refund split and on its own fee, its own figure for paid-out money that can still come back, and a ledger entry for the amount the restaurant now owes. (iii) 'Paid out' was treated as final: a card payment can be taken back for about four months, the money and a fee leave before the issuer rules, and who carries the loss was fixed by the charge type or the chargeback logic set on the payment; the record must stay reopenable, the evidence must have been captured at the sale, and the debit must be booked the day it arrives."
+      },
+      {
+        "id": "AC-4",
+        "statement": "A reader who has read only Part IX can name places where an integration written for one provider's records will be wrong on the other's.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A team's integration was written against Stripe. To add Adyen it writes a thin adapter that maps Adyen's 'Authorised' result to Stripe's 'succeeded' status and changes nothing else. Using only Part IX: name three places in the four journeys where this adapter will report something untrue or miss something, and say what Adyen provides at each.",
+        "expected": "Any three of: (1) there is no payment object to fetch on Adyen's Checkout API, so later changes arrive only as webhooks keyed by the PSP reference and in reports; (2) a CAPTURE or REFUND webhook marked successful can be followed days later by CAPTURE_FAILED or REFUND_FAILED, and no webhook is sent when a payment settles; (3) for a renewal Adyen documents no invoice or subscription object, so the schedule, the state of the membership and the debt for the period are the integrator's, and Adyen's retry feature recovers a payment, not an invoice; (4) on a platform the split and the chargeback logic are declared on the payment, and by default amounts, fees and chargebacks are booked to the platform's liable balance account; (5) a dispute is a series of events, the credit on CHARGEBACK_REVERSED is provisional and a SECOND_CHARGEBACK can take the money again."
+      },
+      {
+        "id": "AC-5",
+        "statement": "The page that carries the part's closing sets the four journeys against the opening's €412,000 difference and says what the four have in common; it does not only hand off to Part X.",
+        "check": "conclusion_calls_back_to_introduction",
+        "method": "rubric",
+        "severity": "major"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "What do four payments followed from start to finish show about where a payment system fails that the chapters on single mechanisms could not?",
+    "claim": "Four payments at Larkfield (Mila's €120 class pass, her declined €49 renewal, the €84 refund after payout and Bram de Wit's €120 chargeback) each cross mechanisms owned by several parties, and every failure the four journeys show appears at a hand-off: the point where one mechanism's answer (an approval, a decline, a payout, a payment marked complete) is taken by the next system as final. The journeys run without loss where each hand-off carries a shared reference and is followed by a later record that confirms or corrects the earlier answer; Adyen and Stripe put those later records in different places, so an integration written for one misreads the other.",
+    "disputed_by": "The view that a payment system is the sum of its mechanisms: if tokenization, authorization, the ledger, the webhook receiver, the billing job and the payout each work and each is tested, the payment works, and an end-to-end failure must be a defect inside one of them or at the provider.",
+    "so_what": "A team that accepts the claim reviews its payments by walking one payment through every system in order, not by testing components, and spends first on references, pending-state sweeps and reconciliations. Five of Larkfield's Keel decisions are of this kind: one key per business event (K1), the provider's record over the webhook (K2), a ledger entry for every movement with a reconciliation of both providers run when each one's reports are ready (K3), renewals paced and retried by decline code (K5) and verification kept as state (K6). Keel adds no orchestration product (K8).",
+    "how_why": "The mechanisms run on different clocks and belong to different parties: the wallet, the provider's risk and authentication checks and the issuer answer in seconds; clearing and network settlement take days; a payout is a bank transfer; a refund can fail days after it was accepted; a chargeback can arrive about four months later. Each step can tell the next only what it knows when it finishes, which is a promise. Whether the promise was kept is reported later by another record: a webhook, a settlement report, a balance movement, a dispute event. A system that stops listening after the first success message is wrong without any component having failed. The two providers expose the later records differently, as documented in 2026: Stripe as objects with a status that can be fetched (PaymentIntent, Invoice, Dispute), Adyen as events and report lines keyed by a PSP reference, with provisional bookings such as a chargeback reversal shown as separate events.",
+    "supporting_claims": [
+      {
+        "id": "P9-1",
+        "claim": "On the path with no failure, a card payment is twelve steps (checkout, tokenization, risk scoring, authentication, authorization, capture, clearing, settlement, ledger entries, split, payout, reconciliation); the first eleven each end in a promise by the party that ran them, the customer's 'Payment successful' reports the fifth, and the merchant's money is established only by the twelfth."
+      },
+      {
+        "id": "P9-2",
+        "claim": "A declined renewal is an open debt with a clock, not a failed payment: the decline code and the network's retry limits decide whether and when to try again, and the state of the membership in between has to be held by the billing side, which on Stripe Billing is an invoice the provider owns and on Adyen is the merchant's own scheduler."
+      },
+      {
+        "id": "P9-3",
+        "claim": "On a platform the split is an instruction attached to the payment, but a refund after payout is debited from a balance the payout already emptied, and the account model chosen at integration decides whose balance goes short and who stands behind it."
+      },
+      {
+        "id": "P9-4",
+        "claim": "A chargeback reopens a payment that every system had closed: the money and a fee are debited before the issuer rules, the merchant gets one submission against a deadline, the dispute counts toward the network's monitoring ratio whatever the outcome, and who carries the loss was decided when the payment was made."
+      },
+      {
+        "id": "P9-5",
+        "claim": "In all four journeys Adyen and Stripe place the confirming record at a different point and in a different form (events and report lines keyed by a reference against objects with a fetchable status; a payment retried against an invoice retried; chargeback logic on the payment against a charge type), so each journey has to be read once per provider."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Puts the mechanisms of Parts I to VIII back together on four payments from the scenario ledger, so the reader sees every mechanism in the order a payment meets it and sees that the failures sit between mechanisms; it supplies the worked evidence for the journal's claim that a payment is a chain of promises.",
+    "supports": [
+      "J9",
+      "J1"
+    ]
+  },
+  "flow": {
+    "pattern": "prerequisite_order",
+    "additional_patterns": [
+      {
+        "pattern": "chronological",
+        "applies_to": "inside each journey: the steps in the order the payment meets them"
+      },
+      {
+        "pattern": "small_to_large",
+        "applies_to": "across the journeys: one payer and one payment that succeeds; the same payer over time; three parties and money going backward by choice; money going backward by force months later"
+      }
+    ],
+    "rationale": "Each journey reuses what the one before it set up. Journey 1 establishes the reading device (the step table with party, record, promise and failure, shown once per provider) and the twelve forward steps on a payment where nothing fails. Journey 2 keeps the payer and removes two things Journey 1 relied on, the customer's presence and a first-time approval, so its retry and notice steps are read as departures from a path the reader has already walked. Journey 3 returns to Journey 1's pass and opens the two rows that Journey 1 only named, the split and the payout, then runs money backward for the first time, by the merchant's choice. Journey 4 runs money backward by the issuer's choice and needs Journey 3's balances to say whose account the chargeback debits. The order is not the calendar's: the disputed payment (2 February) and its chargeback (24 February) come before the pass (9 March), the refund (18 March) and the renewal (1 April). Putting the dispute first would show a chargeback debiting a balance the reader has not yet seen filled and paid out; putting the refund before the renewal would be possible, but the renewal is the simpler variation (one party fewer, no money going back), and placing it second lets the two backward flows be read side by side as a voluntary and a forced reversal."
+  },
+  "opening": {
+    "carried_by": "part-9",
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "At year-end 2025, Larkfield's ledger balance of what it owed its studios differed from the two providers' balances by €412,000. Three weeks of work traced the difference to refunds made after payout, chargeback fees and a currency-conversion rounding rule. None of the three was a payment that had failed."
+    },
+    "bridge": "From Parts I to VIII, which explained one mechanism per chapter and showed where on Mila's class pass each one sits, to the same mechanisms in the order a payment meets them: four payments followed through every party and system, on Adyen with the Stripe equivalent beside it, so the reader sees what passes from each step to the next and what does not.",
+    "roadmap": "Four journeys, each a narrative, a step table (step, party or system, message or record, promise made, what can fail here and the chapter that owns it) and one sequence figure: Mila's €120 pass from tap to reconciled payout; her €49 renewal declined on 1 April and collected on 4 April, with the branch where it is never collected; the pass as a platform payment, split, paid out and then refunded by €84; and Bram de Wit's €120 chargeback from the issuer's claim to the ledger. Each is told on Adyen, Studio Noord's provider, with the Stripe record for the same step shown alongside."
+  },
+  "closing": {
+    "carried_by": "journey-dispute",
+    "synthesis": "The four journeys end in the same place by different roads. In each, the first success message came from the step that made a promise, and the news of whether the promise was kept came later, from a different party, on a different channel, into a different system: the approval on Mila's screen against the settlement report two days on; the decline of 1 April against a membership whose state no payment record holds; the split made on 9 March against a refund debited on 18 March from a balance already paid out; a payment closed in February against a chargeback three weeks later. The four also set one number that no single journey states: a payment's record must stay open, and its ledger entries correctable, for as long as the slowest of these later reports can still arrive, which is the dispute window and not the payout date.",
+    "so_what": "The cheapest improvements to a payment system are at its hand-offs: a reference that survives every hop, a state for 'promised but not yet confirmed', a sweep for whatever stays in that state, and a daily match of provider records against the ledger. Larkfield's Keel program is mostly these, and it adds no provider and no orchestration product. A reader can find their own next incident by walking one payment through their systems before comparing providers, which is what Part X does next.",
+    "callback": "The part opening's €412,000: refunds after payout, chargeback fees and a rounding rule, each of them a later record that corrected an earlier promise and reached the provider's balance without reaching Larkfield's ledger. Journeys 3 and 4 produced the first two as ledger entries.",
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "Take one ordinary payment, one failed renewal, one refund made after payout and one dispute from your own system and fill in a step table for each. For every row write the record that confirms the row before it. Start work at the rows where that cell is empty."
+    }
+  },
+  "transition_in": {
+    "relationship": "example",
+    "carries_over": "The mechanisms of Parts I to VIII, each taught in its own chapter, ending with Part VIII's rule that a money path must be correct before it is available and that a change is verified by reconciliation.",
+    "introduces": "Four single payments followed through all of those mechanisms at once, in the order the payment meets them, to show what passes between them.",
+    "form": "paragraph",
+    "placement": "end_of_previous"
+  },
+  "posts": [
+    {
+      "id": "part-9",
+      "folder": "part-9-intro",
+      "title": "Part IX — JOURNEYS: One Payment, End to End",
+      "kind": "part_intro",
+      "detail": "full",
+      "question": "What does this part argue, and in what order should its four journeys be read?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "Part IX follows four payments in order: Mila's €120 class pass with nothing going wrong; her €49 renewal that is declined and collected three days later; the same pass as a platform payment with an €84 refund after the studio was paid; and a €120 chargeback raised by another member, Bram de Wit.",
+            "Each journey is a narrative with a step table and one sequence figure, told on Adyen (Studio Noord's provider) with the Stripe record for the same step beside it, and each step links to the chapter of Parts I to VIII that owns its mechanism.",
+            "The part's claim: every mechanism can work and the payment can still go wrong, because the failures occur at the hand-offs, where a promise is taken for a finished fact."
+          ],
+          "can_do": [
+            "Pick the journey that matches the payment, renewal, refund or dispute they need to trace, and read a step table row as party, record, promise and failure."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "A reader of this page alone can name the four journeys' subjects in reading order and say what form each takes.",
+            "check": "intro_predicts_content",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "After reading only this page: what will each of the next four chapters follow, in order, and in what form?",
+            "expected": "Mila's €120 class pass from her tap at 19:42 on 9 March 2027 to the studio's payout on 11 March and its reconciliation, with nothing failing; her €49 monthly renewal, declined on 1 April 2027 and collected on 4 April, plus the branch where it is never collected; the pass as a payment divided among studio, platform and provider, then an €84 refund on 18 March after the studio was paid; Bram de Wit's €120 payment of 2 February charged back on 24 February, through evidence, deadline, outcome and ledger. Each as a narrative with a step table and a sequence figure, on Adyen with the Stripe equivalent alongside."
+          },
+          {
+            "id": "AC-2",
+            "statement": "A reader of this page alone can say what to look for while following a journey.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "minor",
+            "probe": "Using only this page: what should a reader watch for in each row of a journey's step table, and why does the part show two providers?",
+            "expected": "At each row: which party acts, what record it leaves, what that record promises, and which later record confirms or corrects it; the failures to look for are at the hand-offs between rows, not inside a row. Two providers are shown because Adyen and Stripe report the same step through different records at different moments, so an integration that waits for the right record on one waits for the wrong one on the other."
+          }
+        ]
+      },
+      "role": {
+        "contribution": "Performs the part's opening: the €412,000 difference of year-end 2025 as the hook, the part thesis in three points, the form every journey shares, the reason each is shown on both providers, and the reading order with the reason the order is not the calendar's.",
+        "supports": []
+      },
+      "post_spec": "posts/part-9-intro/spec.json"
+    },
+    {
+      "id": "journey-card-payment",
+      "folder": "42-journey-card-payment",
+      "title": "Journey 1: Mila's Class Pass, From Tap to Settled",
+      "kind": "walkthrough",
+      "detail": "full",
+      "question": "What happens to Mila's €120, step by step and party by party, between her tap at 19:42 on 9 March 2027 and Studio Noord's reconciled payout, and what does each step promise?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "The twelve steps of the path on which nothing fails (checkout, tokenization, risk scoring, authentication, authorization, capture, clearing, settlement, ledger entries, split, payout, reconciliation) and, for each, the party that acts, the message or record it leaves, the promise made and the failure that can occur there, with the chapter that owns it.",
+            "The canonical figures: €120.00 paid with a Dutch Visa debit card held in a phone wallet; approved and captured automatically at 19:42 on Tuesday 9 March 2027; Larkfield's fee €2.53 and the studio's €117.47; the payout that contains it sent on Thursday 11 March.",
+            "How the same steps are recorded on each provider as documented in 2026: on Adyen a result code, then webhooks keyed by the PSP reference, then report lines, with no endpoint in the Checkout API that returns a payment by its identifier and no webhook when a payment settles; on Stripe a PaymentIntent with a status, a balance that moves from pending to available, and a payout object.",
+            "Where the public record stops: the card networks' settlement cut-off times and cycles, and whether Stripe's standard payout schedule makes funds available before Stripe has received them (Stripe documents paying ahead only for Instant Payouts)."
+          ],
+          "believe": [
+            "'Payment successful' is a true statement about the issuer's authorization and says nothing about the eleven steps around it.",
+            "A payment is finished when the payout has been matched to the provider's settlement record, and reopenable for months after that."
+          ],
+          "can_do": [
+            "Fill in the step table for a card payment in their own system and name, for each row, the record that confirms the row before it.",
+            "Decide for each state in their own payment vocabulary which provider record justifies entering it, on Adyen and on Stripe."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a payment that was approved and never reached the merchant, the reader lists the steps at which it can be lost without an error on the day, and the later record that shows each.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A bike-rental app marks a €45 rental 'Paid' when the provider's API returns an approved authorization (the card issuer's agreement to honor the amount). The app collects the amount later, when the bike is returned. Nine days afterwards, support finds that the rental never appeared in any payout to the shop. Using only this chapter: at which steps could the money have been lost with no error on the day, and which record would have shown each loss?",
+            "expected": "At capture: an authorization is valid for a limited number of days, so a late capture fails; the capture result shows it. After capture: the card scheme can reject a capture that the provider had accepted, days later (on Adyen a CAPTURE_FAILED event after a successful CAPTURE event); the later event and the settlement report show it. At funding: the amount can be held in the provider balance or set off against refunds, a reserve or a negative balance; the balance and settlement report show it. At payout: the bank transfer can fail or be returned; the payout record and the bank statement show it. The app should not call a payment paid on the authorization alone: it should keep a state for 'approved, not yet confirmed', sweep what stays in it, and match captured payments against the settlement report and payouts every day."
+          },
+          {
+            "id": "AC-2",
+            "statement": "The reader can say, for at least two steps, which record an integration should wait for on Adyen and which on Stripe.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "The same €120 pass is bought at a studio whose payments run on Stripe instead of Adyen. Using only this chapter: name two steps of the journey at which the record an integration should rely on differs between the two providers, and say what each provider gives at that step.",
+            "expected": "Any two of: the outcome of the payment (Stripe: a PaymentIntent whose status can be fetched at any time; Adyen: a result code in the response and an AUTHORISATION webhook keyed by the PSP reference, with no endpoint in the Checkout API that returns the payment by its identifier); the capture (Adyen: a CAPTURE webhook that can be followed by CAPTURE_FAILED days later; Stripe: the PaymentIntent's status, with nothing published on whether a capture can fail later at the network); funds reaching the studio's balance (Stripe: a balance that moves from pending to available on a published schedule counted from the payment; Adyen for Platforms: a batch settled to the balance account after the sales day ends and a settlement delay passes, independent of when the schemes pay Adyen, and no webhook when a payment settles)."
+          },
+          {
+            "id": "AC-3",
+            "statement": "Every row of the step table names a party, a record, a promise and a failure, and links the failure to the chapter of Parts I to VIII that owns the mechanism, so a reader can go from any step to its full explanation.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "major"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "What happens to Mila's €120, step by step and party by party, between her tap at 19:42 on 9 March 2027 and Studio Noord's reconciled payout, and what does each step promise?",
+        "claim": "Between Mila's tap at 19:42 on Tuesday 9 March 2027 and Studio Noord's payout on Thursday 11 March, her €120 passes through twelve steps. The first eleven each end in a promise by the party that ran them; only the twelfth, matching the payout to the provider's settlement record, establishes that the studio's €117.47 arrived. The 'Payment successful' on her screen reports the fifth step, the issuer's authorization. The losses on this path are the ones a step's own success message cannot report: an authorization that expires before capture, a capture the scheme rejects days later, a payout the bank returns.",
+        "disputed_by": "The view that a card payment is one request with one result: once Adyen answers 'Authorised' or a Stripe PaymentIntent is 'succeeded', the payment is done, and everything after it is the provider's internal bookkeeping, which an integrator can safely ignore.",
+        "so_what": "A team that accepts this decides, for each state in its own payment vocabulary, which provider record justifies it, and keeps a state for 'promised, not yet confirmed'. Larkfield's Keel program adds the two checks this journey calls for: a job that sweeps every payment still pending against the provider's record (K2) and a reconciliation of both providers' reports against the ledger, run when each provider's reports are ready (K3).",
+        "how_why": "The twelve steps belong to different parties on different clocks. The wallet's device token, the provider's risk score, the authentication on Mila's phone and the issuer's approval take seconds; clearing, network settlement and the bank transfer of the payout take days. Each step passes the next a reference and its own result, which is all it knows. On Adyen, as documented in 2026, the Checkout API has no endpoint that returns a payment by its identifier: the integration gets a result code, then webhooks keyed by the PSP reference, then reports; a CAPTURE webhook marked successful can be followed days later by CAPTURE_FAILED, and no webhook is sent when a payment settles. On Stripe there is one PaymentIntent with a status that can be fetched, a balance that moves from pending to available, and a payout object. Adyen for Platforms settles funds to balance accounts after the sales day and a settlement delay, independent of when the schemes pay Adyen; Stripe publishes an availability schedule and documents paying ahead only for Instant Payouts; for standard payouts its services terms (28 September 2026) count a network's failure to settle to Stripe as a 'Payout Delay' and do not say whether its own receipt of funds otherwise comes first. Cut-off times and settlement cycles of the card networks are not in the public rule texts, so the walkthrough gives the clearing and settlement rows as a documented sequence and labels their timing as industry practice."
+      },
+      "role": {
+        "contribution": "Walks the recurring payment through all twelve steps once on Adyen and once on Stripe, sets up the step table that the other three journeys reuse, and shows on a payment with no failure that the customer's success message and the merchant's money are seven steps and at least two days apart.",
+        "supports": [
+          "P9-1",
+          "P9-5"
+        ]
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The part introduction's claim that payments go wrong at hand-offs, and the step table it describes.",
+        "introduces": "The first payment walked through that table: Mila's class pass, on which nothing fails, so every hand-off can be seen working.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "post_spec": "posts/42-journey-card-payment/spec.json"
+    },
+    {
+      "id": "journey-failed-renewal",
+      "folder": "43-journey-failed-renewal",
+      "title": "Journey 2: A Membership Renewal That Fails, and Comes Back",
+      "kind": "walkthrough",
+      "detail": "full",
+      "question": "When Mila's €49 renewal is declined on 1 April 2027, who decides whether and when to try again, and which system holds the state of her membership until the money arrives?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "The steps of a renewal with the customer absent: the scheduled charge as a merchant-initiated transaction on a stored card, the decline with its code, the decision whether a retry is allowed, the notice to the member, the retry, the recovery, and the branch where recovery fails and the membership lapses; for each, the party, the record, the promise and the failure, with the chapter that owns it.",
+            "The canonical dates: Mila's €49.00 monthly membership at Studio Noord renews on the 1st; on 1 April 2027 the charge is declined for insufficient funds; the retry on 4 April succeeds; the €49 collected on 4 April pays for the period that began on 1 April.",
+            "What the rules and documentation say as of November 2026: Visa sorts decline codes into those a merchant must never resubmit and those it may reattempt within a limit (20 attempts in 30 days in the rules of 24 October 2026; Adyen's page says 15), and requires written notice and at least 7 calendar days to pay by other means after a declined merchant-initiated authorization; Stripe Billing retries an invoice (Smart Retries, by default up to 8 attempts in 2 weeks, with retries suspended on listed hard decline codes until a new payment method appears); Adyen documents a retry feature for payments (Auto Rescue, default window one calendar month) and no invoice or subscription object.",
+            "Where the public record stops: each company has described its retry model once (Stripe in a 2024 post, 'more than 500 attributes'; Adyen in a 2020 post, a contextual bandit with 'about 6% more orders than the baseline'), and neither publishes the current model, its inputs or the timing it would choose for a given decline; the customer figure Adyen publishes for Auto Rescue has no baseline."
+          ],
+          "believe": [
+            "A decline is information about what to do next, not the end of the attempt.",
+            "The debt for a billing period and the payment attempts against it are two records, and something has to own the first."
+          ],
+          "can_do": [
+            "Write a retry policy that separates declines that must never be retried, declines that are a matter of timing and declines that need a new credential, and that stays inside the network's limits.",
+            "Say, for their own provider, which system holds 'still owed for this period' and what state the customer is in while it is owed."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a renewal job that retries every decline the same way, the reader separates the declines by what they call for and says what the job should do with each.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A language-learning app renews 20,000 monthly card subscriptions on the 1st. Its job retries every declined card once a day for 30 days and emails 'your payment failed' after each failed attempt. This month's declines include 'insufficient funds', 'lost card' and 'expired card'. Using only this chapter: what is wrong with the job, and what should it do with each of the three?",
+            "expected": "It treats every decline as the same event. 'Lost card' is in the class the network says must never be resubmitted for that card; retrying it earns fees and nothing else, so stop and ask the customer for a new payment method. 'Insufficient funds' is a matter of timing: a retry is allowed within the network's limit (Visa: 20 attempts in 30 days in its October 2026 rules, 15 on Adyen's page), so retry a few times on chosen days, not daily without thought. 'Expired card' needs a new credential, which an account updater or a network token's lifecycle update may supply without the customer; a plain retry of the old details will not. One written notice with a way to pay otherwise, and at least 7 days to do so under Visa's rule for declined merchant-initiated charges, replaces thirty emails. Between the decline and the recovery the subscription needs a defined state with a defined end."
+          },
+          {
+            "id": "AC-2",
+            "statement": "The reader can say which system holds the debt for the period on each provider and what the integrator must build on each.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "One studio's memberships are charged through Stripe Billing subscriptions; another's are charged by the platform's own renewal job through Adyen. In both, a €49 renewal is declined on the 1st. Using only this chapter: in each case, which system knows that €49 is still owed for the month, what retries it, and what does the platform have to build itself?",
+            "expected": "On Stripe Billing the invoice for the period is the debt: it stays open, the subscription becomes past due, and Stripe's retries (Smart Retries or a custom schedule) run against the invoice, so a new card or another payment can settle the same debt; the platform configures the retry window and what happens when retries run out, and listens for the invoice events. On Adyen there is no invoice or subscription object in the documentation: the platform's renewal job submits a merchant-initiated payment on a stored token, the platform's own records hold the debt and the membership state, and the platform schedules the retries, or lets Adyen's Auto Rescue retry the payment within its window and report by webhook against the platform's reference for that billing cycle."
+          },
+          {
+            "id": "AC-3",
+            "statement": "Given the branch where no retry succeeds, the reader can say what state the membership, the debt and the member's access end in, and that the outcome is a setting or a decision, not something the payment record supplies.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "Suppose every retry of a €49 renewal fails through the end of the retry window. Using only this chapter: what must be decided about the membership, the amount owed and the member's access, and who or what makes each decision on Stripe Billing and on an Adyen integration?",
+            "expected": "Three things: whether the membership is canceled, paused or left unpaid; whether the €49 stays owed or is written off; and from which day the member loses access. On Stripe Billing the first two follow from the account's settings for exhausted retries (the subscription is canceled, marked unpaid, left past due or paused, and the invoice stays open or is marked uncollectible). On an Adyen integration all three are the platform's own rules in its own records. In neither case does a payment record say it: the last record a payment system holds is a declined attempt."
+          }
+        ]
+      },
+      "thesis": {
+        "question": "When Mila's €49 renewal is declined on 1 April 2027, who decides whether and when to try again, and which system holds the state of her membership until the money arrives?",
+        "claim": "A declined renewal is an open debt with a clock, not a failed payment. The decline code decides whether a retry is allowed at all, the card network caps how many, and the state of Mila's membership between the decline on 1 April and the successful retry on 4 April has to be held by the billing side, because no payment record contains it. Where that debt lives depends on the provider: Stripe Billing retries an invoice it owns, while on Adyen, Studio Noord's provider, the provider can retry a payment and Larkfield's renewal job owns the schedule, the membership state and the notice to Mila.",
+        "disputed_by": "The view that recovery is the provider's job: the renewal failed, the provider's retry feature (or a daily retry of the same charge) will collect it when it can, and the merchant needs only an 'unpaid' flag and a reminder email, not a record of a debt.",
+        "so_what": "A team that accepts this classifies a decline before scheduling anything, keeps one record of the debt per billing period against which all attempts are counted, and gives the member a defined state while the debt is open. Larkfield saw what an undefined in-between state costs on 1 October 2026, when 7,900 renewals were delayed to the next day by a rate limit and dunning emails went to members who had done nothing wrong; Keel's K5 paces renewals over 18 hours and ties retries to decline codes.",
+        "how_why": "A merchant-initiated charge has no customer present, so nothing can be asked of Mila at the moment of decline: such payments fall outside strong customer authentication, with no challenge and no liability shift. What remains is the issuer's code. Visa's rules of 24 October 2026 sort codes into those a merchant must never resubmit and those it may reattempt, up to 20 times in 30 days (Adyen's page still says 15), charge fees for excess retries, and require written notice and at least 7 calendar days to pay by other means. Insufficient funds is a matter of timing; a reissued card is a credential problem that an account updater or a network token's lifecycle update solves and a retry does not. Stripe Billing, as documented in 2026, attaches retries to the invoice (by default up to 8 in 2 weeks, suspended on listed hard decline codes until a new payment method appears) and moves the subscription to past due and then to a configured end state. Adyen documents a payment-level retry feature, Auto Rescue, and no invoice or subscription object, so the scheduler and the debt are the integrator's. Neither company publishes the timing its retry model would choose for a given decline, so the walkthrough attributes the choice of 4 April to Larkfield's own schedule and to nothing inside a provider."
+      },
+      "role": {
+        "contribution": "Follows one renewal through decline, classification, notice, retry and recovery, and through the branch where it lapses, on Adyen with Larkfield's renewal job and on Stripe Billing; it shows the hand-off between the billing clock and the payment attempt, which Journey 1 did not have.",
+        "supports": [
+          "P9-2",
+          "P9-5"
+        ]
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "Journey 1's twelve steps on a payment that Mila started herself and that was approved the first time.",
+        "introduces": "The same member and the same stored card with two things removed: Mila is not present when the charge is made, and the issuer says no. The steps that replace authentication and approval are a decline code, a schedule and a notice.",
+        "form": "paragraph",
+        "placement": "both"
+      },
+      "post_spec": "posts/43-journey-failed-renewal/spec.json"
+    },
+    {
+      "id": "journey-platform-payment",
+      "folder": "44-journey-platform-payment",
+      "title": "Journey 3: One Payment, Three Parties, and a Refund After Payout",
+      "kind": "walkthrough",
+      "detail": "full",
+      "question": "How is Mila's €120 divided among Studio Noord, Larkfield and the provider, and whose money pays the €84 refund on 18 March, a week after the studio was paid?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "The steps of a platform payment and its late refund: the studio's verification and capability state, the split instruction, the platform fee, the processing cost, the studio's balance, the payout, the refund request, the debit of a balance that has been paid out, the shortfall and its recovery, and the ledger entries; for each, the party, the record, the promise and the failure, with the chapter that owns it.",
+            "The canonical figures: €120.00 divided into €117.47 for Studio Noord and €2.53 for Larkfield (1.9% + €0.25), with an illustrative provider cost of €0.61 inside the fee; the studio paid on 11 March 2027; a refund of €84.00 for seven unused classes requested on 18 March.",
+            "The same journey in both vocabularies as documented in 2026: on Adyen a splits instruction of typed bookings to the studio's balance account and the platform's liable balance account, refunds debited only from balance accounts the payment credited, and the liable balance account standing behind a negative user balance; on Stripe an application fee or transfers, with the charge type deciding whether the studio's or the platform's balance is debited by a refund, and a refund held pending for up to 45 days when the balance is short.",
+            "Where the public record stops: Adyen documents an option in which it takes a seller's loss only as a pilot with limited availability (Managed Risk), and no Adyen price list for platforms was found; the pairing of Stripe and Adyen terms is the book's own mapping."
+          ],
+          "believe": [
+            "A platform that never holds the money still carries the risk that the money comes back.",
+            "The account model chosen at integration is the answer to 'who pays' for every later refund, whether or not anyone read it that way."
+          ],
+          "can_do": [
+            "Trace a refund made after payout to the balance it is debited from and the party that covers a shortfall, on either provider.",
+            "List what a platform must decide before its first late refund: the refund split, what happens to its own fee, who bears the processing cost, and how a seller's shortfall is recovered and recorded."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a refund after payout on a platform the chapter does not contain, the reader says which balance is debited, who covers a shortfall on each provider and what the platform should have decided and recorded beforehand.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A tutoring platform takes card payments from parents and pays each tutor daily. A parent is refunded €60 for a lesson that was paid out to the tutor four days earlier; the tutor has since stopped using the platform and has no further sales. Using only this chapter: where does the €60 come from on Adyen for Platforms and on Stripe Connect, and what should the platform have decided and recorded before this happened?",
+            "expected": "On Adyen, and on Stripe with a destination charge, the parent gets the €60 at once and the question is which balance is left short. On Adyen the refund can be debited only from the balance accounts the payment credited, so the tutor's balance account goes negative and the platform's liable balance account stands behind it (Adyen allows a negative balance for up to 30 days and then debits the platform's reserved compensation account; only under its Managed Risk pilot does Adyen bear the loss); the platform can recover by a top-up drawn by direct debit from the tutor's verified bank account, if the tutor consented to that at onboarding. On Stripe it depends on the charge type: with a direct charge the refund is debited from the tutor's connected account, and while that balance is short the refund waits as pending and fails after 45 days, so the parent is not repaid until the balance is funded; with a destination charge the platform's balance is debited and the platform must reverse the transfer to the tutor, which errors if the tutor's balance is short. Beforehand: a decision on the refund split and on the platform's own fee, consent to debit, the platform's own figure for money paid out that can still come back per seller, and a ledger entry for the amount the tutor now owes."
+          },
+          {
+            "id": "AC-2",
+            "statement": "The reader can say why the provider's processing cost is not a fixed line in the split and who bears it by default on each provider.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A platform wants every payment split into exactly three known amounts at the moment of payment: the seller's share, the platform's fee and the provider's cost. Using only this chapter: why can it not always know the third amount at that moment, and who pays it by default on Adyen and on Stripe?",
+            "expected": "On Adyen the transaction fees are calculated after the payment request is received and are not known at the time of payment, so the split names who bears each type of fee, not an amount; if the request names nobody, Adyen books all transaction fees to the platform's liable balance account. On Stripe who pays follows from the charge type and the account's fee configuration, and the fee is reported afterwards on the balance transaction. So the platform's ledger records its fee at the payment and the provider's cost when it is reported, and the two are reconciled later."
+          },
+          {
+            "id": "AC-3",
+            "statement": "Every step that names an Adyen resource names the Stripe counterpart, and the chapter says once that the pairing is the book's own mapping, since neither company publishes one.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "major"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "How is Mila's €120 divided among Studio Noord, Larkfield and the provider, and whose money pays the €84 refund on 18 March, a week after the studio was paid?",
+        "claim": "Mila's €120 is divided by an instruction attached to the payment into €117.47 for Studio Noord and €2.53 for Larkfield, and the provider's cost (an illustrative €0.61) comes out of Larkfield's share, leaving it €1.92. The €84 refund of 18 March is debited from a balance out of which that €117.47 was already paid on 11 March, and the platform's account model, chosen long before either date, decides whose balance goes short and who stands behind it. On Adyen a refund is debited from the balance accounts the payment credited, and Larkfield's liable balance account covers a studio balance that goes negative; on Stripe the charge type decides whether the studio's or the platform's balance is debited first.",
+        "disputed_by": "The view that a platform only passes money through: once the split is correct and the studio has been paid, the payment is the studio's business, a later refund is the studio's refund, and a platform that never holds funds carries no balance risk.",
+        "so_what": "A platform that accepts this decides the refund split, the fate of its own fee and the recovery of a seller's shortfall before the first late refund, keeps its own figure per seller for money paid out that can still come back, and books a refund after payout as its own ledger entry. Refunds after payout were one of the three causes of Larkfield's unexplained €412,000 at year-end 2025, and Keel's K3 makes every such movement an entry.",
+        "how_why": "Money moves forward on the provider's schedule and backward on the customer's, so the two meet in a balance at different times. On Adyen, as documented in 2026, a split is a list of typed bookings declared at authorization or capture (the user's balance account, the platform's commission, the fee types); the provider's own fees are calculated after the request and by default fall on the liable balance account; refunds 'can only be deducted from the balance accounts to which the payment was credited', and the result arrives later by webhook; funds can be deducted from the liable balance account when a user's balance account goes negative through refunds or chargebacks; and an instruction that names a missing or closed balance account is not rejected but booked in full to the liable account. On Stripe a platform fee is an application fee on the charge or a transfer after it; a refund on a direct charge debits the connected account, a refund on a destination charge debits the platform, which must reverse the transfer to recover it; a refund against a short balance waits as pending and fails after 45 days; and a connected account's negative balance is collected from its bank account first and, where the platform is responsible, from a platform reserve after 180 days. Adyen documents a negative balance for up to 30 days before the platform's reserved compensation account is debited, and an arrangement in which Adyen itself bears the loss only as a pilot (Managed Risk), so the walkthrough states the default and names the pilot."
+      },
+      "role": {
+        "contribution": "Opens the split and payout rows of Journey 1 into a full platform journey in both providers' vocabularies and then reverses it, showing the first backward flow of the part and the point at which the account model becomes the liability model.",
+        "supports": [
+          "P9-3",
+          "P9-5"
+        ]
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "From Journey 1, the pass of 9 March with its split and payout, each given one row there; from Journey 2, the lesson that a payment's state can stay open after the first answer.",
+        "introduces": "The third party in every Larkfield payment, seen from the platform's side: the split and the studio's balance in detail, and then the first money in the part that goes backward, an €84 refund a week after the payout.",
+        "form": "paragraph",
+        "placement": "both"
+      },
+      "post_spec": "posts/44-journey-platform-payment/spec.json"
+    },
+    {
+      "id": "journey-dispute",
+      "folder": "45-journey-dispute",
+      "title": "Journey 4: A Dispute, From Chargeback to Ledger",
+      "kind": "walkthrough",
+      "detail": "full",
+      "question": "What happens, in money, deadlines and records, when Bram de Wit's bank takes back a €120 payment three weeks after it was made, and who ends up carrying the loss?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "The steps of a dispute: the cardholder's claim to the issuer, the chargeback through the network, the provider's notification, the debit of the amount and a fee, the evidence and its single submission, the deadline, the issuer's review, the outcome and its possible reopening, the booking of the loss on the platform, the ledger entries and the count toward the network's monitoring program; for each, the party, the record, the promise and the failure, with the chapter that owns it.",
+            "The canonical facts: Bram de Wit disputes a €120.00 pass bought at Studio Noord on 2 February 2027 as 'not recognized'; the chargeback arrives on 24 February 2027 with an illustrative €15.00 fee.",
+            "The two providers' dispute records as documented in 2026: on Stripe one Dispute object with a status, the amount and a fee debited when it is created, and the amount returned only on a win; on Adyen a series of events against the original payment (notification of chargeback, chargeback, information supplied, chargeback reversed, second chargeback), with the credit on a reversal provisional. On Adyen for Platforms the chargeback is booked by logic set on the payment, by default to the platform's liable balance account; on Stripe Connect the charge type decides which balance is debited.",
+            "Where the public record stops: Adyen's chargeback fee amount is contractual, with only CAD 24.00 published, in Adyen Canada's fee disclosure (Stripe's Netherlands list price is €20 per dispute received and €20 per dispute countered); Mastercard's deadlines are known here only as the two providers render them."
+          ],
+          "believe": [
+            "A paid-out payment is not final; it is a payment nobody has disputed yet.",
+            "Winning a dispute returns the money and leaves the count against the merchant unchanged.",
+            "Who carries a dispute's loss is settled when the payment is created, so it is a design decision, not something to settle when the dispute arrives."
+          ],
+          "can_do": [
+            "Book a chargeback on the day it arrives, against the balance the account model names, as a provisional entry that a later event can reverse.",
+            "List the evidence their own system would need at the moment of sale to answer a 'not recognized' claim in one submission.",
+            "Say which dispute event on each provider a ledger must not treat as final."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a team's plan for handling a chargeback on a platform the chapter does not contain, the reader says what is wrong with each step of the plan.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A ticket marketplace receives a €200 chargeback (the buyer's bank taking the payment back, here with the claim that the buyer did not make it) on a sale it paid out to the event organizer two months ago. The team plans to (a) book nothing until it knows whether it has won, (b) refund the buyer now so that the dispute goes away, and (c) collect evidence when someone has time. Using only this chapter: what is wrong with each?",
+            "expected": "(a) The €200 and a fee are debited before the issuer has ruled, from the balance fixed by the charge type or the chargeback logic set on the payment, so the ledger is wrong from that day unless the debit is booked at once, as a provisional entry and as an amount owed by the organizer or a loss to the platform. (b) A refund does not close a dispute: the bank has already taken the money, so the buyer would be paid twice; Stripe does not allow a refund outside the dispute process while a dispute is open; and the dispute still counts in the network's monitoring ratio. (c) The merchant gets one submission against a deadline counted in days (at Adyen 18 days for Visa outside the US and Canada and 40 for Mastercard; 'usually 7-21 days' at Stripe), so the evidence has to have been captured at the sale."
+          },
+          {
+            "id": "AC-2",
+            "statement": "The reader can name, for each provider, the dispute event or status that looks final and is not.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A ledger is fed by dispute events from both Stripe and Adyen. Using only this chapter: name one event or status on each provider that the ledger must not treat as the end of the dispute, and say what can follow it.",
+            "expected": "On Adyen, CHARGEBACK_REVERSED: the amount returns while the issuer is still reviewing the defense, and a SECOND_CHARGEBACK can debit it again (and American Express can reopen a dispute closed in the merchant's favor). On Stripe, the status 'lost': it can change to 'won' later when an issuer credits Stripe outside the regular lifecycle, and where appeals are enabled a rejected response can go on to pre-arbitration or arbitration. In both cases the entry for the outcome has to be reversible."
+          },
+          {
+            "id": "AC-3",
+            "statement": "The reader can say whether winning disputes improves a merchant's standing in a network monitoring program and what does.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A studio answers ten disputes in a month and wins nine. Using only this chapter: has its standing in the card networks' dispute monitoring programs (which count a merchant's disputes against its sales each month) improved, and what would have?",
+            "expected": "No. The programs count disputes when they are received and do not consider outcomes or refunds; on Visa a payment with both a fraud report and a dispute counts twice. What lowers the count is fewer disputes arriving: on Visa, disputes resolved through pre-dispute products are excluded from the ratio, so prevention and resolution before the chargeback matter, not the win rate. A platform should keep its own estimate of the ratio and act well below the threshold."
+          }
+        ]
+      },
+      "thesis": {
+        "question": "What happens, in money, deadlines and records, when Bram de Wit's bank takes back a €120 payment three weeks after it was made, and who ends up carrying the loss?",
+        "claim": "A chargeback debits first and judges later. The €120 and a fee (an illustrative €15) leave the platform side before the issuer has ruled on any evidence; the merchant may submit evidence once, within a deadline counted in days (at Adyen, 40 for a Mastercard such as the one in this dispute and 18 for a Visa payment processed outside the US and Canada); and the dispute counts toward the network's monitoring ratio whether it is won or lost. Adyen records it as separate events, with a provisional credit if the chargeback is reversed, and Stripe as one Dispute object whose status can still change after 'lost'. Who carries the €135 was decided before Bram de Wit made his claim: on Adyen by the chargeback logic set on the payment of 2 February, which by default books it to Larkfield's liable balance account, and on Stripe by the charge type.",
+        "disputed_by": "The view that a dispute is a customer-service case: it is rare, support answers it when it arrives, the merchant who is in the right gets the money back, and nothing in the payment system needs to be designed for it.",
+        "so_what": "A team that accepts this captures evidence at the sale, books the debit the day it arrives as an entry a later event can reverse, sets the chargeback logic or charge type knowing it is choosing who pays, and tracks its own dispute count per network. Chargeback fees were one of the three causes of Larkfield's unexplained €412,000, and under K3 every dispute movement is a ledger entry.",
+        "how_why": "The issuer returns the transaction to the acquirer through the network on the cardholder's word, and the rules give the merchant side a response, not a veto: for many Visa conditions the issuer has 120 calendar days from processing to dispute, the Visa rules give the acquirer 30 calendar days to respond, and the providers' merchant-facing deadlines are shorter (18 days at Adyen for Visa outside the US and Canada; 'usually 7-21 days' at Stripe). A 'not recognized' claim is a fraud dispute, which on Visa follows the flow Adyen calls Allocation, where a defended chargeback is not credited back at once. Both providers document that evidence is submitted once (Stripe: 'only one opportunity to submit your response'; Adyen: submitting defense documents 'is irreversible'). As documented in 2026, Stripe models the dispute as one object with a status and moves money when it is created and, if the dispute is won, again when it ends, though 'lost' can later become 'won'; Adyen exposes the network's cycle as separate events, so a reversal's credit is provisional and a second chargeback can take it again. The monitoring programs count disputes received and ignore outcomes and refunds. Adyen's terms (clause 8.2) call the chargeback fee non-refundable and leave its amount to the merchant agreement, so the €15 is illustrative; Mastercard's time limits are given as the two providers state them, because Mastercard's own rule documents were not readable for this book."
+      },
+      "role": {
+        "contribution": "Follows the one flow that starts outside every system the merchant controls, from the cardholder's claim to the ledger entries and the monitoring count, on Adyen and on Stripe; as the part's last journey it also performs the part's closing, setting the four journeys against the €412,000 of the opening.",
+        "supports": [
+          "P9-4",
+          "P9-5"
+        ]
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "Journey 3's refund: money going back because the member asked and the studio agreed, debited from a balance that had been paid out, with the account model deciding who covers the gap.",
+        "introduces": "Money going back because the cardholder's bank says so: the same balances and the same question of who covers the gap, with nobody on the merchant side having agreed, a fee, a deadline and a count that the refund did not have.",
+        "form": "paragraph",
+        "placement": "both"
+      },
+      "post_spec": "posts/45-journey-dispute/spec.json"
+    }
+  ]
+}

@@ -1,0 +1,1619 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "in-person-payments",
+  "journal": "payments-platform-architecture",
+  "part": "part-2",
+  "title": "The Card in the Room: Terminals and Unified Commerce",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "What the chip adds (a one-time cryptogram per transaction), what the networks' liability rules make depend on it, and the two meanings of 'offline': approval by the card on the issuer's preset terms, and store-and-forward at the merchant's risk.",
+        "The integration shapes for terminals (local or cloud at Adyen on the nexo retail protocol; SDK or server-driven at Stripe with the same PaymentIntent as online) and what each does when the connection drops.",
+        "What 'unified commerce' consists of in data terms, and what each company publishes about its in-person business (Adyen reports point-of-sale volume, 22% of processed volume in 2025; Stripe publishes none)."
+      ],
+      "believe": [
+        "A terminal is a managed computer in the payment path, with software, keys and certificates that someone must own.",
+        "Using one provider for both channels does not by itself make a store payment and an online payment one; a shared shopper identifier, a cross-channel refund and a single settlement report each have to be checked."
+      ],
+      "can_do": [
+        "Choose a terminal integration shape for a stated store network and say what it does offline and who carries that risk.",
+        "Test a provider's unified-commerce claim with three separate checks: recognizing the same payer across channels, refunding across channels, and reconciling both channels in one report."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given an offline requirement the chapter does not contain, the reader distinguishes the two mechanisms and states who bears the loss on a later decline.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A ferry operator sells food on board with no connectivity for forty minutes per crossing. It wants to keep taking cards. Using only this chapter: what are its two options for an offline payment, and who loses the money if a stored payment is declined when the ferry docks?",
+        "expected": "Either the card itself approves on terms its issuer preset (not supported by most debit cards), or the terminal stores the payment and asks for authorization later (store-and-forward). In the second case the operator has already handed over the goods and bears the loss on a decline, so limits per transaction and per device are the operator's credit decision; stored payments need their own retry and reconciliation."
+      },
+      {
+        "id": "AC-2",
+        "statement": "Given a 'unified commerce' claim, the reader breaks it into the three checks and does not accept one as proof of the others.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A provider says: 'With us, online and in-store payments are unified.' A shoe retailer wants to let customers return online orders in its shops for a refund to the original card. Using only this chapter, which three things do you verify, and which one does this use case depend on?",
+        "expected": "A shared identifier for the same payer or card across channels; a refund path that works from one channel to a payment made in the other; one settlement report covering both. The return case depends on the cross-channel refund, and passing the other two does not prove it."
+      },
+      {
+        "id": "AC-3",
+        "statement": "The chapter's closing section performs the part's closing: it puts the six layers of a 'yes' side by side, states what follows for comparing approval rates, and returns to the 1,140 Larkfield studios charged through Stripe online and Adyen at the front desk.",
+        "check": "conclusion_synthesizes_and_answers_so_what",
+        "method": "rubric",
+        "severity": "major"
+      },
+      {
+        "id": "AC-4",
+        "statement": "Liability rules are attributed to the network rules actually read (Visa, with their edition date) and Mastercard's are marked as not verified; terminal models, country lists and volumes carry their dates; the chapter says that neither company publishes its terminal key management, and that Adyen documents how it rolls out terminal software releases (every four weeks, gradually) while Stripe documents no equivalent.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      },
+      {
+        "id": "AC-5",
+        "statement": "A reader of the introduction alone (callouts and paragraphs p01 to p04) can predict the chapter's sections.",
+        "check": "intro_predicts_content",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "After reading only the introduction: what will this chapter discuss, and in what order?",
+        "expected": "The chip and liability; the terminal as a managed device; ways of driving a terminal; two kinds of offline and who carries the loss; three checks behind 'unified commerce'; Stripe and Adyen compared; Larkfield's case; failures."
+      },
+      {
+        "id": "AC-6",
+        "statement": "A reverse outline of the draft, written without the spec, lists the same controlling ideas in the same order as the spec's paragraphs.",
+        "check": "reverse_outline_matches_spec",
+        "method": "reverse_outline",
+        "severity": "blocker"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "What changes when the card is physically present, and what does it take to treat a store payment and an online payment as one?",
+    "claim": "When the card is present, a device joins the payment path: whether a fraud loss falls on the issuer or the merchant's side depends on the terminal reading the chip and the acquirer passing the chip data on, and a payment taken offline is credit the merchant extends. Treating a store payment and an online payment as one takes three things that have to be built and checked separately, a shared identifier for the payer, a refund path across channels and one settlement report; Stripe approaches them by reusing its online payment object at the counter, Adyen by shared references on one platform reached through a retail-industry terminal protocol.",
+    "disputed_by": "The view that a terminal is a card reader, an input device for the same payment, and that 'unified commerce' follows automatically from buying online and in-store payments from one provider.",
+    "so_what": "A platform that puts terminals in its customers' shops takes on a device estate: inventory, software versions, keys and certificates per site, offline limits with a named owner, and a reconciliation path for stored payments. And it tests each of the three unified-commerce properties on its own, because a provider can deliver one without the others.",
+    "how_why": "The chip produces a one-time cryptogram, and Visa's published rules (edition of October 2026) let an issuer push a counterfeit-fraud loss to the acquirer when the transaction did not take place at a chip-reading device or the full chip data was not transmitted; Mastercard's rules were not read and are described only as industry knowledge. Offline has two documented forms: Adyen supports approval by the card and store-and-forward with limits the merchant sets, Stripe store-and-forward only with a ceiling it enforces. In store-and-forward, authorization is attempted only after the connection returns, so the goods have left before any issuer has answered, which is why the chapter calls it credit extended by the merchant. The integration shapes differ in the same direction: Adyen's Terminal API follows the nexo retail protocol and runs locally or through the cloud; Stripe drives readers from an SDK or its own API and represents the payment as the PaymentIntent used online, with a generated card for reuse, since Stripe documents that a card read in person cannot itself be reused online. That the shared identifier, the cross-channel refund and the single report are separable, so that a provider can deliver one without the others, is the author's judgement and not a documented finding about either company. Adyen has designed terminals in-house since 2022 and reports point-of-sale volume (22% of processed volume in 2025); Stripe publishes no in-person volume. That Adyen exposes more of the card-present toolkit and Stripe one safer default is the author's reading; neither publishes key management or failure rates, and only Adyen documents how terminal software updates are rolled out.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "The chip gives each transaction a one-time cryptogram, and Visa's rules put a counterfeit-fraud loss on the acquirer's side when the terminal did not read the chip or the acquirer did not transmit the chip data."
+      },
+      {
+        "id": "S2",
+        "claim": "A terminal is a managed computer in the payment path, with certifications, keys and software versions that someone must own, and neither company publishes how it manages keys; only Adyen documents how it stages fleet software updates."
+      },
+      {
+        "id": "S3",
+        "claim": "The integration shape, local or cloud at Adyen on the nexo protocol and SDK or server-driven at Stripe on the online payment object, decides what the counter does when the connection drops."
+      },
+      {
+        "id": "S4",
+        "claim": "Offline has two forms, approval by the card and store-and-forward, and a store-and-forward payment is credit the merchant extends, bounded by limits that need an owner."
+      },
+      {
+        "id": "S5",
+        "claim": "Treating a store payment and an online payment as one takes a shared payer identifier, a refund path across channels and one settlement report, which are built and checked separately."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Adds the device to the layers of a 'yes' and carries the part's closing, where the six layers are set side by side and the part hands off to the question of where the approved money is recorded.",
+    "supports": [
+      "P2-6"
+    ]
+  },
+  "flow": {
+    "pattern": "prerequisite_order",
+    "additional_patterns": [
+      {
+        "pattern": "problem_solution",
+        "applies_to": "scene to in-practice: two requests posed at Larkfield, answered after the mechanisms are taught"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "integration-shapes and where-they-differ"
+      }
+    ],
+    "rationale": "The reader meets two requests the online stack cannot answer, then gets the mechanisms in the order each depends on the last: the chip and the liability rule say why the device matters; the device as a managed computer says what has been deployed; the integration shape says how software reaches it and, with that, whether it can work without the internet; offline can be explained only after the shapes, because it exists on one of them; unified commerce comes after the single counter payment is understood, because it is about joining that payment to another. The company comparison follows the mechanisms so that every cell repeats a fact already met, Larkfield's case answers the scene's two requests with all of it, and the failures come last because each is a mechanism failing. Moving offline before the integration shapes would ask the reader to weigh a risk without knowing which design carries it; moving unified commerce first would compare channels before the reader knows what the counter channel is."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "On a Saturday morning a studio's internet connection drops while six people queue at the front desk. The terminal on the counter still lights up when a card is tapped and still prints 'approved'. No bank has been asked. Who approved those payments, and who pays if one of them is refused on Monday?"
+    },
+    "bridge": {
+      "from_reader_world": "An engineer who has integrated online payments thinks of a terminal as an input device: it reads a card and hands the number to the same payment API.",
+      "to_topic": "The terminal is a computer in the payment path that holds keys, decides what data the issuer receives and can accept a payment with nobody upstream listening; and a payment it takes does not join the online payments of the same customer unless somebody builds the join."
+    },
+    "thesis_statement": {
+      "text": "When the card is present, a device joins the payment path: who carries a counterfeit-fraud loss depends on the terminal reading the chip and the acquirer passing the chip data on, and a payment taken offline is credit the merchant extends. Treating a store payment and an online payment as one takes a shared identifier for the payer, a refund path across channels and one settlement report, each built and checked separately.",
+      "placement": "KEY POINTS callout (all three bullets) and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p04",
+      "promises": [
+        {
+          "promise": "Start at Larkfield's front desks with two requests that the online payment stack could not answer.",
+          "kept_in": [
+            "scene"
+          ]
+        },
+        {
+          "promise": "Explain what the chip adds and what the networks' liability rules make depend on it.",
+          "kept_in": [
+            "chip-and-liability"
+          ]
+        },
+        {
+          "promise": "Show the terminal as a managed computer with certifications, keys and software versions.",
+          "kept_in": [
+            "managed-device"
+          ]
+        },
+        {
+          "promise": "Compare the ways point-of-sale software drives a terminal, on Adyen and on Stripe.",
+          "kept_in": [
+            "integration-shapes"
+          ]
+        },
+        {
+          "promise": "Separate the two meanings of 'offline' and say who carries the loss in each.",
+          "kept_in": [
+            "offline"
+          ]
+        },
+        {
+          "promise": "Break 'unified commerce' into three checks.",
+          "kept_in": [
+            "unified-commerce"
+          ]
+        },
+        {
+          "promise": "Set Stripe and Adyen side by side, work the checks through at Larkfield and list the failures.",
+          "kept_in": [
+            "where-they-differ",
+            "in-practice",
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "A terminal that keeps printing 'approved' with the internet down has asked no bank, so somebody other than the issuer has made the promise.",
+        "function": "context",
+        "organization": "narration",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "A studio front desk on a Saturday morning, connection down, six people in the queue, the terminal still accepting taps.",
+            "shows": "The instant answer at the counter can be given with no issuer behind it, which an online payment API never does."
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "A terminal is a computer in the payment path, and what it reads, transmits and stores decides who carries a fraud loss and whether a counter payment can be joined to an online one.",
+        "function": "claim",
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "The question of who approved the offline payments.",
+          "introduces": "The chapter's claim: the device is a participant, liability turns on its data, offline acceptance is the merchant's credit, and 'one payment across channels' is three separate properties.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "Mila's class pass was bought in the app, so no terminal touched it; this chapter covers the same card tapped at Studio Noord's front desk, where a device stands between the card and the acquirer.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's class pass of 9 March 2027 (in the app, Studio Noord on Adyen) against a counter payment at the same studio.",
+            "shows": "Places the chapter on the payment's journey: the same authorization, with one more party in front of it.",
+            "source": "Larkfield scenario ledger (fictional)"
+          }
+        ],
+        "transition_in": {
+          "relationship": "place",
+          "carries_over": "The chapter's claim.",
+          "introduces": "Its position relative to the recurring payment.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "controlling_idea": "The chapter goes from Larkfield's front desks to the chip and liability, the terminal as a managed device, the integration shapes, offline payments, the three checks of unified commerce, the comparison of Stripe and Adyen, Larkfield's worked case and the failures.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The position on the journey.",
+          "introduces": "The order of the sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: Two Requests From the Front Desk",
+      "controlling_idea": "Two ordinary requests from studios, keep selling when the Wi-Fi drops and refund an online purchase at the counter, could not be answered from Larkfield's online payment stack.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S5"
+        ],
+        "how": "Poses the chapter's two questions as concrete requests: one about the device and the connection, one about joining channels."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The roadmap's first stop.",
+        "introduces": "Larkfield's front-desk estate and the two requests that expose what a terminal adds.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p05",
+          "controlling_idea": "Larkfield's front desks are a device estate on one provider: terminals at 2,100 studios, all supplied by Adyen and driven by the front-desk app, taking €210 million in 3.8 million payments in 2026.",
+          "function": "context",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Terminals at 2,100 studios; €210M in 3.8M front-desk payments in 2026 (about €55 on average); all terminals on Adyen; the front-desk app is a tablet app that drives the terminal.",
+              "shows": "The in-person business is a fifth of volume and sits on one provider and one integration.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ]
+        },
+        {
+          "id": "p06",
+          "controlling_idea": "In February 2027 two requests reached Femke de Graaf that the online stack could not answer: a studio owner wanted the terminal to keep working when the Wi-Fi dropped, and a member at one of the 1,140 studios on Stripe online wanted an online pass refunded at the counter.",
+          "function": "example",
+          "organization": "narration",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "The 1,140 studios in the Netherlands and Germany that are on Stripe for online payments and on Adyen terminals at the front desk; a studio owner's outage; a member's refund request at the desk.",
+              "shows": "Each request is about a property the device or the channel split adds, and neither exists in an online-only integration.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The estate on one provider.",
+            "introduces": "Two requests that test it: offline acceptance and a refund across channels.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "chip-and-liability",
+      "heading": "What the Chip Adds, and Who Pays When It Is Not Read",
+      "controlling_idea": "The chip gives each transaction a one-time cryptogram the issuer can check, and Visa's rules move a counterfeit-fraud loss to the acquirer's side when the terminal did not read the chip or the acquirer did not transmit the chip data.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S1"
+        ],
+        "how": "Establishes that liability depends on what the device reads and what the acquirer transmits."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "Card-present is defined before the chip, the chip before the message that carries its data, and the message before the rule that depends on it; the rule would be unreadable without 'chip-reading device' and 'full chip data'."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The terminal on Larkfield's counters.",
+        "introduces": "What the card and the terminal exchange, starting with the vocabulary: card-present, magnetic stripe, chip.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p07",
+          "controlling_idea": "A card-present payment is one where a terminal reads the physical card or phone, and the oldest way of reading it, the magnetic stripe, hands over static data that can be copied onto another card.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "A magnetic stripe holds the same data on every swipe, so a copy of the stripe is indistinguishable from the card.",
+              "shows": "States the problem the chip was introduced to solve."
+            }
+          ]
+        },
+        {
+          "id": "p08",
+          "controlling_idea": "EMV is the chip-card standard: the chip computes a one-time cryptogram for each transaction, by contact or contactless, so a copied card cannot replay an earlier one.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'EMV Chip technology uses advanced cryptography to generate a one-time security code (cryptogram) for each transaction that allows the card issuer and merchant point-of-sale terminal to authenticate the card. The security code is unique to each transaction and cannot be reused'",
+              "shows": "The standard body's own statement of what the chip adds.",
+              "source": "EMVCo, 'EMV Contact Chip', n.d., accessed November 2026, https://www.emvco.com/emv-technologies/emv-contact-chip/"
+            },
+            {
+              "kind": "quotation",
+              "what": "'EMVCo does not mandate or enforce EMV compliance or the implementation policies for issuers, merchants, and acquirers, which are handled by payment networks independently outside of EMVCo'",
+              "shows": "The standard and the rules that give it consequences have different owners.",
+              "source": "EMVCo, 'Overview of EMVCo', n.d., accessed November 2026, https://www.emvco.com/about-us/overview-of-emvco/"
+            },
+            {
+              "kind": "statistic",
+              "what": "'globally, 97% of card-based transactions are EMV Chip', statistics as of Q4 2025, reported for card-present transactions.",
+              "shows": "Chip is the normal case, so the exceptions are what an architect must look for.",
+              "source": "EMVCo, 'Worldwide EMV deployment statistics', n.d., accessed November 2026"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The copyable stripe.",
+            "introduces": "The chip and its one-time cryptogram.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p09",
+          "controlling_idea": "The cryptogram is useful only if it reaches the issuer: the terminal reads the chip, and the chip data travels with the authorization request through the provider, the acquirer and the network to the issuer, which verifies it.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "figure",
+              "what": "Message flow: card, terminal, provider and acquirer, card network, issuer; the chip data rides in the authorization request; the answer returns the same way.",
+              "shows": "Shows the two places where the data can be lost: at a device that cannot read the chip, and at an acquirer that does not pass it on."
+            },
+            {
+              "kind": "reasoning",
+              "what": "The parties are those of the four-party model (journey-of-a-payment) and the message is the authorization of payment-authorization, with one added field group.",
+              "shows": "Links the card-present flow to what the reader already knows."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The cryptogram the chip produces.",
+            "introduces": "The path it takes to the party that can check it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "controlling_idea": "The networks attach money to that path through the EMV liability shift, a dispute rule under which Visa lets an issuer push a counterfeit-fraud loss to the acquirer when the chip was not read or the chip data was not transmitted.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Dispute Condition 10.1, 'EMV Liability Shift Counterfeit Fraud': the transaction 'was completed with a Counterfeit Card in a Card-Present Environment', 'The Cardholder denies authorization', 'The Card is a Chip Card', and any of: 'The Transaction did not take place at a Chip-Reading Device', or it 'was Chip-initiated and, if the Transaction was authorized Online, the Acquirer did not transmit the Full-Chip Data to Visa in the Authorization Request', or it 'was approved offline, and the Acquirer did not transmit the Full-Chip Data to Visa in the Clearing Record' (Table 11-9, entry last updated October 2023).",
+              "shows": "The rule's own wording names the device and the acquirer's transmission as the two conditions.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf"
+            },
+            {
+              "kind": "fact",
+              "what": "Table 11-1: the shift applies to all domestic, intraregional and interregional POS and ATM transactions in Visa's Canada, CEMEA, Europe and LAC regions, and to counterfeit POS and ATM transactions in the US region.",
+              "shows": "The rule is regional and is a network rule, not a law.",
+              "source": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The chip data's path to the issuer.",
+            "introduces": "The rule that decides who loses money when the data does not make the trip.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "controlling_idea": "Read as an engineer, the rule makes liability a property of data in transit: a certified terminal is not enough if the acquirer drops the chip data, and an offline approval keeps its protection only if the chip data reaches the clearing record; Mastercard's rules were not read for this chapter.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Two of the rule's three conditions are about what the acquirer transmits, in the authorization request or in the clearing record.",
+              "shows": "Shows why the provider between terminal and network matters to the merchant's liability."
+            },
+            {
+              "kind": "fact",
+              "what": "Mastercard's public rules returned an access error during research; Mastercard's equivalent shift is described only as industry knowledge.",
+              "shows": "Marks the limit of the evidence, as the chapter's acceptance criterion requires."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "Visa's rule text.",
+            "introduces": "What it means for the design, and where the evidence stops.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "managed-device",
+      "heading": "A Terminal Is a Managed Computer",
+      "controlling_idea": "A terminal is a certified computer holding encryption keys and versioned software, so putting one on a counter creates an estate that someone must inventory, update and replace, and neither Stripe nor Adyen publishes how it does the key and update work.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S2"
+        ],
+        "how": "Shows the device as a participant with its own lifecycle, against the view that it is a card reader."
+      },
+      "flow": {
+        "pattern": "large_to_small",
+        "rationale": "From the device and its certification, to the card data inside it and the compliance scope that follows, to the case where the device is a phone, and last to what is not published; the limit of the evidence closes the section because it applies to everything before it."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "Liability depends on what the terminal reads and what is transmitted.",
+        "introduces": "The terminal itself: what kind of machine has to be trusted with that.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p12",
+          "controlling_idea": "A payment terminal is a certified computer with an expiry date: its hardware is approved under a PCI device standard by version, and both providers push software to it on their own schedule.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen's terminal catalog labels each model 'PCI PTS 5' or 'PCI PTS 6' and states 'PCI PTS 5 payment terminals will no longer be available for order starting April 30, 2026'.",
+              "shows": "Certification versions end, which forces hardware refresh.",
+              "source": "Adyen documentation, 'Select your terminals', n.d., accessed 2026-11"
+            },
+            {
+              "kind": "quotation",
+              "what": "'All these terminals are all fully certified, can be centrally managed, and will automatically update themselves with the latest Adyen software'",
+              "shows": "The provider, not the merchant, updates the device.",
+              "source": "Adyen documentation, 'In-person payments', n.d., accessed 2026-11"
+            },
+            {
+              "kind": "quotation",
+              "what": "'The reader restarts every day at midnight for PCI compliance'",
+              "shows": "A Stripe reader has operating behavior the point-of-sale software must plan around.",
+              "source": "Stripe documentation, 'Stripe Reader S700/S710', n.d., accessed November 2026"
+            }
+          ]
+        },
+        {
+          "id": "p13",
+          "controlling_idea": "Both providers encrypt card data inside the terminal by default and sell a point-to-point encryption (P2PE) solution validated against PCI's standard as an option, and the choice decides which compliance questionnaire the merchant completes.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "PCI SSC: a P2PE solution 'cryptographically protects account data from the point where a merchant accepts the payment card to the secure point of decryption'; merchants using listed solutions 'have fewer applicable PCI Data Security Standard (PCI DSS) requirements'.",
+              "shows": "Defines P2PE and why it shrinks scope.",
+              "source": "PCI Security Standards Council, 'Point-to-Point Encryption (P2PE)', n.d., accessed November 2026"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen: default end-to-end encryption needs 'the SAQ B-IP'; P2PE needs 'the SAQ P2PE and the P2PE Instruction Manual'; 'While E2EE is secure, it does not have the PCI P2PE-validated “stamp”'.",
+              "shows": "The default and the listed option differ in paperwork and audit standing, by Adyen's own account.",
+              "source": "Adyen documentation, 'Adyen's E2EE and P2PE PCI security', n.d., accessed 2026-11, https://docs.adyen.com/development-resources/e2ee-p2pe-comparison"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'All payments using Terminal are securely encrypted using end-to-end encryption (E2EE) by default'; 'Stripe P2PE is an optional, paid feature'; Terminal-only merchants 'can validate using SAQ C'.",
+              "shows": "Same structure at Stripe, with a different default questionnaire.",
+              "source": "Stripe documentation, 'Terminal overview', n.d., accessed November 2026, https://docs.stripe.com/terminal/overview; Stripe, 'PCI compliance guide', n.d., accessed November 2026"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The certified device.",
+            "introduces": "What happens to card data inside it, and the compliance scope that follows.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p14",
+          "controlling_idea": "Tap to pay on a phone removes the terminal hardware and keeps everything else: the provider still supplies the certified terminal configuration, and a separate PCI standard covers payment acceptance on ordinary devices.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Apple: developers 'will first need to integrate with a supported payment service provider (PSP) who processes the payments read by Tap to Pay on iPhone and provides the certified terminal configurations that are loaded on the merchant's device. The PSP is responsible for all the necessary certifications and security considerations'.",
+              "shows": "The phone replaces the hardware, not the acquirer or the certification.",
+              "source": "Apple, 'Tap to Pay on iPhone', n.d., accessed November 2026, https://developer.apple.com/tap-to-pay/"
+            },
+            {
+              "kind": "fact",
+              "what": "PCI SSC's Mobile Payments on COTS (MPoC) standard is for solutions accepting PIN and contactless data on a commercial off-the-shelf device; Adyen says store and forward with its Android Mobile SDK is in limited availability 'because it is not yet PCI MPoC certified'.",
+              "shows": "The software terminal is certified too, feature by feature.",
+              "source": "PCI SSC, 'Mobile Payments on COTS (MPoC)', n.d.; Adyen documentation, 'Offline payments', n.d., accessed 2026-11, https://docs.adyen.com/point-of-sale/offline-payment"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A dedicated certified device.",
+            "introduces": "The case where the device is an ordinary phone.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p15",
+          "controlling_idea": "Neither company publishes how keys are loaded and rotated or how often terminals fail, and only Adyen documents how software updates are staged across a fleet, so the estate's own records have to be kept by the party that deploys the devices.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "No Stripe or Adyen page read describes terminal key injection or rotation, terminal failure rates or hardware economics. Adyen's 'Update to a new release' (n.d., accessed 2026-11) documents four-weekly releases, gradual automatic rollout and manual updating in batches; Stripe's S700 page says only that readers update automatically when not in use.",
+              "shows": "States where the public record stops."
+            },
+            {
+              "kind": "reasoning",
+              "what": "Per device and site, the deployer can still record model, certification version, software version, last contact and assigned store, because both providers expose device management through an API or dashboard.",
+              "shows": "Turns the limit into what the reader can do without the missing information; labeled as the author's recommendation.",
+              "source": "Adyen documentation, 'Automating terminal management' (Management API), n.d., accessed 2026-11; Stripe documentation, 'Terminal overview'"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What the providers document about their devices.",
+            "introduces": "What they do not, and what the deployer must therefore record itself.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "integration-shapes",
+      "heading": "Driving the Terminal: Local or Cloud, SDK or Server",
+      "controlling_idea": "Point-of-sale software reaches a terminal either over the store's own network or through the provider's cloud, on both providers, and that choice decides what the counter can do when the internet connection drops.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S3"
+        ],
+        "how": "Lays out the integration shapes and ties each to its behavior on connection loss, and shows the two companies' different starting points (a retail protocol; the online payment object)."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The shared problem first, then each provider's two shapes, then the four side by side, then the choice; the table needs both providers' vocabulary and the recommendation needs the table."
+      },
+      "transition_in": {
+        "relationship": "sequence",
+        "carries_over": "The terminal as a managed computer.",
+        "introduces": "How the merchant's own software talks to that computer.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p16",
+          "controlling_idea": "The point-of-sale software knows the amount and the terminal knows the card, so every counter payment needs a channel between the two, and there are two places to put it: the store's network or the provider's cloud.",
+          "function": "context",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "The point of sale (POS) is the merchant's till software; the terminal is the provider's certified device; card data must not cross from the second to the first.",
+              "shows": "Frames the integration as a control channel that carries amounts and results, never card numbers."
+            },
+            {
+              "kind": "table",
+              "what": "Requirements of the channel: how fast, how consistent (one request, one payment), how available (as available as the till), and what happens on failure (the till can always ask what happened to its last request); targets labeled as the author's.",
+              "shows": "States what any of the four shapes must guarantee before they are compared."
+            }
+          ]
+        },
+        {
+          "id": "p17",
+          "controlling_idea": "Adyen's Terminal API follows nexo, a retail-industry protocol for messages between a till and a terminal, and runs in two architectures: local, where the till posts to the terminal's own address, and cloud, where the request goes to Adyen and is forwarded.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Our Terminal API is based on the nexo Retailer Protocol'; protocol version 3.0; `ServiceID` 'Must be unique within the last 48 hours for the terminal (`POIID`) being used'.",
+              "shows": "The request model, including its duplicate protection, is the protocol's and not Adyen's online API's.",
+              "source": "Adyen documentation, 'Terminal API', n.d., accessed 2026-11, https://docs.adyen.com/point-of-sale/design-your-integration/terminal-api"
+            },
+            {
+              "kind": "quotation",
+              "what": "Local: 'you make an API request directly to the IP address of the terminal'; 'You receive the result of the payment synchronously'; the terminal 'listens for POST requests to `/nexo` on port 8443'; 'you need to add Adyen's certificate to your POS app, and encrypt your messages'. Cloud: 'you send your Terminal API requests to an endpoint on the Adyen payments platform. This request is forwarded to the terminal'; results 'synchronously or asynchronously'. Summary: 'cloud communications is easier to implement but does not support all use cases. Local communications on the other hand can be more robust but requires an additional effort'.",
+              "shows": "Adyen's own description of the two paths and the trade between them.",
+              "source": "Adyen documentation, 'Choose an integration architecture', n.d., accessed 2026-11, https://docs.adyen.com/point-of-sale/design-your-integration/choose-your-architecture"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The two places for the channel.",
+            "introduces": "Adyen's version of each.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p18",
+          "controlling_idea": "Stripe offers the same two places under different names, an SDK inside the point-of-sale app or a server-driven integration through the Stripe API, and in both the counter payment is the PaymentIntent used online.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Server-driven integrations use the Stripe API instead of a Terminal SDK to connect to' smart readers; 'The Stripe API: Receives requests and forwards them to a smart reader'; 'Server-driven integration doesn't support: Stripe Terminal mobile readers; Collect card payments while offline'.",
+              "shows": "Stripe's cloud path and its stated limits.",
+              "source": "Stripe documentation, 'Set up your integration' (server-driven), n.d., accessed November 2026, https://docs.stripe.com/terminal/payments/setup-integration"
+            },
+            {
+              "kind": "fact",
+              "what": "The offline flow diagrams show the POS application calling 'Create PaymentIntent', 'Collect payment method' and 'Confirm PaymentIntent' on the Terminal SDK.",
+              "shows": "The counter payment is the same object as the online payment (payment-state-machines).",
+              "source": "Stripe documentation, 'Accept offline payments' and 'Collect card payments while offline' (smart readers), n.d., accessed November 2026, https://docs.stripe.com/terminal/features/operate-offline/overview"
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "Adyen's local and cloud architectures.",
+            "introduces": "Stripe's SDK and server-driven integrations, and the object they share with online payments.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p19",
+          "controlling_idea": "Set side by side, the four shapes pair up: the two that stay inside the store keep working when the internet drops and cost network and certificate work, and the two that go through the provider's cloud are simpler and stop with the connection.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Shape (Adyen local, Adyen cloud, Stripe SDK, Stripe server-driven) by path of the request, how the result returns, security and network work for the merchant, and what happens when the internet connection drops.",
+              "shows": "The trade-off table: resilience against integration effort, with each cell taken from the documentation quoted in p17, p18 and the offline section.",
+              "source": "Adyen documentation, 'Choose an integration architecture', n.d., accessed 2026-11, https://docs.adyen.com/point-of-sale/design-your-integration/choose-your-architecture; Stripe documentation, 'Set up your integration' (server-driven), n.d., accessed November 2026, https://docs.stripe.com/terminal/payments/setup-integration; Adyen documentation, 'Offline payments', n.d., accessed 2026-11, https://docs.adyen.com/point-of-sale/offline-payment; Stripe documentation, 'Accept offline payments' and 'Collect card payments while offline' (smart readers), n.d., accessed November 2026, https://docs.stripe.com/terminal/features/operate-offline/overview"
+            },
+            {
+              "kind": "figure",
+              "what": "Two paths from a till to a terminal: through the store's local network, and out to the provider's cloud and back.",
+              "shows": "Makes visible that the cloud path crosses the internet connection twice."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "Each provider's two shapes.",
+            "introduces": "The four in one table, paired by where the channel runs.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "controlling_idea": "I would choose the cloud path for many small sites whose networks nobody manages and the local path where a store must keep selling through an outage, because the first trades resilience for an estate with no per-site network configuration and the second does the reverse.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "The local path needs a reserved address per terminal, a certificate and a shared key in the till software; the cloud path needs none of it and fails when the store's link fails.",
+              "shows": "Gives the conditions under which the recommendation flips; the author's judgement."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The paired trade-off.",
+            "introduces": "The author's rule for choosing, with its conditions.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "offline",
+      "heading": "Two Meanings of Offline, and Who Carries the Loss",
+      "controlling_idea": "'Offline' names two mechanisms, approval by the card on terms its issuer preset and store-and-forward, and in the second the merchant hands over goods before any issuer has answered, which makes it credit the merchant extends.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "S4"
+        ],
+        "how": "Argues that a payment taken offline by store-and-forward is the merchant's credit decision and needs limits, an owner and its own reconciliation."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "additional_patterns": [
+          {
+            "pattern": "problem_solution",
+            "applies_to": "p22 to p25: the merchant's exposure, then the limits, the boundary of what offline covers and the recovery path"
+          }
+        ],
+        "rationale": "The two mechanisms are told apart first, because everything after applies only to the second; the risk comes before the limits that bound it, and the limits before the cases they do not cover and the clean-up afterward."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "Only the in-store shapes keep working without the internet.",
+        "introduces": "What 'keep working' means when nobody upstream can be asked.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p21",
+          "controlling_idea": "In the first mechanism, offline EMV, the card itself approves the payment on terms its issuer configured in advance, which most debit cards do not allow.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Offline EMV: the payment terminal verifies that the PIN entered by the shopper matches the PIN on the EMV chip embedded in the card, and then asks the card to approve the payment. Whether the transaction is approved, depends on how the issuer configured the card. Because the card is in control, the payment can be processed in the clearing stream directly.' 'Most debit cards do not support this type of payment.'",
+              "shows": "An issuer's decision exists, made in advance and carried on the chip.",
+              "source": "Adyen documentation, 'Offline payments', n.d., accessed 2026-11, https://docs.adyen.com/point-of-sale/offline-payment"
+            }
+          ]
+        },
+        {
+          "id": "p22",
+          "controlling_idea": "In the second mechanism, store-and-forward, the terminal accepts the payment with no check, stores it and asks for authorization after the connection returns, so the merchant has extended credit to the customer for the time in between.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'the payment terminal or Mobile SDK approves payments without any verification'; 'In practice the authorization rates range from 95% in some industries to several percentage points higher'; 'You are fully liable for the risk of failed captures, chargebacks, and disputes related to payments that you process offline.'",
+              "shows": "The provider says in terms that the loss is the merchant's, and gives its own (undocumented-method) figure for how often the later authorization succeeds.",
+              "source": "Adyen documentation, 'Offline payments', n.d., accessed 2026-11, https://docs.adyen.com/point-of-sale/offline-payment"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'authorization is only attempted after connectivity is restored and the payment is forwarded'; 'You, as the user, assume all decline and tamper-related risks associated with an offline transaction'; 'there's no way to recover the funds'.",
+              "shows": "Same allocation of risk at Stripe, which documents store-and-forward only.",
+              "source": "Stripe documentation, 'Accept offline payments' and 'Collect card payments while offline' (smart readers), n.d., accessed November 2026, https://docs.stripe.com/terminal/features/operate-offline/overview"
+            },
+            {
+              "kind": "figure",
+              "what": "Timeline: goods leave the counter, the payment waits on the device, the connection returns, the issuer answers; a 'no' at the end is the merchant's loss.",
+              "shows": "Shows the interval during which the merchant is the only party that has promised anything."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Approval by the card.",
+            "introduces": "Acceptance by the terminal with no approval at all.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p23",
+          "controlling_idea": "Because the exposure is the merchant's, its size is set by limits, and the two providers put the limits in different hands: Adyen has the merchant set them, and Stripe enforces a ceiling and lets the merchant add its own.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen: chip floor limit, contactless floor limit, 'Store-and-forward max. amount' and 'Max. payments' per terminal; 'you need to set a transaction floor limit before your integration can make offline payments'.",
+              "shows": "Per-transaction and per-device limits are configuration the merchant must decide.",
+              "source": "Adyen documentation, 'Offline payments', n.d., accessed 2026-11, https://docs.adyen.com/point-of-sale/offline-payment"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'the Stripe-enforced offline maximum of 10,000 USD or equivalent in your operating currency'; in the European Economic Area 'customers are required to insert their card and enter a PIN'; 'Swiping isn't allowed'.",
+              "shows": "One fixed ceiling and stricter entry rules by default.",
+              "source": "Stripe documentation, 'Accept offline payments' and 'Collect card payments while offline' (smart readers), n.d., accessed November 2026, https://docs.stripe.com/terminal/features/operate-offline/overview"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The merchant carries the loss.",
+            "introduces": "The limits that bound it and who sets them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p24",
+          "controlling_idea": "Store-and-forward covers the store's connection failing and little else: Adyen states that it does not work during an outage of its own platform, and Stripe requires a reader to have been online recently before it will work offline.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'Store-and-forward offline payments do not work in the event of an outage of the Adyen payments platform'; with cloud communications 'it is not very useful to enable offline payments'.",
+              "shows": "Offline acceptance is not a defense against the provider being down, and not available on the cloud path in practice.",
+              "source": "Adyen documentation, 'Offline payments', n.d., accessed 2026-11, https://docs.adyen.com/point-of-sale/offline-payment"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'you must have previously connected to the same reader using a valid connection token within the last 24 hours, on the same local network'; a reader whose 'software hasn't been updated in 30 days or more' must go online first.",
+              "shows": "Offline is a state that has to be prepared while online.",
+              "source": "Stripe documentation, 'Accept offline payments' and 'Collect card payments while offline' (smart readers), n.d., accessed November 2026, https://docs.stripe.com/terminal/features/operate-offline/overview"
+            },
+            {
+              "kind": "reasoning",
+              "what": "INFERENCE, NOT DOCUMENTED: why Adyen's terminals refuse store-and-forward during a platform outage is not explained on the page; a plausible reason is that the terminal can tell a failed store link from an unreachable platform and treats only the first as the case the merchant accepted risk for.",
+              "shows": "Labels the explanation as inference."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The limits a merchant can set.",
+            "introduces": "The outages no limit covers.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p25",
+          "controlling_idea": "A stored payment has a second life after the outage: it surfaces later with identifiers the online path would have issued at once, may be declined, and may be retried, so it needs its own reconciliation path.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: the offline response 'misses the PSP reference. Only contains the tender reference'; 'failed store-and-forward payments that are eligible will be automatically retried for one calendar month' (Auto Rescue).",
+              "shows": "The till must match on the terminal's reference and expect an outcome up to a month later.",
+              "source": "Adyen documentation, 'Offline payments', n.d., accessed 2026-11, https://docs.adyen.com/point-of-sale/offline-payment"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'When a network connection is restored, the SDK or smart reader automatically forwards any stored payments to Stripe'; the forwarding diagram ends in a 'Success or decline response' and a 'Forwarding event notification' to the POS application.",
+              "shows": "The outcome arrives as an event after the sale is closed.",
+              "source": "Stripe documentation, 'Accept offline payments' and 'Collect card payments while offline' (smart readers), n.d., accessed November 2026, https://docs.stripe.com/terminal/features/operate-offline/overview"
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "The outage and its limits.",
+            "introduces": "What happens to stored payments once the connection is back.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "unified-commerce",
+      "heading": "Unified Commerce Is Three Separate Checks",
+      "controlling_idea": "In data terms 'unified commerce' is three properties, a shared identifier for the payer, a refund path across channels and one settlement report, and a provider can deliver one without the others.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "S5"
+        ],
+        "how": "Breaks the claim 'online and in-store are unified' into three checks and shows what each company documents for each."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "The claim, then the three checks in the order a payment meets them (who paid, how money goes back, how it is reported), then the test for each; the closing table depends on all three having been defined."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "What the device adds to one counter payment.",
+        "introduces": "The second question of the chapter: what it takes to treat that payment and an online payment as one.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p26",
+          "controlling_idea": "A provider's statement that online and in-store payments are 'unified' can mean three different things, and my judgement is that they have to be verified one by one.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: Unified Commerce 'allows you to consolidate payments data from all customer-facing and back-end systems. With Adyen's single payments platform you have a unified view on all your customers'. Stripe: 'Manage online and in-person payments in a single Stripe account'.",
+              "shows": "Both companies make the general claim; neither sentence says which of the three properties it covers.",
+              "source": "Adyen documentation, 'Omnichannel', n.d., accessed 2026-11; Stripe documentation, 'Terminal overview', n.d., accessed November 2026, https://docs.stripe.com/terminal/overview"
+            },
+            {
+              "kind": "reasoning",
+              "what": "That the three are separable is the author's judgement, not a documented finding about either company.",
+              "shows": "Keeps the claim labeled as the thesis requires."
+            }
+          ]
+        },
+        {
+          "id": "p27",
+          "controlling_idea": "The first check is a shared identifier for the payer: Adyen returns a card alias that identifies a card and cannot pay, Stripe a fingerprint shared by online and in-person card records, and at both a card held in a phone wallet breaks the match.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'The card alias. You can use this to identify the shopper based on their card, but not to make payments'; 'PaymentAccountReference: If the shopper used an NFC wallet, you can use this instead of the alias'.",
+              "shows": "Recognition and payment are different identifiers, and wallets need a third.",
+              "source": "Adyen documentation, 'Card acquisition', n.d., accessed 2026-11, https://docs.adyen.com/point-of-sale/card-acquisition"
+            },
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'If you tokenize the shopper's payment details when they make a payment at the point of sale, you can use that token in a later online payment.'",
+              "shows": "A payable token can cross channels at Adyen, tied to the merchant's own shopper reference.",
+              "source": "Adyen documentation, 'Tokenization' (point of sale), n.d., accessed 2026-11, https://docs.adyen.com/point-of-sale/recurring-payments"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'each `card_present` payment method has a fingerprint attribute that uniquely identifies a particular card number. Cards from mobile wallets (for example, Apple Pay or Google Pay) don't share a fingerprint with cards used online.' 'When you create a PaymentIntent or SetupIntent with a card-present payment method, you can't save the PaymentMethod directly. However, in most cases, Stripe can create a reusable `generated_card` PaymentMethod'.",
+              "shows": "Stripe's identifier, its wallet exception, and the separate object needed to pay online with a card read in person.",
+              "source": "Stripe documentation, 'Collect and save payment details for future use', n.d., accessed November 2026, https://docs.stripe.com/terminal/features/saving-payment-details/overview"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "Three properties to verify.",
+            "introduces": "The first, with what each company documents.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p28",
+          "controlling_idea": "The second check is a refund that crosses channels: Adyen documents refunding an online payment at a terminal by its PSP reference, and Stripe refunds every channel through the same server-side Refunds API with no card presented.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen, table of refund types, row 'Omnichannel refunds': 'Supported, using the PSP reference' for referenced refunds and 'Not supported' for unreferenced ones; 'To refund an ecommerce payment, you need to know the PSP reference, the date, and the currency of the original payment'; for unreferenced refunds 'You are fully liable for losses resulting from fraudulent or duplicate unreferenced refunds'.",
+              "shows": "The cross-channel refund exists at Adyen and depends on the till knowing the original payment's reference.",
+              "source": "Adyen documentation, 'Refund a payment' (point of sale), n.d., accessed 2026-11, https://docs.adyen.com/point-of-sale/basic-tapi-integration/refund-payment; 'Referenced refund', n.d., accessed 2026-11"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe: 'create a refund by passing in the PaymentIntent ID or the charge ID'; 'Online refunds don't require a cardholder to present their card again at the point of sale'; 'In-person refunds are only available on Interac'.",
+              "shows": "At Stripe the refund is a server call against the payment object, whichever channel created it; the terminal takes no part except for one Canadian network.",
+              "source": "Stripe documentation, 'Refund transactions' (Terminal), n.d., accessed November 2026, https://docs.stripe.com/terminal/features/refunds"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "Recognizing the payer.",
+            "introduces": "Sending money back across channels.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p29",
+          "controlling_idea": "The third check is one settlement report covering both channels, and here the documentation read for this chapter gives general statements and no field-level proof, so it is the check to run on real files.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'The PSP reference and tender reference can be found in your Customer Area, and in reports generated by Adyen.' Stripe: 'We recommend reconciling payments on your back end after a day's activity to prevent unintended authorizations and uncollected funds.'",
+              "shows": "Both point to reports and reconciliation; neither page shows a combined report.",
+              "source": "Adyen documentation, 'Terminal API', n.d., accessed 2026-11, https://docs.adyen.com/point-of-sale/design-your-integration/terminal-api; Stripe documentation, 'Refund transactions' (Terminal), n.d., accessed November 2026, https://docs.stripe.com/terminal/features/refunds"
+            },
+            {
+              "kind": "reasoning",
+              "what": "A store-and-forward payment enters the report days after the sale and under the terminal's reference, so a report can cover both channels and still not match the till's day.",
+              "shows": "Names the case that breaks a nominally single report; the mechanics of settlement reports belong to payment-reconciliation-and-reporting."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The refund path.",
+            "introduces": "The report, and the limit of the evidence for it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p30",
+          "controlling_idea": "Each check has its own test and its own way of failing, which is why passing one says nothing about the others.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Check (shared identifier, cross-channel refund, one report) by what to test and the sign that it fails: a wallet payment not matched to the same card online; a refund that needs the card present or an unreferenced refund; counter payments in a different file, or stored payments missing from the day they were sold.",
+              "shows": "Gives the reader the three tests in runnable form; the failing signs come from the documented exceptions in p27 to p29."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "The three checks and their evidence.",
+            "introduces": "One table of tests and failing signs.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "Stripe reaches the counter by extending its online payment object and SDKs, Adyen through a retail-industry protocol and shared references on its own acquiring platform, and only Adyen publishes the size of its in-person business.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S5"
+        ],
+        "how": "Sets the documented facts of the earlier sections side by side and states the two approaches the thesis names."
+      },
+      "flow": {
+        "pattern": "assertion_evidence_reasoning",
+        "rationale": "What each company has published about its in-person business, then the table of documented differences, then what an integrator should do differently; the advice depends on the table."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "The mechanisms and the three checks, each with both companies' documentation.",
+        "introduces": "The two companies compared directly.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p31",
+          "controlling_idea": "The two companies publish very different amounts about their in-person business: Adyen has designed terminals since 2022 and reports point-of-sale volume, and Stripe, which launched Terminal in 2018, publishes no in-person volume or reader count.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen, 18 August 2022: 'the launch of its first in-house designed terminals', the NYC1 and AMS1, 'after expanding into designing hardware for the first time'.",
+              "shows": "Dates Adyen's move into hardware design.",
+              "source": "Adyen press release, 2022-08-18 (evidence age: 4 years)"
+            },
+            {
+              "kind": "statistic",
+              "what": "Adyen: 'point-of-sale volumes were €310.9 billion, comprising 22% of total processed volume, up from 18% in 2024' (Annual Report 2025); 'point-of-sale volumes were €311 billion, up 34% for the full year' (H2 2025 release, 2026-02-12); 'The number of transacting terminals across the platform reached 878k, up 25% YoY' (Q3 2026 business update).",
+              "shows": "In-person is a reported line of Adyen's business; the figures are company-reported volume, not revenue.",
+              "source": "Adyen Annual Report 2025 (signed 2026-03-05); Adyen H2 2025 results release; Adyen Q3 2026 Business Update"
+            },
+            {
+              "kind": "fact",
+              "what": "Stripe announced Terminal on 17 September 2018 as 'a programmable point of sale for in-person payments'; no Terminal volume, reader count or in-person share was found in Stripe's documentation, product pages or annual letters.",
+              "shows": "Stripe's in-person scale is not public, so the two cannot be ranked.",
+              "source": "Stripe newsroom, 2018-09-17 (evidence age: 8 years)"
+            }
+          ]
+        },
+        {
+          "id": "p32",
+          "controlling_idea": "On seven aspects the public record shows a consistent difference: Stripe gives the counter its online objects and one enforced default, and Adyen gives it a retail protocol, more configuration and its own references.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Aspect by Stripe, Adyen and what the difference suggests: how software drives the device; the payment record; recognizing a card across channels; offline acceptance; refunds across channels; encryption and compliance scope; published scale.",
+              "shows": "The required comparison; every Stripe and Adyen cell repeats a fact cited earlier in the chapter, and the last column is the author's reading."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "What each publishes about its business.",
+            "introduces": "What each documents about its product, aspect by aspect.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p33",
+          "controlling_idea": "An integrator on Stripe should design around the PaymentIntent and decide early whether offline is needed, because that rules out the server-driven shape; an integrator on Adyen should choose local or cloud first and then own the limits and references the platform leaves to the merchant.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stripe: server-driven excludes offline; card-present methods are not reusable without the generated card. Adyen: offline needs local communications and merchant-set limits; referenced refunds need the PSP reference; neither publishes key management or failure rates; only Adyen documents a gradual rollout of fleet updates, and Stripe documents automatic updates, their timing and required dates that vary across a fleet.",
+              "shows": "Derives the advice from the table's rows and restates the common limit of the evidence."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The table of differences.",
+            "introduces": "What to do differently on each provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: One Estate, No Offline, Three Checks",
+      "controlling_idea": "Larkfield keeps every terminal on one provider and on the cloud path with offline acceptance switched off, and for the studios split across two providers it supplies the three unified-commerce properties from its own systems.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S4",
+          "S5"
+        ],
+        "how": "Applies the device-estate view, the offline credit decision and the three checks to the two requests of the opening scene."
+      },
+      "flow": {
+        "pattern": "problem_solution",
+        "rationale": "The standing decision (one estate) first, then the two requests from the scene in the order they were posed, each answered with the section that taught the mechanism."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The comparison of the two providers.",
+        "introduces": "One platform's decisions on one of them, with the scene's two requests answered.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p34",
+          "controlling_idea": "Larkfield put every terminal on Adyen in 2024 because for a platform with thousands of small sites the cost of in-person payments is the estate, one device range, one certification path and one adapter in the front-desk app, more than the price per payment.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Adyen chosen in 2024 for in-person payments on one platform with online; all front-desk terminals on Adyen; in-person fee to studios 1.4% + €0.10.",
+              "shows": "The one-provider decision is a device-management decision.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ]
+        },
+        {
+          "id": "p35",
+          "controlling_idea": "To the studio owner's request Femke's answer was no: the front-desk app drives the terminals over the cloud path, where offline acceptance is not practical, and the app itself cannot check a member in without the internet, so stored payments would have nothing to be sold against.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Front-desk app on Adyen's Terminal API with cloud communications; offline payments not enabled. Illustrative sizing had it been enabled on the local path: a store-and-forward maximum of €120 (one ten-class pass) and 25 payments per terminal bound the exposure at €3,000 per terminal per outage.",
+              "shows": "Shows the limits as a credit decision with a number and an owner, and that offline payment is only as useful as the till's own offline mode.",
+              "source": "Larkfield scenario ledger (fictional); limits are an assumption for teaching"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The estate on one provider.",
+            "introduces": "The first request, offline acceptance, and why it was declined.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p36",
+          "controlling_idea": "At the 1,140 split studios none of the three checks passes at the provider level, so Larkfield supplies each itself: its member id is the shared identifier, the payment service refunds an online payment against the provider that took it, and the reconciliation job reads both providers' reports.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "A Stripe fingerprint and an Adyen card alias are two unrelated values for one card; a pass bought online through Stripe cannot be refunded by an Adyen terminal; the member's request at the counter becomes a call from the front-desk app to the payment service, which creates the refund at Stripe with no card presented; Keel K3 extends the reconciliation job to both providers.",
+              "shows": "Each property is rebuilt above the providers when the channels sit on different ones.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The first request.",
+            "introduces": "The second request, the refund across channels, taken through the three checks.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p37",
+          "controlling_idea": "At Studio Noord, where both channels are on Adyen, the same refund could be made at the terminal, and Mila's €84.00 shows what it needs: the PSP reference of the online payment, its date and its currency.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Mila's refund of the unused part of her pass, €84.00 for seven classes, requested on 18 March 2027; the pass was bought in the app on 9 March 2027 for €120.00 in euros; had she asked at the front desk, the front-desk app would need the payment's PSP reference from the payment record store.",
+              "shows": "The cross-channel refund works on one provider only if the till can look up the original reference, which is Larkfield's own record.",
+              "source": "Larkfield scenario ledger (fictional); Adyen documentation, 'Refund a payment' (point of sale), n.d., accessed 2026-11, https://docs.adyen.com/point-of-sale/basic-tapi-integration/refund-payment"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Studios split across two providers.",
+            "introduces": "A studio with both channels on one provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong",
+      "controlling_idea": "The counter fails in four characteristic ways, an unknown outcome between till and terminal, a stored payment declined later, a device that has aged out of service and an outage of the single provider, and each has a detection and a recovery.",
+      "function": "cause_effect",
+      "advances_thesis": {
+        "supports": [
+          "S2",
+          "S3",
+          "S4"
+        ],
+        "how": "Shows the cost of treating the terminal as an input device: each failure comes from the device, the channel to it or the credit extended through it."
+      },
+      "flow": {
+        "pattern": "small_to_large",
+        "rationale": "From one payment, to a batch of stored payments, to a device, to the whole estate; the last failure is the one the earlier remedies do not reach."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "Larkfield's decisions when everything works.",
+        "introduces": "The failures those decisions have to survive.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p38",
+          "controlling_idea": "When the till loses contact with the terminal after the card was presented, the outcome is unknown, and starting the payment again before asking for the status of the first is how a customer is charged twice at a counter.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'When the connection is back, check the transaction status before you start the transaction again.' Stripe: 'We recommend reconciling payments on your back end after a day's activity to prevent unintended authorizations and uncollected funds.'",
+              "shows": "Both providers tell the integrator to resolve the first attempt before or after acting; the general rule is in idempotency-and-retries.",
+              "source": "Adyen documentation, 'Offline payments', n.d., accessed 2026-11, https://docs.adyen.com/point-of-sale/offline-payment; Stripe documentation, 'Refund transactions' (Terminal), n.d., accessed November 2026, https://docs.stripe.com/terminal/features/refunds"
+            }
+          ]
+        },
+        {
+          "id": "p39",
+          "controlling_idea": "A stored payment that is declined after the customer has left is a loss that must be booked by someone, so the forwarded outcomes need a consumer and the write-off needs an owner.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "The decline arrives as a webhook or forwarding event after the sale is closed; Adyen may retry for a calendar month; the goods are gone.",
+              "shows": "Detection is the event and the settlement report; recovery is retry and then a recorded loss, under the liability statements quoted in the offline section.",
+              "source": "Adyen documentation, 'Offline payments', n.d., accessed 2026-11, https://docs.adyen.com/point-of-sale/offline-payment; Stripe documentation, 'Accept offline payments' and 'Collect card payments while offline' (smart readers), n.d., accessed November 2026, https://docs.stripe.com/terminal/features/operate-offline/overview"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "One payment with an unknown outcome.",
+            "introduces": "A batch of payments whose outcome arrives late.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p40",
+          "controlling_idea": "Devices drift out of service quietly, through a certification version that can no longer be ordered, software too old to work offline or a unit swapped between sites, and only an inventory with a last-seen date and a version per device shows it before a counter stops.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen's catalog says PCI PTS 5 terminals 'will no longer be available for order starting April 30, 2026'; a Stripe reader whose software 'hasn't been updated in 30 days or more' cannot collect offline until it goes online.",
+              "shows": "Both documented cases are detectable from device records before they cause a failure.",
+              "source": "Adyen documentation, 'Select your terminals'; Stripe documentation, 'Accept offline payments' and 'Collect card payments while offline' (smart readers), n.d., accessed November 2026, https://docs.stripe.com/terminal/features/operate-offline/overview"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Failures of payments.",
+            "introduces": "Failures of the device estate.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p41",
+          "controlling_idea": "An estate on one provider has no second rail at the counter: store-and-forward does not cover the provider's own outage, and Larkfield's rehearsed switch moves online card payments only.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen: 'Store-and-forward offline payments do not work in the event of an outage of the Adyen payments platform'.",
+              "shows": "The offline mechanism is not a failover for the provider.",
+              "source": "Adyen documentation, 'Offline payments', n.d., accessed 2026-11, https://docs.adyen.com/point-of-sale/offline-payment"
+            },
+            {
+              "kind": "scenario",
+              "what": "Keel K8: the payment service can move a studio's online card payments to the other provider; the front desk stays on Adyen.",
+              "shows": "States the accepted risk at Larkfield in the terms of the Single Rail pattern.",
+              "source": "Larkfield scenario ledger (fictional)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "emphasis",
+            "carries_over": "Device failures one at a time.",
+            "introduces": "The failure of everything at once, which the earlier remedies do not reach.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "The chip rule, the managed device, the integration shape, the offline limit and the three checks are one observation: at the counter the merchant's side of the payment holds state, keys and risk that online it had handed to the provider. And the terminal is the sixth layer of Part II's 'yes': set beside the acquirer, the method, the state model, the optimizer and the routing choice, it shows that an approval rate describes a whole stack and belongs to a provider, a country and a method together.",
+    "so_what": "A platform that puts terminals in its customers' shops takes on a device estate and a credit decision, and tests each unified-commerce property on its own. For Part II as a whole: Larkfield's K8 keeps two providers and one rehearsed switch and adds no orchestration product, because the gain at its volume is in knowing each stack.",
+    "callback": {
+      "to": "The introduction's terminal that prints 'approved' with the internet down, and the part's opening scene of 1,140 studios charged through Stripe online and Adyen at the front desk.",
+      "how": "The reader can now say who approved the offline payments (nobody yet: the studio extended credit) and can see the terminal on the counter as the last layer of one of the two stacks the same card meets."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "For each provider and country, write down the acquiring entity, each payment method with the date its payments become final, the provider states your own record mirrors, the approval metric with its denominator, and the date the switch to the other provider was last rehearsed; for the counter add the device inventory, the offline limits with their owner and the three unified-commerce tests."
+    },
+    "hand_off": {
+      "to": "part-3",
+      "relationship": "cause_effect",
+      "carries_over": "Part II's result: an approved payment, held in a state machine, on a route and a device chosen to get a yes.",
+      "introduces": "Every approval creates debts between issuer, network, provider and merchant that are paid over days, and a payment's state does not say who owes whom, so the provider needs a second record, the ledger."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The failures and their recoveries.",
+      "introduces": "What holds across the chapter, sorted by how settled it is, and then across the part.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p42",
+        "form": "list",
+        "controlling_idea": "Established: the chip's one-time cryptogram, Visa's liability rule tied to chip reading and chip data, the two offline mechanisms and the merchant's liability for stored payments are documented by the standard body, the network and both providers.",
+        "function": "synthesis"
+      },
+      {
+        "id": "p43",
+        "form": "list",
+        "controlling_idea": "Depends on context: local or cloud, whether to accept offline and at what limits, and one provider or two for the two channels each turn on stated conditions.",
+        "function": "synthesis",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is documented.",
+          "introduces": "What changes with the situation.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p44",
+        "form": "list",
+        "controlling_idea": "The author's synthesis: treat a terminal rollout as taking on a device estate and a credit line, and treat 'unified' as three tests.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is established and what depends on context.",
+          "introduces": "The author's own position, labeled as such.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p45",
+        "controlling_idea": "Set side by side, the six layers of a 'yes' each have a different owner, so an approval rate describes the whole stack and cannot be moved from one provider, country and method to another.",
+        "function": "synthesis",
+        "evidence": [
+          {
+            "kind": "table",
+            "what": "Layer (acquirer and license, payment method, state model, optimization inside the call, choice of providers, device) by who owns it and the chapter that covers it.",
+            "shows": "Performs the part's closing synthesis: no single chapter puts the six beside each other."
+          }
+        ],
+        "transition_in": {
+          "relationship": "conclusion_summary",
+          "carries_over": "This chapter's take-aways.",
+          "introduces": "The part's: the device as the sixth layer beside the five before it.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p46",
+        "controlling_idea": "For Larkfield and for the reader the consequence is to know each stack before unifying anything: K8 keeps two providers and one rehearsed switch, the 1,140 split studios are two stacks meeting one card, and the thing to write down is a short record per provider and country.",
+        "function": "recommendation",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Keel K8; the 1,140 studios charged through Stripe online and through Adyen at the front desk.",
+            "shows": "Returns to the part's opening scene and to the chapter's opening queue with the answer.",
+            "source": "Larkfield scenario ledger (fictional)"
+          }
+        ],
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "An approval rate describes a whole stack.",
+          "introduces": "What Larkfield decided and what the reader should write down.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p47",
+        "form": "list",
+        "controlling_idea": "Nine questions let the reader test a terminal rollout and a unified-commerce claim in a design review or a provider evaluation.",
+        "function": "recommendation",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The take-aways.",
+          "introduces": "Questions that apply them.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p48",
+        "controlling_idea": "An approved payment, whichever stack produced it, creates debts between issuer, network, provider and merchant that are paid over days, and the payment's state does not say who owes whom, which is the subject of Part III.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The approval Part II has explained.",
+          "introduces": "The debts it creates and the record needed to track them.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "The authorization message, holds and response codes in general.",
+      "covered_in": [
+        "payment-authorization"
+      ]
+    },
+    {
+      "topic": "Acquiring licenses, network membership and which entity acquires in which country.",
+      "covered_in": [
+        "acquiring-and-network-connectivity"
+      ]
+    },
+    {
+      "topic": "PCI DSS scope, self-assessment questionnaires and tokenization in depth.",
+      "covered_in": [
+        "tokenization-vaulting-and-pci",
+        "network-tokens"
+      ]
+    },
+    {
+      "topic": "The liability shift for online payments under 3-D Secure.",
+      "covered_in": [
+        "three-d-secure-and-sca"
+      ]
+    },
+    {
+      "topic": "Settlement reports and the reconciliation job's design.",
+      "covered_in": [
+        "payment-reconciliation-and-reporting"
+      ]
+    },
+    {
+      "topic": "Idempotency and the unknown-outcome problem in general.",
+      "covered_in": [
+        "idempotency-and-retries"
+      ]
+    },
+    {
+      "topic": "Point-of-sale software, loyalty and promotions, and hardware-first companies such as Block and Toast beyond a mention.",
+      "covered_in": [
+        "payment-contrast-cases"
+      ]
+    },
+    {
+      "topic": "Card-present interchange and pricing.",
+      "covered_in": [
+        "payment-economics"
+      ]
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "Mastercard's liability-shift rules were not readable (HTTP 403); the chapter cites Visa only and says so.",
+    "Neither company documents, on the pages read, a single settlement report format proven to cover both channels; the third unified-commerce check is stated as a test to run, not as a documented property.",
+    "Adyen's '95%' later-authorization figure for store-and-forward has no published dataset or method.",
+    "Country counts and terminal model lists change monthly; the chapter gives none as a load-bearing fact."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "Open with the offline queue (who approved these payments?) and use Larkfield's scene for both of the chapter's questions, so the device and the channel join are each posed as a concrete request before any mechanism.",
+      "rejected": [
+        "Opening with the part's 1,140-studio scene, which the conclusion returns to and the part introduction already uses."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Put integration shapes before offline, because offline acceptance exists only on the in-store shapes and its risk cannot be weighed without them.",
+      "rejected": [
+        "Offline directly after the liability rule, which would have grouped the two money topics but used 'local communications' before defining it."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Carry the part's closing as two prose paragraphs inside 'What to Take Away', after the three tiers, with a six-layer table.",
+      "rejected": [
+        "A separate closing section, which the style guide's page format does not have."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Add documentation fetched in this session on cross-channel refunds (Adyen 'Refund a payment'; Stripe Terminal 'Refund transactions') and on Stripe's card fingerprint, because the research briefs had no dated evidence for the second unified-commerce check.",
+      "rejected": [
+        "Presenting the refund path as inference only."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Tap to pay gets one paragraph and hardware-first companies none: the first has little that differs architecturally from a terminal, and the second belongs to the contrast-cases chapter.",
+      "rejected": [
+        "A section on tap to pay with country lists."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "PLAN.md, contract for 11-in-person-payments",
+      "contributed": "Scope, owned terms and the Larkfield thread."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-acquiring-methods-and-terminals.md, Part 3",
+      "contributed": "EMV, liability, PCI standards, tap to pay, offline, both companies' terminals and APIs, volumes, the open questions."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-adyen-payments-and-api.md (3.5), brief-card-data-tokens-and-authentication.md (1.4, cross-channel tokens), brief-companies-and-bets.md",
+      "contributed": "Terminal API identifiers, encryption modes and questionnaires, Stripe Terminal's launch date, Adyen's terminal count."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md; _research/consistency-issues.md (rulings 8 and 17)",
+      "contributed": "Larkfield's front-desk figures, the 1,140 studios, K3 and K8, Mila's refund; the gloss of 'liability shift' and the Mastercard limitation."
+    },
+    {
+      "kind": "external",
+      "ref": "Visa Core Rules and Visa Product and Service Rules, edition of 24 October 2026, https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf",
+      "contributed": "Dispute Condition 10.1 and Table 11-1."
+    },
+    {
+      "kind": "external",
+      "ref": "EMVCo pages (n.d., accessed 2026-11); PCI SSC pages on P2PE and MPoC (n.d.); Apple, 'Tap to Pay on iPhone' (n.d.)",
+      "contributed": "What the chip does, who enforces, P2PE and MPoC definitions, the PSP's role on a phone."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen documentation: Offline payments (2026-05-04), Choose an integration architecture (2023-12-06), Terminal API (2023-07-11), Refund a payment (2026-11-17), Card acquisition (2023-02-23), Tokenization (2026-11-17), E2EE and P2PE (2025-09-10), Select your terminals (2026-04-15)",
+      "contributed": "Offline mechanisms and limits, local and cloud, nexo, references, omnichannel refunds, card alias, encryption modes."
+    },
+    {
+      "kind": "external",
+      "ref": "Stripe documentation (n.d., accessed 2026-11): Accept offline payments, Collect card payments while offline, Set up your integration (server-driven), Collect and save payment details, Refund transactions, Terminal overview, Stripe Reader S700/S710",
+      "contributed": "Store-and-forward and its ceiling, SDK and server-driven shapes, generated_card and fingerprint, refunds, encryption."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen press release 2022-08-18; Adyen Annual Report 2025; Adyen H2 2025 results release 2026-02-12; Adyen Q3 2026 Business Update; Stripe newsroom 2018-09-17",
+      "contributed": "In-house terminals, point-of-sale volume and share, transacting terminals, Terminal's launch."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 104 claims checked (91 confirmed, 5 corrected, 6 hedged, 0 unsupported and removed or relabeled, 0 unreachable, 2 term glosses not checked); the claim that neither company documents how terminal software updates are staged was wrong for Adyen (its 'Update to a new release' page documents gradual rollout and batches), so one supporting claim, the controlling idea and evidence of p15 and the evidence of the integrator-advice paragraph were reworded; no unit added, dropped, merged or reordered. Acceptance criterion AC-4 and thesis.how_why are copied from the journal spec and still say that neither company publishes fleet updates: the author must decide whether to change them there."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Initial outcome spec, written from the PLAN contract, the research briefs and pages fetched in the session; intent, thesis and role copied from the journal spec."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('the chapter says that neither company publishes its terminal' -> 'the chapter says that neither company publishes its terminal')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('neither publishes key management, fleet updates or failure r' -> 'neither publishes key management or failure rates, and only ')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation after verification: journal-spec entry and spec body brought into line with the verified page and consistency rulings (ruling 28 / K3). Adyen documentation pages are now cited 'n.d., accessed 2026-11' instead of with 'last modified' metadata dates (ruling 30). No unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: 5 statements of absence re-tested with a wide search (0 overturned, 2 narrowed, 3 hold; table in _research/absence-audit/11-in-person-payments.md). Narrowed: Stripe documents the timing of reader software updates (midnight local time; a required date that can vary across the fleet) though no rollout policy; a Stripe guide article says it handles key injection and decryption."
+    }
+  ],
+  "length": {
+    "target_words": 5300,
+    "max_words": 6500
+  }
+}

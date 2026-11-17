@@ -1,0 +1,23 @@
+# Absence audit — 25-3ds-and-sca (`three-d-secure-and-sca`)
+
+Audit of 17 November 2026. The verification pass tested these against the documentation indexes, the pages read and one or two web searches. Searched now: the four sitemaps (patterns: 3d-secure, sca, exempt, passkey, delegat, authentication, adaptive, chargeback, fee); `docs.adyen.com` SCA guide, SCA exemptions, Dynamic 3D Secure; `adyen.com/pricing`, `/licenses/canada-information-summary-box`, `/legal/services-description`, `/uplift/authenticate`, knowledge-hub articles on SCA and delegated authentication; `stripe.com/payments/authentication`, `stripe.com/guides/strong-customer-authentication`, `stripe.com/sessions/2026/the-truth-about-3ds` (transcript read); web searches restricted to the providers' domains.
+
+| Statement | Where searched | Result | Change |
+| --- | --- | --- | --- |
+| "Adyen publishes no amount" for a chargeback fee (scene and Larkfield section) | `adyen.com/pricing` (no chargeback fee); Adyen docs "Manage disputes"; knowledge-hub articles give industry ranges only; `adyen.com/licenses/canada-information-summary-box` lists "Chargeback Fee … Per transaction CAD 24.00" in the standard terms of Adyen Canada Ltd | narrowed | "no euro amount" in the scene; the Larkfield section says the pricing page lists none and the one amount found is CAD 24.00 in the Canadian fee disclosure. Source added |
+| "Adyen publishes no ceiling" for the low-risk exemption | Adyen SCA guide and exemptions page ("if your fraud levels are below fraud thresholds", no amount); knowledge-hub SCA article (the three legal bands only); help center; two web searches | holds | Now says what was searched: "states no ceiling of its own in its documentation, help center or site (November 2026)" |
+| "I found neither the argument nor an engine that selects among methods in Stripe's documentation" | Stripe docs sitemap and index (no page); `stripe.com/payments/authentication`: an "authentication engine" that will "Automatically select the optimal protocol optimisation and authentication pathway for your business", and "Use Stripe for both authentication and payment processing: Maximise conversion across the funnel with our full-stack payments processing solution"; Sessions 2026 talk: Adaptive 3DS "calculates a risk score for every transaction and is also trained on past issuer behavior" | narrowed | Documentation still has neither; the product page and the talk are quoted. Two sources added |
+| Inference block: whether Stripe uses the training signal, and how either model is built, "is not public" | as above | narrowed | Says Stripe's talk names past issuer behavior as a training input; the rest remains not public |
+| Table: Stripe "no selection among methods documented" | as above | narrowed | "an engine that selects the 'authentication pathway' is claimed on the product page, not documented" |
+| Table: Stripe "Stated design argument: Not public" | as above | narrowed | Cell gives the product-page line and the talk; last column "only asserts it" |
+| "I found no Stripe page on scheme passkeys" | Stripe docs and support sitemaps (passkey pages are Dashboard and Link sign-in only), product page, Sessions talk (passkeys mentioned only as the networks' plans for agents), two web searches | holds | Now says "in its documentation, support site or product pages" |
+| "Neither company documents authentication delegated to the merchant as a product" | Stripe product page and support article (delegation to Stripe); Adyen knowledge-hub article of 17 April 2023 and `uplift/authenticate` (delegation to Adyen: "allows us to fully authenticate the customer on behalf of the issuer") | holds | none. Note: Adyen also describes delegation to itself; the page says this only of Stripe |
+| "I found no public account of either company losing a band" | web search (open web and provider domains); nothing | holds | none (already scoped) |
+
+Counts: 9 statements — 4 hold, 0 overturned, 5 narrowed (one fee statement in two places counted once; four cells and sentences about Stripe's argument and method selection), 0 already wide.
+
+## Locked journal-spec sentence affected
+
+Thesis `how_why` (copied from the journal spec) ends: "for Stripe only an undated support article on Stripe Authentication … was found, and no selection among methods". Stripe's product page claims an authentication engine that selects the pathway; not edited, reported.
+
+Spec: evidence of p8 (ceiling), p31 (controlling idea, inference) and p35 aligned; changelog line added. Page 6,498 words (limit 6,500); five connective phrases trimmed to make room.

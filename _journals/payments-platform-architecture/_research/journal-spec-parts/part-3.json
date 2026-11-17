@@ -1,0 +1,549 @@
+{
+  "id": "part-3",
+  "title": "Part III — LEDGER: Recording and Moving Money",
+  "detail": "full",
+  "intent": {
+    "outcome": {
+      "know": [
+        "What a double-entry ledger, an immutable entry, a clearing account and a fund flow are, and what Stripe (2024, 2026) and Adyen (2021) have each published about theirs.",
+        "What pending, available and reserved funds, pre-funding, a payout, a payout return, provider-side reconciliation and safeguarding are, and how Stripe's and Adyen's documented models of each differ.",
+        "Which licenses Stripe and Adyen state they hold in the EEA, the United Kingdom and the United States, and what the public record does not say about where either holds customer funds."
+      ],
+      "believe": [
+        "A balance at a provider is the provider's record of what it owes, not a count of cash, and it is knowledge only while it is matched against records the provider did not write.",
+        "'Available', 'paid' and 'settled' are each one party's statement at one moment, and each can be reversed by a later entry."
+      ],
+      "can_do": [
+        "For any money movement in their own system (fee, split, refund, dispute, payout, return), write the balanced entries, name the clearing account that must return to zero and name the outside record that proves the movement happened.",
+        "Read a change in a provider balance, or a bank credit that differs from expectations, and say which report explains it and which record to book from.",
+        "Tell whether a proposed funds flow puts the builder in possession of other people's money, and name the license question that follows."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Every supporting claim of the part thesis is argued by at least one chapter, and every chapter supports at least one.",
+        "check": "children_cover_parent_thesis",
+        "method": "deterministic",
+        "severity": "blocker"
+      },
+      {
+        "id": "AC-2",
+        "statement": "Each chapter's closing hand-off expresses the relationship its successor declares in transition_in.",
+        "check": "transition_expresses_declared_relationship",
+        "method": "rubric",
+        "severity": "major"
+      },
+      {
+        "id": "AC-3",
+        "statement": "A reader who has read only Part III can say what a provider balance is and is not, where the cash behind it sits, and what would prove the figure.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A food-delivery platform's provider dashboard shows €2.1 million 'available'. Its finance director asks: 'Is that €2.1 million sitting in a bank account with our name on it?' Answer in the terms of Part III, and say what would prove the figure.",
+        "expected": "No. The figure is the provider's ledger statement of what it owes the platform and its restaurants as of now; the cash is pooled in accounts held by the provider or by banks it uses, depending on the provider's license. 'Available' is the provider's decision that it will pay, not evidence that the cash arrived. Proof is reconciliation: the provider's against network and bank records, and the platform's own entries against the provider's reports and the bank credits it receives."
+      },
+      {
+        "id": "AC-4",
+        "statement": "Given a movement that arrives after a payout, a reader who has read only Part III says how it is recorded and where it will show up.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A restaurant was paid out on Monday for last week's orders. On Wednesday a €60 order from last week is refunded to the customer. Using Part III: what is recorded, where does the restaurant see it, and what must the platform not do?",
+        "expected": "The refund is a new entry, not an edit of last week's payment or payout; it reduces what the restaurant is owed, appears in the restaurant's current balance or batch (not the original day's), and may make the balance negative until later sales or a debit cover it. The platform must not rewrite the earlier records or recompute Monday's payout."
+      }
+    ]
+  },
+  "thesis": {
+    "question": "Between the customer paying and the merchant being paid, how does a payment provider know where the money is and whose it is?",
+    "claim": "A provider knows where money is and whose it is only from a double-entry record it keeps itself, and that record counts as knowledge only while it is matched against records the provider did not write: network clearing files, bank statements and the statements of the accounts where customer funds are held. A balance and a report are that record read at a given moment, a payout is one of its entries becoming a bank transfer, and the provider's license decides which accounts the record must contain.",
+    "disputed_by": "The view that the money is simply 'at the provider', so that the balance in a dashboard is a count of cash like a bank balance, and ledgers and reconciliation are back-office accounting added later for the finance team.",
+    "so_what": "An engineer who accepts the claim stops reading 'available', 'paid' and 'settled' as facts about cash, keeps an entry of their own for every movement, books from reports instead of from notifications, and asks of any funds flow who is licensed to hold the money in it.",
+    "how_why": "The cash behind a payment is never where the API objects are: it is in transit through networks and pooled in bank accounts across thousands of merchants, so 'where is this €120' can be answered only as entries that say who owes whom since when. Recording each movement twice makes a missing or wrong movement visible as an account that does not empty, but only a record kept by someone else can show that a recorded movement happened. Stripe (2024) and Adyen (2021) each describe a ledger built on this invariant and differ in where they enforce it; the merchant's balance, the payout and the settlement report are views of it; and safeguarding law turns the comparison between the ledger and the bank account into a legal duty for a provider that is not a bank.",
+    "supporting_claims": [
+      {
+        "id": "P3-1",
+        "claim": "A ledger makes money errors visible by recording each movement as balanced, immutable entries through accounts that must empty; Stripe (2024) checks that invariant after the fact across many writing systems, and Adyen (2021) enforces it at the moment of writing."
+      },
+      {
+        "id": "P3-2",
+        "claim": "A merchant's balance is the provider's record of what it owes, and 'pending', 'available' and 'reserved' are the provider's decisions about when and how much it will pay, not reports of where the cash is."
+      },
+      {
+        "id": "P3-3",
+        "claim": "A payout turns a ledger balance into a transfer on a bank rail the provider does not control, so 'sent' and 'arrived' are different states and a transfer that fails comes back as a new movement."
+      },
+      {
+        "id": "P3-4",
+        "claim": "A ledger is proof only when its entries are matched against records it did not write, and the scheduled report, not the webhook, is the form in which a provider passes that proof to its customers."
+      },
+      {
+        "id": "P3-5",
+        "claim": "The license a provider holds decides which accounts its ledger must contain, which funds may never be mixed and what must be reconciled against a bank."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Supplies the record behind every later part: the ledger entry, the balance, the payout and the reconciliation that the API (IV) exposes, that billing (VI) and platforms (VII) build on, and that the journeys (IX) follow.",
+    "supports": [
+      "J3"
+    ]
+  },
+  "flow": {
+    "pattern": "prerequisite_order",
+    "additional_patterns": [
+      {
+        "pattern": "large_to_small",
+        "applies_to": "payment-ledgers to payouts-and-money-movement: the provider's whole record, then one merchant's balance in it, then one transfer out of it"
+      },
+      {
+        "pattern": "problem_solution",
+        "applies_to": "payouts-and-money-movement to payment-reconciliation-and-reporting: a payout that is 'paid' and has not arrived, then the matching that settles which record is right"
+      }
+    ],
+    "rationale": "Each chapter needs the one before it. The ledger chapter supplies entries, accounts and clearing accounts; a balance is then read as a view of those entries; a payout is the moment an entry becomes a bank transfer; reconciliation compares all three with outside records; and the license chapter states the legal duty that reconciliation serves. Put reconciliation first and the reader is asked to match records before knowing what they contain. Put licenses first and safeguarding is a legal definition with nothing in the system to attach it to; after reconciliation it is one more comparison between a ledger and a bank account, this time required by law."
+  },
+  "opening": {
+    "carried_by": "part-3",
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "At year-end 2025 Larkfield's ledger said one thing about what it owed its studios, and the balances at Stripe and Adyen said another: the two differed by €412,000. It took three weeks to trace the difference to refunds made after payout, chargeback fees and a currency-conversion rounding rule."
+    },
+    "bridge": "From Part II, where the question was whether a payment is approved and the record was one payment's state, to the days after approval, where the question is who owes whom and the record is a set of accounts that must agree with the banks.",
+    "roadmap": "Five chapters in order: how a provider builds the ledger that records every movement twice; what a merchant's balance says and does not say; how money leaves the provider and what happens when it does not arrive; how the provider proves its books against networks and banks and what it gives customers to prove theirs; and who is legally allowed to hold the money."
+  },
+  "closing": {
+    "carried_by": "licences-and-safeguarding",
+    "synthesis": "The ledger, the balance, the payout, the reconciliation and the license are one control seen five ways: a statement of who owes whom, made true by comparing it with a record somebody else keeps. No chapter alone says that 'where is the money' has no answer inside the provider: the cash is at banks, and what the provider holds is a structure of claims and the proof that it matches.",
+    "so_what": "An integrator cannot inherit that proof by reading a balance. It has to keep its own entry for each movement, reconcile it against the provider's reports, and know which licensed party holds the funds at each step, or it will find its own unexplained difference at year-end.",
+    "callback": "Larkfield's €412,000: the difference sat in movements that came after the payment (refunds after payout, chargeback fees) and in a rounding rule, none of which a record of payments has a place for.",
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "For each kind of movement in your system (fee, split, refund, dispute, payout, return), write the entry, name the clearing account it must empty and name the outside report that proves it, as Larkfield's Keel decision K3 does."
+    }
+  },
+  "transition_in": {
+    "relationship": "cause_effect",
+    "carries_over": "Part II's result: an approved payment, held in a state machine that says what happened to the payment (authorized, captured, refunded) on a route chosen to get a yes.",
+    "introduces": "Every approval creates debts between issuer, network, provider and merchant that are paid over days; a payment's state does not say who owes whom, so the provider needs a second record, the ledger, and a way to prove it.",
+    "form": "paragraph",
+    "placement": "both"
+  },
+  "posts": [
+    {
+      "id": "part-3",
+      "folder": "part-3-intro",
+      "title": "Part III — LEDGER: Recording and Moving Money",
+      "kind": "part_intro",
+      "detail": "full",
+      "question": "What does Part III argue, and in what order should its chapters be read?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "Part III answers five questions in order: how the provider records money, what a balance means, how money leaves, how the record is proven, and who may hold the money."
+          ],
+          "believe": [
+            "A payment marked paid says nothing yet about who owes whom; that is a second record."
+          ],
+          "can_do": [
+            "Pick the Part III chapter that answers a money question in front of them: an unexplained difference, a balance that moved, a payout that did not arrive, a close that will not tie, or a funds flow that might need a license."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "A reader of this page alone can name the five chapters' subjects in reading order and say why the ledger comes first.",
+            "check": "intro_predicts_content",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "After reading only this page: what will each of the next five chapters tell you, in order, and why does the first one come first?",
+            "expected": "Ledgers; balances and funds flows; payouts; reconciliation and reporting; licenses and safeguarding. The ledger comes first because balances, payouts and reports are all read from it."
+          },
+          {
+            "id": "AC-2",
+            "statement": "The page states the part thesis in a form a reader can repeat: the provider knows where money is only from a record kept twice and proven against outside parties.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "After reading only this page: according to Part III, how does a provider know where the money is?",
+            "expected": "From its own double-entry ledger, which it must keep proving against the networks' and banks' records; not from the payment's status and not by looking at a bank balance."
+          }
+        ]
+      },
+      "role": {
+        "contribution": "Performs the part's opening: poses the question with Larkfield's €412,000 difference, states the part thesis and gives the reading order.",
+        "supports": []
+      },
+      "post_spec": "posts/part-3-intro/spec.json"
+    },
+    {
+      "id": "payment-ledgers",
+      "folder": "12-payment-ledgers",
+      "title": "The Book of Record: How Payment Companies Build Ledgers",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "How does a payment company know, at every moment, whose money it holds and where it is?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "What double-entry, an immutable entry, a clearing account and a fund flow are, and why a ledger is a separate system from the payment database.",
+            "What Stripe published about its Ledger in 2024 and its money-movement platform in 2026, what Adyen published about its accounting system in 2021, and that Adyen's account is five years old.",
+            "What neither company has published: Stripe's ledger storage and how its customer-facing balance is derived; whether Adyen's 2021 design is current."
+          ],
+          "believe": [
+            "A ledger's value is that a missing or wrong movement becomes a balance that will not clear, which a simple query finds.",
+            "A platform should copy a provider's ledger invariants and not its scale machinery."
+          ],
+          "can_do": [
+            "Given a money movement, write it as balanced entries through a clearing account and say what a nonzero balance in that account would mean.",
+            "Say, for a given system, whether money correctness is enforced when an entry is written or detected afterwards, and what each choice requires."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a design that keeps money as mutable status fields and computed sums, the reader names what it cannot answer and the two changes that fix it.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "blocker",
+            "probe": "A marketplace keeps each order's payment status in an orders table and works out what it owes each seller with a nightly SUM over paid orders. A refund made after the seller was paid is recorded by changing the order's status to 'refunded'. Using only this chapter: what can this design not tell you, and what two changes would you make?",
+            "expected": "It cannot say what was owed on an earlier date, or show that the seller was paid money that is now owed back, because the status was overwritten and the sum silently changes. Change one: append-only balanced entries, with the refund as a new entry and never an edit. Change two: accounts for money in flight (clearing accounts) that must return to zero, so the amount to recover from the seller stays visible until it is recovered."
+          },
+          {
+            "id": "AC-2",
+            "statement": "The reader can explain why a clearing account with a nonzero balance signals an error and why that makes detection cheap at any volume.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "An account named 'card funds expected from the network' shows €18,400 that has been there for nine days. What does that tell you, and why did nobody need to compare individual payments to find it?",
+            "expected": "A flow that should have completed did not: an expected movement is missing, late or was recorded against the wrong identifier. Because every flow must leave the clearing account at zero, the error shows up as a remaining balance, found by querying for clearing accounts that are not empty."
+          },
+          {
+            "id": "AC-3",
+            "statement": "Every statement about Stripe's or Adyen's ledger carries its year; Adyen's 2021 account is flagged as five years old; and the chapter says in plain words what neither has published.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "How does a payment company know, at every moment, whose money it holds and where it is?",
+        "claim": "It does not know it from the payment database, and it does not know it at every moment: it knows it from a separate, append-only double-entry ledger in which every movement is two balanced entries and every amount in flight sits in a clearing account that must return to zero, so that a missing or mismatched movement appears as a balance that will not clear. The knowledge is as current as that proof, which at Stripe in 2024 meant 99.99% of dollar volume ingested and verified within four days.",
+        "disputed_by": "The view that the payment tables already are the record: sum the successful payments, subtract refunds and fees, and you have each merchant's money, so a ledger is a reporting layer that finance can add later.",
+        "so_what": "A team building on a provider needs the same invariants at small scale (entries never edited, every movement balanced, clearing accounts that must empty, corrections as new entries) and none of the provider's machinery; a team that skips them finds out, as Larkfield did with €412,000, that a list of paid payments cannot explain a balance.",
+        "how_why": "A payment row holds one payment's current state and is overwritten as it changes; it has no place for money that is between parties or for what was true yesterday. Double entry gives every amount a source and a destination, so a missing half is visible. The two anchors apply this at different points. Adyen's 2021 engineering post says records can be added only through templates proven to net to zero, so an unbalanced entry cannot be written, and that the payment layer queues work for the accounting databases instead of waiting for them. Stripe's 2024 post describes many independent systems publishing events into an immutable log, with errors found afterwards by three measures: clearing, timeliness and completeness. The public record stops there: Stripe names no storage engine and does not say how the balance in its API relates to Ledger, and no newer Adyen account confirms the 2021 design."
+      },
+      "role": {
+        "contribution": "Supplies the record and its vocabulary (entry, account, clearing account, fund flow) that the balance, payout, reconciliation and license chapters all read from.",
+        "supports": [
+          "P3-1"
+        ]
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The part intro's claim that a provider knows where money is only from a record kept twice, and Larkfield's €412,000 difference that a list of paid payments could not explain.",
+        "introduces": "What that record is made of: balanced immutable entries, accounts, clearing accounts that must empty, and the two published ways of enforcing the invariant.",
+        "form": "sentence",
+        "placement": "end_of_previous"
+      },
+      "post_spec": "posts/12-payment-ledgers/spec.json"
+    },
+    {
+      "id": "balances-and-funds-flows",
+      "folder": "13-balances-and-funds-flows",
+      "title": "Pending, Available, Reserved: Balances and Funds Flows",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "Between the customer paying and the merchant being paid, where is the money and whose is it?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "What a merchant balance, pending and available funds, a reserve, a negative balance and pre-funding are.",
+            "How Stripe's documented model (a balance per account and currency, one balance transaction per change, availability by a country and method schedule) differs from Adyen's (payable batches per sales day with a computed payout delay; balance accounts on platforms).",
+            "That Adyen documents paying out before the scheme pays it, capped at 30 days, and that Stripe's documentation does not say whether it does so for standard payouts, while its terms (28 September 2026) let a payout wait when a network fails to settle to Stripe."
+          ],
+          "believe": [
+            "A balance is a dated claim on the provider, and 'available' is a risk decision expressed as a timestamp.",
+            "Money can leave a balance without a payout, because refunds, chargebacks, fees and holds are booked when they occur, not on the day of the original sale."
+          ],
+          "can_do": [
+            "Given a change in a provider balance, list the kinds of movement that could explain it and name the record that shows which one it was.",
+            "Map Stripe's and Adyen's balance vocabularies onto one internal model without matching terms by name."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a balance that fell with no payout, the reader names at least three kinds of movement that could explain it and the record that settles which.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "On Friday a merchant's provider dashboard shows €10,000 available and €4,000 pending. On Monday it shows €9,200 available. No payout was sent and no new sale became available over the weekend. Using only this chapter: name three things that could have happened, and say where you would look to find out which.",
+            "expected": "Any three of: a refund or a chargeback deducted from the balance; the provider raising a hold on the merchant's funds (a reserve at Stripe, a deposit at Adyen); a fee debited separately from the sales; an amount paid in advance being taken back because the network never settled it. The itemized record decides: the balance transactions at Stripe, the journal types in the settlement details report at Adyen."
+          },
+          {
+            "id": "AC-2",
+            "statement": "The reader can say what 'available' does and does not tell them about where the cash is.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "A colleague says: 'The funds are available, so the card network must have paid the provider.' Is that a safe conclusion? Answer for each of the two providers as the chapter documents them.",
+            "expected": "No. At Adyen, the default payout model pays on a fixed delay whether or not the scheme has paid, and reverses the amount if it has not arrived within 30 days. At Stripe, availability follows a published schedule by country and payment method, and the documentation does not say whether it waits for the network's settlement. In both cases 'available' is the provider's decision to pay."
+          },
+          {
+            "id": "AC-3",
+            "statement": "The reader does not map 'reserve' between the two providers by name: they can say which term at each provider means a hold the provider imposes and which means a buffer the merchant sets.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "minor",
+            "probe": "Your internal model has one field, 'held by provider for risk'. Which documented term feeds it at Stripe and which at Adyen?",
+            "expected": "Stripe: reserve. Adyen: deposit. Adyen's 'reserve' is an amount the merchant configures, which corresponds to Stripe's minimum balance."
+          }
+        ]
+      },
+      "thesis": {
+        "question": "Between the customer paying and the merchant being paid, where is the money and whose is it?",
+        "claim": "Between payment and payout the cash is in transit through the network or in bank accounts that are not the merchant's, and the merchant's share of it exists only as the provider's record of what it owes: the merchant holds a claim, not money. 'Pending', 'available' and 'reserved' are the provider's decisions about when and how much of that claim it will pay. Adyen documents that under its default payout model it pays the merchant whether or not the scheme has paid Adyen, and takes back what has not settled within 30 days; Stripe documents a schedule by country and payment method and does not say whether it waits for the network, beyond terms that let a payout wait when a network fails to pay Stripe.",
+        "disputed_by": "The view that a provider balance works like a bank balance: 'pending' means the money is on its way from the network, 'available' means it has arrived and is the merchant's cash held in the merchant's name.",
+        "so_what": "An integrator has to model each amount with its own availability date and state instead of one running total, expect entries that are unrelated to the day of the original sale, plan for a balance that goes negative, and translate each provider's vocabulary by function, because 'reserve' names a hold the provider imposes at Stripe and a buffer the merchant sets at Adyen.",
+        "how_why": "A provider collects from networks in bulk and pays merchants one by one, so no bank account holds one merchant's sales; what exists per merchant is a line in the provider's books, and the states of that line are rules the provider sets. The two providers' documentation shows the rules. Stripe's documentation (accessed November 2026) gives every balance transaction an available_on time set by a schedule per country and payment method, nets its fee on each transaction and holds risk money in a reserve; it does not say whether availability waits for the network's own settlement. Adyen's documentation (accessed November 2026) assigns sales to a payable batch per sales day, sets the payout delay at the break-even point between fast and slow payment methods, nets fees in the batch with a monthly invoice that is trued up later, and holds risk money in a deposit recalculated daily. Refunds, chargebacks and adjustments are booked when they occur at both, so a day's payout cannot be recomputed from that day's sales. Who carries the gap when a provider pays before it is paid is documented for Adyen and, for standard payouts, not stated by Stripe beyond terms (28 September 2026) that let it delay a payout when a network fails to settle to it; the chapter says so and does not fill the gap."
+      },
+      "role": {
+        "contribution": "Turns the provider's ledger into what a merchant sees of it, and shows that the states of a balance are decisions about a debt, which the payout chapter then follows out of the provider.",
+        "supports": [
+          "P3-2"
+        ]
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "The ledger as the provider's complete, two-sided record of every movement, kept for the provider's own proof.",
+        "introduces": "The merchant sees none of that: it sees one-sided lines against a balance, and the open question there is not how much but when the amount becomes the merchant's to use.",
+        "form": "paragraph",
+        "placement": "end_of_previous"
+      },
+      "post_spec": "posts/13-balances-and-funds-flows/spec.json"
+    },
+    {
+      "id": "payouts-and-money-movement",
+      "folder": "14-payouts-and-money-movement",
+      "title": "Getting Money Out: Payouts and Money Movement",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "How does money leave the provider and reach a bank account, and what happens when it does not arrive?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "What a payout, a payout rail, a cut-off, a value date, a payout return and an instant payout are.",
+            "The documented payout states at each provider: at Stripe, 'paid' that may become 'failed' within five business days, and 'posted' then 'returned' for Global Payouts; at Adyen, 'booked' followed by tracking events and possibly 'returned'.",
+            "What the EU's verification of payee rule (in force for euro-area providers since 9 October 2025) and the UK's Confirmation of Payee check before a transfer, and what each provider exposes of it."
+          ],
+          "believe": [
+            "'Paid' on a payout means the provider sent it; arrival is a separate fact that often has to be inferred from the absence of a return.",
+            "A returned payout is a new credit that reopens a debt to the payee, not an undo of the original."
+          ],
+          "can_do": [
+            "Design a payout record with separate states for instructed, sent, arrived and returned, and say how long it must stay open.",
+            "Given a rail and a time of day, reason about when the transfer is processed and when a failure could still surface.",
+            "Decide what to do with a payee-name check that returns a close match or no match, and say who carries the loss if the sender continues."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a payout marked complete that the payee never received, the reader explains what happened and what the payout record should have looked like.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "blocker",
+            "probe": "A platform marks a seller's payout 'completed' when the provider's notification says the payout is paid. Eight days later the seller says nothing arrived, and the provider shows a balance for that seller that is higher than the platform's own records say. Using only this chapter: what most likely happened, and how should the platform have recorded the payout?",
+            "expected": "The receiving bank returned the transfer, and the return came back days later as a new credit to the seller's balance at the provider. The platform should keep 'sent' and 'arrived' as different states, leave a payout open for the return window, and book a return as a new entry linked to the original payout that reopens the amount owed to the seller."
+          },
+          {
+            "id": "AC-2",
+            "statement": "The reader can say how the two providers' payout interfaces differ in what the sender chooses, and what follows for an adapter over both.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "You must send the same third-party payout through either provider. What do you choose in the request at Stripe's Global Payouts and what at Adyen's Transfers API, and which of the two tells you the money arrived?",
+            "expected": "At Stripe the sender can name the network (for example SEPA, Faster Payments, Fedwire, SWIFT); at Adyen the sender names a priority (regular, fast, instant, wire, cross-border) that Adyen maps to a route. Adyen reports a 'credited' status for instant bank transfers; otherwise both report that the transfer was sent, and a return may follow."
+          },
+          {
+            "id": "AC-3",
+            "statement": "Product availability, limits, fees and cut-off times are stated with 'as of November 2026' and marked as likely to change.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "major"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "How does money leave the provider and reach a bank account, and what happens when it does not arrive?",
+        "claim": "Money leaves the provider through two processes that finish at different times: the provider's accounting debits the balance when it instructs the transfer, and a bank rail then delivers or returns it on the rail's own clock, so a payout marked 'paid' has been sent, not received. A transfer that does not arrive comes back days later as a new credit, and Stripe and Adyen both document payouts this way.",
+        "disputed_by": "The view that a payout is the last step of a payment and ends when the provider reports it paid, so that a payout failure is an error returned by the API at request time.",
+        "so_what": "A platform must keep every payout open until the return window has passed, link each return to the payout it undoes and to the payee it now owes again, and check the payee before sending, because Stripe's documentation says funds sent to a wrong account might not be recoverable.",
+        "how_why": "Batch rails accept a transfer first and reject it later: the receiving bank finds the account closed or the details wrong and sends the money back. Stripe's documentation (accessed November 2026) says a failed payout 'might initially show as paid' and change to failed within five business days, that a posted Global Payout 'doesn't guarantee that your recipient has received money', and that the funds of a returned one come back 'in a separate transaction'. Adyen's (accessed November 2026) splits the lifecycle into accounting events up to 'booked' and tracking events after it, says a non-instant payout 'cannot fail' but can be returned, and creates a new transaction for the return. The documented difference is in what the sender controls and learns: Stripe's Global Payouts lets the sender name the network, Adyen's Transfers API takes a priority and chooses the route, and Adyen confirms arrival for instant bank transfers. Checks of the payee's name before sending (required of euro-area providers since 9 October 2025, and offered in the UK as Confirmation of Payee) move the error to a warning before the money leaves; both providers pass the result to the sender and leave the decision there. Which rail either uses for a standard merchant payout in each country is not published."
+      },
+      "role": {
+        "contribution": "Follows a balance out of the provider's ledger onto a rail it does not control, and leaves the part with its sharpest case of two records that disagree: 'paid' at the provider and nothing at the bank.",
+        "supports": [
+          "P3-3"
+        ]
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "The available balance as a debt the provider has decided it will pay.",
+        "introduces": "Paying it means leaving the ledger for a bank rail, where the provider can record that it sent the money and cannot see whether it arrived.",
+        "form": "sentence",
+        "placement": "end_of_previous"
+      },
+      "post_spec": "posts/14-payouts-and-money-movement/spec.json"
+    },
+    {
+      "id": "payment-reconciliation-and-reporting",
+      "folder": "15-payment-reconciliation-and-reporting",
+      "title": "Proving the Money: Reconciliation Inside the Provider and Out",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "How does a provider prove its own books against the networks and banks, and what does it give customers to prove theirs?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "What provider-side reconciliation, a clearing file, a settlement report and exception aging are.",
+            "What Stripe (2024) and Adyen (2021, five years old) have published about reconciling their own books, and that neither publishes matching rules, file formats or exception volumes.",
+            "The reports and data products each exposes, the unit each reconciles on (the payout at Stripe; the payable batch at Adyen, with a daily report per balance account for platforms) and what each says about timing."
+          ],
+          "believe": [
+            "A provider's figures are not true because the provider processed the payments; they are true where an outside record agrees with them.",
+            "Reports and webhooks are different contracts: a report is complete and late, a webhook is prompt and may be missing."
+          ],
+          "can_do": [
+            "Build a daily close that books from the provider's reports, waits for them to be available and uses webhooks only as prompts.",
+            "Hold an unmatched amount as an open item with an age and an owner instead of adjusting a total to make it tie.",
+            "Choose the matching key for each provider when reconciling bank credits across two of them."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a bank credit that differs from the sum of the day's payment notifications, the reader names the record to book from, what the difference is probably made of, and how to treat it while it is unexplained.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "blocker",
+            "probe": "A finance team books sales each night from the 'payment succeeded' notifications it received that day. On Thursday the bank credit from the provider is €1,930 lower than the sum of those notifications. Using only this chapter: which record should the team have booked from, what is the €1,930 probably made of, and what should happen to it until it is explained?",
+            "expected": "Book from the provider's report that itemizes the payout or batch, not from notifications. The difference is probably fees, refunds, chargebacks, a change in a hold, or sales that belong to a different payout or batch. Until each part is matched, the amount stays an open item with an age and an owner; it is not written off or absorbed into a total."
+          },
+          {
+            "id": "AC-2",
+            "statement": "The reader can state the difference between the two providers' settlement reports in unit and in published timing.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "You reconcile bank credits from both providers. What does one line of the main reconciliation report correspond to at each, and what does each say about when the report is ready?",
+            "expected": "Stripe's payout reconciliation report is organized by payout, and Stripe states its reports are normally ready within about 12 hours after the day ends, adding that a payout can arrive before its report. Adyen's settlement details report is organized by payable batch (by default a sales day) and is generated when the batch closes; Adyen says to expect it within 3 hours after the batch closes, and publishes when scheduled daily reports are generated (between 02:00 and 10:00 CET)."
+          },
+          {
+            "id": "AC-3",
+            "statement": "The chapter states where the public record on each provider's own reconciliation stops and does not describe matching internals that no source documents; it is short where the evidence is thin.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "How does a provider prove its own books against the networks and banks, and what does it give customers to prove theirs?",
+        "claim": "A provider proves its books by matching each movement its ledger expects against a record it did not write, a network's file or a bank's statement, and by putting an age and an owner on whatever stays unmatched. What it gives customers is the same proof one level down: scheduled reports itemized per payout at Stripe and per payable batch at Adyen (for a platform, also per day and balance account), which are complete where webhooks are only prompt.",
+        "disputed_by": "The view that a ledger whose entries balance is already proven, so that matching it against outside files is a finance formality, and that a customer can keep its books from the webhook stream and treat reports as an optional export.",
+        "so_what": "A customer's close has to book from reports, wait until they are available and keep open items with an age, and a platform on both providers needs two matching keys, because one reconciles on a bank credit and the other on a day of sales.",
+        "how_why": "A ledger can only show that its own entries balance; whether an expected movement happened is known only to the party that carried it out. Stripe's 2024 post puts 'reconciling money movement with third-party reporting' inside its fund flows and reports unresolved balances by age with tickets assigned to teams. Adyen's 2021 post (five years old) describes parsing partner files and matching them to transactions in two steps across its accounting clusters, and its reports distinguish a payment sent for settlement from one whose funds Adyen has received. For customers, Stripe documents reports computed daily and normally ready within 12 hours, warns that 'a payout might arrive before its reconciliation data is ready', and sells query and warehouse access to the data; Adyen generates its settlement details report when the payable batch closes, says to expect it within 3 hours after the batch closes and publishes a daily window for scheduled reports, and for platforms requires a daily Balance Platform Accounting Report. Neither publishes its matching rules, file formats, match rates or exception volumes, so the chapter describes the principle, the published fragments and the customer-facing reports, and says that the internals are not public."
+      },
+      "role": {
+        "contribution": "Resolves what the first three chapters leave open: when the provider's record and an outside record disagree, how the disagreement is found, and what a customer receives to repeat the proof.",
+        "supports": [
+          "P3-4"
+        ]
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "A payout the provider recorded as paid that the bank returned: two records of the same money that disagree, with nothing in the ledger alone to say which is right.",
+        "introduces": "The standing answer: match every expected movement against the other party's record, age what does not match, and hand customers reports so they can do the same.",
+        "form": "paragraph",
+        "placement": "both"
+      },
+      "post_spec": "posts/15-payment-reconciliation-and-reporting/spec.json"
+    },
+    {
+      "id": "licences-and-safeguarding",
+      "folder": "16-licences-and-safeguarding",
+      "title": "Whose Money Is It? Licences, Safeguarding and Where Funds Sit",
+      "kind": "chapter",
+      "detail": "full",
+      "question": "Who is legally allowed to hold customer money, where does it sit, and how does that shape the architecture?",
+      "intent": {
+        "outcome": {
+          "know": [
+            "What a payment institution, an e-money institution, a bank (credit institution), a money transmitter, a partner bank and safeguarding are.",
+            "The licenses each company states it holds: Adyen N.V. as a Dutch credit institution with a UK branch and a US federal branch; Stripe as an e-money institution in the EEA and the UK and, in the US, a state-licensed money transmitter and a payment facilitator of six named acquirers (five banks and its own limited-purpose bank), plus the narrow charters of 2025 and 2026 and their status.",
+            "What is not public: which banks hold Stripe's safeguarded funds in the EU and UK, and which banks hold the balances Adyen keeps before payout (Adyen documents that it holds them itself, in a country per settlement currency)."
+          ],
+          "believe": [
+            "A license is a design input: it fixes which accounts must exist, which funds may never be mixed and which comparison with a bank must always hold.",
+            "A platform stays outside these rules only while a licensed provider, and not the platform, has possession or control of the funds."
+          ],
+          "can_do": [
+            "Look at a proposed funds flow and say at which step, if any, the builder would hold other people's money, and what that would require.",
+            "Ask a provider which entity holds the funds in each region, under which license, and how user funds are kept apart from its own."
+          ]
+        },
+        "acceptance_criteria": [
+          {
+            "id": "AC-1",
+            "statement": "Given a funds flow that routes customer money through the builder's own bank account, the reader names what the builder has become, what the rules would require and the design that avoids it.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "blocker",
+            "probe": "A tutoring marketplace plans to collect parents' payments into its own company bank account, hold them until the lesson has taken place, and pay tutors weekly, tracking each tutor's share in its database. Using only this chapter: what has the marketplace taken on, what would EU rules require of a firm doing this, and what is the alternative design?",
+            "expected": "It would be holding money received for other people, which is a regulated payment service: it would probably need its own license (a payment or e-money institution in the EU, money transmitter licenses in US states) and would have to keep those funds apart from its own in a safeguarding account and reconcile its record of who is owed what against that account. The alternative is to leave the funds in a licensed provider's accounts for the tutors and only instruct splits and payouts, so the marketplace never has possession or control."
+          },
+          {
+            "id": "AC-2",
+            "statement": "The reader can state the documented license difference between Stripe and Adyen in one region and one thing it lets or requires each to do, without claiming where either holds the funds.",
+            "check": "custom",
+            "method": "cold_reader",
+            "severity": "major",
+            "probe": "In the EEA, what kind of licensed institution is each of the two providers, and name one consequence the chapter documents for each.",
+            "expected": "Adyen N.V. is a credit institution (a bank) supervised by the Dutch central bank; Adyen says its banking licenses enable direct connections to payment rails and card schemes. Stripe's EEA entity is an e-money institution authorized in Ireland; it says user funds are settled to safeguarding accounts before payout. A passing answer does not name the banks or accounts, which are not public."
+          },
+          {
+            "id": "AC-3",
+            "statement": "Every statement that links Adyen's bank status to a product behavior (such as paying out before it is paid) is labeled as inference, and pending regulation and charters are given with their status as of November 2026.",
+            "check": "custom",
+            "method": "rubric",
+            "severity": "blocker"
+          }
+        ]
+      },
+      "thesis": {
+        "question": "Who is legally allowed to hold customer money, where does it sit, and how does that shape the architecture?",
+        "claim": "The license decides which accounts a provider's ledger must contain, which funds may never be mixed and what must be compared with a bank. A licensed non-bank may hold customers' money only apart from its own: Stripe, an e-money institution in the EEA and the UK and by its own words 'not a bank' in the US, keeps user funds in safeguarding and partner-bank accounts, and where such an account is pooled Stripe's own record is the only division of it between customers. Adyen N.V. is a bank, a Dutch credit institution with UK and US branches; it says the licenses give it direct connections to rails and schemes, and it says merchant balances are held by Adyen before settlement, in a country documented per settlement currency, without naming the banks.",
+        "disputed_by": "The view that licensing is a matter for lawyers and contracts with no effect on system design, and that a platform which holds customers' funds 'only in transit' for a few days in its own account is not holding customer money.",
+        "so_what": "Before drawing a funds flow, a builder has to ask at which step the money would be in its possession or control. Larkfield never touches member funds for this reason, and a design that pools them in the platform's own account, or that has the platform track recipients' funds itself, has taken on a license question whether or not anyone decided to.",
+        "how_why": "EU law says funds received by a payment institution are not deposits and must be safeguarded: kept apart from everyone else's and placed in a separate account at a bank or in secure assets, insulated from the institution's creditors. The UK regulator's 2025 policy statement, in force since 7 May 2026, adds a formal comparison between what is owed to users and what the safeguarding accounts hold, with any shortfall made up from the firm's own funds. That comparison is the ledger-to-bank reconciliation of the previous chapter, required by law. Stripe's documentation shows the structure: safeguarding accounts in the EU and UK, a partner bank holding pooled US balances while Stripe keeps the per-customer record, and, in its 2026 engineering post on fee credits, a ledger that separates user funds from corporate funds that need not be safeguarded. Adyen's pages state its license (a European banking license since 2017, a US federal branch since 2021) and, in a 2026 release, that the licenses enable direct connections to rails and schemes; its terms and documentation say merchant balances are held by Adyen before settlement, in a country per settlement currency, without naming a bank, and the reading that its documented pre-financing of payouts rests on a bank's balance sheet is the author's inference. In 2025 and 2026 Stripe added narrow charters (a Georgia acquiring bank it now lists among its US acquirers, and a national trust bank for its stablecoin subsidiary that has the OCC's preliminary conditional approval only), none of them a full banking license."
+      },
+      "role": {
+        "contribution": "Answers the 'whose' in the part's question, shows that the reconciliation of ledger to bank is a legal duty and not only good practice, and carries the part's closing.",
+        "supports": [
+          "P3-5"
+        ]
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Reconciliation as the comparison of the provider's ledger with a bank's record of the same money.",
+        "introduces": "Whose bank account that is and who is allowed to hold it: the license that decides which accounts must exist and turns that comparison into a legal requirement.",
+        "form": "paragraph",
+        "placement": "end_of_previous"
+      },
+      "post_spec": "posts/16-licences-and-safeguarding/spec.json"
+    }
+  ]
+}

@@ -1,0 +1,1497 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "payment-data-stores-and-consistency",
+  "journal": "payments-platform-architecture",
+  "part": "part-8",
+  "title": "Never Lose a Cent: Data Stores and Consistency",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "What Stripe has published about its document database platform (2024, 2026) and its online migrations (2017), and what Adyen has published about PostgreSQL, its sharded accounting clusters (2021) and partitioning (2023 to 2025).",
+        "The terms shard, online migration, consistency boundary and outbox.",
+        "What is not public for either company: which data is replicated synchronously, read consistency, and how a transfer across shards or clusters is made atomic."
+      ],
+      "believe": [
+        "The choice of database product matters less for money than where the consistency boundary is drawn and whether everything that crosses it is idempotent and checked afterwards."
+      ],
+      "can_do": [
+        "Draw the consistency boundary for a payment record in their own system and say what is allowed to catch up later.",
+        "Replace a proposed cross-system transaction with a local transaction, an outbox and an idempotent consumer, and name the check that proves the two sides agree.",
+        "Plan the steps of an online migration of a payment table."
+      ]
+    },
+    "audience": {
+      "who": "A software engineer or architect who is new to payments and is designing, operating or reviewing the data stores behind a payment integration.",
+      "already_knows": [
+        "Relational and document databases, transactions, replication, queues and at-least-once delivery as general ideas",
+        "The split between the path that must answer and the record that must be right (payment-reliability-and-availability)",
+        "Idempotency keys between a merchant and a provider (idempotency-and-retries)",
+        "The inbox and the receiver's contract for webhooks (payment-webhooks-and-events)"
+      ],
+      "does_not_know": [
+        "What Stripe and Adyen have published about their databases, with dates, and what they have not",
+        "The terms shard, online migration, consistency boundary and outbox as this book uses them",
+        "That the absence of a spanning transaction at either company is an inference from published mechanisms"
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a proposal for a transaction across a database and a queue, the reader gives the outbox design and the duty it puts on the consumer.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A team must mark a payment as paid in its database and tell the booking system so that a class pass is activated. They propose one distributed transaction across the database and the message queue. What does this chapter suggest instead, what can still go wrong, and how is it caught?",
+        "expected": "Write the payment state and an outbox row in one local transaction; a separate process publishes the row, possibly more than once; the booking system deduplicates by event or payment id so that a repeat has no effect; a periodic comparison of paid payments against activated passes catches anything that was never delivered."
+      },
+      {
+        "id": "AC-2",
+        "statement": "Given a design in which one account's money can sit in two shards, the reader identifies that a transfer between them is no longer one transaction and says what keeps it correct.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A ledger is split into four databases and new entries go to whichever database is next in turn. A payout must debit a balance whose entries are spread across two of them. Why is this harder than before the split, and what did Adyen say it did about it in 2021?",
+        "expected": "The debit can no longer be one local transaction; money has to be moved from one cluster to the other. Adyen's 2021 account says the migration was 'quite painful' and that jobs exchange 'back and forth messages between the clusters to keep everything aligned'; the protocol itself is not public. The reader adds that such messages must be idempotent and verified."
+      },
+      {
+        "id": "AC-3",
+        "statement": "The statement that neither company uses a transaction spanning its money path is presented as an inference from the published mechanisms, labeled as such, and the chapter lists what is not public for each company.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      },
+      {
+        "id": "AC-4",
+        "statement": "Published scale figures for the two companies are given with their year and unit and are not ranked against each other.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "major"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "Which databases sit under a payment platform, and how do they keep money consistent while scaling?",
+    "claim": "Stripe scaled a document database and Adyen a relational one, and in what either has published no transaction spans the shards: the published mechanisms imply that money is kept consistent by local transactions, retries that are safe to repeat, messages between clusters and verification afterwards.",
+    "disputed_by": "The view that money needs one strongly consistent relational database, or distributed transactions across every service that touches it, and that a document store or any eventual consistency has no place near a payment.",
+    "so_what": "The reader stops asking which database is safe for money and instead draws a small consistency boundary (for Larkfield, the payment record and its outbox row), makes everything that crosses it idempotent, and adds a check that proves both sides agree.",
+    "how_why": "Stripe's 2024 account describes DocDB, built on MongoDB Community, with more than 2,000 shards and a platform that moves data between them; during the switch, which takes under two seconds, 'all failed reads and writes directed to the source shard succeed on retries'. Adyen's 2018 to 2025 posts describe PostgreSQL clusters; its 2021 account says accounting was sharded round-robin, that rebalancing was not implemented, and that clusters exchange 'back and forth messages' to stay aligned, while templates guarantee that the records sum to zero. That is the documented difference: Stripe invested in moving data between shards and verifies its ledger after the fact (2024), Adyen in not needing to move it and in checking at write time (2021). That both rely on idempotent operations and later verification instead of a global transaction is an inference from these mechanisms; neither company states it, and which data is replicated synchronously, read consistency and the cross-cluster protocol are not public.",
+    "supporting_claims": [
+      {
+        "id": "C1",
+        "claim": "Payment data does not need one level of consistency: a small set of records must change together (the consistency boundary, at most one database) and everything else may catch up, so the design question is where the boundary sits, not which database is used."
+      },
+      {
+        "id": "C2",
+        "claim": "Sharding keeps transactions local to a shard and removes them between shards; the shard key decides which operations stay local, and aggregate queries, cross-shard transfers and rebalancing become separate problems."
+      },
+      {
+        "id": "C3",
+        "claim": "Stripe has published a document database platform on MongoDB (2024, 2026) that moves data between more than 2,000 shards with a write pause under two seconds absorbed by retries, a dual-write pattern for reshaping data online (2017) and a ledger that verifies after the fact (2024); transaction boundaries, read consistency and replication settings are not public."
+      },
+      {
+        "id": "C4",
+        "claim": "Adyen has published PostgreSQL clusters (2018 to 2025), an accounting database sharded by rotation with no rebalancing, messages between clusters and templates checked at write time (2021); the cross-cluster protocol, the number of clusters and which data is replicated synchronously are not public."
+      },
+      {
+        "id": "C5",
+        "claim": "The published mechanisms imply, as an inference neither company states, that no transaction spans the shards; the same design at small scale is a local transaction, an outbox, an idempotent consumer and a check that proves both sides agree."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Shows how the record that chapter 37 says must be right stays right once it no longer fits in one database, and gives the reader the consistency boundary and the outbox as the small-scale version.",
+    "supports": [
+      "P8-2"
+    ]
+  },
+  "flow": {
+    "pattern": "problem_solution",
+    "additional_patterns": [
+      {
+        "pattern": "prerequisite_order",
+        "applies_to": "what-has-to-be-exact, shards: the consistency boundary, then what happens to it when data is split"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "stripe-published, adyen-published, where-they-differ: each company's dated record, then the two side by side"
+      },
+      {
+        "pattern": "large_to_small",
+        "applies_to": "no-spanning-transaction, outbox, in-practice: what the two records imply at provider scale, the same design for one database, then one payment at Larkfield"
+      }
+    ],
+    "rationale": "The reader meets a paid pass that was not activated and a proposed distributed transaction before any theory, so the chapter's question arrives as a decision someone has to make. The boundary is defined before sharding because sharding is only a problem once the reader knows a transaction stops at one database. The two companies' accounts come before the inference drawn from them, and each ends with what is not public, so the inference is read as an inference; reversing that order would present a conclusion about both companies before its evidence. The comparison stands directly after the two accounts, where every cell has just been cited, and the inference follows it because it is a reading of the table's silence on transactions. The outbox comes after the inference because it is the same four parts at small scale; putting it first would teach a pattern without the reason two very large systems point to it. Larkfield's design and its failures close the body, so the last thing the reader sees is the design surviving its own faults."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "In 2023 Stripe moved 1.5 petabytes of data from one set of database shards to another while payments kept running. Each move ended with a step in which every read and write on the data being moved was rejected, for up to two seconds, on purpose. A platform whose promise is never to lose a cent chose to say no for two seconds."
+    },
+    "bridge": {
+      "from_reader_world": "An engineer's first instinct for money is one strongly consistent relational database, or a distributed transaction across every system that touches a payment.",
+      "to_topic": "Neither of the two largest providers describes anything like that: each has divided its data many times over, and each has published what it lets give way so that the record does not."
+    },
+    "thesis_statement": {
+      "text": "Stripe scaled a document database and Adyen a relational one, and in what either has published no transaction spans the shards; money is kept consistent by small local transactions, retries that are safe to repeat, messages between clusters and verification afterwards (the last step of that reading is the author's inference), so what matters is where the consistency boundary is drawn.",
+      "placement": "KEY POINTS callout and paragraph p03"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p05",
+      "promises": [
+        {
+          "promise": "Start from a pass at Larkfield that was paid and not activated.",
+          "kept_in": [
+            "scene"
+          ]
+        },
+        {
+          "promise": "Say which payment data has to be exact and define the consistency boundary.",
+          "kept_in": [
+            "what-has-to-be-exact"
+          ]
+        },
+        {
+          "promise": "Explain what sharding keeps and what it breaks.",
+          "kept_in": [
+            "shards"
+          ]
+        },
+        {
+          "promise": "Report what Stripe has published and then what Adyen has published, with dates and with what is not public.",
+          "kept_in": [
+            "stripe-published",
+            "adyen-published"
+          ]
+        },
+        {
+          "promise": "Compare the two and state what both records imply about transactions.",
+          "kept_in": [
+            "where-they-differ",
+            "no-spanning-transaction"
+          ]
+        },
+        {
+          "promise": "Give the small-scale version: a local transaction, an outbox and an idempotent consumer.",
+          "kept_in": [
+            "outbox"
+          ]
+        },
+        {
+          "promise": "Apply it to Larkfield's payment record store and go through the ways it fails.",
+          "kept_in": [
+            "in-practice",
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "controlling_idea": "In 2023 Stripe moved 1.5 petabytes of data between database shards while payments ran, and each move deliberately rejected reads and writes on the data being moved for up to two seconds, which is not what 'never lose a cent' is usually taken to mean.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "quotation",
+            "what": "Stripe's 2024 post: \"we bin-packed thousands of underutilized databases by migrating 1.5 petabytes of data transparent to product applications, and reduced the total number of underlying DocDB shards by approximately three quarters\"; \"The entire traffic switch protocol takes less than two seconds to execute, and all failed reads and writes directed to the source shard succeed on retries.\"",
+            "shows": "A documented case in which a provider chose a short refusal over any risk to the data: the puzzle the chapter resolves.",
+            "source": "Stripe engineering blog, J. Morzaria and S. Narkhede, 'How Stripe's document databases supported 99.999% uptime with zero-downtime data migrations', https://stripe.dev/blog/how-stripes-document-databases-supported-99.999-uptime-with-zero-downtime-data-migrations, published 2024-06-06"
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "controlling_idea": "Chapter 37 separated the path that must answer from the record that must be right, and the consequence is that the record has to be kept right on its own terms, in databases that have themselves been divided, without a transaction that covers all of them.",
+        "function": "transition",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "payment-reliability-and-availability: the answering path is kept independent of the record; the record may lag but may not be wrong.",
+            "shows": "Carries the previous chapter's split into this chapter's question."
+          }
+        ],
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The documented two-second refusal.",
+          "introduces": "The split from chapter 37 that explains it, and what that split demands of the record.",
+          "form": "paragraph",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "controlling_idea": "Stripe scaled a document database and Adyen a relational one, and in what either has published no transaction spans the shards: the published mechanisms imply that money is kept consistent by local transactions, retries that are safe to repeat, messages between clusters and verification afterwards, so the database product matters less than where the consistency boundary is drawn.",
+        "function": "claim",
+        "evidence": [
+          {
+            "kind": "fact",
+            "what": "Stripe: DocDB, 'an extension of MongoDB Community', 2,000+ shards (2024). Adyen: PostgreSQL clusters (2018), accounting sharded round-robin with 'back and forth messages between the clusters' (2021).",
+            "shows": "The two documented choices the thesis rests on, with their years.",
+            "source": "Stripe engineering blog, J. Morzaria and S. Narkhede, 'How Stripe's document databases supported 99.999% uptime with zero-downtime data migrations', https://stripe.dev/blog/how-stripes-document-databases-supported-99.999-uptime-with-zero-downtime-data-migrations, published 2024-06-06; Adyen knowledge hub, Willem Pino, 'Design to Duty: The Accounting and Reporting Systems at Adyen', https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2, published 2021-08-23 (evidence age: 5 years)"
+          }
+        ],
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "A record that must stay right across divided databases.",
+          "introduces": "The chapter's answer and the part of it that is an inference.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "controlling_idea": "In the journey of Mila's class pass this chapter covers the write that follows the approval at 19:42 on Tuesday 9 March 2027, when Larkfield's record becomes `paid` and her pass has to become usable, and the stores under every later write for the same payment.",
+        "function": "context",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's class pass: €120.00 from Studio Noord, Tuesday 9 March 2027 at 19:42, on Adyen; the payment record store moves to `paid` on the AUTHORISATION webhook (scenario ledger, recurring worked examples; addition by 08-payment-state-machines).",
+            "shows": "Locates the chapter on the payment's path: the moment a paid payment must have effects in another system.",
+            "source": "scenario-ledger.md"
+          }
+        ],
+        "transition_in": {
+          "relationship": "example",
+          "carries_over": "The general claim about boundaries.",
+          "introduces": "Where a boundary sits in the book's recurring payment.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p05",
+        "controlling_idea": "The chapter goes from a paid pass that was not activated at Larkfield, through which data has to be exact, what sharding keeps and breaks, what Stripe and then Adyen have published, how the two differ and what both records imply, to the outbox as the small-scale version, Larkfield's own design and the ways it fails.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The claim and its place in the journey.",
+          "introduces": "The order of the sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: Paid, and Not Activated",
+      "controlling_idea": "Larkfield's payment record store marked a payment paid and then told the booking app in a second, separate step, so a failure between the two left members who had paid without the thing they paid for.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "C1",
+          "C5"
+        ],
+        "how": "Shows the problem at the scale the reader works at: two systems that must agree and no transaction that covers both."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The fault as it was found, the first proposed repair, then the question that replaced it; the proposal is only understandable after the fault, and the question only after the proposal."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The claim that consistency depends on where the boundary is drawn.",
+        "introduces": "A case in which no boundary had been drawn at all.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p06",
+          "controlling_idea": "Before Keel, Larkfield's webhook processing took a stored message from the inbox table, committed `paid` to the payment record store and then called the booking app to activate the pass or membership, and in 2026 that second step failed silently for 146 purchases.",
+          "function": "context",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Scenario ledger: the payment record store (PostgreSQL, fed by webhooks through an inbox table) and the booking app are separate systems. New local facts added to the ledger: before Keel the activation was a direct call made after the commit, with no retry; 146 purchases in 2026 stayed `paid` without an activated pass or membership period until the member contacted support (illustrative).",
+              "shows": "Fixes the fault: a state change and its effect in another system written as two unrelated steps.",
+              "source": "scenario-ledger.md"
+            }
+          ]
+        },
+        {
+          "id": "p07",
+          "controlling_idea": "Tom Hendriks's first proposal in February 2027 was to add a message queue and wrap the database write and the publish in one distributed transaction, which is the answer most engineers reach for first.",
+          "function": "context",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Local detail consistent with the ledger: Femke de Graaf's review of the record with Tom Hendriks is in late March 2027 (addition by 08-payment-state-machines); the proposal is made in February 2027, in Femke's second month, and the outbox design that replaced it is live from 1 March 2027, before Mila's pass of 9 March.",
+              "shows": "States the disputed view in the mouth of a competent engineer, so the chapter argues against a reasonable position.",
+              "source": "scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "The paid-and-not-activated purchases.",
+            "introduces": "The repair that was proposed first.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p08",
+          "controlling_idea": "Femke de Graaf replaced the proposal with three questions that the rest of the chapter answers: which records must change together, what is allowed to catch up later, and which check proves afterwards that both sides agree.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Keel decisions K2 (the provider's record is the truth; a job sweeps everything still pending) and K3 (clearing accounts must return to zero; reconciliation when each provider's reports are ready) already answer the third question for provider data (scenario ledger).",
+              "shows": "Shows the three questions are the same discipline Keel already applies between Larkfield and its providers, now applied between Larkfield's own systems.",
+              "source": "scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A transaction stretched over two systems.",
+            "introduces": "A boundary, a list of what may lag, and a check.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "what-has-to-be-exact",
+      "heading": "What Has to Be Exact: Consistency Boundaries by Kind of Data",
+      "controlling_idea": "Payment data does not need one level of consistency: a small set of records must change together or not at all, everything else may catch up, and the line between them is the consistency boundary.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "C1"
+        ],
+        "how": "Supplies the term the thesis turns on and shows that the requirement differs by kind of data."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The observation that requirements differ comes first, with a provider's own words; the term for the line is defined from it; only then can the reader see why stretching the line over several systems is avoided. Defining the boundary before showing that data differs would give a term with nothing to apply it to."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Femke's first two questions: what must change together and what may catch up.",
+        "introduces": "The general answer by kind of data, and the name for the line between the two.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p09",
+          "controlling_idea": "The kinds of data on a money path have different requirements: the record of a payment and of the money must be exact when written, while balances shown to people, reports and analytics may run behind as long as they say so.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen, 2021: \"Whereas for the latter the priority was uptime, for the accounting systems we don't mind if they are down for a little bit as long as we can guarantee their reliability and consistency.\" Stripe, 2024: \"99.99% of our dollar volume is fully ingested and verified within four days\". Adyen, 2024: reports were served from \"an aggregated (and summarized) version of the original data from all shards\" in a separate database.",
+              "shows": "Both companies state in public that different data runs at different speeds: the edge answers at once, the books and the verification follow.",
+              "source": "Adyen knowledge hub, Willem Pino, 'Design to Duty: The Accounting and Reporting Systems at Adyen', https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2, published 2021-08-23 (evidence age: 5 years); Stripe engineering blog, Ilya Ganelin, 'Ledger: Stripe's system for tracking and validating money movement', https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement, published 2024-02-16; Adyen knowledge hub, Derk van Veen, 'How the default partition saved the day', https://www.adyen.com/knowledge-hub/how-the-default-partition-saved-the-day, published 2024-12-06"
+            },
+            {
+              "kind": "table",
+              "what": "Requirements table, the author's reference design (not a provider's): rows idempotency-key record, payment state with its outbox row, ledger entries, balance shown to a studio, reports and analytics; columns: must be exact when, may lag by, what happens when the store is unavailable.",
+              "shows": "Turns the observation into a requirements table the reader can fill in for their own system."
+            }
+          ]
+        },
+        {
+          "id": "p10",
+          "controlling_idea": "A consistency boundary is the set of records that change together in one local transaction or not at all, and in practice it can be no larger than one database.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "A local transaction is the one mechanism a database gives that is atomic without a protocol between machines owned by different systems; everything outside it is reached by a message or a call that can fail independently.",
+              "shows": "Defines the owned term from what a single database guarantees."
+            },
+            {
+              "kind": "figure",
+              "what": "Figure 38-consistency-boundary: a small fenced area holding a payment row and an outbox row that change together; outside the fence a pass, a ledger and a report, each with a clock.",
+              "shows": "Makes the boundary a picture: small, and with everything else catching up."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "Data that must be exact and data that may lag.",
+            "introduces": "The name and the size of the line between them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "controlling_idea": "A transaction stretched across systems is avoided on a money path for three reasons: both systems must be up for either to commit, a participant that fails mid-way leaves the others waiting, and the most important participant, the provider or the bank, offers no transaction to join.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "A practitioner statement of the common position: \"it is not viable to use a traditional distributed transaction (2PC) that spans the database and the message broker\", because either \"might not support 2PC\" and it is \"often undesirable to couple the service to both\".",
+              "shows": "Shows that avoiding two-phase commit between a database and a broker is established practice, stated here as industry practice and not as either provider's statement.",
+              "source": "Chris Richardson, microservices.io, 'Pattern: Transactional outbox', https://microservices.io/patterns/data/transactional-outbox.html, n.d., accessed 2026-11 (practitioner source)"
+            },
+            {
+              "kind": "reasoning",
+              "what": "A card authorization is a message to a bank; no API of either provider exposes a prepare-and-commit step a merchant's database could enrol in.",
+              "shows": "The decisive reason is specific to payments: the far side of the boundary is outside any transaction manager."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "A boundary no larger than one database.",
+            "introduces": "Why it is not simply made larger.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "shards",
+      "heading": "When One Database Is Not Enough: What a Shard Keeps and What It Breaks",
+      "controlling_idea": "Splitting one kind of data across shards keeps transactions local to each shard and removes them between shards, so the choice of shard key decides which operations stay inside a boundary.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "C2"
+        ],
+        "how": "Explains why growth turns one consistency boundary into many, which is the condition both companies' published designs answer."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The term first, then the choice it forces, then the alternatives to making that choice at all; the contrast cases only mean something once the reader knows what sharding costs."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "A boundary that is at most one database.",
+        "introduces": "What happens to it when the data no longer fits in one database.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p12",
+          "controlling_idea": "A shard is one of many databases that each hold a slice of the same kind of data; inside a shard a transaction works as before, and across shards three things stop being free: a transaction, a query over all the data, and moving data to even out the load.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Stripe, 2019: \"Stripe splits data by kind into different database clusters and by quantity into different shards. Each cluster has many shards, and each shard has multiple redundant nodes.\" Adyen, 2024: \"sharding splits a large database into smaller, more manageable shards\".",
+              "shows": "Both companies use the term in the same sense, so the definition holds for both accounts that follow.",
+              "source": "Stripe, 'Root cause analysis: significantly elevated error rates on 2019-07-10', https://stripe.com/rcas/2019-07-10, published 2019-07 (evidence age: 7 years); Adyen knowledge hub, Derk van Veen, 'How the default partition saved the day', https://www.adyen.com/knowledge-hub/how-the-default-partition-saved-the-day, published 2024-12-06"
+            }
+          ]
+        },
+        {
+          "id": "p13",
+          "controlling_idea": "The shard key decides what stays local: placing data by business entity keeps one merchant's operations in one shard and makes shards uneven, while placing it by rotation or hash keeps shards even and spreads one merchant's money across several.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Adyen, 2021, on why it rejected placement by merchant or payment method: \"every rule we considered would bring its own problems. For example, if we would put each processing merchant in one database, you still need to go to every shard when you need aggregate data to send to our payment method partners.\"",
+              "shows": "A provider's own account of the trade: no key keeps every query local.",
+              "source": "Adyen knowledge hub, Willem Pino, 'Design to Duty: The Accounting and Reporting Systems at Adyen', https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2, published 2021-08-23 (evidence age: 5 years)"
+            },
+            {
+              "kind": "table",
+              "what": "Trade-off table, three placements (by business entity, by rotation or hash, by time or kind): what stays in one transaction, what crosses shards, what rebalancing needs, when it fits.",
+              "shows": "The chapter's design comparison for sharding."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "Transactions that are local to a shard.",
+            "introduces": "The key that decides which operations those are.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p14",
+          "controlling_idea": "Two published contrasts avoid the trade instead of making it: Square's 2019 Books service bought global consistency from a managed distributed database, and TigerBeetle's documentation argues for a ledger database that does not shard at all.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Square, 2019: \"we picked Google Cloud Spanner. It is a fully managed, globally distributed SQL database which let us not worry about sharding\". TigerBeetle documentation: \"Unfortunately, business transactions don't shard well.\"",
+              "shows": "Shows the design space is wider than the two anchors, with one production account (seven years old) and one database vendor's design argument, labeled as such.",
+              "source": "Square developer blog, Łukasz Strzałkowski, 'Books, an immutable double-entry accounting database service', https://developer.squareup.com/blog/books-an-immutable-double-entry-accounting-database-service/, published 2019-10-16 (evidence age: 7 years); TigerBeetle documentation, 'Online Transaction Processing (OLTP)', https://docs.tigerbeetle.com/concepts/oltp/, n.d., accessed 2026-11"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Choosing a shard key.",
+            "introduces": "Two published ways of not having to choose one.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "stripe-published",
+      "heading": "What Stripe Has Published: A Document Database and a Platform That Moves Data",
+      "controlling_idea": "Stripe has published a document database platform on MongoDB with more than 2,000 shards (2024, 2026), a platform that moves data between them with a write pause under two seconds, a 2017 pattern for changing a data model online and a ledger that verifies after the fact, and it has not published transaction boundaries, read consistency or replication settings.",
+      "function": "evidence",
+      "advances_thesis": {
+        "supports": [
+          "C3"
+        ],
+        "how": "Sets out the documented half of the thesis for Stripe, each item with its year, and ends where the record stops."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "Three groups: the platform and the one operation that shows what it relaxes (p15 to p17), two further published mechanisms that share its copy-compare-switch habit, the 2017 migration pattern and the ledger that checks afterwards (p18, p19), and the limits of the record (p20). The migration pattern stays here and not with Larkfield's migration because it is Stripe's dated evidence and defines the term the later section uses. The list of what is not public comes last because it is only credible after the reader has seen how much is public."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The costs of sharding in general.",
+        "introduces": "The first of two published accounts of living with them.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p15",
+          "controlling_idea": "Stripe's 2024 account describes DocDB, an in-house platform around MongoDB Community chosen in 2011 for developer productivity, with applications reaching more than 2,000 shards through proxies that look up where each chunk of data lives.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"Stripe's DocDB is an extension of MongoDB Community—a popular open-source database—and consists of a set of services that we built in-house. It serves over five million queries per second from Stripe's product applications.\"; \"10,000+ distinct query shapes over petabytes of important financial data that lives in 5,000+ collections distributed over 2,000+ database shards\"; \"we chose MongoDB as our online database because it offered better developer productivity than standard relational databases\"; proxies \"developed in-house in Go\" rely on \"a chunk metadata service that maps chunks to database shards\"; shards are \"replica sets that comprise a primary node and several secondary nodes with replication and automated failover\".",
+              "shows": "The store, its scale in 2024 with units, the reason for the original choice and the indirection (chunk to shard) that makes moving data possible.",
+              "source": "Stripe engineering blog, J. Morzaria and S. Narkhede, 'How Stripe's document databases supported 99.999% uptime with zero-downtime data migrations', https://stripe.dev/blog/how-stripes-document-databases-supported-99.999-uptime-with-zero-downtime-data-migrations, published 2024-06-06"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe, 2026: \"A MongoDB shard—one of 2,000 that collectively processed $1.9 trillion in payments in 2025\".",
+              "shows": "A second, newer first-party source confirming the store and the order of magnitude of the shard count.",
+              "source": "Stripe engineering blog, P. Mehta and S. Samant, 'How Stripe uses graph search and state machines to auto-remediate a global database fleet', https://stripe.dev/blog/how-stripe-uses-graph-search-and-state-machines-to-auto-remediate-a-global-database-fleet, published 2026-07-16"
+            }
+          ]
+        },
+        {
+          "id": "p16",
+          "controlling_idea": "The same account describes a Data Movement Platform that moves a chunk between shards in six steps, and the only step the application can notice is the switch, during which reads and writes on that chunk are rejected for under two seconds and succeed when retried.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Steps as published: registration, bulk import, asynchronous replication, a correctness check \"by comparing point-in-time snapshots\", traffic switch, deregistration. The switch uses \"versioned gating\": \"We added a custom patch to MongoDB that allows a shard to enforce that the version token number it receives on requests from the proxy servers is newer than the version token number it knows of\"; \"all reads and writes on the chunk on the source shard are rejected at this point\"; \"The entire traffic switch protocol takes less than two seconds to execute, and all failed reads and writes directed to the source shard succeed on retries.\"",
+              "shows": "The documented mechanism in which availability of one chunk is given up briefly so that no write can land on the old copy.",
+              "source": "Stripe engineering blog, J. Morzaria and S. Narkhede, 'How Stripe's document databases supported 99.999% uptime with zero-downtime data migrations', https://stripe.dev/blog/how-stripes-document-databases-supported-99.999-uptime-with-zero-downtime-data-migrations, published 2024-06-06"
+            },
+            {
+              "kind": "figure",
+              "what": "Figure 38-shard-move: a chunk copied from a source shard to a target shard, kept in sync, checked, then a short pause while the route is switched.",
+              "shows": "Shows the order of the steps and where the pause sits."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "A map from chunks to shards.",
+            "introduces": "What the map makes possible: moving a chunk while it is in use.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p17",
+          "controlling_idea": "What the move relaxes is availability, for one chunk and for a time Stripe set to match what its applications already tolerate, and what it does not relax is the data: the copy is compared before the switch and a version check stops the source shard from serving the chunk once the route has moved.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "The stated bound for the switch: \"shorter than the duration of a planned database primary failover—typically lasting a few seconds, and in line with the retry budget of our product applications\".",
+              "shows": "The pause was sized to an existing tolerance, so the callers' retries are part of the design and not an accident.",
+              "source": "Stripe engineering blog, J. Morzaria and S. Narkhede, 'How Stripe's document databases supported 99.999% uptime with zero-downtime data migrations', https://stripe.dev/blog/how-stripes-document-databases-supported-99.999-uptime-with-zero-downtime-data-migrations, published 2024-06-06"
+            },
+            {
+              "kind": "reasoning",
+              "what": "The post does not say how product applications make a retried write safe. That those writes are idempotent is the author's inference, stated in an INFERENCE block.",
+              "shows": "Keeps the documented mechanism apart from the reading of it."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "A rejected request that succeeds on retry.",
+            "introduces": "What was given up, what was kept, and the part of the explanation that is inference.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p18",
+          "controlling_idea": "Moving data between shards is one kind of online migration, and Stripe's 2017 post describes the other kind, changing the shape of the data, as four steps of dual writing with reads compared in production before any switch.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "The \"4 step dual writing pattern\": \"Dual writing to the existing and new tables to keep them in sync\", \"Changing all read paths in our codebase to read from the new table\", \"Changing all write paths in our codebase to only write to the new table\", \"Removing old data that relies on the outdated data model\"; the example moved \"hundreds of millions of Subscriptions objects\"; reads were verified with \"GitHub's Scientist\"; \"We perform all infrastructure upgrades online, rather than relying on planned maintenance windows.\" Evidence age nine years; whether the same tooling is used today is not public; the 2024 post covers a different problem and does not replace it.",
+              "shows": "Defines online migration with a published four-step pattern, and shows the same habit as the shard move: copy, compare, then switch.",
+              "source": "Stripe engineering blog, Jacqueline Xu, 'Online migrations at scale', https://stripe.com/blog/online-migrations, published 2017-02-02 (evidence age: 9 years)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "similarity",
+            "carries_over": "Data moved between shards with a comparison before the switch.",
+            "introduces": "Data reshaped in place by the same discipline, in an older account.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p19",
+          "controlling_idea": "Stripe's 2024 Ledger post describes verification after the fact as a system of its own: an immutable log that every producing system writes to, in which a missing or wrong event shows up as a clearing account that does not return to zero.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"We built Ledger, an immutable and auditable log\"; \"Each day, Ledger sees five billion events and 99.99% of our dollar volume is fully ingested and verified within four days\"; a problem is found with a query such as \"Find the clearing Accounts with nonzero balance.\" The post names no storage engine for Ledger.",
+              "shows": "The published check that runs after the writes, with its own measure of lateness (four days), which is why the chapter calls Stripe's published correctness mechanism detection.",
+              "source": "Stripe engineering blog, Ilya Ganelin, 'Ledger: Stripe's system for tracking and validating money movement', https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement, published 2024-02-16"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Comparisons made before a switch.",
+            "introduces": "A comparison that runs all the time, over all money movement.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "controlling_idea": "The record stops short of the things a consistency argument would most like to know: which data lives outside DocDB, where transaction boundaries sit across collections, what consistency a read has, and how many replicas acknowledge a write.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Not found in any Stripe first-party source read for this book (research of 17 November 2026): whether the ledger, the card vault or idempotency keys are stored in DocDB; transaction boundaries across collections; the consistency level of reads; replica counts per shard and the replication mode. The 2024 post does not use the word 'transaction'.",
+              "shows": "States where the evidence stops for Stripe, as acceptance criterion AC-3 requires.",
+              "source": "Stripe engineering blog, J. Morzaria and S. Narkhede, 'How Stripe's document databases supported 99.999% uptime with zero-downtime data migrations', https://stripe.dev/blog/how-stripes-document-databases-supported-99.999-uptime-with-zero-downtime-data-migrations, published 2024-06-06"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What Stripe has published.",
+            "introduces": "What it has not.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "adyen-published",
+      "heading": "What Adyen Has Published: PostgreSQL, Accounting Clusters and Partitions",
+      "controlling_idea": "Adyen has published PostgreSQL clusters (2018 to 2025), an accounting database sharded by rotation with no rebalancing, messages between clusters and write-time templates (2021), and it has not published the cross-cluster protocol, the number of clusters or which data it replicates synchronously.",
+      "function": "evidence",
+      "advances_thesis": {
+        "supports": [
+          "C4"
+        ],
+        "how": "Sets out the documented half of the thesis for Adyen, each item with its year, and ends where the record stops."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "additional_patterns": [
+          {
+            "pattern": "problem_solution",
+            "applies_to": "p22 to p24: the sharding decision, the problem it created for payouts, and the two mechanisms that keep the books right despite it"
+          }
+        ],
+        "rationale": "The posts are read in the order they were written (2018, 2021, 2023 to 2025) because each describes the system at one moment and the later ones revise sizes; within the 2021 account the decision comes before its cost and the cost before what contains it. The limits of the record close the section, as in the Stripe section, so the two can be compared item by item."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "A document database with data that is moved between shards.",
+        "introduces": "A relational database whose owner decided not to move data.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p21",
+          "controlling_idea": "Adyen's 2018 post gives the starting point: PostgreSQL chosen because it is transactional, run as clusters of one primary and at least three replicas spread over several data centers.",
+          "function": "description",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"Our PostgreSQL database clusters consist of one primary and at least three replica servers, spread over multiple data centers.\"; \"having a transactional database was key as it ensures we don't lose track of records\"; \"We currently process 5,000+ PostgreSQL transactions per second across multiple clusters\"; \"our biggest cluster has already grown to 74 terabytes.\" Evidence age eight years: the sizes are superseded (\"transactional databases of hundreds of terabytes\", 2021; \"Some of our tables are already over 20TB in size\", 2023) and the cluster shape is not restated in newer posts.",
+              "shows": "The store, the reason for it, and scale figures with their years and units.",
+              "source": "Adyen knowledge hub, Reinier Haasjes, 'Updating a 50 terabyte PostgreSQL database', https://www.adyen.com/knowledge-hub/updating-a-50-terabyte-postgresql-database, published 2018-03-14 (evidence age: 8 years); Adyen knowledge hub, Willem Pino, 'Design to Duty: The Accounting and Reporting Systems at Adyen', https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2, published 2021-08-23 (evidence age: 5 years); Adyen knowledge hub, D. van Veen and C. O. Pene, 'Partitioning at Adyen', https://www.adyen.com/knowledge-hub/partitioning-at-adyen, published 2023-10-06 (evidence age: 3 years)"
+            }
+          ]
+        },
+        {
+          "id": "p22",
+          "controlling_idea": "The 2021 account says the accounting database, which takes about 50 inserted rows per payment, stopped scaling and was split into several clusters filled by rotation, a key chosen so that a cluster can be added or taken out of routing at any time and nothing ever has to be rebalanced.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"Over the lifetime of a payment transaction, about 50 rows have to be inserted into the accounting database.\"; \"Now we have several accounting databases, or clusters, processing side-by-side.\"; \"eventually decided to go for a simple round-robin strategy with some parameters we can adjust\"; \"At the moment we can just add a new cluster whenever we need more capacity or remove one from the routing when we see strange behavior we want to investigate.\"; rebalancing \"has not been implemented yet for this setup\". Evidence age five years; no newer Adyen account of the accounting system was found.",
+              "shows": "The sharding decision and its stated reason: flexibility of routing over locality of data.",
+              "source": "Adyen knowledge hub, Willem Pino, 'Design to Duty: The Accounting and Reporting Systems at Adyen', https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2, published 2021-08-23 (evidence age: 5 years)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "time",
+            "carries_over": "One relational store in 2018.",
+            "introduces": "The same store's accounting data, split three years later.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p23",
+          "controlling_idea": "The cost of that key falls on any operation that needs one account's money in one place: a merchant's money ends up on several clusters, a payout must come from one account, and moving the money between clusters is no longer one transaction.",
+          "function": "cause_effect",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"The migration to a sharded accounting database was quite painful.\"; \"consider a payout to a merchant. This needs to come from one account. However, because you processed these transactions on different clusters, the money needs to be transferred from one cluster to the other in order to end up in the same account. To do this without compromising on the strict correctness requirement was quite difficult. In the end, we created several jobs and processes that use back and forth messages between the clusters to keep everything aligned.\" The protocol is not described.",
+              "shows": "A provider says in its own words that sharding its books broke a transaction and that messages between clusters replaced it.",
+              "source": "Adyen knowledge hub, Willem Pino, 'Design to Duty: The Accounting and Reporting Systems at Adyen', https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2, published 2021-08-23 (evidence age: 5 years)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Entries placed by rotation.",
+            "introduces": "What rotation does to an operation that needs one account's money in one place.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p24",
+          "controlling_idea": "Two published mechanisms keep the books right despite the split: entries can be written only through templates that are verified to sum to zero, and the edge hands payments to accounting through a queue held in a local database, so accounting can run behind without losing anything.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"The only way to add new records to the accounting system is by means of templates\"; \"we can guarantee that if at any time, we sum up all the records in the accounting system, the result will always be 0\"; the payment layer \"saves the payment in a local database and a separate process picks it up when possible. This process will run behind if we have doubt about whether we can guarantee consistency in the accounting or if an accounting database is not available but that will not impact the availability of the PAL itself.\"",
+              "shows": "Correctness enforced at write time, and a database-backed hand-off between the answering path and the books: the same shape as an outbox, in a provider's own account.",
+              "source": "Adyen knowledge hub, Willem Pino, 'Design to Duty: The Accounting and Reporting Systems at Adyen', https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2, published 2021-08-23 (evidence age: 5 years)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "A transfer that is no longer one transaction.",
+            "introduces": "What Adyen says keeps the books correct anyway.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p25",
+          "controlling_idea": "The partitioning posts of 2023 to 2025 show the other way Adyen divides data, inside one database, and record that this too can threaten the store: adding one partition to a critical database brought it close to failure before a December peak.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "\"As a rule of thumb, we partition tables that might exceed the size of 100GB.\" (2023); \"In most cases, it is not possible to lock the table for more than a few seconds.\" (2024); \"I still have nightmares about incident number 2016. We were preparing for one of the most critical seasons for our merchants – December shopping– when the CPU unexpectedly spiked.\" and \"We partitioned individual tables, not the environment.\" (2025; '2016' is an incident number, not a year).",
+              "shows": "Distinguishes a partition (a slice of a table inside one database, still inside one transaction) from a shard, and shows the operational cost with a first-party near miss.",
+              "source": "Adyen knowledge hub, D. van Veen and C. O. Pene, 'Partitioning at Adyen', https://www.adyen.com/knowledge-hub/partitioning-at-adyen, published 2023-10-06 (evidence age: 3 years); Adyen knowledge hub, 'Maintenance under pressure', https://www.adyen.com/knowledge-hub/maintenance-under-pressure, published 2024-01-19; Adyen knowledge hub, 'Partitioning an environment, not individual tables', https://www.adyen.com/knowledge-hub/partitioning-an-environment-not-individual-tables, published 2025-09-17"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Data divided across clusters.",
+            "introduces": "Data divided inside one cluster, in the newer posts.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p26",
+          "controlling_idea": "For Adyen the record stops at the protocol: the number of accounting clusters, how a cross-cluster transfer is made atomic, whether rebalancing now exists, which data is replicated synchronously and how failover works are not public (one 2024 podcast remark says both asynchronous and synchronous replicas are in use), and one 2021 sentence names a second store, which the post calls Cockroach, for idempotency keys, with no later Adyen confirmation and one vendor customer story of 2023.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "2021, on API idempotency at the stateless edge: \"The information needs to be available locally, so we eventually decided on integrating Cockroach, a distributed database, with our PALs.\" No newer first-party source confirms current use. Not found in any Adyen first-party source read for this book: the number of accounting clusters, the cross-cluster protocol, which data is replicated synchronously, failover procedure and time.",
+              "shows": "States where the evidence stops for Adyen, as AC-3 requires, and records the one non-PostgreSQL store Adyen has named on the payment path.",
+              "source": "Adyen knowledge hub, 'Design to Duty: How we make architecture decisions at Adyen', https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture, published 2021-07-28 (evidence age: 5 years)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What Adyen has published.",
+            "introduces": "What it has not.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "The documented difference is that Stripe built the ability to move data between shards and verifies money after the fact, while Adyen chose not to need to move data and checks entries as they are written; replication, read consistency and cross-shard transfers are not public for either, and the published scale figures cannot be compared.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "C3",
+          "C4"
+        ],
+        "how": "Condenses the two accounts into the comparison the thesis states, cell by cell, with 'Not public' where the record is silent."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The table first, because the advice is read off its rows; it stands directly after the two accounts so every cell has just been cited."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "Two accounts, each ending in a list of what is not public.",
+        "introduces": "The two set side by side.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p27",
+          "controlling_idea": "Seven aspects of the public record can be compared, and the last column of the table is the author's reading of each difference.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "'Where They Differ' table, seven rows: primary online store; how data is placed and scaled; what gives way during a move or an outage of the store; where money correctness is checked; moving money across shards; replication and read consistency; published scale (not comparable: different years and units).",
+              "shows": "Puts the two records side by side; scale figures carry year and unit and are not ranked (AC-4).",
+              "source": "Stripe engineering blog, J. Morzaria and S. Narkhede, 'How Stripe's document databases supported 99.999% uptime with zero-downtime data migrations', https://stripe.dev/blog/how-stripes-document-databases-supported-99.999-uptime-with-zero-downtime-data-migrations, published 2024-06-06; Stripe engineering blog, P. Mehta and S. Samant, 'How Stripe uses graph search and state machines to auto-remediate a global database fleet', https://stripe.dev/blog/how-stripe-uses-graph-search-and-state-machines-to-auto-remediate-a-global-database-fleet, published 2026-07-16; Stripe engineering blog, Ilya Ganelin, 'Ledger: Stripe's system for tracking and validating money movement', https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement, published 2024-02-16; Adyen knowledge hub, Reinier Haasjes, 'Updating a 50 terabyte PostgreSQL database', https://www.adyen.com/knowledge-hub/updating-a-50-terabyte-postgresql-database, published 2018-03-14 (evidence age: 8 years); Adyen knowledge hub, Willem Pino, 'Design to Duty: The Accounting and Reporting Systems at Adyen', https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2, published 2021-08-23 (evidence age: 5 years)"
+            }
+          ]
+        },
+        {
+          "id": "p28",
+          "controlling_idea": "For an integrator the difference changes little at the API and a good deal in what can be copied: on both providers a brief refusal is retried under the same idempotency key and the books are confirmed from the provider's later record, and a team choosing its own design should copy the constraint each company accepted, not its database.",
+          "function": "recommendation",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stripe's design needs a platform team to build proxies, a chunk map and a migration system; Adyen's needs every cross-cluster operation rewritten as messages. A team with one PostgreSQL database needs neither, which is the Borrowed Blueprint failure pattern in reverse.",
+              "shows": "Turns the comparison into advice and ties it to a named failure pattern."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The documented differences.",
+            "introduces": "What an integrator and a builder do with them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "no-spanning-transaction",
+      "heading": "What Both Records Imply: No Transaction Spans the Money Path",
+      "controlling_idea": "Neither company describes a transaction that spans its shards or clusters, and the mechanisms each has published imply the same four-part design: small local transactions, retries that are safe to repeat, messages between stores and verification afterwards; this is an inference, and it is the one a small team can use.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "C5"
+        ],
+        "how": "States the inferential step of the thesis, labels it, and explains the two ideas it depends on."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The inference with its label and its grounds first, then the two ideas that make it work in order of dependence: repeats made harmless, then the check that finds what repeats cannot. Verification comes last because it only makes sense once the reader accepts that messages can be lost as well as repeated."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "Two different stores with the same silence about cross-shard transactions.",
+        "introduces": "What the published mechanisms have in common.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p29",
+          "controlling_idea": "Read together, the two records contain no transaction that spans shards and four things in its place, and the conclusion that both companies rely on idempotent operations and later verification instead of a global transaction is the author's inference, which neither company states.",
+          "function": "claim",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Grounds: Stripe's switch works because \"all failed reads and writes directed to the source shard succeed on retries\" (2024) and its Ledger verifies afterwards (2024); Adyen's clusters are aligned by \"back and forth messages\" and fed through a database queue (2021), with templates checked at write time. Neither post mentions a distributed transaction. Rendered as a prose paragraph followed by an `INFERENCE, NOT DOCUMENTED` block.",
+              "shows": "Presents the thesis's inferential step as an inference with its evidence, as AC-3 requires.",
+              "source": "Stripe engineering blog, J. Morzaria and S. Narkhede, 'How Stripe's document databases supported 99.999% uptime with zero-downtime data migrations', https://stripe.dev/blog/how-stripes-document-databases-supported-99.999-uptime-with-zero-downtime-data-migrations, published 2024-06-06; Adyen knowledge hub, Willem Pino, 'Design to Duty: The Accounting and Reporting Systems at Adyen', https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2, published 2021-08-23 (evidence age: 5 years)"
+            }
+          ]
+        },
+        {
+          "id": "p30",
+          "controlling_idea": "The first idea the inference depends on is that an effect happens exactly once when a message that may arrive several times meets a receiver that records what it has already applied, in the same local transaction as the effect.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Uber's 2018 account of its payments platform lists among its design goals \"exactly-once payment processing by the means of idempotency and strong consistency\" (evidence age eight years; a payer of drivers, not a processor).",
+              "shows": "A company that does state the principle in public, used as a contrast because neither anchor states it.",
+              "source": "Uber engineering blog, 'Engineering Uber's next-gen payments platform', https://www.uber.com/blog/payments-platform/, published 2018-12-05 (evidence age: 8 years)"
+            },
+            {
+              "kind": "reasoning",
+              "what": "The same mechanism as the idempotency key between a merchant and a provider (idempotency-and-retries), applied between two internal stores.",
+              "shows": "Connects the internal case to a mechanism the reader already has."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "'Retries that are safe to repeat'.",
+            "introduces": "How a repeated message is made harmless.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p31",
+          "controlling_idea": "The second idea is that idempotency only makes a repeat harmless and cannot notice a message that was never sent, so the design is complete only with a comparison that runs afterwards and has an owner.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stripe's published check is the clearing account that must return to zero (2024); Adyen split its partner report matching per cluster (2021: \"a two-step framework that would first parse a file and then split it into the relevant parts for each cluster\"); for a merchant the equivalent is reconciliation against the provider's reports (payment-reconciliation-and-reporting).",
+              "shows": "Shows that both companies describe a check after the write, and names the reader's own version of it.",
+              "source": "Stripe engineering blog, Ilya Ganelin, 'Ledger: Stripe's system for tracking and validating money movement', https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement, published 2024-02-16; Adyen knowledge hub, Willem Pino, 'Design to Duty: The Accounting and Reporting Systems at Adyen', https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2, published 2021-08-23 (evidence age: 5 years)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Repeats made harmless.",
+            "introduces": "The failure that idempotency cannot see, and what catches it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "outbox",
+      "heading": "The Same Design at Small Scale: A Local Transaction, an Outbox and an Idempotent Consumer",
+      "controlling_idea": "For a team with one database and one other system to inform, the four-part design reduces to an outbox: the state change and a row describing the message are committed together, a relay delivers the row at least once, the consumer ignores repeats, and a periodic comparison proves the two sides agree.",
+      "function": "process",
+      "advances_thesis": {
+        "supports": [
+          "C5"
+        ],
+        "how": "Gives the reader the small-scale form of the thesis and the design comparison that justifies it."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The mechanism, then its alternatives, then the duties it leaves behind. The comparison table needs the outbox defined; the consumer's duty and the check are last because they are what the outbox does not do by itself."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "Four parts inferred from systems with thousands of shards.",
+        "introduces": "The same four parts for one database and one consumer.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p32",
+          "controlling_idea": "An outbox is a table in the same database as the business data: the state change and a row describing the message are written in one local transaction, and a separate relay reads the rows and publishes them, repeating until each is acknowledged.",
+          "function": "definition",
+          "evidence": [
+            {
+              "kind": "source",
+              "what": "The pattern as commonly described by practitioners: the service \"must atomically update the database and send messages\", and does so by inserting the message into an outbox table as part of the local transaction; a separate process publishes it.",
+              "shows": "A stable public description of the pattern, cited as a practitioner source.",
+              "source": "Chris Richardson, microservices.io, 'Pattern: Transactional outbox', https://microservices.io/patterns/data/transactional-outbox.html, n.d., accessed 2026-11 (practitioner source)"
+            },
+            {
+              "kind": "figure",
+              "what": "Figure 38-outbox-flow: inbox, one transaction containing a payment row and an outbox row, a relay, a queue, a consumer with a list of applied event ids, and a nightly comparison underneath.",
+              "shows": "The chapter's structural figure: the message flow and where each guarantee comes from."
+            }
+          ]
+        },
+        {
+          "id": "p33",
+          "controlling_idea": "Four designs can connect a state change to a message (write then publish, a distributed transaction as Tom proposed, an outbox, and change data capture from the database log), and they differ in what happens when a process dies between the two steps.",
+          "function": "comparison",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Design comparison, four rows: write then publish (dual write); distributed transaction; outbox with a relay; change data capture from the database log. Columns: what a crash between steps leaves, what it requires, when it is the right choice. Stripe's 2024 post documents change data capture at its scale: \"We transport the oplog from every DocDB shard to Kafka\".",
+              "shows": "The trade-off table for the chapter's central design choice, with one documented instance of the fourth option.",
+              "source": "Stripe engineering blog, J. Morzaria and S. Narkhede, 'How Stripe's document databases supported 99.999% uptime with zero-downtime data migrations', https://stripe.dev/blog/how-stripes-document-databases-supported-99.999-uptime-with-zero-downtime-data-migrations, published 2024-06-06"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The outbox.",
+            "introduces": "The three other ways to do the same job.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p34",
+          "controlling_idea": "The outbox moves the problem to the consumer, which must expect each message more than once and out of order, and to a comparison of the two systems, which is the only thing that finds a message that was never produced or never applied.",
+          "function": "explanation",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "At-least-once delivery from the relay means duplicates; several relay workers mean disorder; a bug that skips writing the outbox row is invisible to the relay. Deduplication by event id inside the consumer's own transaction answers the first, a state machine that ignores backward moves the second (payment-state-machines), a periodic comparison the third.",
+              "shows": "Completes the answer acceptance criterion AC-1 expects: what can still go wrong and how it is caught."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "A relay that repeats until acknowledged.",
+            "introduces": "What that leaves for the receiving side to do.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: The Payment Record Store and Its Outbox",
+      "controlling_idea": "Under Keel, Larkfield's consistency boundary is the payment row and its outbox row; activation of the pass, ledger entries and the warehouse catch up, each with a named check, and the store's own schema is changed by an online migration in five steps.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "C1",
+          "C5"
+        ],
+        "how": "Works the thesis through with ledger numbers: one boundary, a list of what lags, a check per item."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "Mila's payment is followed in the order things happen to it, then the table of what lags is read off that sequence, then the migration, which changes the store the first two paragraphs describe and so comes after them."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The outbox in general.",
+        "introduces": "The outbox in Larkfield's payment record store, for one payment.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p35",
+          "controlling_idea": "When Mila's €120.00 payment is approved at 19:42 on 9 March 2027, one local transaction marks the inbox message processed, moves the payment row to `paid` and inserts an outbox row, and the booking app activates her pass when the relay delivers that row, once, however many times it arrives.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Scenario ledger: Mila's class pass (€120.00, Studio Noord on Adyen, 19:42, `paid` on the AUTHORISATION webhook); the payment record store is PostgreSQL fed through an inbox table. New canonical facts added to the ledger: under Keel the store has an outbox table in the same database; a relay publishes rows to a queue the booking app consumes; the booking app records applied event ids.",
+              "shows": "The chapter's worked example with ledger amounts and times.",
+              "source": "scenario-ledger.md"
+            }
+          ]
+        },
+        {
+          "id": "p36",
+          "controlling_idea": "Everything outside that transaction is allowed to lag, by an amount Larkfield has written down, and each lagging item has a check that proves it caught up.",
+          "function": "example",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Table for Mila's payment: inside the boundary (inbox mark, payment row, outbox row: together or not at all); pass activation (seconds; alert when the oldest unpublished outbox row is older than 5 minutes, assumption); ledger entries (written from the settlement report by the reconciliation job, K3; open items reviewed after five business days); data warehouse (next day). Check for activation: a nightly comparison of `paid` payments against activated passes and paid period records.",
+              "shows": "Shows a filled-in version of the boundary with what lags, by how much and what proves agreement; uses K3 and the reconciliation facts already in the ledger.",
+              "source": "scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "One transaction for the payment row and its outbox row.",
+            "introduces": "The list of what sits outside it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p37",
+          "form": "list",
+          "controlling_idea": "The store's own schema changes without a maintenance window: Keel's child rows for attempts, captures, refunds and disputes were introduced by an online migration in five steps, each reversible until the last.",
+          "function": "process",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Scenario ledger (addition by 08-payment-state-machines): under Keel the payment record store adds child rows for attempts, captures, refunds and disputes, each with an amount and its own status. The five steps (create and dual-write in one transaction; backfill in idempotent batches; compare reads and daily counts and sums; switch reads; stop writing the old columns and later drop them) follow Stripe's 2017 pattern with a reconciliation of counts and amounts added before each switch.",
+              "shows": "Gives the reader a plan for an online migration of a payment table (the third 'can do' outcome), as a numbered list.",
+              "source": "scenario-ledger.md; Stripe engineering blog, Jacqueline Xu, 'Online migrations at scale', https://stripe.com/blog/online-migrations, published 2017-02-02 (evidence age: 9 years)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The store in steady state.",
+            "introduces": "The store while its own shape is being changed.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong: A Stalled Relay, a Repeated Message and a Row That Was Never Written",
+      "controlling_idea": "The outbox design fails in three ways, a relay that stops, a message delivered twice or out of order, and a state change with no outbox row, and each is late or caught by a check rather than wrong.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "C5"
+        ],
+        "how": "Tests the design against its own failures and shows that each ends in lateness or detection, not in a wrong record."
+      },
+      "flow": {
+        "pattern": "order_of_importance",
+        "rationale": "In ascending order of importance: from the failure that is most frequent and least harmful (the relay stops) to the one that is rarest and silent (no row was written), which is last because only the comparison finds it and it is the reason the comparison exists. Reversed, the section would end on the failure the reader least needs to remember."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "A payment for which every step worked.",
+        "introduces": "The steps failing one at a time.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p38",
+          "controlling_idea": "When the relay stops, payments stay `paid` and passes stay inactive until it resumes, which is late and visible: the age of the oldest unpublished row is the alarm, and nothing has to be repaired afterwards.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield's setting: alert when the oldest unpublished outbox row is older than 5 minutes (assumption).",
+              "shows": "The most common failure degrades to lateness, the outcome the part's thesis says a money path should prefer.",
+              "source": "scenario-ledger.md"
+            }
+          ]
+        },
+        {
+          "id": "p39",
+          "controlling_idea": "When a message arrives twice or after a newer one, the consumer's record of applied event ids and its state rules absorb it, provided the id is written in the same transaction as the effect.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "If the booking app activated the pass and recorded the event id in two steps, a crash between them would reproduce the original fault one system further along; ten classes would become twenty on a redelivery.",
+              "shows": "Shows that the consumer needs its own consistency boundary, with a concrete consequence for Mila's ten-class pass."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "A message that is late.",
+            "introduces": "A message that is repeated or out of order.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p40",
+          "controlling_idea": "The silent failure is a code path that changes a payment's state without writing an outbox row, and only the nightly comparison finds it, which is why the comparison is kept even when the relay has never lost a message.",
+          "function": "analysis",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Illustration: a support tool that sets a payment to `paid` by hand with a direct update. The nightly comparison lists the payment as `paid` with no activated pass; the item has an owner and an age, like an open reconciliation item (addition by 15-payment-reconciliation-and-reporting).",
+              "shows": "The failure that neither the transaction nor idempotency prevents, caught by the third leg of the design.",
+              "source": "scenario-ledger.md"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Failures the mechanism absorbs.",
+            "introduces": "The failure that bypasses the mechanism.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "The two providers started from opposite stores and made opposite sharding choices, and the public record of both still reduces to the same shape Larkfield uses for one table: keep the atomic unit small, make whatever crosses it repeatable, and prove agreement afterwards. What each company relaxed is documented (two seconds of refusals at Stripe, books that run behind and data that is never rebalanced at Adyen); what a consistency proof would need (which data is replicated synchronously, read consistency, the cross-cluster protocol) is not, so the claim that neither uses a spanning transaction remains an inference from mechanisms.",
+    "so_what": "A team stops choosing a database for its reputation with money and writes down three things for each money-moving write: the records inside the boundary, the lag allowed to everything outside it, and the check that proves agreement and who owns it.",
+    "callback": {
+      "to": "The two seconds in which Stripe's platform rejects reads and writes on a chunk being moved.",
+      "how": "The refusal is the design working: availability of one chunk gives way for a time the callers' retries already cover, so that no write lands on the wrong copy."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "For one money-moving write in your system, draw the boundary, list what catches up and by how much, and name the check that proves both sides agree; if a proposal needs a transaction across two systems, replace it with an outbox and an idempotent consumer."
+    },
+    "hand_off": {
+      "to": "payment-multi-region-and-data-residency",
+      "relationship": "contrast",
+      "carries_over": "Shards and clusters: data divided for engineering reasons, by size and load, in designs both companies have described at length.",
+      "introduces": "Data divided for reasons engineers do not choose, by country and by law, in a part of the record where both companies have published very little."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The failures of the small-scale design and what catches each.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p41",
+        "form": "list",
+        "controlling_idea": "Established: both companies have published sharded stores with their dates, a local transaction is atomic only inside one database, and neither has published which data is replicated synchronously, read consistency or a cross-shard transfer protocol.",
+        "function": "synthesis",
+        "evidence": [
+          {
+            "kind": "source",
+            "what": "Stripe 2024 and 2026 database posts, 2017 migrations post, 2024 Ledger post; Adyen 2018 PostgreSQL post, 2021 accounting post, 2023 to 2025 partitioning posts.",
+            "shows": "The points the dated public record settles.",
+            "source": "Stripe engineering blog, J. Morzaria and S. Narkhede, 'How Stripe's document databases supported 99.999% uptime with zero-downtime data migrations', https://stripe.dev/blog/how-stripes-document-databases-supported-99.999-uptime-with-zero-downtime-data-migrations, published 2024-06-06; Adyen knowledge hub, Willem Pino, 'Design to Duty: The Accounting and Reporting Systems at Adyen', https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2, published 2021-08-23 (evidence age: 5 years)"
+          }
+        ]
+      },
+      {
+        "id": "p42",
+        "form": "list",
+        "controlling_idea": "Depends on context: whether to shard at all, which shard key, outbox or change data capture, and how much lag each consumer may have all turn on stated conditions.",
+        "function": "synthesis",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "Each recommendation holds under a condition (data size against one database, whether operations are per-entity, whether a log-reading platform already exists, the cost of a minute of lag to the person waiting).",
+            "shows": "Separates conditional advice from established fact."
+          }
+        ],
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is settled.",
+          "introduces": "What depends on the system at hand.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p43",
+        "form": "list",
+        "controlling_idea": "The author's synthesis: the database product matters less than the boundary, and a claim that a store is 'consistent' is incomplete until it names the check that would show it is not.",
+        "function": "recommendation",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "Both anchors reached scale on stores an engineer would not have predicted for money; what their accounts share is the discipline around the store.",
+            "shows": "The author's position, with its reasoning."
+          }
+        ],
+        "transition_in": {
+          "relationship": "emphasis",
+          "carries_over": "Conditional advice.",
+          "introduces": "The author's own position.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p44",
+        "form": "list",
+        "controlling_idea": "Eight questions let the reader check a money-moving write, or a proposed data design, in a review.",
+        "function": "recommendation",
+        "evidence": [
+          {
+            "kind": "reasoning",
+            "what": "The questions restate the chapter's decisions as checks: boundary, lag, consumer idempotency, comparison and owner, shard key, cross-shard operations, migration steps and way back, and what a provider has and has not published.",
+            "shows": "Gives the 'can do' outcomes a usable form."
+          }
+        ],
+        "transition_in": {
+          "relationship": "conclusion_summary",
+          "carries_over": "The three tiers of take-away.",
+          "introduces": "The same content as questions to ask.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p45",
+        "controlling_idea": "The shards and clusters of this chapter divide data for reasons engineers choose, size and load, in designs both companies describe at length; the next chapter turns to data divided for reasons engineers do not choose, country and law, where both have published very little.",
+        "function": "transition",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "Data divided by size and load, with a long public record.",
+          "introduces": "Data divided by country and law, with a short one.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "Ledger design: double entry, clearing accounts, immutability, and the internals of Stripe's Ledger and Adyen's accounting templates.",
+      "covered_in": [
+        "payment-ledgers"
+      ]
+    },
+    {
+      "topic": "Idempotency keys between merchant and provider: retention windows, key design, retry policy.",
+      "covered_in": [
+        "idempotency-and-retries"
+      ]
+    },
+    {
+      "topic": "The webhook receiver's contract and the inbox.",
+      "covered_in": [
+        "payment-webhooks-and-events"
+      ]
+    },
+    {
+      "topic": "Availability targets, failure isolation, graceful degradation and incident reports, including Stripe's outage of 10 July 2019 as an incident.",
+      "covered_in": [
+        "payment-reliability-and-availability"
+      ]
+    },
+    {
+      "topic": "Regions, hosting, data residency, and whether shards or clusters span regions.",
+      "covered_in": [
+        "payment-multi-region-and-data-residency"
+      ]
+    },
+    {
+      "topic": "Deployment practice, progressive rollout, dark launches and zero-downtime schema changes as a release discipline.",
+      "covered_in": [
+        "payment-safe-change"
+      ]
+    },
+    {
+      "topic": "Reconciliation against provider reports.",
+      "covered_in": [
+        "payment-reconciliation-and-reporting"
+      ]
+    },
+    {
+      "topic": "Consensus protocols, isolation levels and the theory of distributed transactions beyond what the argument needs."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "Whether Adyen still uses CockroachDB for idempotency keys: one 2021 Adyen sentence (which writes 'Cockroach') and a Cockroach Labs customer story of 14 February 2023 read in an archived copy; no later Adyen publication. The chapter reports both with their dates.",
+    "Whether Adyen's accounting clusters can now be rebalanced, and how many there are: the 2021 post is the last account.",
+    "Whether Stripe's 2017 dual-write tooling is still in use; the 2024 post covers a different kind of migration.",
+    "Pat Helland's 'Life beyond Distributed Transactions' (ACM Queue, 2016) would be the natural research citation for the inference; the page could not be fetched in this session (blocked), so it is not cited."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "The statement that neither company uses a transaction spanning its money path is a section of its own, placed after the comparison table and rendered with an INFERENCE, NOT DOCUMENTED block.",
+      "rejected": [
+        "Stating it in each company's section, where it would read as a documented fact about that company.",
+        "Leaving it to the take-aways, which would put the thesis's main step in the conclusion."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Adyen's database queue between the edge and accounting is described as having the same shape as an outbox, not as 'Adyen's outbox': the post does not use the word.",
+      "rejected": [
+        "Calling it an outbox."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Contrasts are limited to Square Books (2019), TigerBeetle's documentation and one sentence from Uber (2018), each with its age and kind of source. Checkout.com and PayPal are left out because no first-party architecture source was read; Airbnb's 2019 account is left to idempotency-and-retries.",
+      "rejected": [
+        "A survey of ledger databases.",
+        "A contrast built on vendor case studies."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Larkfield gains an outbox table, a relay, a queue consumed by the booking app, and a count of 146 paid-and-not-activated purchases in 2026 (illustrative); these are appended to the scenario ledger.",
+      "rejected": [
+        "Reusing the Silent Webhook as the scene: it is a missing inbound event, owned by payment-webhooks-and-events, not a missing outbound effect."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The chapter is planned at normal length (about 4,800 words): the contract says 'short where the record is thin, especially for Adyen', and the record for this chapter is the richest in Part VIII; the Adyen section is kept to what five dated posts say and ends in a list of what is not public.",
+      "rejected": [
+        "A 2,500-word chapter, which would drop either the online-migration plan or the design comparison that the 'can do' outcomes require."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "PLAN.md, chapter contract 38",
+      "contributed": "Scope, owned terms (shard, online migration, consistency boundary, outbox), the Larkfield thread (the payment record store and its outbox)."
+    },
+    {
+      "kind": "internal",
+      "ref": "journal-spec.json, part-8, payment-data-stores-and-consistency",
+      "contributed": "Intent, acceptance criteria, thesis and role, copied unchanged; the neighbours' transitions."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-reliability-and-scale.md, Parts 0, 1.2, 2 and 6, and 'Open questions'",
+      "contributed": "Verified quotations for Stripe's database, migration and RCA posts and Adyen's PostgreSQL, accounting and partitioning posts; the contrasts; the lists of what is not public."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-ledgers-and-money-movement.md, Part 1",
+      "contributed": "Verified quotations for Stripe's Ledger post and Adyen's accounting templates; the detection and prevention reading, kept as the author's judgement."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md and _research/consistency-issues.md (rulings 4 and 12)",
+      "contributed": "The payment record store, the inbox, K2 and K3, Mila's class pass, the child rows added under Keel, reconciliation open items; no payment GET on Adyen."
+    },
+    {
+      "kind": "external",
+      "ref": "Stripe, 'How Stripe's document databases supported 99.999% uptime with zero-downtime data migrations', 2024-06-06; 'How Stripe uses graph search and state machines to auto-remediate a global database fleet', 2026-07-16; 'Online migrations at scale', 2017-02-02; 'Ledger', 2024-02-16; root cause analysis of 2019-07-10",
+      "contributed": "Every Stripe fact in the chapter; all re-fetched on 17 November 2026."
+    },
+    {
+      "kind": "external",
+      "ref": "Adyen, 'Design to Duty' parts 1 and 2, 2021-07-28 and 2021-08-23; 'Updating a 50 terabyte PostgreSQL database', 2018-03-14; partitioning series, 2023-10-06 to 2025-09-16 (displayed dates, ruling 25)",
+      "contributed": "Every Adyen fact in the chapter; all re-fetched on 17 November 2026."
+    },
+    {
+      "kind": "external",
+      "ref": "Square, 'Books, an immutable double-entry accounting database service', 2019-10-16; TigerBeetle documentation, OLTP page, accessed 2026-11; Uber, 'Engineering Uber's next-gen payments platform', 2018-12-05; microservices.io, 'Transactional outbox', accessed 2026-11",
+      "contributed": "Contrasts and the practitioner description of the outbox; re-fetched on 17 November 2026."
+    },
+    {
+      "kind": "external",
+      "ref": "Jimmy Morzaria (Stripe), 'Stripe's DocDB: How Zero-Downtime Data Movement Powers Trillion-Dollar Payment Processing', QCon San Francisco, November 2025, transcript published by InfoQ 2026-04-30; Postgres FM episode 100, 'To 100TB, and beyond!', 2024-06-07 (Derk van Veen of Adyen); Cockroach Labs, 'The Price of Payments: How Adyen Guarantees Idempotency & Eliminates Downtime', 2023-02-14, archived copy",
+      "contributed": "Added in the verification pass of 17 November 2026: where Stripe's retries happen, Adyen's replication remark and sharding redesign remark, and the one later (secondary) account of the idempotency store."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation pass (parts 6-8): fields copied from the journal spec and unit-level controlling ideas and evidence brought into line with the verified page and the consistency rulings; no unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "First version, written from the chapter contract, the reliability and ledger research briefs and the scenario ledger; intent, thesis and role copied from the journal spec."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "After the flow rubric (sound with notes): Tom's proposal moved to February 2027 so it precedes Mila's payment of 9 March; the inbox named in the scene; a spec-internal label removed from p23; change data capture and Tom's proposal named in p33; flow labels of three sections corrected. Not acted on, for the author: moving the 2017 migration pattern (p18) next to Larkfield's migration, shrinking the partitioning paragraph (p25), merging p34 into p32, and moving the advice in p28 after the inference (the style guide puts it after the table)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 76 claims checked (62 confirmed, 7 corrected, 6 hedged, 0 unsupported, 0 unreachable, 1 not checked); the statements that Stripe does not describe its retries and that Adyen's replication mode and idempotency store have no later source were corrected against a 2025 Stripe talk, a 2024 podcast remark by an Adyen engineer and an archived 2023 vendor story; 'Partitioning an environment' dated 2025-09-16 (ruling 25); 'Cockroach' as the 2021 post writes it; 16 inline URLs moved to Sources (ruling 22); evidence-age marks added for the 2021 and 2023 Adyen posts."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: statements of absence re-tested with a wide search (documentation and support sitemaps, stripe.com, stripe.dev, adyen.com, medium.com/adyen, web searches on replication, ledger storage and sharding). Narrowed: Stripe on moving money across stores (an April 2026 post on fee credits gives a three-phase transfer lifecycle through the ledger: submitted, prepared, disbursed; storage and shards not stated). Holds: Stripe's replication mode, read consistency, Ledger storage engine, data outside DocDB, who retries; Adyen's cluster count, cross-cluster protocol, rebalancing, failover time. One source added; units unchanged."
+    }
+  ],
+  "length": {
+    "target_words": 4800,
+    "max_words": 6500
+  }
+}

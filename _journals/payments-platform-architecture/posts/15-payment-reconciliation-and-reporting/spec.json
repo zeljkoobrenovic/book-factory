@@ -1,0 +1,1407 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "payment-reconciliation-and-reporting",
+  "journal": "payments-platform-architecture",
+  "part": "part-3",
+  "title": "Proving the Money: Reconciliation Inside the Provider and Out",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "What provider-side reconciliation, a clearing file, a settlement report and exception aging are.",
+        "What Stripe (2024) and Adyen (2021, five years old) have published about reconciling their own books, and that neither publishes matching rules, file formats or exception volumes.",
+        "The reports and data products each exposes, the unit each reconciles on (the payout at Stripe; the payable batch at Adyen, with a daily report per balance account for platforms) and what each says about timing."
+      ],
+      "believe": [
+        "A provider's figures are not true because the provider processed the payments; they are true where an outside record agrees with them.",
+        "Reports and webhooks are different contracts: a report is complete and late, a webhook is prompt and may be missing."
+      ],
+      "can_do": [
+        "Build a daily close that books from the provider's reports, waits for them to be available and uses webhooks only as prompts.",
+        "Hold an unmatched amount as an open item with an age and an owner instead of adjusting a total to make it tie.",
+        "Choose the matching key for each provider when reconciling bank credits across two of them."
+      ]
+    },
+    "audience": {
+      "who": "An engineer or architect new to payments who integrates or operates on a payment provider and has to make its books agree with the provider and the bank.",
+      "already_knows": [
+        "APIs, databases, queues, webhooks and data warehouses.",
+        "Double-entry ledgers, immutable entries and clearing accounts (payment-ledgers).",
+        "Pending and available balances, reserves and Adyen's pre-financing (balances-and-funds-flows).",
+        "Payouts, payout returns and that 'paid' means sent (payouts-and-money-movement).",
+        "Capture, clearing and net settlement in outline (clearing-and-settlement)."
+      ],
+      "does_not_know": [
+        "Reconciliation as a provider-side process, clearing file, exception, exception aging.",
+        "Which report each provider offers, its unit and its timing."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a bank credit that differs from the sum of the day's payment notifications, the reader names the record to book from, what the difference is probably made of, and how to treat it while it is unexplained.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "blocker",
+        "probe": "A finance team books sales each night from the 'payment succeeded' notifications it received that day. On Thursday the bank credit from the provider is €1,930 lower than the sum of those notifications. Using only this chapter: which record should the team have booked from, what is the €1,930 probably made of, and what should happen to it until it is explained?",
+        "expected": "Book from the provider's report that itemizes the payout or batch, not from notifications. The difference is probably fees, refunds, chargebacks, a change in a hold, or sales that belong to a different payout or batch. Until each part is matched, the amount stays an open item with an age and an owner; it is not written off or absorbed into a total."
+      },
+      {
+        "id": "AC-2",
+        "statement": "The reader can state the difference between the two providers' settlement reports in unit and in published timing.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "You reconcile bank credits from both providers. What does one line of the main reconciliation report correspond to at each, and what does each say about when the report is ready?",
+        "expected": "Stripe's payout reconciliation report is organized by payout, and Stripe states its reports are normally ready within about 12 hours after the day ends, adding that a payout can arrive before its report. Adyen's settlement details report is organized by payable batch (by default a sales day) and is generated when the batch closes; Adyen says to expect it within 3 hours after the batch closes, and publishes when scheduled daily reports are generated (between 02:00 and 10:00 CET)."
+      },
+      {
+        "id": "AC-3",
+        "statement": "The chapter states where the public record on each provider's own reconciliation stops and does not describe matching internals that no source documents; it is short where the evidence is thin.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "How does a provider prove its own books against the networks and banks, and what does it give customers to prove theirs?",
+    "claim": "A provider proves its books by matching each movement its ledger expects against a record it did not write, a network's file or a bank's statement, and by putting an age and an owner on whatever stays unmatched. What it gives customers is the same proof one level down: scheduled reports itemized per payout at Stripe and per payable batch at Adyen (for a platform, also per day and balance account), which are complete where webhooks are only prompt.",
+    "disputed_by": "The view that a ledger whose entries balance is already proven, so that matching it against outside files is a finance formality, and that a customer can keep its books from the webhook stream and treat reports as an optional export.",
+    "so_what": "A customer's close has to book from reports, wait until they are available and keep open items with an age, and a platform on both providers needs two matching keys, because one reconciles on a bank credit and the other on a day of sales.",
+    "how_why": "A ledger can only show that its own entries balance; whether an expected movement happened is known only to the party that carried it out. Stripe's 2024 post puts 'reconciling money movement with third-party reporting' inside its fund flows and reports unresolved balances by age with tickets assigned to teams. Adyen's 2021 post (five years old) describes parsing partner files and matching them to transactions in two steps across its accounting clusters, and its reports distinguish a payment sent for settlement from one whose funds Adyen has received. For customers, Stripe documents reports computed daily and normally ready within 12 hours, warns that 'a payout might arrive before its reconciliation data is ready', and sells query and warehouse access to the data; Adyen generates its settlement details report when the payable batch closes, says to expect it within 3 hours after the batch closes and publishes a daily window for scheduled reports, and for platforms requires a daily Balance Platform Accounting Report. Neither publishes its matching rules, file formats, match rates or exception volumes, so the chapter describes the principle, the published fragments and the customer-facing reports, and says that the internals are not public.",
+    "supporting_claims": [
+      {
+        "id": "C1",
+        "claim": "A ledger whose entries balance is consistent, not proven: whether an expected movement happened is known only from a record the other party wrote, a network's file or a bank's statement."
+      },
+      {
+        "id": "C2",
+        "claim": "What does not match is an exception, and it is controlled by giving it an age and an owner, not by adjusting a total."
+      },
+      {
+        "id": "C3",
+        "claim": "Stripe (2024) and Adyen (2021) have each published a fragment of their own reconciliation, and neither publishes matching rules, file formats, match rates or exception volumes."
+      },
+      {
+        "id": "C4",
+        "claim": "What customers receive is the same proof one level down: scheduled reports itemized per payout at Stripe, with a published processing time, and per payable batch at Adyen, tied to the batch closing."
+      },
+      {
+        "id": "C5",
+        "claim": "Reports and webhooks are different contracts, so a close books from reports, waits for them and keeps open items, with a different matching key on each provider."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Resolves what the first three chapters leave open: when the provider's record and an outside record disagree, how the disagreement is found, and what a customer receives to repeat the proof.",
+    "supports": [
+      "P3-4"
+    ]
+  },
+  "flow": {
+    "pattern": "problem_solution",
+    "additional_patterns": [
+      {
+        "pattern": "large_to_small",
+        "applies_to": "balanced-not-proven, what-providers-publish, reports-customers-get: the principle, the provider proving its own books, then the customer proving theirs with the provider's report"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "reports-customers-get, ways-to-close, where-they-differ"
+      },
+      {
+        "pattern": "prerequisite_order",
+        "applies_to": "reports-vs-webhooks before ways-to-close before in-practice: the rule, the designs that follow or break it, then the worked close"
+      }
+    ],
+    "rationale": "The reader meets a close that balanced and was wrong before any vocabulary, so reconciliation arrives as the answer to a felt problem. The principle comes before the companies because the published fragments are only readable as parts of it. The provider's own reconciliation comes before the customer reports because the report is that reconciliation passed down a level; reversing them would present reports as an export feature. Reports are described before they are contrasted with webhooks, since the contrast needs their unit and timing. The comparison table comes after all documented material so every cell is already cited, and the worked close comes after it because it uses the two keys the table yields. Failures come last because they are failures of the recommended design."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "A payout is 'paid' in the provider's record and absent from the payee's bank: the bank returned it. Two records of the same money disagree, and the provider's ledger, which balances, cannot say which is right."
+    },
+    "bridge": {
+      "from_reader_world": "An engineer trusts a system whose internal invariants hold: the entries balance, the tests pass.",
+      "to_topic": "In payments an invariant that holds inside one system proves nothing about money another party moved, so proof has to come from comparing records with different writers."
+    },
+    "thesis_statement": {
+      "text": "A provider proves its books by matching each movement its ledger expects against a record it did not write and by aging what stays unmatched; what it gives customers is the same proof one level down, as scheduled reports itemized per payout at Stripe and per payable batch at Adyen (for a platform, also per day and balance account), which are complete where webhooks are only prompt.",
+      "placement": "KEY POINTS callout, first two bullets, and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p04",
+      "promises": [
+        {
+          "promise": "Start from Larkfield's close that covered one provider and what it cost.",
+          "kept_in": [
+            "scene"
+          ]
+        },
+        {
+          "promise": "Explain why a balanced ledger is not a proven one, with the terms reconciliation, clearing file, exception and aging.",
+          "kept_in": [
+            "balanced-not-proven"
+          ]
+        },
+        {
+          "promise": "Report what Stripe and Adyen have published about reconciling their own books, and where the record stops.",
+          "kept_in": [
+            "what-providers-publish"
+          ]
+        },
+        {
+          "promise": "Describe the reports and data products each gives customers, their unit and their timing.",
+          "kept_in": [
+            "reports-customers-get"
+          ]
+        },
+        {
+          "promise": "Show why reports and webhooks are different contracts and compare three ways to run a close.",
+          "kept_in": [
+            "reports-vs-webhooks",
+            "ways-to-close"
+          ]
+        },
+        {
+          "promise": "Compare the two providers.",
+          "kept_in": [
+            "where-they-differ"
+          ]
+        },
+        {
+          "promise": "Close 9 March 2027 at Larkfield on both providers, and go through the ways a close fails.",
+          "kept_in": [
+            "in-practice",
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "function": "context",
+        "controlling_idea": "A payout that the provider recorded as paid and the receiving bank returned leaves two records of the same money that disagree, and nothing inside either record says which is right.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "The previous chapter's returned payout: 'paid' at the provider, nothing at the payee's bank, and Larkfield's 412 returned payouts worth €386,000 that sat unreconciled for three weeks in June 2026 (scenario ledger, the Payout That Bounced).",
+            "shows": "The disagreement is found only by comparing the provider's record with the bank's; the ledger alone would have stayed balanced and wrong."
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "function": "claim",
+        "controlling_idea": "A provider proves its books by matching each movement its ledger expects against a record it did not write and by putting an age and an owner on what stays unmatched, and what it gives customers is the same proof one level down: scheduled reports, itemized per payout at Stripe and per payable batch at Adyen.",
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "Two records that disagree with nothing in the ledger to settle it.",
+          "introduces": "The standing answer: match every expected movement against the other party's record, age what does not match, and hand customers reports to do the same.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "function": "context",
+        "controlling_idea": "In the journey of Mila's class pass this chapter covers the days after the sale of Tuesday 9 March 2027, when the provider, the network, the banks and Larkfield each hold a record of her €120 and the records are compared.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's class pass: €120.00 on 9 March 2027 at 19:42 at Studio Noord, on Adyen; the studio's payout that includes it arrives on Thursday 11 March (scenario ledger).",
+            "shows": "Places the chapter after the payout chapter and before the question of who may hold the funds."
+          }
+        ],
+        "transition_in": {
+          "relationship": "example",
+          "carries_over": "The claim that proof is a match between records.",
+          "introduces": "Where that match happens for the book's recurring payment.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "function": "transition",
+        "controlling_idea": "The chapter goes from Larkfield's one-provider close, through why a balanced ledger is not a proven one, what the two companies have published about their own reconciliation, the reports customers get, why reports and webhooks are different contracts, three ways to run a close, the comparison of the two providers, a worked close of 9 March and the ways a close fails.",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "Where the chapter sits in the payment's journey.",
+          "introduces": "The order of the sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: A Close That Covered One Provider",
+      "controlling_idea": "At the start of 2027 Larkfield reconciled its Adyen side against reports and kept its Stripe side from notifications, and the question Femke de Graaf asks is which record the books should be written from.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "C1",
+          "C5"
+        ],
+        "how": "Poses the chapter's question in a company whose books balanced and were still wrong by €412,000."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The state before Keel, what it cost at year-end 2025, then the question asked in 2027."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The claim that proof is a match against an outside record.",
+        "introduces": "A company that had the match on one provider and not on the other.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p05",
+          "function": "context",
+          "controlling_idea": "Until the Keel program, Larkfield's nightly reconciliation job compared provider reports with its own records for Adyen only, while the Stripe side of its ledger was fed by webhooks.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Scenario ledger: the reconciliation job 'covered only Adyen until Keel'; the payment record store is fed by webhooks through an inbox table; Stripe carried 44% of 2026 member payment volume (€493M).",
+              "shows": "Almost half of the volume was booked from notifications with no outside record to check them against."
+            }
+          ]
+        },
+        {
+          "id": "p06",
+          "function": "evidence",
+          "controlling_idea": "The €412,000 difference at year-end 2025 was made of movements that no 'payment succeeded' notification carries: refunds after payout, chargeback fees and a currency-conversion rounding rule.",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "The Unexplained €0.4 Million (scenario ledger): the ledger's 'owed to studios' balance differed from the two providers' balances by €412,000; three weeks of work traced it to refunds after payout, chargeback fees and a currency-conversion rounding rule; an audit finding for Priya Raman, the finance controller.",
+              "shows": "A ledger fed by payment events balances on its own terms and has no place for the movements that come after the payment."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Books fed by notifications on one provider.",
+            "introduces": "What that produced at year-end.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p07",
+          "function": "claim",
+          "controlling_idea": "Femke de Graaf's question for the Keel decision K3 is which record Larkfield books from on each provider, and what it does with an amount that the two sides do not explain.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Keel K3 (scenario ledger): 'A ledger entry for every movement... clearing accounts must return to zero; the reconciliation job covers both providers, one run per provider, started when that provider's reports are ready.' K2: the provider's record is the truth; 'the settlement report where it does not' let Larkfield read the object.",
+              "shows": "K3 names the goal; the rest of the chapter supplies the record to book from and the treatment of the unexplained."
+            }
+          ],
+          "transition_in": {
+            "relationship": "problem_solution",
+            "carries_over": "A difference found once, at year-end, by hand.",
+            "introduces": "The design question that prevents the next one.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "balanced-not-proven",
+      "heading": "Why a Balanced Ledger Is Not Yet a Proven One",
+      "controlling_idea": "A ledger shows that its own entries balance; whether an expected movement happened is known only to the party that carried it out, so proof needs that party's record and a way to handle what does not match.",
+      "function": "explanation",
+      "advances_thesis": {
+        "supports": [
+          "C1",
+          "C2"
+        ],
+        "how": "Establishes the principle and the vocabulary (reconciliation, clearing file, bank statement, exception, aging) the rest of the chapter uses."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The limit of double entry first, then the activity that addresses it, then why it is hard, then the treatment of what is left over; each term is used by the next paragraph."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Larkfield's question: which record to book from.",
+        "introduces": "Why the provider faces the same question about its own ledger, and the terms for answering it.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p08",
+          "function": "claim",
+          "controlling_idea": "Double entry proves that every recorded movement has two sides, not that the movement took place, because both sides were written by the same party.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "A ledger entry 'expect €120 from the card network' balances whether or not the network ever pays; only the network's file and the bank's statement can confirm it. The ledger chapter's clearing account is where the expectation waits (payment-ledgers).",
+              "shows": "Separates internal consistency from external truth, which is the distinction the thesis rests on."
+            }
+          ]
+        },
+        {
+          "id": "p09",
+          "function": "definition",
+          "controlling_idea": "Reconciliation is proving that two independently written records of the same money agree and explaining every difference; provider-side reconciliation compares the provider's ledger with the card networks' clearing files and the banks' statements.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Three records of one payment: the provider's ledger (written by the provider, one entry per movement, at the time of the event); the network clearing file (written by the card network or acquirer, one line per transaction it processed, typically daily); the bank statement (written by the bank, one line per credit or debit, often a net amount for many transactions). Industry practice, not a description of either company.",
+              "shows": "The three records differ in writer, grain and timing, which is why matching them is work and not a lookup."
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "Proof needs a record written by someone else.",
+            "introduces": "The name of the activity and the three records it compares at a provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "function": "explanation",
+          "controlling_idea": "The match is hard because the three records use different identifiers, different grains and different clocks: a bank line is one net amount for thousands of payments, less fees, on a later day.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Net settlement (clearing-and-settlement): the network pays one amount per settlement cycle after deducting interchange and fees; a refund or chargeback from an earlier day reduces today's amount. Industry practice.",
+              "shows": "A total that fails to tie says nothing about which of thousands of items is wrong, so matching has to happen at the level of the item."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Three records with different writers, grains and timing.",
+            "introduces": "Why comparing them cannot be a comparison of totals.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "function": "definition",
+          "controlling_idea": "An item that does not match is an exception, and exception aging means tracking how long each one has been open and who owns it, because an unexplained amount gets harder to recover and more likely to be a loss as it gets older.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Most exceptions are timing (the other record has not arrived yet) and close by themselves; the ones that stay open are missing files, duplicates, wrong amounts or money that never came. Industry practice; the author's judgement on why age is the useful measure.",
+              "shows": "Age separates a timing difference from a problem without anyone having to inspect each item."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "Matching at the level of the item.",
+            "introduces": "What happens to the items that do not match.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "what-providers-publish",
+      "heading": "What Stripe and Adyen Have Published About Proving Their Own Books",
+      "controlling_idea": "Stripe (2024) describes the control around its reconciliation and Adyen (2021) describes one piece of the matching; neither publishes matching rules, file formats, match rates or exception volumes.",
+      "function": "evidence",
+      "advances_thesis": {
+        "supports": [
+          "C2",
+          "C3"
+        ],
+        "how": "Gives the dated public fragments for each company and states where the record stops."
+      },
+      "flow": {
+        "pattern": "grouping",
+        "rationale": "Stripe's fragments together, then Adyen's, each from engineering post to current documentation, then the limit of both."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The principle: match against outside records and age the exceptions.",
+        "introduces": "What each of the two companies has said in public about doing so.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p12",
+          "function": "evidence",
+          "controlling_idea": "Stripe's 2024 engineering post puts reconciliation with outside reports inside the fund flows its Ledger models, and names bad partner reports as a failure it has to absorb.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "A fund flow 'requires moving funds between banks, reconciling money movement with third-party reporting, and matching regulatory reporting with financial reporting'; 'We witness basic and obvious failures like malformed reports or propagated errors from banking or network partners'; detection query 'Find the clearing Accounts with nonzero balance.' https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement (Ilya Ganelin, Stripe, published 2024-02-16)",
+              "shows": "Stripe treats the outside report as an input to the ledger whose absence or error shows up as a clearing account that does not empty."
+            }
+          ]
+        },
+        {
+          "id": "p13",
+          "function": "evidence",
+          "controlling_idea": "The same post describes exceptions as aged and owned: unresolved balances are scored by age, tickets are generated for the owning team, and an item caused by a third party can be reassigned.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'the 50% score for Aging Balances means that some clearing issues have persisted over time'; 'auto-generated tickets'; 'the root cause is related to an infrastructure or third-party incident outside their control—they can reassign ownership'; '99.99% of our dollar volume is fully ingested and verified within four days... the remaining long-tail is reliably handled through manual analysis.' https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement (Ilya Ganelin, Stripe, published 2024-02-16)",
+              "shows": "Aging and ownership are part of the published design, and Stripe's own verification runs on a clock of days, with a manual tail."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Outside reports as an input to Stripe's Ledger.",
+            "introduces": "What Stripe says happens to what does not clear.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p14",
+          "function": "evidence",
+          "controlling_idea": "For pooled bank accounts Stripe's documentation states the ledger-to-bank comparison in one sentence.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "For an FBO-backed financial account: 'Stripe records how much of the total balance belongs to your business and reconciles that record against the funds held at the bank.' https://docs.stripe.com/treasury.md (n.d., accessed 2026-11)",
+              "shows": "A current, customer-facing statement that the per-customer record is checked against the bank's record of the pooled account."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The engineering account of 2024.",
+            "introduces": "A statement in current documentation of the comparison with the bank.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p15",
+          "function": "evidence",
+          "controlling_idea": "Adyen's 2021 post, now five years old, describes matching partners' files to accounting records in two steps across its sharded accounting clusters, and says the work is specific to each integration.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'if we received reports on processed transactions from our partners, we needed to match them to transactions in different clusters... we introduced a two-step framework that would first parse a file and then split it into the relevant parts for each cluster. The second step was to match the relevant transactions within the clusters'; 'the reconciliation needs to happen for a lot of different very custom integrations so this was a real team effort.' https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2 (Willem Pino, Adyen, published 2021-08-23; evidence age 5 years)",
+              "shows": "Adyen confirms file-to-transaction matching as a core process and that it does not generalize across partners; the design may have changed since 2021."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Stripe's account of the control around reconciliation.",
+            "introduces": "Adyen's older account of the matching step itself.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p16",
+          "function": "evidence",
+          "controlling_idea": "Adyen's current reports show the result of that matching to merchants: a payment sent for settlement and a payment whose funds Adyen has received are different records, and an amount not received within 30 days is reversed.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Payment accounting report record types: 'SentForSettle: Request to transfer the payment sent to the financial institution'; 'Settled: Payment has been settled, and the funds have been received by Adyen'; 'SettledReversed: Payment has not been settled because Adyen has not received the funds 30 days after capture.' https://docs.adyen.com/reporting/invoice-reconciliation/payment-accounting-report.md (n.d., accessed 2026-11). 'Prefinancing is capped at 30 days.' https://docs.adyen.com/account/sales-day-payout/upgrade-to-sdp.md (n.d., accessed 2026-11)",
+              "shows": "The 30-day reversal is a published aging rule: an expected receipt that stays unmatched for 30 days is taken back by a new entry."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The 2021 engineering account.",
+            "introduces": "What current documentation shows of the same process.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p17",
+          "function": "analysis",
+          "controlling_idea": "The public record stops there: neither company publishes its matching rules, the formats of the files it receives, its match rates or its exception volumes, so any fuller picture of provider-side reconciliation is inference.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Research brief, open question 6: file formats, match rates, exception volumes and tooling beyond Stripe's data-quality description are not public; the same holds for Adyen beyond the 2021 two-step description. The three-way picture (ledger, network file, bank statement, with clearing accounts holding the expectation) is a reference-architecture inference and is labeled so in an INFERENCE block.",
+              "shows": "Keeps the documented fragments apart from the model the chapter uses to connect them."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "What the two have published.",
+            "introduces": "What neither has.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "reports-customers-get",
+      "heading": "What Customers Get: Reports Itemized by Payout and by Batch",
+      "controlling_idea": "Each provider hands customers a scheduled report that itemizes every movement behind an amount it paid: Stripe organizes it by payout and publishes a processing time, Adyen organizes it by payable batch and ties it to the batch closing.",
+      "function": "description",
+      "advances_thesis": {
+        "supports": [
+          "C4"
+        ],
+        "how": "Describes the customer-facing proof at each provider: its unit, its contents, its timing and the other reports around it."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "The shared need, then Stripe (content, timing, data access), then Adyen on the same points (content, timing, other reports), so the two can be compared on unit and timing."
+      },
+      "transition_in": {
+        "relationship": "similarity",
+        "carries_over": "The provider matching its ledger against records it did not write.",
+        "introduces": "The customer in the same position one level down, with the provider's report as the outside record.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p18",
+          "function": "claim",
+          "controlling_idea": "A customer is to its provider what the provider is to the network: it holds its own record and needs the other party's itemized record to prove it, and that record is a report, not a balance or a notification.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "The bank shows the customer one net credit; only the provider knows which payments, refunds, disputes and fees it nets. The provider's report is to the customer what the clearing file is to the provider.",
+              "shows": "Sets up the two providers' reports as two answers to the same need."
+            }
+          ]
+        },
+        {
+          "id": "p19",
+          "function": "description",
+          "controlling_idea": "Stripe's payout reconciliation report is organized by payout: for each automatic payout it lists every balance transaction the payout settles, and it does not exist for payouts whose timing the customer controls.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "The report 'helps you match the payouts you receive in your bank account with the batches of payments and other transactions that they relate to'; the itemized download lets you 'review every payment, refund, dispute, fee, and other balance transaction included in the payout'; 'only available for users with automatic payouts enabled'; for instant payouts 'Stripe can’t identify which transactions are included in each payout. You’re responsible for reconciling'. Columns include automatic_payout_id and balance_transaction_id. An 'Ending balance reconciliation' section lists 'transactions that hadn’t been settled as of the report’s end date'. https://docs.stripe.com/reports/payout-reconciliation.md (n.d., accessed 2026-11). The balance summary report 'works like a bank statement' and 'doesn’t associate payouts with payment transactions'. https://docs.stripe.com/reports/balance.md (n.d., accessed 2026-11)",
+              "shows": "The matching key Stripe offers is the payout: one bank credit, one payout ID, a list of balance transactions."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The need for an itemized outside record.",
+            "introduces": "Stripe's report and its unit.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "function": "description",
+          "controlling_idea": "Stripe publishes a processing time for these reports, 12 hours after the day ends, and says plainly that the money can arrive before the report.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Data availability: 'Within 12 hours'; 'Stripe computes all your data on a daily basis beginning at 12:00 am... A day’s report is normally available by 12:00 pm on the following day'; 'SLAs indicate when the reports are available for download. Webhook notifications might take additional time'; the 12-hour figure does not apply to first automatic payouts after manual or after a 180-day gap. https://docs.stripe.com/reports/options.md (n.d., accessed 2026-11). 'Report data follows a separate processing schedule, so a payout might arrive before its reconciliation data is ready.' https://docs.stripe.com/reports/payout-reconciliation.md (n.d., accessed 2026-11). 'Stripe publishes reporting.report_type.updated events... twice per day (at 00:00 and 12:00 UTC)'; not sent to Connect webhook endpoints. https://docs.stripe.com/reports/v1-api.md (n.d., accessed 2026-11)",
+              "shows": "A close can be scheduled against a stated number, and must still wait for the data-available signal instead of the bank credit."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "What the Stripe report contains.",
+            "introduces": "When it is ready.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p21",
+          "function": "description",
+          "controlling_idea": "Stripe also sells direct access to the underlying data: SQL over it in the Dashboard (Sigma) and scheduled delivery to the customer's warehouse (Data Pipeline), each with a stated freshness of hours.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "Sigma: 'an interactive SQL environment in the Stripe Dashboard'; 'All data is read-only'; 'Sigma makes most of your Stripe transaction data available to query within three hours'; the balance_transactions table 'is the canonical record of changes to your Stripe balance'. https://docs.stripe.com/data/how-sigma-works.md (first two quotations) and https://docs.stripe.com/data/data-freshness.md (three hours; the canonical-record comment in an example query) (n.d., accessed 2026-11). Data Pipeline: Snowflake, Amazon Redshift, Databricks, BigQuery or Parquet files to cloud storage; 'delivering a full load of data every 3 hours'; 'Data delivery varies from customer to customer and is largely determined by the data sizes.' https://docs.stripe.com/data/access-data-in-warehouse.md and https://docs.stripe.com/data/data-pipeline/data-freshness.md (n.d., accessed 2026-11). Bank reconciliation 'is currently only available for users with direct US-based Stripe accounts using an automated payout schedule'. https://docs.stripe.com/bank-reconciliation.md (n.d., accessed 2026-11)",
+              "shows": "Stripe offers the data as a queryable table as well as a file, which changes what a customer's reconciliation can be built on."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Stripe's scheduled reports.",
+            "introduces": "The same data offered as tables to query.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p22",
+          "function": "description",
+          "controlling_idea": "Adyen's settlement details report is organized by payable batch: for each merchant account and batch it lists every entry credited or debited, down to the payout itself with a reference that also appears on the bank statement.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'The Settlement details report includes the details of payments that have been settled and paid out to you by Adyen'; 'The default setting is to generate the report per merchant account, per batch'; entry types: transactions, transaction fees, deposit corrections, invoice deductions, payouts; journal types include Settled, Refunded, Chargeback, DepositCorrection, InvoiceDeduction and MerchantPayout, whose modification reference is 'a description containing Account code, batch number, and the unique payout reference (TX...XT), which can also be found on the bank statement'. https://docs.adyen.com/reporting/settlement-reconciliation/transaction-level/settlement-details-report.md (n.d., accessed 2026-11). Sales day payout: 'You get all the funds from a particular sales day in a single payout batch'; 'Refunds, chargebacks, and other adjustments are added to the payable batch as they occur and are not related to the sales day of the original transaction.' https://docs.adyen.com/account/sales-day-payout.md (n.d., accessed 2026-11)",
+              "shows": "The matching key Adyen offers is the batch: a merchant account, a batch number, a day of sales plus whatever adjustments occurred that day."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Stripe's unit, the payout.",
+            "introduces": "Adyen's unit, the payable batch.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p23",
+          "function": "description",
+          "controlling_idea": "Adyen ties the report's timing to an event, the closing of the batch, and says to expect the report within 3 hours after the batch closes; it also publishes a 02:00 to 10:00 CET window for scheduled daily reports and says a manually generated report may take several hours.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'When the payable batch closes, we create a Settlement details report.' https://docs.adyen.com/account/getting-paid.md (n.d., accessed 2026-11). 'For Sales day payout, the payable batch always closes two hours after your sales day closing time... After the payable batch closes we create a bank instruction to pay out to you. Additionally, if you configured to generate reports automatically we'll start generating your Settlement details report.' https://docs.adyen.com/account/sales-day-payout.md (n.d., accessed 2026-11). 'When a new report has been generated, you will receive a REPORT_AVAILABLE webhook.' https://docs.adyen.com/reporting/automatically-get-reports.md (n.d., accessed 2026-11). Adyen publishes when scheduled daily reports are generated (between 02:00 and 10:00 CET) and that a manual report 'may take several hours'. 'If you have configured automatic generation of the Settlement details report at batch closure, you can expect the report to be generated within 3 hours after the batch closes.' https://docs.adyen.com/reporting/time-zone-setting.md (n.d., accessed 2026-11).",
+              "shows": "On Adyen the customer has an expected time, three hours after the batch closes, and still waits for the report-available notification before closing."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "What the Adyen report contains.",
+            "introduces": "When it is created.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p24",
+          "function": "description",
+          "controlling_idea": "Around the settlement details report Adyen provides reports at other grains, and a platform needs the balance platform's own daily report as well.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Report / provider / what one line is / what it is for: Stripe payout reconciliation (one balance transaction, grouped by payout); Stripe balance summary (one balance transaction in a period, no link to payouts); Adyen settlement details (one journal entry in a payable batch); Adyen aggregate settlement details (totals per batch, payment method and journal type, to match the bank statement; 'BankInstructionReturned' for a returned payout); Adyen payment accounting (one row per lifecycle status of a payment, used with the monthly invoice); Adyen Balance Platform Accounting Report ('a daily report that tracks all balance changes on all balance accounts in your balance platform', by day in Central European Time). Sources: https://docs.adyen.com/reporting/settlement-reconciliation/batch-level/aggregate-settlement-details-report.md, https://docs.adyen.com/account/getting-paid.md, https://docs.adyen.com/platforms/reports-and-fees.md, https://docs.adyen.com/marketplaces/reports-and-fees/balance-platform-accounting-report.md (n.d., accessed 2026-11)",
+              "shows": "The reader can pick the report whose grain matches the record being proved."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Adyen's main reconciliation report.",
+            "introduces": "The other reports at each provider and the grain of each.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "reports-vs-webhooks",
+      "heading": "Reports and Webhooks Are Different Contracts",
+      "controlling_idea": "A webhook promises to tell you soon that something happened and does not promise to arrive; a report promises every movement behind an amount and does not promise to be early, so a close books from reports and uses webhooks as prompts.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "C5"
+        ],
+        "how": "Argues the belief the chapter exists for and answers the view that books can be kept from the event stream."
+      },
+      "flow": {
+        "pattern": "assertion_evidence_reasoning",
+        "rationale": "The opposing practice stated fairly, the documented difference between the channels, what the difference is made of in money, then the rule."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "Reports as the provider's itemized record.",
+        "introduces": "The other channel customers already receive, and why it cannot stand in for the report.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p25",
+          "function": "counterargument",
+          "controlling_idea": "Keeping the books from webhooks is attractive because the events arrive within seconds, carry amounts and are already being consumed to update payment state.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Larkfield's Stripe side before Keel: the payment record store fed by webhooks through an inbox table, used as the source for the ledger (scenario ledger).",
+              "shows": "States the opposing practice fairly: it is the cheapest design and it works on most days."
+            }
+          ]
+        },
+        {
+          "id": "p26",
+          "function": "refutation",
+          "controlling_idea": "The two channels make different promises, and the providers say so: Stripe separates report availability from webhook timing, and Adyen sends some balance-changing events only if the customer has switched them on.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "What it promises / what it does not promise. Webhook: prompt notice of one event; not delivery, order or completeness (payment-webhooks-and-events). Report: every movement behind a payout or batch, with fees and adjustments, as of a cut-off; not speed. Stripe: 'SLAs indicate when the reports are available for download. Webhook notifications might take additional time' https://docs.stripe.com/reports/options.md (n.d., accessed 2026-11). Adyen: the SETTLED_REVERSED and REFUND_NOT_CLEARED event types 'apply to all payment methods and are disabled by default' https://docs.adyen.com/account/sales-day-payout.md (n.d., accessed 2026-11); the Balance Platform Accounting Report is to 'Confirm the balance changes that you are informed of through webhooks' https://docs.adyen.com/platforms/reports-and-fees.md (n.d., accessed 2026-11)",
+              "shows": "Both providers position the report as the record that confirms and the webhook as the notice."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "Why booking from events is attractive.",
+            "introduces": "What each channel does and does not promise.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p27",
+          "function": "explanation",
+          "controlling_idea": "A day's 'payment succeeded' notifications and the bank credit differ for reasons that are in the report and not in those notifications: fees, refunds, chargebacks, changes in a reserve or deposit, and sales that belong to a different payout or batch.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stripe's itemized report lists 'every payment, refund, dispute, fee, and other balance transaction included in the payout'; Adyen's batch includes transaction fees, DepositCorrection, InvoiceDeduction and adjustments added 'as they occur'. A payment notified on Wednesday can sit in Thursday's or Friday's payout. Illustrative case: a bank credit €1,930 lower than the day's notifications.",
+              "shows": "Gives the reader the list of what a difference between events and a bank credit is probably made of, and where each part is itemized."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Two channels with different promises.",
+            "introduces": "What goes missing when the prompt one is used as the complete one.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p28",
+          "function": "recommendation",
+          "controlling_idea": "Book from the report, wait for the provider's signal that the report data is available, use webhooks to update state and to prompt a check, and hold any amount the report does not explain as an open item with an age and an owner.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Keel K2 (scenario ledger): 'The provider's record is the truth; the webhook is the doorbell.' The signals: Stripe's reporting.report_type.updated event and data_available_end; Adyen's REPORT_AVAILABLE webhook, and balancePlatform.report.created for balance platform reports. The author's recommendation; it does not hold for a decision that cannot wait for a report, such as granting access after a payment, which belongs to payment state (payment-state-machines).",
+              "shows": "Turns the comparison into a rule for a close and states its limit."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "What the event stream leaves out.",
+            "introduces": "The rule that follows for the books.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "ways-to-close",
+      "heading": "Three Ways to Run a Close on Provider Data",
+      "controlling_idea": "A close can be fed by events, driven by reports per payout or batch, or run as queries over provider data in a warehouse; they differ in what proves completeness and in how soon a difference is seen.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "C5"
+        ],
+        "how": "Sets out the realistic designs and when each is right."
+      },
+      "flow": {
+        "pattern": "comparison",
+        "rationale": "Three designs on the same two criteria, weakest proof of completeness first, then the choice."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "The rule: book from reports.",
+        "introduces": "The designs a team actually chooses between, including the one the rule argues against.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p29",
+          "function": "comparison",
+          "controlling_idea": "An event-fed close posts every webhook to the books as it arrives: it is the earliest and the cheapest, and nothing in it can show that an event is missing.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Completeness in this design rests on delivery; a movement that has no event, or whose event was not enabled or was lost, never reaches the books. Industry practice and the author's judgement.",
+              "shows": "Names the weakness as structural, not as an operational slip."
+            }
+          ]
+        },
+        {
+          "id": "p30",
+          "function": "comparison",
+          "controlling_idea": "A report-driven close books each payout or batch from its itemized report and matches the report's total to the bank line: completeness comes from the provider's own cut-off, at the cost of a delay of a day or more.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Each bank credit is matched to one payout (Stripe) or one batch (Adyen), and each line of the report to one internal entry; what is left on either side is an open item. Industry practice; RECONCILED's payments-to-ledger describes the posting.",
+              "shows": "This is the design the providers' reports are built for."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "A close that trusts delivery.",
+            "introduces": "A close that trusts a cut-off.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p31",
+          "function": "comparison",
+          "controlling_idea": "A warehouse-driven close loads the provider's transaction data into the customer's own warehouse and runs the match as queries, which shortens the delay to hours on Stripe and has to be built from report files on Adyen.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Stripe's Data Pipeline delivers a full load every 3 hours and Sigma data is queryable within about three hours (documented above); for Adyen's payment and settlement reports this book found only files documented, so the same design means ingesting each report file; for platforms Adyen also documents a Transfers API query for balance account transactions (https://docs.adyen.com/platforms/transfer-transactions/track-api, n.d., accessed 2026-11). The author's reading.",
+              "shows": "Shows that this design depends on what each provider exposes, which the comparison section takes up."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Booking per report file.",
+            "introduces": "Booking from the same data held as tables.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p32",
+          "function": "recommendation",
+          "controlling_idea": "I would book from reports per payout or batch, add the warehouse when volume or two providers make file handling the bottleneck, and keep the event-fed figures only as an early estimate that the report later replaces.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Design / what proves completeness / delay before a difference is seen / when it is right: event-fed (nothing; seconds, but a missing event is never seen; as an estimate, never as the books); report-driven (the provider's cut-off per payout or batch; a day or more; the default); warehouse-driven (the provider's data set plus your own queries; hours where the provider delivers tables; high volume, several providers or a daily close). The author's judgement.",
+              "shows": "A trade-off table the reader can apply to their own volume and number of providers."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "Three designs.",
+            "introduces": "Which one the author would choose and under what conditions.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "The two providers differ in what they have published about their own reconciliation, in the unit of the main report, in whether report timing is a number or an event, and in whether the data is offered as tables.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "C3",
+          "C4"
+        ],
+        "how": "Sets the documented facts of the earlier sections side by side and reads them for an integrator."
+      },
+      "transition_in": {
+        "relationship": "conclusion_summary",
+        "carries_over": "The documented facts about each provider and the designs for a close.",
+        "introduces": "The same facts in one table, with the author's reading of each difference.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p33",
+          "function": "comparison",
+          "controlling_idea": "On five aspects the public record shows a difference, and the last column of the table is the author's inference from it.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Aspect / Stripe / Adyen / what the difference suggests. (1) Own reconciliation, published: 2024 Ledger post (clearing accounts, aging scores, tickets, verification within four days) / 2021 post (two-step matching of partner files across accounting clusters; five years old). (2) Unit of the main reconciliation report: the payout / the payable batch, by default a sales day. (3) Timing statement: 'Within 12 hours' after the day ends, payout may arrive first / created when the batch closes, expected within 3 hours after the batch closes, a daily window for scheduled reports (02:00 to 10:00 CET). (4) Signal that data is ready: reporting.report_type.updated twice a day, not sent to Connect endpoints / REPORT_AVAILABLE webhook with a download URL, and balancePlatform.report.created for balance platform reports. (5) Access to the data: Sigma and Data Pipeline, freshness in hours / report files in CSV and other formats, and for platforms the Transfers API's transactions endpoint. Sources as cited in sections what-providers-publish and reports-customers-get.",
+              "shows": "Every cell is a fact documented earlier in the chapter, so the table adds the comparison and not new claims."
+            }
+          ]
+        },
+        {
+          "id": "p34",
+          "function": "recommendation",
+          "controlling_idea": "An integrator on Stripe keys its reconciliation on the payout ID and schedules against the 12-hour figure; on Adyen it keys on merchant account and batch number and waits for the report-available webhook; on both it needs two keys and one treatment of open items.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Follows from rows 2 to 4 of the table; the author's recommendation.",
+              "shows": "Says what to do differently on each provider, which is the purpose of the section."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The differences in unit, timing and signal.",
+            "introduces": "What an integrator does differently on each provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: Closing Tuesday 9 March on Two Providers",
+      "controlling_idea": "Under Keel K3 Larkfield closes each day from the providers' reports, with the batch as the key on Adyen and the payout as the key on Stripe, and carries what does not match as dated, owned open items.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "C4",
+          "C5"
+        ],
+        "how": "Works the close for the day of Mila's class pass on both providers and shows open items with an age and an owner."
+      },
+      "flow": {
+        "pattern": "chronological",
+        "rationale": "The job starts, the matched line on each provider, the unmatched lines, then what the method changes."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "Two matching keys and one treatment of open items.",
+        "introduces": "Larkfield's close for one day, with Mila's €120 traced through it.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p35",
+          "function": "context",
+          "controlling_idea": "Larkfield's reconciliation job now runs per provider on that provider's signal, not at a fixed hour, and writes ledger entries only from report lines.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Keel K3 and K2 (scenario ledger); local illustrative detail: the Adyen run starts on the REPORT_AVAILABLE webhook for each merchant account's batch and on balancePlatform.report.created for the balance platform's daily report, the Stripe run when the reporting data's availability passes the end of the day.",
+              "shows": "Applies the rule of the webhook section to the two signals documented for the providers."
+            }
+          ]
+        },
+        {
+          "id": "p36",
+          "function": "example",
+          "controlling_idea": "On Adyen, Mila's €120.00 is one line in the batch for the sales day of 9 March, and the balance platform's daily report shows how it was split between Studio Noord and Larkfield.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Mila's class pass (scenario ledger): €120.00 at 19:42 on 9 March 2027, Studio Noord on Adyen; Larkfield's fee €2.53, the studio receives €117.47; illustrative provider cost €0.61 inside the fee (assumption), leaving Larkfield €1.92; payout arrives Thursday 11 March. Documented behavior used: the batch closes two hours after the sales day closes; split payments appear in the Balance Platform Accounting Report as separate lines with the same PSP reference; fees are by default debited from the platform's liable balance account (https://docs.adyen.com/platforms/reports-and-fees.md, n.d., accessed 2026-11).",
+              "shows": "One payment matched to one report line and to the ledger entries K3 requires, with the report as the source of each amount."
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The job's rule: entries only from report lines.",
+            "introduces": "The Adyen side for the recurring payment.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p37",
+          "function": "example",
+          "controlling_idea": "Had Studio Noord been on Stripe, the same €120.00 would be found under the payout that carries it, and the day could not be closed from the bank credit alone because the report may come after the money.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "'Had Studio Noord been on Stripe' (the scenario ledger's device). Documented behavior used: the itemized payout reconciliation report carries automatic_payout_id and balance_transaction_id on each row; a day's report is normally available by 12:00 pm the next day; 'a payout might arrive before its reconciliation data is ready'; platforms can view the financial reports of connected accounts they control (https://docs.stripe.com/reports/options.md, n.d., accessed 2026-11).",
+              "shows": "The same payment needs a different key and a different wait on the other provider."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The Adyen side, keyed on the batch.",
+            "introduces": "The Stripe side, keyed on the payout.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p38",
+          "function": "example",
+          "controlling_idea": "What the reports and Larkfield's records do not explain on the day stays on a list of open items, each with an amount, an age and an owner, and nothing is adjusted to make the day tie.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Illustrative open items after the close of 9 March (all figures are assumptions for teaching): a €16.00 drop-in marked paid in the payment record store and absent from the batch (captured after the sales day closed; expected in the next batch; owner: the reconciliation job; closes in one day); a €49.00 refund line in the batch with no refund request in Larkfield's records (made in the provider's console; owner: Tom Hendriks; age 1 day); a £0.03 rounding difference on a GBP conversion (owner: Priya Raman; booked to a rounding account under a written rule). Larkfield's rule: an item open for more than five business days goes to Priya Raman's weekly review.",
+              "shows": "Shows the three usual kinds of exception (timing, a movement made outside the system, a rule difference) and that each is kept visible until it is matched."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The lines that match.",
+            "introduces": "The lines that do not.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p39",
+          "function": "analysis",
+          "controlling_idea": "Run this way, the three causes of the €412,000 would each have appeared as open items within days, on the day the refund, the fee or the rounding was first reported.",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "The Unexplained €0.4 Million (scenario ledger): refunds after payout, chargeback fees and a currency-conversion rounding rule, found after three weeks at year-end 2025.",
+              "shows": "The difference between the old and new close is when a difference becomes visible and whether it has an owner, not whether differences occur."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "Open items listed by age and owner each day.",
+            "introduces": "What that would have done to the year-end difference.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong: Late Reports, Late Reversals and Totals Forced to Tie",
+      "controlling_idea": "A report-driven close fails in four ways: the report is late, a movement arrives after the day was closed, the day boundaries of two records differ, and someone adjusts a total to make it tie.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "C2",
+          "C5"
+        ],
+        "how": "Gives detection and recovery for each failure of the recommended design."
+      },
+      "flow": {
+        "pattern": "order_of_importance",
+        "rationale": "From the most frequent and least harmful (a late report) to the least visible and most harmful (a total forced to tie)."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "A close that worked.",
+        "introduces": "The ways the same close fails, and what to do in each.",
+        "form": "sentence",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p40",
+          "function": "process",
+          "controlling_idea": "When the money arrives before the report, or the report is late, the close for that payout or batch waits; the bank credit is recorded as received and unmatched, not booked as sales.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe: 'a payout might arrive before its reconciliation data is ready'; the 12-hour figure has stated exceptions (https://docs.stripe.com/reports/payout-reconciliation.md and https://docs.stripe.com/reports/options.md, n.d., accessed 2026-11). Adyen says to expect its settlement details report within 3 hours after the batch closes, which is an expectation and not a guarantee (above).",
+              "shows": "The late report is a documented, expected case, so the design needs a state for 'cash received, detail pending'."
+            }
+          ]
+        },
+        {
+          "id": "p41",
+          "function": "process",
+          "controlling_idea": "When a movement arrives after its day was closed, it is booked as a new entry in the day it is reported and linked to the original; the closed day is not reopened.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Adyen: SettledReversed after 30 days without funds, and 'If Adyen receives the funds after 30 days, you see an additional Settled booking'; adjustments 'are added to the payable batch as they occur' (https://docs.adyen.com/account/sales-day-payout/upgrade-to-sdp.md and https://docs.adyen.com/account/sales-day-payout.md, n.d., accessed 2026-11). Stripe: a payout reported as paid can change to failed within five business days (payouts-and-money-movement). Larkfield's refund after payout: €84.00 on 18 March for a pass paid out on 11 March (scenario ledger).",
+              "shows": "Both providers report late changes as new lines in a later report, which matches the ledger's rule that entries are immutable."
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "A report that is late.",
+            "introduces": "A movement that is late.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p42",
+          "function": "process",
+          "controlling_idea": "When two records cut the day at different times, items near midnight appear as differences that reverse the next day, and the fix is to reconcile on the provider's unit and time zone, not on your own calendar day.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "Stripe reports can be run in the account's time zone or UTC (https://docs.stripe.com/reports/options.md, n.d., accessed 2026-11); Adyen's settlement details report uses the account's time-zone setting, its Balance Platform Accounting Report covers a day in Central European Time and 'Your invoice is always based on the CET time zone' (https://docs.adyen.com/reporting/settlement-reconciliation/transaction-level/settlement-details-report.md, https://docs.adyen.com/marketplaces/reports-and-fees/balance-platform-accounting-report.md, https://docs.adyen.com/reporting/invoice-reconciliation/payment-processing-invoice.md, n.d., accessed 2026-11).",
+              "shows": "A platform with studios in three time zones on two providers has several definitions of 'the day' and must pick the provider's for each match."
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "Movements that arrive late.",
+            "introduces": "Movements that only appear late because of where the day is cut.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p43",
+          "function": "process",
+          "controlling_idea": "The failure that does lasting damage is adjusting a total so the day ties: the difference disappears from view, keeps its cause and returns larger.",
+          "evidence": [
+            {
+              "kind": "case",
+              "what": "The Unexplained €0.4 Million accumulated over a year in which no single day's difference had an owner (scenario ledger; the author's reading). Stripe's post describes the alternative: unresolved balances scored by age with tickets assigned to teams (https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement (Ilya Ganelin, Stripe, published 2024-02-16)).",
+              "shows": "An open item with an age is the control; a plug removes it."
+            }
+          ],
+          "transition_in": {
+            "relationship": "emphasis",
+            "carries_over": "Three failures that a waiting state or a new entry handles.",
+            "introduces": "The one that comes from people, and that the others tempt.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "The provider's reconciliation and the customer's close are the same act at two levels: each holds a ledger that balances by construction and becomes proof only against a record written by the party one step closer to the money, and at each level what turns a mismatch from a loss into a task is its age and its owner. The report is how that proof is passed down a level.",
+    "so_what": "A team that books from webhooks has a ledger that agrees with itself; a team that books from reports, waits for them and ages its open items has one that agrees with the provider, and through the provider with the networks and banks. On two providers that takes two keys, the payout and the batch.",
+    "callback": {
+      "to": "The payout recorded as paid that the bank returned, and Larkfield's €412,000.",
+      "how": "Neither record was entitled to win by itself: the return shows up as a line in a later report, and the difference is closed by matching that line, which is what the year-end search did by hand, a year late."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "For each provider, name the report you book from, the signal you wait for, the key that ties a bank credit to its lines, and the owner and age limit of an unmatched item. Eight questions to ask follow."
+    },
+    "hand_off": {
+      "to": "licences-and-safeguarding",
+      "relationship": "elaboration",
+      "carries_over": "Reconciliation as the comparison of the provider's ledger with a bank's record of the same money.",
+      "introduces": "Whose bank account that is and who is allowed to hold it: the license that decides which accounts must exist and turns the comparison into a legal requirement."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The failures of a close and their repairs.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p44",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Established: a balanced ledger is not proof until it is matched to outside records; both providers publish itemized reports for that purpose, by payout at Stripe and by batch at Adyen; and both say that reports and notifications run on different schedules."
+      },
+      {
+        "id": "p45",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Depends on context: whether a file-based or a warehouse-based close is right, how long an open item may age, and whether a daily close is worth its cost.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What the documentation and the engineering posts establish.",
+          "introduces": "What changes with volume, the number of providers and the provider's own timing.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p46",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "The author's synthesis: the report is the provider's reconciliation passed down one level, so book from it, and treat the open-items list, not the tied total, as the output of a close.",
+        "transition_in": {
+          "relationship": "additional_support",
+          "carries_over": "What is established and what depends.",
+          "introduces": "The author's own position.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p47",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "Eight questions let the reader test a close or a provider's reporting in a design review.",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "The author's position.",
+          "introduces": "Questions that apply it.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p48",
+        "function": "transition",
+        "controlling_idea": "Reconciliation compares the provider's ledger with a bank's record; the next chapter asks whose bank account that is, who may hold it, and why the law makes the comparison a duty.",
+        "transition_in": {
+          "relationship": "elaboration",
+          "carries_over": "The comparison of ledger and bank account.",
+          "introduces": "The license behind the account.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "How a customer posts provider reports to its general ledger and ERP: clearing accounts on the customer's side, the three-way match of order, payment and bank.",
+      "covered_in": [
+        "payments-to-ledger",
+        "traceability-and-reconciliation"
+      ]
+    },
+    {
+      "topic": "Ledger design: double entry, immutability, clearing accounts.",
+      "covered_in": [
+        "payment-ledgers"
+      ]
+    },
+    {
+      "topic": "Balance states, reserves, pre-financing and who carries its risk.",
+      "covered_in": [
+        "balances-and-funds-flows"
+      ]
+    },
+    {
+      "topic": "Payout rails, payout states and returns.",
+      "covered_in": [
+        "payouts-and-money-movement"
+      ]
+    },
+    {
+      "topic": "The webhook receiver's contract: verify, persist, deduplicate, confirm, sweep.",
+      "covered_in": [
+        "payment-webhooks-and-events"
+      ]
+    },
+    {
+      "topic": "Safeguarding reconciliation as a legal duty.",
+      "covered_in": [
+        "licences-and-safeguarding"
+      ]
+    },
+    {
+      "topic": "Reconciliation across providers as a cost of orchestration.",
+      "covered_in": [
+        "payment-routing-and-orchestration"
+      ]
+    },
+    {
+      "topic": "Per-seller reporting to connected accounts and sub-merchants.",
+      "covered_in": [
+        "splits-balances-and-platform-payouts"
+      ]
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "File formats, matching rules, match rates and exception volumes of either provider's reconciliation against networks and banks are not public.",
+    "No published completion time was found for any Adyen report.",
+    "Whether Adyen's 2021 two-step matching design is current is unknown; no newer engineering source was found.",
+    "Whether Adyen offers a documented SQL or warehouse-delivery product comparable to Sigma or Data Pipeline was not established; the chapter says only that none was found documented.",
+    "The meaning of Stripe's balance transaction type payment_unreconciled is not explained on the object page; the chapter does not use it."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "Network clearing-file formats and scheme reconciliation programs are described only as industry practice in one table; no network documentation was in the research base for this page.",
+      "rejected": [
+        "Describing Visa or Mastercard clearing and settlement report formats from memory."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The worked close uses Mila's class pass on Adyen and the ledger's 'had Studio Noord been on Stripe' device; open items in the example are local illustrative details, labeled as assumptions.",
+      "rejected": [
+        "A full numeric tie-out of a studio's batch, which would need invented volumes and provider mechanics the documentation read for this page does not fix."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Stripe's payment_unreconciled balance transaction type is left out because its meaning is undocumented.",
+      "rejected": [
+        "Interpreting it as evidence of Stripe's internal reconciliation."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Flow rubric notes not acted on, left for the author: move the comparison section before the three designs; move the customer-report evidence of Adyen's Settled/SettledReversed records from the provider section to the reports section; align the opening hook (returned payout) more closely with the scene (the €412,000). The note that the report-available signals should be named before they are relied on is already met: paragraphs p20 and p23 name them.",
+      "rejected": [
+        "Reordering sections after a 'sound with notes' verdict without the author's decision."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "PLAN.md, chapter contract 15",
+      "contributed": "Scope, owned terms, Larkfield thread, links to RECONCILED."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/brief-ledgers-and-money-movement.md, Part 4 and sections 1.1, 1.3, 2.4, 2.5, 2.7",
+      "contributed": "Verified quotations and the list of what is not public."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "Mila's class pass, the Unexplained €0.4 Million, the Payout That Bounced, Keel K2 and K3, the systems landscape, the cast."
+    },
+    {
+      "kind": "external",
+      "ref": "https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement (2024-02-16)",
+      "contributed": "Stripe's account of reconciliation inside fund flows, aging and ownership."
+    },
+    {
+      "kind": "external",
+      "ref": "https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2 (2021-08-23)",
+      "contributed": "Adyen's two-step matching of partner files."
+    },
+    {
+      "kind": "external",
+      "ref": "docs.stripe.com: reports/payout-reconciliation, reports/balance, reports/options, reports/v1-api, payouts/reconciliation, stripe-data pages, bank-reconciliation, treasury (n.d., accessed 2026-11)",
+      "contributed": "Stripe's customer-facing reports, timing and data products."
+    },
+    {
+      "kind": "external",
+      "ref": "docs.adyen.com: settlement details report, aggregate settlement details report, payment accounting report, getting-paid, sales-day-payout, upgrade-to-sdp, automatically-get-reports, platforms/reports-and-fees, Balance Platform Accounting Report (n.d., accessed 2026-11)",
+      "contributed": "Adyen's customer-facing reports, journal types, timing and platform reports."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "First version, written from the chapter contract, the ledger research brief and the scenario ledger; intent, thesis and role copied from the journal spec."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes)."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 78 claims checked (61 confirmed, 11 corrected, 6 hedged, 0 unsupported and removed or relabeled, 0 unreachable); the claim that Adyen publishes no timing figure for any report was corrected (no time from batch close to the settlement details report, but a published 02:00 to 10:00 CET window for scheduled daily reports), and the balance platform's own report-ready webhook (balancePlatform.report.created) and Transfers API were added. Units unchanged. AC-2's 'no duration is published' is left as copied from the journal spec and needs the author's correction there."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('and is generated when the batch closes; no duration is publi' -> 'and is generated when the batch closes; Adyen publishes when')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('Adyen generates its settlement details report when the payab' -> 'Adyen generates its settlement details report when the payab')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation after verification: journal-spec entry and spec body brought into line with the verified page and consistency rulings (journal entry thesis.claim (ruling 32c) re-synced; journal entry know[2] (ruling 32c) re-synced; ledger K3 wording; ruling 32a; ruling 32b; ruling 32d). No unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: 4 statements of absence re-tested with a wide search (1 overturned, repeated in four places; 0 narrowed; 3 hold; table in _research/absence-audit/15-payment-reconciliation-and-reporting.md). Overturned: Adyen's 'Time zone setting' page says the settlement details report is expected 'within 3 hours after the batch closes'. p23's controlling idea and evidence, the comparison-table evidence and the late-report evidence updated. thesis.how_why ('no duration from batch close') and AC-2 are journal-spec-locked and now false; reported to the author. Consistency ruling 32(a) needs the same correction."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('publishes a daily window for scheduled reports but no durati' -> 'says to expect it within 3 hours after the batch closes and ')."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Journal-spec entry corrected after verification; intent, thesis and role re-synced ('Adyen publishes when scheduled daily reports are generated (' -> 'Adyen says to expect it within 3 hours after the batch close')."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Sweep of rulings 46-48: thesis how_why and the expected answer of acceptance criterion 2 now give Adyen's 'within 3 hours after the batch closes' (Time zone setting page) in place of 'no duration from batch close' (ruling 47f). Prose unchanged."
+    }
+  ],
+  "length": {
+    "target_words": 4600,
+    "max_words": 6500
+  }
+}

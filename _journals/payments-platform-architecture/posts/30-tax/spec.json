@@ -1,0 +1,1136 @@
+{
+  "$schema": "../../../../_wiring/outcome-specs/post-spec.schema.json",
+  "spec_version": "0.1",
+  "kind": "post",
+  "id": "billing-and-payment-tax",
+  "journal": "payments-platform-architecture",
+  "part": "part-6",
+  "title": "Whose Tax, at What Rate: Tax Calculation in the Payment Path",
+  "status": "accepted",
+  "revised": "2026-11-17",
+  "intent": {
+    "outcome": {
+      "know": [
+        "At an introductory level, what VAT, GST and sales tax are, what a tax registration and a threshold are, and what a deemed supplier is.",
+        "The four steps Stripe's documentation names (know where you must collect, register, calculate and collect, file and remit) and which of them Stripe Tax performs as of November 2026.",
+        "That no public source was found describing an Adyen product that calculates, collects or files tax on a merchant's sales, and that this is an absence of evidence."
+      ],
+      "believe": [
+        "A provider's tax product is a calculator with partial sight: the registrations, the sales it does not see and the liability remain the seller's.",
+        "For a platform, who owes the tax is a property of each transaction that the payment flow has to carry."
+      ],
+      "can_do": [
+        "Say which facts and which state a tax calculation needs and where in a checkout or billing flow they are available.",
+        "Spot when a provider's threshold monitoring undercounts, and name the two ways to fix it.",
+        "Ask whether a platform is a deemed supplier for its category before designing its funds flow."
+      ]
+    },
+    "audience": {
+      "who": "A software engineer or architect who builds billing or checkout on a payment provider and has treated tax as a line the provider or the finance team fills in.",
+      "already_knows": [
+        "Subscriptions, invoices, finalization and why a finalized invoice is frozen (subscriptions-and-billing-engines, invoicing-collections-and-dunning).",
+        "Platform payments at the level of 'the studio is the seller and Larkfield takes a fee' (meet-larkfield).",
+        "Larkfield, its two providers and Mila's class pass (meet-larkfield)."
+      ],
+      "does_not_know": [
+        "Indirect tax, VAT, GST, sales tax, tax registration, registration threshold, economic nexus, One Stop Shop, reverse charge, deemed supplier.",
+        "Which of the four compliance steps Stripe Tax performs, and that no Adyen tax product for a merchant's sales was found in the public record."
+      ]
+    },
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Given a business that sells through more than one channel, the reader explains why one provider's threshold monitoring can be wrong and what to do.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A software company takes 60% of its sales through a provider that has a tax feature and 40% through another provider. The tax feature's monitor says no new tax registration is needed anywhere. Why might that be wrong, and what are the two ways to fix it?",
+        "expected": "The monitor counts only the sales that provider processed, while a registration threshold applies to all of the seller's sales into a territory. Fix: import the other sales into the tax product, or use a tax engine that is independent of both providers. Either way, confirming the obligation remains the seller's job."
+      },
+      {
+        "id": "AC-2",
+        "statement": "The reader can explain why a calculated tax of zero is not proof that no tax is due.",
+        "check": "custom",
+        "method": "cold_reader",
+        "severity": "major",
+        "probe": "A provider's tax calculation returns €0 tax on a sale to a consumer in another country. Give one reason, from this chapter, why that may not mean 'no tax is due'.",
+        "expected": "The calculation returns zero wherever the seller has not recorded a registration, so zero can mean 'not registered here', which may itself be the problem if a threshold has been passed. An accepted alternative: a customer tax number that made the sale look business-to-business was not validated."
+      },
+      {
+        "id": "AC-3",
+        "statement": "The Adyen column of the comparison says 'nothing public found' where that is the case, names where the search was made, and does not infer an Adyen design from the absence.",
+        "check": "custom",
+        "method": "rubric",
+        "severity": "blocker"
+      }
+    ]
+  },
+  "thesis": {
+    "question": "How does indirect tax get calculated, collected and reported when the payment provider is also the tax engine?",
+    "claim": "A provider can calculate indirect tax because the checkout or invoice it runs already holds the three facts the calculation needs (who sells, what is sold, where the customer is), but calculating and collecting is one of four steps (know where tax is due, register, calculate and collect, file and remit) and the liability stays with the seller: Stripe Tax returns zero where the seller has recorded no registration, monitors thresholds only on the sales it sees, and as of November 2026 files itself only in the United States and for selected registrations in Ireland and Canada. The comparison is one-sided: no public source shows an Adyen product that calculates, collects or files tax on a merchant's sales, so on Adyen tax is computed by the merchant's own system or a separate tax engine.",
+    "disputed_by": "The view that switching on a provider's tax feature makes tax the provider's responsibility; and the opposite view that tax belongs wholly to finance and the ERP and has no place in the payment path.",
+    "so_what": "The reader treats a provider's tax product as a calculator fed by the provider's own data: registrations are state the business must maintain, a business on two providers (as Larkfield is) must feed the other provider's sales in or use an independent engine, and a platform must record the liable party on each transaction.",
+    "how_why": "The tax amount has to be on the invoice before it is finalized and correct at the moment of the charge, which is why calculation sits beside billing and checkout and not in the ledger. Whether tax is due at all depends on registration, and registration depends on thresholds counted across every channel: an EU-wide €10,000 threshold for cross-border consumer sales since 1 July 2021, and sales-based 'economic nexus' in US states since the Wayfair decision of 21 June 2018. For platforms the law can move the liability itself: the EU has treated marketplaces as deemed suppliers of certain goods since 2021, and the 2025 VAT in the Digital Age package extends the idea to short-term accommodation and road passenger transport from 1 July 2028. The public record stops early on the Adyen side: searches of Adyen's documentation, help center and product pages found no product that calculates, collects or files tax on a merchant's sales, which is absence of evidence and not a statement by Adyen. They found how Adyen taxes its own fees, a tax amount the merchant may send with a payment, a `VAT` split type that books an amount the platform supplies, the filing of US form 1099-K for platform sellers, and a clause in Adyen's terms under which each party complies with its own tax obligations; Orb's documentation says it connects to third-party tax providers. The chapter is short for that reason.",
+    "supporting_claims": [
+      {
+        "id": "S1",
+        "claim": "An indirect-tax calculation needs three facts (who sells, what is sold, where the customer is) and one piece of state (where the seller is registered); a checkout or an invoice already holds the facts, which is why a provider can calculate and why the calculation sits beside billing and not in the ledger."
+      },
+      {
+        "id": "S2",
+        "claim": "Calculating and collecting is one of four steps; knowing where tax is due, registering, filing and remitting, and the liability itself stay with the seller, and registration depends on thresholds counted across every channel the seller uses."
+      },
+      {
+        "id": "S3",
+        "claim": "Stripe Tax as documented in November 2026 is a calculator with partial sight: it returns zero where the seller has recorded no registration, applies a reverse charge on the format of a tax number, monitors thresholds only on the sales it sees, and files itself only in the United States and for selected registrations in Ireland and Canada."
+      },
+      {
+        "id": "S4",
+        "claim": "For a platform, who owes the tax is a property of each transaction: the law can make the platform the deemed supplier, and Stripe's documentation for platforms starts from deciding which entity is liable."
+      },
+      {
+        "id": "S5",
+        "claim": "The comparison is one-sided: no public source was found that shows an Adyen product calculating, collecting or filing tax on a merchant's sales, which is absence of evidence, so on Adyen and for any business on two providers the calculation lives in the merchant's own system or a separate tax engine."
+      }
+    ]
+  },
+  "role": {
+    "contribution": "Adds the first of the two calculations that read the invoice, and the part's first chapter in which the comparison is Stripe's product against what a merchant must bring itself.",
+    "supports": [
+      "P6-4",
+      "P6-5"
+    ]
+  },
+  "flow": {
+    "pattern": "prerequisite_order",
+    "additional_patterns": [
+      {
+        "pattern": "problem_solution",
+        "applies_to": "scene to in-practice: the three zero-tax invoices are posed in the first section and resolved in the sixth"
+      },
+      {
+        "pattern": "comparison",
+        "applies_to": "where-they-differ and designs"
+      }
+    ],
+    "rationale": "The reader meets a zero that cannot be read, then gets the vocabulary (the tax, its inputs, registration, the four steps, the deemed supplier) without which Stripe's documented behavior is a feature list, then that behavior step by step, and only then the comparison, because 'Adyen documents none of this' means nothing before 'this' is defined. The designs follow the comparison because the one-sided result is what makes the choice necessary; the Larkfield cases come after the designs because each case picks one, and the failure modes come last because they generalize what the cases fixed. Moving the Stripe section before the vocabulary would leave 'registration', 'reverse charge' and 'liable entity' undefined at first use; moving the designs before the comparison would offer a choice before showing why a provider's built-in tax is not available on both sides."
+  },
+  "introduction": {
+    "hook": {
+      "type": "puzzling_scenario",
+      "content": "Three invoices for the same software plan each show a tax line of €0.00. On the first, the customer is a business in another country and owes the tax itself. On the second, the seller never told the tax calculator that it is registered where the customer lives. On the third, somebody marked the product as non-taxable years ago. The three zeros look identical on the page; only one of them is right."
+    },
+    "bridge": {
+      "from_reader_world": "An engineer sees tax as a percentage applied to an amount, switched on with a flag in the provider's settings.",
+      "to_topic": "The percentage is the last step of a decision about who the seller is, where the sale takes place and whether the seller is registered there, and the provider knows only part of the answer."
+    },
+    "thesis_statement": {
+      "text": "A payment provider can calculate indirect tax because its checkout or invoice already holds the facts the calculation needs, but calculation is one of four steps and the liability stays with the seller. Stripe Tax returns zero where no registration is recorded, counts thresholds only on the sales it sees and files only in a few places; no public source shows an Adyen product that does any of it.",
+      "placement": "KEY POINTS bullets 1 to 3, and paragraph p02"
+    },
+    "roadmap": {
+      "placement": "IN THIS CHAPTER callout and paragraph p04",
+      "promises": [
+        {
+          "promise": "Start from three Larkfield invoices that each show zero tax.",
+          "kept_in": [
+            "scene"
+          ]
+        },
+        {
+          "promise": "Define indirect tax, the facts and state a calculation needs, registration and thresholds, the four steps and the deemed supplier.",
+          "kept_in": [
+            "what-tax-asks"
+          ]
+        },
+        {
+          "promise": "Go through what Stripe Tax documents for each step, including what it does for platforms.",
+          "kept_in": [
+            "stripe-tax"
+          ]
+        },
+        {
+          "promise": "Set Stripe beside Adyen and say where the public record on Adyen stops.",
+          "kept_in": [
+            "where-they-differ"
+          ]
+        },
+        {
+          "promise": "Compare the four places a tax calculation can live.",
+          "kept_in": [
+            "designs"
+          ]
+        },
+        {
+          "promise": "Work the two Larkfield cases, a studio's class pass and Larkfield's own subscription, and list the ways tax in the payment path fails.",
+          "kept_in": [
+            "in-practice",
+            "when-it-goes-wrong"
+          ]
+        }
+      ]
+    },
+    "paragraphs": [
+      {
+        "id": "p01",
+        "function": "context",
+        "organization": "illustration",
+        "controlling_idea": "Three invoices can show the same tax of €0.00 for three different reasons, and only one of the reasons means that no tax is due.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Three zero-tax invoices for one plan: a reverse charge to a business abroad, a registration the seller never recorded, a product marked non-taxable.",
+            "shows": "The amount alone cannot tell a correct zero from a missing one, which is the chapter's problem in one picture."
+          }
+        ]
+      },
+      {
+        "id": "p02",
+        "function": "claim",
+        "controlling_idea": "A provider can calculate tax because its checkout or invoice holds the facts, but calculating is one of four steps, the liability stays with the seller, and the public record shows this product at Stripe and not at Adyen.",
+        "transition_in": {
+          "relationship": "problem_solution",
+          "carries_over": "The three zeros nobody can tell apart.",
+          "introduces": "Why a provider can calculate at all, what it cannot know, and the thesis in plain words.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p03",
+        "function": "context",
+        "controlling_idea": "Tax is not a step on the path of Mila's class pass: it is decided before the €120.00 is authorized, because the price she pays already contains it, and it is reported by the studio weeks later.",
+        "evidence": [
+          {
+            "kind": "scenario",
+            "what": "Mila's €120.00 ten-class pass from Studio Noord, Tuesday 9 March 2027 at 19:42; the studio receives €117.47.",
+            "shows": "Places tax before and after the payment's journey and names the studio, not Larkfield, as the party that owes it.",
+            "source": "scenario ledger"
+          }
+        ],
+        "transition_in": {
+          "relationship": "place",
+          "carries_over": "The claim about what a provider can calculate.",
+          "introduces": "Where tax sits relative to the book's recurring payment.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p04",
+        "function": "transition",
+        "controlling_idea": "The chapter goes from three Larkfield invoices, through what indirect tax asks of a seller and what Stripe Tax does at each step, to the comparison with Adyen, the places a calculation can live, two worked Larkfield cases and the failure modes.",
+        "transition_in": {
+          "relationship": "sequence",
+          "carries_over": "Where the chapter sits relative to the payment.",
+          "introduces": "The order of its sections.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "scene",
+      "heading": "Setting the Scene at Larkfield: Three Invoices with No Tax",
+      "controlling_idea": "A tax feature that has been switched on for years can produce a wrong zero without any error, and nothing in the provider's settings says whose job it was to notice.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S2"
+        ],
+        "how": "Poses the chapter's two questions in a concrete case: which zero is which, and whose responsibility the tax is once the provider calculates it."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The roadmap.",
+        "introduces": "The Larkfield case that poses the question.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p05",
+          "function": "context",
+          "organization": "narration",
+          "controlling_idea": "In May 2027 the payments team takes over Larkfield's billing integration and finds Stripe Tax switched on since 2023 with exactly one registration recorded, the Dutch one.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Ledger: the billing integration (Stripe Billing objects for studio subscriptions) is owned by the growth team until 2027; plans at €89, €189 and €349 per month. New local fact: Stripe Tax enabled in 2023 with only the Dutch registration recorded.",
+              "shows": "A plausible state for a tax feature nobody owns: enabled, calculating, never reviewed.",
+              "source": "scenario ledger; addition by this chapter"
+            }
+          ]
+        },
+        {
+          "id": "p06",
+          "function": "evidence",
+          "controlling_idea": "Three of the month's invoices show the problem: a Dutch studio is charged 21%, a German studio with a VAT number is charged nothing under a reverse charge, and a German studio without a VAT number is charged nothing because no registration covers Germany; Priya Raman asks which zero is which, and whether the tax is Stripe's job now.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Three May 2027 invoices: Utrecht, €189 plan, 21% = €39.69, total €228.69; Cologne, €189 plan, VAT number on file, €0.00; Leipzig, €89 plan, no VAT number, €0.00. Rates: Netherlands standard 21%, Germany 19% (European Commission, Your Europe, VAT rates table, last checked 13 July 2026).",
+              "shows": "Two zeros with different causes sit next to one correct positive amount; the export Priya reads shows only amounts."
+            },
+            {
+              "kind": "scenario",
+              "what": "Priya Raman, finance controller: 'Two zeros. Which one did we mean? And the dashboard says tax is on, so is this Stripe's now?'",
+              "shows": "States the two views the thesis disputes from the mouth of the person who signs the return.",
+              "source": "scenario ledger (cast)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "example",
+            "carries_over": "The single registration.",
+            "introduces": "What that produced on three invoices, and the controller's two questions.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "what-tax-asks",
+      "heading": "What Indirect Tax Asks of a Seller",
+      "controlling_idea": "Indirect tax is owed by the seller, computed from three facts and one piece of state, and wrapped in three other duties (knowing where it is due, registering, filing and remitting) that no calculation performs.",
+      "function": "definition",
+      "advances_thesis": {
+        "supports": [
+          "S1",
+          "S2",
+          "S4"
+        ],
+        "how": "Supplies the vocabulary and the split between the facts a checkout holds and the state and duties it does not, which the rest of the chapter applies to Stripe, Adyen and Larkfield."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The tax itself first, then what computing it needs, then the state that decides whether it is computed at all (registration and thresholds), then the full cycle of duties, and last the case where the law changes who the seller is; each paragraph uses the term the previous one defined."
+      },
+      "transition_in": {
+        "relationship": "elaboration",
+        "carries_over": "Priya's question whether the tax is Stripe's job.",
+        "introduces": "What the tax is and what it asks of the party that sells.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p07",
+          "function": "definition",
+          "controlling_idea": "Indirect tax is a tax on a sale that the seller collects from the buyer and passes to a tax authority; it is called VAT in Europe, GST in Canada and much of Asia-Pacific and sales tax in the United States, and each jurisdiction sets its own rates.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'The buyer pays the tax and the seller forwards it to the government' (Stripe documentation, How Stripe Tax works, n.d., accessed 2026-11-17).",
+              "shows": "The seller is a collector for the state, which is why the liability sits with the seller.",
+              "source": "Stripe documentation, n.d., accessed 2026-11-17"
+            },
+            {
+              "kind": "fact",
+              "what": "'each member country is responsible for setting its own rates' (European Commission, Your Europe, VAT rules and rates, last checked 13 July 2026).",
+              "shows": "The rate is a property of a place and a product category, not of the seller.",
+              "source": "https://europa.eu/youreurope/business/taxation/vat/vat-rules-rates/index_en.htm"
+            }
+          ]
+        },
+        {
+          "id": "p08",
+          "function": "explanation",
+          "controlling_idea": "The calculation needs three facts (who sells and from where, what is sold, where the customer is or the service is performed), the customer's status (a business buying across a border usually accounts for the tax itself, which is called a reverse charge), and one piece of state (where the seller is registered); a checkout or invoice holds the facts at the moment the amount is fixed, which is why the calculation sits beside billing and not in the ledger.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Input | where a billing or checkout flow has it | what goes wrong without it. Rows: seller's location; product category (tax code); customer's location or place of performance; customer status (tax number, exemption); seller's registrations.",
+              "shows": "Four of five inputs are data the flow already holds; the fifth is state only the seller can supply."
+            },
+            {
+              "kind": "quotation",
+              "what": "'Stripe Tax uses your business address, tax registrations, product tax codes, customers' locations, and customer status to determine the correct tax rates' (How Stripe Tax works). 'Stripe calculates the tax at the published rate at the time of invoice finalization' (Collect tax on invoices). Both n.d., accessed 2026-11-17.",
+              "shows": "A provider's own list of inputs matches the three facts plus state, and the calculation is tied to the moment the invoice freezes.",
+              "source": "Stripe documentation, n.d., accessed 2026-11-17"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The seller who must collect the right amount.",
+            "introduces": "What computing that amount needs and where those inputs are.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p09",
+          "function": "definition",
+          "controlling_idea": "A tax registration is the seller's enrollment with a tax authority, and whether it is required usually depends on a threshold of sales into the territory, counted over all of the seller's sales there and not over one provider's; in the EU one registration, the One Stop Shop, can cover consumer sales into every member state.",
+          "evidence": [
+            {
+              "kind": "fact",
+              "what": "EU: 'a new EU-wide threshold of EUR 10 000', below which cross-border consumer sales of telecommunications, broadcasting and electronic services and distance sales of goods 'may remain subject to VAT in the Member State where the taxable person is established'; rules in force from 1 July 2021; the One Stop Shop lets a seller 'register in one EU Member State' for 'the declaration and payment of VAT' on such sales (European Commission, VAT e-Commerce One Stop Shop, n.d., accessed 2026-11-17).",
+              "shows": "A threshold moves the place of taxation and with it the duty to register; one registration can cover 27 countries.",
+              "source": "https://vat-one-stop-shop.ec.europa.eu/index_en"
+            },
+            {
+              "kind": "quotation",
+              "what": "South Dakota v. Wayfair, decided 21 June 2018: 'Because the physical presence rule of Quill is unsound and incorrect', Quill and National Bellas Hess 'are overruled'; the Act covered sellers that 'deliver more than $100,000 of goods or services into the State or engage in 200 or more separate transactions' (evidence age 8 years; holding stands; current state thresholds not verified).",
+              "shows": "Since 2018 sales volume alone can create a duty to register in a US state (economic nexus).",
+              "source": "https://www.law.cornell.edu/supremecourt/text/17-494"
+            }
+          ],
+          "transition_in": {
+            "relationship": "elaboration",
+            "carries_over": "The one input that is state: where the seller is registered.",
+            "introduces": "What a registration is and what triggers the duty to have one.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p10",
+          "function": "process",
+          "controlling_idea": "Tax compliance is a cycle of four steps (know where tax is due, register, calculate and collect, file and remit), and a calculation is only the third; the liability for all four stays with the seller; the indirect tax itself moves only when a provider sells in its own name as merchant of record, the supplier for indirect tax where local rules allow.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'1. Understand which locations require you to collect tax. 2. Register for tax in those locations. 3. Calculate and collect tax. 4. File and remit the tax you collected.' (How Stripe Tax works, n.d., accessed 2026-11-17).",
+              "shows": "The provider's own framing puts calculation in the middle of a cycle whose other steps are addressed to 'you'.",
+              "source": "Stripe documentation, n.d., accessed 2026-11-17"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "Registration as the step that precedes calculation.",
+            "introduces": "The whole cycle and who owes it.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p11",
+          "function": "definition",
+          "controlling_idea": "For a platform the law can change who the seller is: a deemed supplier is a platform treated for VAT as if it had bought and resold what its sellers sell, so who owes the tax has to be known per transaction; the EU rule covers certain goods since 2021 and two service sectors from 2028, and a fitness platform is in neither on the face of these texts.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Online marketplaces/platforms facilitating supplies of goods are, in certain circumstances, deemed for VAT purposes to have received and supplied the goods themselves (\"deemed supplier\")' (European Commission, VAT e-Commerce One Stop Shop, n.d., accessed 2026-11-17).",
+              "shows": "The liability can move to the platform by law.",
+              "source": "https://vat-one-stop-shop.ec.europa.eu/index_en"
+            },
+            {
+              "kind": "quotation",
+              "what": "ViDA, adopted 11 March 2025: 'From 1 July 2028: deemed supplier measure for short-term accommodation rental and passenger transport platforms (Member States can delay implementation until 1 January 2030)'; platforms 'will become responsible for collecting and remitting VAT to tax authorities when the suppliers using the platform do not' (European Commission, VAT in the Digital Age, n.d., accessed 2026-11-17).",
+              "shows": "The idea is being extended from goods to services, sector by sector, so a platform's category is a dated fact to recheck.",
+              "source": "https://taxation-customs.ec.europa.eu/taxation/vat/vat-digital-age-vida_en"
+            },
+            {
+              "kind": "reasoning",
+              "what": "The author's reading, labeled as inference: fitness classes are in neither listed category; whether a national rule applies is a question for a tax adviser.",
+              "shows": "Keeps the Larkfield conclusion (the studio is the seller) apart from legal advice."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The seller who owes all four steps.",
+            "introduces": "The case in which the law names a different seller: the platform.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "stripe-tax",
+      "heading": "How Stripe Tax Works, Step by Step",
+      "controlling_idea": "As documented in November 2026, Stripe Tax performs the calculation fully, helps with the other three steps in part, and at each step depends on state the seller supplies and on the sales Stripe sees.",
+      "function": "evidence",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S4",
+          "S1"
+        ],
+        "how": "Gives the documented behavior behind 'a calculator with partial sight': the zero, the tax number, the monitor, the filing coverage and the liable entity on a platform."
+      },
+      "flow": {
+        "pattern": "prerequisite_order",
+        "rationale": "The paragraphs start from the calculation and work outward, because each later step is described by what it reads from the calculation: where it runs, what a zero result means, how customer status changes it, then the steps around it (monitoring, registering and filing), and last the platform case, which changes whose calculation it is. Monitoring is placed after calculation, as in Stripe's own cycle diagram, because it reads the transactions the calculation produced; putting it first would describe a monitor before the reader knows what a calculated transaction or a zero result is."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The four steps and the liable seller.",
+        "introduces": "What one provider's tax product does at each step, from its own documentation.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p12",
+          "function": "process",
+          "organization": "process",
+          "controlling_idea": "Stripe Tax calculates where Stripe already fixes an amount (Checkout, a subscription's invoice at finalization, or a Tax API call from a custom flow), and when the customer's location is unusable it stops the invoice instead of guessing.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "The Tax Calculations and Tax Transactions APIs can be used 'when processing payments off-Stripe' (Stripe Tax API page, n.d., accessed 2026-11-17).",
+              "shows": "The same calculator is offered inside Stripe's flows and as an API beside any flow.",
+              "source": "Stripe documentation, n.d., accessed 2026-11-17"
+            },
+            {
+              "kind": "quotation",
+              "what": "If an invoice's automatic_tax.status is requires_location_inputs, 'Stripe can't calculate the taxes, can't finalize the invoice, and can't collect the payment' (Collect tax on subscriptions, n.d., accessed 2026-11-17).",
+              "shows": "A missing tax input becomes a billing failure: the renewal is not collected.",
+              "source": "Stripe documentation, n.d., accessed 2026-11-17"
+            },
+            {
+              "kind": "figure",
+              "what": "Placeholder 30-four-step-cycle: the four steps as a cycle, each marked with who performs it.",
+              "shows": "Shows calculation as one step of four and the seller's hand on the other three."
+            }
+          ]
+        },
+        {
+          "id": "p13",
+          "function": "evidence",
+          "controlling_idea": "A result of zero is not a statement that no tax is due: Stripe returns zero wherever the seller has recorded no registration, and the reason is carried in a separate field, one of whose values is itself ambiguous.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Stripe only calculates tax in jurisdictions where you have an active tax registration. Without a registration in the customer's location, the calculation returns zero tax' (Stripe Tax API page, n.d., accessed 2026-11-17).",
+              "shows": "The zero on the Leipzig invoice is the documented behavior for a missing registration.",
+              "source": "Stripe documentation, n.d., accessed 2026-11-17"
+            },
+            {
+              "kind": "quotation",
+              "what": "'The API returns the reason for a tax result in the taxability_reason field'; values include not_collecting, reverse_charge, customer_exempt, zero_rated, not_subject_to_tax; 'not_collecting is ambiguous: it means either no active registration in the customer's jurisdiction or a Nontaxable product tax code' (Zero tax amounts and reverse charges, n.d., accessed 2026-11-17).",
+              "shows": "The three zeros of the opening are distinguishable only by a field most exports drop, and one value still needs a second check.",
+              "source": "Stripe documentation, n.d., accessed 2026-11-17"
+            },
+            {
+              "kind": "figure",
+              "what": "Placeholder 30-three-zeros: three identical invoices with a zero tax line, each with a different reason tag behind it.",
+              "shows": "Makes the opening scenario and the reason field one picture."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The calculation that runs or stops.",
+            "introduces": "The calculation that runs and returns zero, and what the zero means.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p14",
+          "function": "evidence",
+          "controlling_idea": "Customer status rests on a tax number the seller collects: Stripe applies the reverse charge when the number has the right format, reports the government check separately and later, and leaves the decision about an unverified number to the seller.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Stripe Tax uses customer tax identification numbers to determine whether a transaction is B2B ... Stripe Tax doesn't validate whether the provided tax identification number exists or is valid' (How Stripe Tax works).",
+              "shows": "The calculation trusts the number.",
+              "source": "Stripe documentation, n.d., accessed 2026-11-17"
+            },
+            {
+              "kind": "quotation",
+              "what": "Stripe Billing validates EU VAT numbers against VIES and reports a verification status; 'you're responsible for determining how to handle an unverified tax ID'; 'Stripe Tax applies the reverse charge or zero rate according to applicable laws when the tax ID has the required number format, regardless of the government verification result' (Customer tax IDs, n.d., accessed 2026-11-17).",
+              "shows": "Verification exists but does not gate the zero: a second way a zero can be wrong, and the seller's to handle.",
+              "source": "Stripe documentation, n.d., accessed 2026-11-17"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "A zero caused by a missing registration.",
+            "introduces": "A zero caused by the customer's status, and how far that status is checked.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p15",
+          "function": "evidence",
+          "controlling_idea": "Threshold monitoring counts the sales Stripe sees: Stripe-processed sales less refunds, plus what the seller imports or records through the Tax API, with documented exceptions, and it leaves confirming the obligation to the seller.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Stripe Tax tracks your Stripe-processed sales (minus refunds) based on each customer's location and compares these sales against local tax registration thresholds'; 'it's up to you to confirm whether registration is actually required in each jurisdiction'; 'We only monitor Stripe-processed sales or imported transactions'; 'Application fees that Connect platforms charge don't count toward the platform's tax registration thresholds' (Monitor your obligations, n.d., accessed 2026-11-17).",
+              "shows": "The monitor's sight is bounded by the provider's own data and by stated assumptions, and it produces a hint, not a determination.",
+              "source": "Stripe documentation, n.d., accessed 2026-11-17"
+            },
+            {
+              "kind": "quotation",
+              "what": "Sales from other channels can be imported (Import transactions into Stripe Tax); an off-Stripe payment recorded as a tax transaction 'is included in threshold monitoring by default in live mode' (Collect tax on off-Stripe payments). Both n.d., accessed 2026-11-17.",
+              "shows": "The documented remedy for partial sight is to feed the other sales in.",
+              "source": "Stripe documentation, n.d., accessed 2026-11-17"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "The calculation and its zeros.",
+            "introduces": "The step that reads the calculated transactions to say where the seller should register next.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p16",
+          "function": "evidence",
+          "controlling_idea": "Registering and filing are mostly the seller's: the seller registers and records the registration in Stripe, and Stripe files itself only in the United States and for two kinds of registration in Ireland and Canada, with partners elsewhere and global filing in private preview.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'You must register with the tax authority in a location to collect taxes there'; 'Stripe Tax offers automated filing in the US, as well as automated filing for selected registrations in Ireland and Canada' ('non-Union OSS registrations in Ireland and simplified federal GST/HST registrations in Canada'); filing partners elsewhere; global filing in private preview (How Stripe Tax works; File and remit; n.d., accessed 2026-11-17).",
+              "shows": "Steps two and four are covered in a few places and delegated or left to the seller in the rest.",
+              "source": "Stripe documentation, n.d., accessed 2026-11-17"
+            }
+          ],
+          "transition_in": {
+            "relationship": "sequence",
+            "carries_over": "Monitoring, which says where to register.",
+            "introduces": "Who registers and who files.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p17",
+          "function": "evidence",
+          "controlling_idea": "On a platform Stripe asks first which entity is liable, and its tooling follows that answer per charge: with the connected account liable the account needs its own tax settings and registrations, and the platform's monitor includes connected accounts' sales only if the platform declares itself liable and the charge type tells Stripe who that is.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'The first step for using Stripe Tax with Connect requires you to determine which entity has the obligation to collect and report taxes'; two cases, software platforms (connected accounts liable) and marketplaces (platform liable) (Use Stripe Tax with Connect, n.d., accessed 2026-11-17).",
+              "shows": "The liable party is an input the platform must supply, not something the provider derives.",
+              "source": "Stripe documentation, n.d., accessed 2026-11-17"
+            },
+            {
+              "kind": "quotation",
+              "what": "'Separate charges and transfers without on_behalf_of aren't included. This is because Stripe can't know who the liable party for the transfer is' (Monitor your obligations). 'If a connected account doesn't add a tax registration, but calculates tax for that jurisdiction, Stripe Tax returns a tax amount of 0.00 and sets the taxability reason to not_collecting' (Tax for software platforms). Both n.d., accessed 2026-11-17.",
+              "shows": "Liability has to be carried by the funds flow itself, and the silent zero repeats once per connected account.",
+              "source": "Stripe documentation, n.d., accessed 2026-11-17"
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "One seller with its own registrations.",
+            "introduces": "A platform, where the first question is which of two parties is the seller for tax.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "where-they-differ",
+      "heading": "Stripe and Adyen: Where They Differ",
+      "controlling_idea": "The public record shows a tax product on Stripe's side and none on Adyen's, so the comparison is Stripe's product against what a merchant on Adyen must bring itself, and the Adyen column records an absence of evidence.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S5",
+          "S3"
+        ],
+        "how": "The required comparison, with the Adyen cells limited to what was found, where the search was made, and 'Not public'."
+      },
+      "transition_in": {
+        "relationship": "contrast",
+        "carries_over": "Stripe's documented tax product, step by step.",
+        "introduces": "The other anchor, where the search found no such product.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p18",
+          "function": "evidence",
+          "controlling_idea": "For Adyen the evidence stops early: searches of its documentation, help center and product pages found no product that calculates, collects or files tax on a merchant's sales, only how Adyen taxes its own fees, fields in which the merchant or platform sends a tax amount it has already computed (Level 2/3 data, the VAT split type), US 1099-K information returns for platform sellers and a contract clause that leaves tax on sales with the merchant; the missing calculator is absence of evidence and not a statement by Adyen, and Orb documents that it calculates tax through third-party providers.",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Adyen does not deduct sales tax or value-added tax (VAT) from your settlement batches'; Adyen charges sales tax on its own invoices in some US states and VAT in France since 1 May 2021 (Adyen documentation, Payment processing invoice, n.d., accessed 2026-11-17; the help-center article of the first draft now redirects to this page).",
+              "shows": "What Adyen publishes about tax concerns its own fees to the merchant.",
+              "source": "https://docs.adyen.com/reporting/invoice-reconciliation/payment-processing-invoice"
+            },
+            {
+              "kind": "quotation",
+              "what": "'Level 2/3 enhanced scheme data (ESD) helps you track the amount spent on corporate cards and the amount of sales tax'; the merchant sends levelTwoThree.totalTaxAmount in the request (Adyen documentation, Level 2/3 data, n.d., accessed 2026-11-17; ruling 30: last-modified stamps are not used as dates). Also the VAT split type on Adyen's page on splitting transactions, the 1099-K page, clause 4.5 of Adyen's terms and conditions (last updated 1 November 2023) and Orb's tax overview page, all fetched in the verification pass.",
+              "shows": "On Adyen a tax amount enters the payment as data the merchant has already computed.",
+              "source": "https://docs.adyen.com/payment-methods/cards/enhanced-scheme-data/l2-l3"
+            },
+            {
+              "kind": "fact",
+              "what": "Research brief, section 4.4: searches of docs.adyen.com, help.adyen.com, adyen.com product pages and the open web for tax calculation, sales tax, VAT engine, Avalara, Vertex found nothing; the verification pass repeated the search over docs.adyen.com/llms.txt and llms-full.txt and the help-center sitemap with the same result, and found that Orb's documentation says it connects to third-party tax providers.",
+              "shows": "Names where the search was made, which AC-3 requires, and the limit of the claim."
+            }
+          ]
+        },
+        {
+          "id": "p19",
+          "function": "comparison",
+          "controlling_idea": "Aspect by aspect, Stripe documents a tax product for each step and the Adyen column reads 'Not public', with the last column of the table as the author's inference.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Rows: calculation on a sale; what a zero result says; threshold monitoring; registration and filing; liable party on a platform; who owes the tax. Columns: Stripe, Adyen, what the difference suggests.",
+              "shows": "Every Stripe cell is a fact cited in the previous section; every Adyen cell is 'Not public' or a documented fact cited in the paragraph before the table (Level 2/3 data, 1099-K filing, the VAT split type, the terms and conditions)."
+            }
+          ],
+          "transition_in": {
+            "relationship": "conclusion_summary",
+            "carries_over": "What was and was not found on each side.",
+            "introduces": "The two set side by side.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p20",
+          "function": "recommendation",
+          "controlling_idea": "On Stripe an integrator should treat registrations and the reason for every zero as its own data to maintain and export; on Adyen it should decide before integrating which system computes tax, and send Adyen the gross amount.",
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The one-sided table.",
+            "introduces": "What to do differently on each provider.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "designs",
+      "heading": "Four Places the Calculation Can Live",
+      "controlling_idea": "A tax calculation can live in the provider's own checkout and invoices, in a provider's tax API called from every channel, in an independent tax engine, or in the seller's own rate table, and the choice turns on how many providers, jurisdictions and product categories the seller has.",
+      "function": "comparison",
+      "advances_thesis": {
+        "supports": [
+          "S5",
+          "S1"
+        ],
+        "how": "Turns the one-sided comparison into a design choice and names the two fixes for partial sight that AC-1 asks for."
+      },
+      "transition_in": {
+        "relationship": "problem_solution",
+        "carries_over": "One provider with a tax product and one without.",
+        "introduces": "The designs open to a business that uses either or both.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p21",
+          "function": "comparison",
+          "controlling_idea": "The four designs differ in what the calculator can see and who maintains the rules: built into one provider's flows it sees only that provider's sales; as that provider's API, or as an independent engine, it can see every channel the seller sends; as the seller's own table it sees everything and knows no rules but the ones the seller wrote.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Design | sees | rules maintained by | fits when | limits. Rows: provider's built-in tax (Stripe Tax automatic tax); provider's tax API for all channels (Stripe Tax API with off-Stripe payments); independent tax engine (Avalara AvaTax, Vertex O Series); the seller's own rate table.",
+              "shows": "The trade-off table: sight against dependence."
+            },
+            {
+              "kind": "quotation",
+              "what": "Avalara: 'Avalara AvaTax automates precise tax calculations, explains line-item determinations, and verifies transaction data in real time ... across your ERP, billing, purchasing and commerce systems'. Vertex: 'Continually updated tax rules and rates for 19,000 jurisdictions around the world' (vendor pages, n.d., accessed 2026-11-17; vendor claims).",
+              "shows": "Independent engines position themselves across systems, which is the property a two-provider business lacks in a provider's built-in tax.",
+              "source": "https://www.avalara.com/us/en/products/calculations.html; https://www.vertexinc.com/solutions/products/vertex-indirect-tax-o-series"
+            },
+            {
+              "kind": "figure",
+              "what": "Placeholder 30-partial-sight: a seller's sales in three streams, one provider's monitor seeing one of them, against a threshold line.",
+              "shows": "Shows why a monitor inside one provider undercounts."
+            }
+          ]
+        },
+        {
+          "id": "p22",
+          "function": "recommendation",
+          "controlling_idea": "The author's rule: use the provider's built-in tax when one provider carries all taxable sales, feed the other channels in or move to an independent engine as soon as a second channel exists, keep a rate table only where the seller sets its own rates in one country, and treat merchant of record as a different decision because it changes who the seller is.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "Partial sight is fixed in two ways only: bring the unseen sales to the calculator (import, or record them through its API) or move the calculator out of the provider. Managed Payments does not allow 'Third-party tax integrations' (Stripe documentation, n.d., accessed 2026-11-17).",
+              "shows": "Names the two fixes and marks where the choice stops being about calculation."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The table of designs.",
+            "introduces": "When each is right, in the author's judgement.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "in-practice",
+      "heading": "In Practice at Larkfield: Two Sellers, Two Calculations",
+      "controlling_idea": "Larkfield meets tax twice, as a platform whose studios are the sellers of class passes and as the seller of its own subscription, and the two cases need different calculators and the same discipline about who is liable.",
+      "function": "example",
+      "advances_thesis": {
+        "supports": [
+          "S4",
+          "S3",
+          "S2"
+        ],
+        "how": "Works the liable-party rule on Mila's pass and the registration, zero-reason and partial-sight rules on Larkfield's own invoices, with ledger numbers."
+      },
+      "transition_in": {
+        "relationship": "example",
+        "carries_over": "The four designs and the rule for choosing.",
+        "introduces": "Larkfield's two cases, each with its own choice.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p23",
+          "function": "example",
+          "organization": "illustration",
+          "controlling_idea": "On Mila's class pass the studio is the seller and owes the VAT: the €120.00 she pays already contains it, the booking app computes it from a rate the studio sets, both providers receive only the gross amount, and the studio's €117.47 payout includes tax money that is not the studio's revenue.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Mila's pass: €120.00 gross; at an assumed 9% reduced rate, €110.09 net and €9.91 VAT (the Dutch tax authority puts giving the opportunity to do sport under 9%, lessons without the accommodation under 21%, and exempts nonprofit sports organizations; which treatment fits a studio's classes stays a labeled assumption); studio receives €117.47. The refund of €84.00 on 18 March reverses €6.94 of VAT.",
+              "shows": "The liable party is a property of the transaction (the studio), the payment path carries no tax breakdown, and a refund is also a tax event.",
+              "source": "scenario ledger; arithmetic by the author"
+            },
+            {
+              "kind": "reasoning",
+              "what": "Larkfield is not a deemed supplier on the face of the EU texts (inference), is not the merchant of record (ledger), and records the studio as the liable party on every payment on both providers.",
+              "shows": "Applies the per-transaction liability rule to the book's recurring payment."
+            }
+          ]
+        },
+        {
+          "id": "p24",
+          "function": "example",
+          "controlling_idea": "On its own subscription Larkfield is the seller: recording its One Stop Shop registration turns the Leipzig zero into €16.91 of German VAT, and exporting the reason field and holding the reverse charge until a VAT number is verified separates the Cologne zero from it.",
+          "evidence": [
+            {
+              "kind": "scenario",
+              "what": "Leipzig: €89.00 × 19% = €16.91, total €105.91. Assume 180 of the 1,450 German studios have no VAT number and are on the €89 plan (assumption): 180 × €16.91 = €3,043.80 a month not collected since the feature was switched on. Whether such customers are taxed as consumers is a question of law the chapter does not settle; in the fiction Priya's adviser confirms it.",
+              "shows": "Sizes a silent zero with ledger prices and shows the fix is one piece of state the seller supplies.",
+              "source": "scenario ledger; assumptions labeled"
+            },
+            {
+              "kind": "reasoning",
+              "what": "Stripe's documented behavior: zero without a registration; reverse charge on number format regardless of verification; verification status reported by event.",
+              "shows": "Each Larkfield fix answers a behavior documented in the Stripe section."
+            }
+          ],
+          "transition_in": {
+            "relationship": "contrast",
+            "carries_over": "The sale where a studio is the seller.",
+            "introduces": "The sale where Larkfield is.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
+          "id": "p25",
+          "function": "example",
+          "controlling_idea": "Stripe's threshold monitor sees about half of Larkfield's sales: the €24.5 million of subscriptions it bills, and not the €19.8 million of payment fees or the €1.7 million of other revenue, so Priya's team counts thresholds from the ledger and imports what Stripe did not process.",
+          "evidence": [
+            {
+              "kind": "statistic",
+              "what": "2026 revenue €46.0M: subscriptions €24.5M (53%), payments revenue €19.8M (platform fees on both providers), other €1.7M (assumed invoiced outside Stripe). Stripe documents that application fees do not count toward a platform's thresholds and that it monitors only Stripe-processed or imported sales.",
+              "shows": "A two-provider business is the case in which a provider's monitor is wrong by construction; whether the fees are taxable is the adviser's question, but they are sales the monitor never sees.",
+              "source": "scenario ledger; Stripe documentation, n.d., accessed 2026-11-17"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "The registrations Larkfield now records.",
+            "introduces": "How Larkfield finds out where the next registration is due.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    },
+    {
+      "id": "when-it-goes-wrong",
+      "heading": "When It Goes Wrong",
+      "controlling_idea": "Tax in the payment path fails silently, as an amount that is plausible and wrong, and each failure is tax state that has drifted from business state.",
+      "function": "analysis",
+      "advances_thesis": {
+        "supports": [
+          "S3",
+          "S2"
+        ],
+        "how": "Lists the failures that follow from partial sight and seller-held state, with detection and recovery for each."
+      },
+      "transition_in": {
+        "relationship": "cause_effect",
+        "carries_over": "Larkfield's fixes.",
+        "introduces": "The general failure modes those fixes came from, and how to detect each.",
+        "form": "paragraph",
+        "placement": "start_of_this"
+      },
+      "paragraphs": [
+        {
+          "id": "p26",
+          "function": "analysis",
+          "controlling_idea": "Six failures recur (the silent zero, the unverified tax number, the undercounted threshold already met at Larkfield, the invoice blocked by a bad address, the refund with no tax reversal, the calculation never recorded), and each has a detection that reads the provider's own fields.",
+          "evidence": [
+            {
+              "kind": "table",
+              "what": "Failure | what happens | how you detect it | recovery. Rows: silent zero; unverified tax number; undercounted threshold; blocked invoice; refund without reversal; calculation without transaction.",
+              "shows": "Each row cites a documented Stripe behavior from this chapter and pairs it with a check the seller runs."
+            },
+            {
+              "kind": "quotation",
+              "what": "'The Tax Transactions page only includes transactions and not calculations' (Stripe documentation, Tax API with PaymentIntents, n.d., accessed 2026-11-17).",
+              "shows": "A calculated tax that was never recorded as a transaction is missing from reports and filing.",
+              "source": "Stripe documentation, n.d., accessed 2026-11-17"
+            }
+          ]
+        },
+        {
+          "id": "p27",
+          "function": "analysis",
+          "controlling_idea": "None of these failures raises an error at the moment of the charge except the blocked invoice, so the control is a periodic comparison: tax collected per jurisdiction against invoices and registrations, owned by a named person.",
+          "evidence": [
+            {
+              "kind": "reasoning",
+              "what": "The same control as the book's reconciliation chapters: a statement made true by comparing it with a record kept elsewhere; here the tax report against the invoice export and the registration list.",
+              "shows": "Ties the chapter to the book's central discipline and to the Larkfield scene, where nobody owned the feature."
+            }
+          ],
+          "transition_in": {
+            "relationship": "cause_effect",
+            "carries_over": "The six failures and their detections.",
+            "introduces": "What they have in common and the one control that covers them.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        }
+      ]
+    }
+  ],
+  "conclusion": {
+    "heading": "What to Take Away",
+    "synthesis": "The three zeros of the opening are one fact seen at three steps of the cycle: a calculation can be exact and still wrong, because whether it should have run (registration), for whom (the liable party) and on which sales (the threshold) are decided outside it. A provider's tax product moves the arithmetic next to the invoice and leaves those three decisions where they were.",
+    "so_what": "The reader treats 'tax is switched on' as the start of a responsibility: registrations become maintained state with an owner, every zero carries a reason that is stored and reviewed, thresholds are counted over all channels, and on a platform the liable party is recorded on each transaction.",
+    "callback": {
+      "to": "The three invoices that each show €0.00.",
+      "how": "The reader can now name the field that tells them apart, the state that produced the wrong one and the party who should have noticed."
+    },
+    "takeaway": {
+      "type": "course_of_action",
+      "content": "List where you are registered, compare it with where your provider thinks you are registered, and export one month of zero-tax invoices with their reasons; then count your sales per territory from all channels, not from one provider."
+    },
+    "hand_off": {
+      "to": "billing-revenue-recognition",
+      "relationship": "similarity",
+      "carries_over": "Tax as a calculation that reads the invoice's lines and asks where the sale took place and who owes the tax.",
+      "introduces": "A second calculation that reads the same lines and asks a different question: in which period the amount counts as revenue. As with tax, the provider can compute it only for what it sees."
+    },
+    "transition_in": {
+      "relationship": "conclusion_summary",
+      "carries_over": "The failure modes and the control.",
+      "introduces": "What holds across the chapter, sorted by how settled it is.",
+      "form": "phrase",
+      "placement": "start_of_this"
+    },
+    "paragraphs": [
+      {
+        "id": "p28",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Established: the seller owes indirect tax and the four steps; registration follows thresholds counted over all of the seller's sales; Stripe documents zero tax without a registration and monitoring of Stripe-processed sales only; no Adyen tax product for a merchant's sales was found."
+      },
+      {
+        "id": "p29",
+        "form": "list",
+        "function": "synthesis",
+        "controlling_idea": "Depends on context: where the calculation should live depends on the number of providers, jurisdictions and product categories; whether a platform owes its sellers' tax depends on its category and country and changes over time.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is settled.",
+          "introduces": "What changes with the situation.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p30",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "The author's synthesis: a calculated tax can be exact and still wrong, so store the reason with every tax amount, give the registration list an owner, and record the liable party on each platform transaction; the three zeros differ only in state the seller holds.",
+        "transition_in": {
+          "relationship": "contrast",
+          "carries_over": "What is established and what depends.",
+          "introduces": "The author's own position, returning to the three zeros.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p31",
+        "form": "list",
+        "function": "recommendation",
+        "controlling_idea": "Eight questions let the reader test tax in a billing or checkout design of their own or in a provider evaluation.",
+        "transition_in": {
+          "relationship": "cause_effect",
+          "carries_over": "The take-aways.",
+          "introduces": "Questions that apply them.",
+          "form": "phrase",
+          "placement": "start_of_this"
+        }
+      },
+      {
+        "id": "p32",
+        "function": "transition",
+        "controlling_idea": "Tax reads the invoice's lines and asks where the sale took place and who owes the tax; revenue recognition reads the same lines and asks in which period the amount counts, and there too the provider can compute only what it sees.",
+        "transition_in": {
+          "relationship": "similarity",
+          "carries_over": "Tax as a reading of the invoice.",
+          "introduces": "The second reading, by period.",
+          "form": "sentence",
+          "placement": "start_of_this"
+        }
+      }
+    ]
+  },
+  "non_goals": [
+    {
+      "topic": "The invoice as a legal document, finalization, credit notes and e-invoicing mandates.",
+      "covered_in": [
+        "invoicing-collections-and-dunning",
+        "tax-invoicing-and-ledger"
+      ]
+    },
+    {
+      "topic": "VAT mechanics in depth (input tax, returns, place-of-supply rules beyond the introductory level) and posting tax to the ledger.",
+      "covered_in": [
+        "tax-invoicing-and-ledger",
+        "accounting-for-architects"
+      ]
+    },
+    {
+      "topic": "Merchant of record as an operating model, Stripe Managed Payments, Paddle and app stores.",
+      "covered_in": [
+        "merchant-of-record"
+      ]
+    },
+    {
+      "topic": "Connect charge types, on_behalf_of and who the settlement merchant is.",
+      "covered_in": [
+        "platform-payment-models"
+      ]
+    },
+    {
+      "topic": "Revenue recognition and amounts net of tax by period.",
+      "covered_in": [
+        "billing-revenue-recognition"
+      ]
+    },
+    {
+      "topic": "Income tax reporting on sellers' earnings (for example US 1099 forms or EU DAC7 reporting)."
+    },
+    {
+      "topic": "Current US state nexus thresholds, national VAT rules and prices of tax products, which change faster than a book."
+    },
+    {
+      "topic": "Tax advice on whether a given platform is a deemed supplier or which rate applies to a given product."
+    }
+  ],
+  "modalities": [],
+  "open_questions": [
+    "No public source describes an Adyen product that calculates, collects or files tax on a merchant's sales; this is absence of evidence from searches of docs.adyen.com, help.adyen.com and adyen.com on 17 November 2026, not confirmation from Adyen.",
+    "Resolved in the verification pass: Orb's documentation says it calculates tax through third-party tax providers (Adyen closed the Orb acquisition on 1 July 2026); whether Adyen will offer this inside its own platform is not public.",
+    "Current US state economic-nexus thresholds were not verified; only the 2018 Wayfair decision and the South Dakota figures in it are cited.",
+    "The legal basis of the EU deemed-supplier rule (Article 14a of the VAT Directive) was not fetched; the chapter cites the Commission's One Stop Shop pages.",
+    "The Dutch tax authority's page puts giving the opportunity to do sport under the 9% rate (verified 17 November 2026); whether a given studio's classes qualify, fall under 21% or are exempt was not determined, so the 9% in the worked example stays a labeled assumption.",
+    "Whether a business customer without a VAT number is taxed as a consumer is a question of law; the chapter states only Stripe's documented calculation behavior.",
+    "Stripe documentation is undated and volatile: filing coverage, the private preview of global filing and the monitoring exceptions should be rechecked before publication."
+  ],
+  "decision_log": [
+    {
+      "date": "2026-11-17",
+      "decision": "The Larkfield scene is a discovery made when the billing integration changes hands in May 2027 (Stripe Tax on since 2023 with only the Dutch registration recorded), not a 2026 incident, because the ledger has no tax incident and says the growth team owned the integration until 2027.",
+      "rejected": [
+        "Inventing a tax audit or penalty at Larkfield.",
+        "Opening with Mila's class pass, where the studio and not Larkfield owes the tax and no provider tax product is involved."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Seven short sections instead of the four to six suggested for a short chapter, because the style guide's fixed elements (scene, comparison, in practice, failure modes) each need a heading; the body has 23 paragraphs. The length target is 4,800 words, above the 2,000 to 3,000 PLAN expected for a short chapter: the Stripe side of the record turned out to be well documented (thirteen documentation pages, each with a behavior the argument needs), so the chapter is of normal length on Stripe and short only on Adyen, where the evidence is.",
+      "rejected": [
+        "Folding 'When It Goes Wrong' into the Larkfield section, which would mix an example with an analysis."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Prices of Stripe Tax and of tax engines are left out as volatile; only the documented fact that the calculation covers the seller's registered jurisdictions is used.",
+      "rejected": [
+        "A price comparison table."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "Adyen's Level 2/3 data field (a tax amount the merchant sends) is included as the one documented place where tax appears in an Adyen payment, to show what 'the merchant brings it' means in a request; it is not presented as a tax feature.",
+      "rejected": [
+        "Leaving the Adyen column as 'Not public' in every row, which would hide a documented fact."
+      ]
+    },
+    {
+      "date": "2026-11-17",
+      "decision": "The Dutch rate on the class pass is a labeled assumption (9%), because the rate applicable to a studio's classes was not verified and is the studio's own tax question.",
+      "rejected": [
+        "Stating a rate for fitness classes as fact."
+      ]
+    }
+  ],
+  "sources": [
+    {
+      "kind": "internal",
+      "ref": "_research/brief-billing-and-revenue.md",
+      "contributed": "Part 4 (tax in the payment path), section 3.6 (ViDA dates), section 6.2 (Managed Payments and third-party tax integrations), the research limitations and open questions 11 and 12."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/scenario-ledger.md",
+      "contributed": "Larkfield's revenue split, plan prices, markets, the billing integration's ownership, Mila's class pass and the refund after payout."
+    },
+    {
+      "kind": "internal",
+      "ref": "_research/consistency-issues.md",
+      "contributed": "Ruling 6 (who holds the invoice is owned by chapter 27)."
+    },
+    {
+      "kind": "external",
+      "ref": "Pages fetched by the writer on 2026-11-17: Stripe documentation (How Stripe Tax works; Stripe Tax API; Zero tax amounts and reverse charges; Monitor your obligations; File and remit; Use Stripe Tax with Connect; Tax for software platforms; Customer tax IDs; Collect tax on invoices; Collect tax on subscriptions; Collect tax on off-Stripe payments; Import transactions; EU supported-countries page); European Commission (VAT e-Commerce One Stop Shop; VAT in the Digital Age; Your Europe VAT rates); South Dakota v. Wayfair (Cornell LII); Adyen help center and Level 2/3 data page; Avalara and Vertex product pages.",
+      "contributed": "Verification of every quotation used."
+    }
+  ],
+  "changelog": [
+    {
+      "date": "2026-11-17",
+      "change": "Reconciliation pass (parts 6-8): fields copied from the journal spec and unit-level controlling ideas and evidence brought into line with the verified page and the consistency rulings; no unit added, dropped, merged or reordered."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Verification pass: 59 claims checked (48 confirmed, 9 corrected, 2 hedged, 0 unsupported and removed or relabeled, 0 unreachable); three of the six 'Not public' cells on the Adyen side were replaced with documented facts (1099-K filing for US platform sellers, the VAT split type, clause 4.5 of Adyen's terms and conditions on who owes tax on a sale), and Orb's tax handling, previously 'not verified', is now stated from Orb's documentation."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Accepted under the author's delegation of 17 November 2026: validates and passed the flow rubric (sound with notes). Notes acted on: reverse charge is defined in p08, the One Stop Shop is named in p09, merchant of record is glossed in p10, the Stripe section's order is declared as prerequisite order, and the failure table points back to the Larkfield case. Not acted on: moving the 'where we are' paragraph before the thesis, because the style guide fixes that order."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "First version, written from the PLAN contract, the journal spec entry and the billing research brief."
+    },
+    {
+      "date": "2026-11-17",
+      "change": "Absence audit: the seven Adyen tax absences were already tested widely by the verification pass (documentation index and full text, help-center sitemap, web search); re-checked against the adyen.com and documentation sitemaps: hold, no change to the page."
+    }
+  ],
+  "length": {
+    "target_words": 4800,
+    "max_words": 5000
+  }
+}
