@@ -36,6 +36,9 @@ Cash asks for no trust. The baker needs to know nothing about the customer, not 
 
 It is that simple only under three conditions. Both people stand in the same place. The buyer has the money now. And someone carries the coins and guards them, because cash can be lost, stolen or forged. **The steps that follow begin where one of these conditions did not hold**: the buyer had no money yet, or was a stranger, or was somewhere else.
 
+![A customer and a baker at one counter; a coin passes to the baker and a loaf to the customer in the same moment, labeled paid and now.](assets/images/how-payments-got-complicated/evolution-step-cash.jpeg)
+**Figure 2:** *With cash the baker has the money and the customer has the bread in the same moment and nobody has promised anything, which works only while both stand in the same place and the buyer has the money now.*
+
 **When is it really paid?** At once. **Who is on the hook until then?** Nobody, because there is no “until then”.
 
 ## The Village Shop: A Promise in a Notebook
@@ -50,6 +53,9 @@ The price is the shopkeeper's, and it has two parts. The customer may never pay.
 
 A shopkeeper who sells on promises therefore has to manage that risk, and the notebook is the tool. Who gets credit at all: the family down the road, not the traveler passing through. How much: a week of bread, not a year of it. When to stop: no more goods for a customer whose old debt is still open. And how to survive the debts that are never paid: by setting prices that leave room for them. The book calls this work **risk management**. Every later way of paying does it too, with a model in place of the shopkeeper's memory ([[payment-fraud-and-risk]]).
 
+![A shopkeeper hands bread to a customer with empty pockets and writes in a notebook; payday is circled on a wall calendar, and a traveler by the door gets no credit.](assets/images/how-payments-got-complicated/evolution-step-village-shop.jpeg)
+**Figure 3:** *The shopkeeper hands over the bread on a promise and writes it in the notebook, so the family eats before payday, the shopkeeper carries the risk, and the traveler passing through gets no credit.*
+
 **When is it really paid?** On payday, if the customer comes. **Who is on the hook until then?** The shopkeeper, whose only proof is the notebook.
 
 ## The Check: A Promise on Paper, Carried Between Banks
@@ -62,6 +68,9 @@ Both sides gain again. The buyer can trade with someone in another town without 
 
 The price is that the check put two banks between buyer and seller, and commonly days between handing over the goods and having the money. The same essay describes how, at times, “a check wound its way through a series of banks” in several cities before it was collected. At the end of the route the buyer's bank could still refuse, because the account was empty, and the check came back unpaid. **The paper was a claim on money, not money.**
 
+![A buyer in one town hands a check to a seller in another; the paper travels from the seller's bank to the buyer's bank while days pass, and one check comes back marked with a cross.](assets/images/how-payments-got-complicated/evolution-step-check.jpeg)
+**Figure 4:** *A check lets a buyer pay a seller in another town without carrying cash, but it puts two banks and days between the goods and the money, and it can still come back unpaid.*
+
 **When is it really paid?** When the buyer's bank has honored the check, days later. **Who is on the hook until then?** The seller, who has given up the goods and holds a piece of paper.
 
 ## The Card: Someone Else Guarantees the Shop Is Paid
@@ -73,6 +82,9 @@ The card puts a third party's promise between them. A company gives its customer
 Now the shop can sell to a stranger and still count on being paid, so it no longer turns away the traveler or the newcomer. The customer can buy without cash in the pocket, and pay later, in one bill.
 
 The guarantee has a price. The shop receives a little less than the price on the tag, and the difference is its fee for the card company's promise ([[payment-economics]]). The card company now carries the customers who do not pay their bill. And the promise holds only if the shop follows the company's rules, and only in shops that have signed up with that one company.
+
+![A customer the shop does not know shows a card at the counter; behind the customer the card company sends coins to the shop, keeps one as a fee and holds a bill for the customer.](assets/images/how-payments-got-complicated/evolution-step-card.jpeg)
+**Figure 5:** *With a card the shop can sell to a stranger because the card company pays the shop and collects from the customer afterwards, and the shop receives a little less than the price as its fee for that promise.*
 
 **When is it really paid?** For the shop, when the card company pays it, which no longer depends on the customer if the shop kept to the rules. **Who is on the hook until then?** The card company carries the customer until the bill is paid; the shop has to trust only the card company.
 
@@ -91,7 +103,7 @@ The gain is reach. The customer carries one card that works in any shop of any m
 The price is that this step separates the answer from the money. They now travel days apart, between parties that cannot see each other. A shop can take the approval for the money. An answer can be lost on the way, and then the shop does not know whether the issuer said yes. And the banks settle in daily totals, in which a single payment cannot be seen.
 
 ![A shop, an acquirer, a network and an issuer in a row; a fast upper path carries the question and the approval in seconds, a slow lower path carries the money in days, and the clerk holds an approval but no money yet.](assets/images/how-payments-got-complicated/evolution-answer-before-money.jpeg)
-**Figure 2:** *The card network separated the answer from the money: the approval arrives in seconds as a message, and the money follows a day or more later by clearing and settlement.*
+**Figure 6:** *The card network separated the answer from the money: the approval arrives in seconds as a message, and the money follows a day or more later by clearing and settlement.*
 
 **When is it really paid?** Promised in seconds, moved between the banks a day or more later, and paid to the shop after that. **Who is on the hook until then?** The issuer owes the acquirer and the acquirer owes the shop, which holds a promise in the meantime.
 
@@ -109,6 +121,9 @@ An online shop is software, and connecting it to an acquirer is specialized work
 
 Distance made new failures possible too. A thief can try a list of stolen numbers against any shop's checkout page. Money can be taken back weeks after the goods were shipped. Card numbers end up in logs never meant to hold them. Every payment now depends on the provider being reachable. And software does not behave like a clerk: **a program that gets no answer sends the request again**. The first request may have been approved all the same, and then the customer has paid twice. With a coin on a counter that cannot happen.
 
+![A customer at home with a laptop sends only a row of dots, standing for the card number, through a provider to an online shop, and a parcel comes back; a gloved hand holds a copy of the same number.](assets/images/how-payments-got-complicated/evolution-step-distance.jpeg)
+**Figure 7:** *At a distance only the card's number travels, through a payment provider, so a shop can sell to a customer at home, but a number can be copied and the shop cannot check who is paying.*
+
 **When is it really paid?** As in the network step, and then only provisionally: for about 120 days the cardholder's bank can take it back. **Who is on the hook until then?** Mostly the shop, which commonly carries a payment the cardholder denies having made.
 
 ## The Stored Card: Charging When the Customer Is Not There
@@ -120,6 +135,9 @@ So the card is kept on file. A stored card number is exactly what a thief looks 
 The customer no longer retypes anything or has to remember to pay, and the next purchase is a single tap. The seller gets income that returns every month without asking, which makes the subscription possible as a way of selling.
 
 The cost is the customer's absence. Cards expire and accounts run empty, and when a renewal is refused nobody is at the checkout to try another card, so the shop has to retry and send reminders ([[invoicing-collections-and-dunning]]). The stored cards exist only as one provider's tokens, which mean nothing to another provider. And a shop that renews every customer on the first of the month sends a month of payments within an hour.
+
+![An empty armchair where the customer would be; the provider keeps the card in a locked box, and the shop's software, holding a token, presses a charge button on the first of each month.](assets/images/how-payments-got-complicated/evolution-step-stored-card.jpeg)
+**Figure 8:** *The provider keeps the card number and gives the shop a token, which the shop's software charges every month with no customer present, so when a renewal is refused nobody is at the checkout to try another card.*
 
 **When is it really paid?** As before, but a program now asks for the promise, on a date. **Who is on the hook until then?** When the answer is no, the shop: it goes on serving a customer who has not paid, and it has to collect.
 
@@ -135,6 +153,9 @@ The gain is for the smallest sellers. A yoga teacher can take card payments afte
 
 Standing in the middle also brings duties. Someone must know who each seller is, and must keep checking, because the requirements change ([[platform-onboarding-and-verification]]). Holding other people's money is a regulated activity: under the European directive of 2015, a licensed payment company has to keep such funds apart and protected, or insure them ([[licences-and-safeguarding]]). And the payout is one more transfer that can fail. So a seller can be paid late, frozen or not paid at all while every card payment succeeded.
 
+![Customers pay into one platform building that holds a jar of coins for each of two small sellers; coins from the yoga teacher's jar travel on a later day to a bank beside her, while a studio owner waits.](assets/images/how-payments-got-complicated/evolution-step-platform.jpeg)
+**Figure 9:** *A platform takes card payments for many small sellers, keeps a balance for each, takes a fee and pays out the rest on a schedule, so the smallest seller can take cards but is paid only when the payout arrives.*
+
 **When is it really paid?** For the payer, at the approval. For the seller, only when the payout reaches the bank account. **Who is on the hook until then?** Whoever holds the balance owes it to the seller.
 
 ## Today: Every Step at Once, and One More Record
@@ -148,6 +169,9 @@ What the present adds is the software that started the payment, here Larkfield's
 Together the steps make this possible: almost anyone can buy from almost anyone, anywhere, at any hour. A studio with three instructors sells a pass to a member it may never have met, at 19:42 on a Tuesday, with nobody at the desk, and has the money two days later.
 
 The price is that the software's record is one more copy, and it can disagree with all the others, which is the shopkeeper's notebook problem again: it has to be reconciled. A notification can arrive late, twice or not at all. The provider's interface changes from one version to the next. A bank debit does not follow a card's steps. A design copied from a far larger company brings its machinery without its reasons. And a record marked “paid” at the approval is a copy of a promise.
+
+![A customer taps Pay on a phone; behind the tap, in a row, stand a notebook, a check, a card company, two banks and a hub, a provider, a token and a platform's jar, and at the end the business's own screen shows a record marked paid with a question mark.](assets/images/how-payments-got-complicated/evolution-step-today.jpeg)
+**Figure 10:** *One tap in an app rests on every earlier way of paying, and the business's own software adds one more record, which can be marked “paid” when all it holds is a copy of a promise.*
 
 **When is it really paid?** In installments: promised in seconds, moved between banks in a day or two, paid out after that, and final only when the dispute window has closed. **Who is on the hook until then?** A different party at each stage: the issuer, the acquirer, the provider or platform, and for months the seller.
 
