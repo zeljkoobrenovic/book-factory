@@ -7,7 +7,7 @@
   "part": "part-3",
   "title": "Pending, Available, Reserved: Balances and Funds Flows",
   "status": "accepted",
-  "revised": "2026-11-17",
+  "revised": "2026-11-24",
   "intent": {
     "outcome": {
       "know": [
@@ -513,7 +513,7 @@
           "evidence": [
             {
               "kind": "fact",
-              "what": "Fields: amount, fee, fee_details, net ('amount - fee'), status ('either available or pending'), available_on ('The date that the transaction's net funds become available in the Stripe balance'), type, reporting_category, source, balance_type, exchange_rate.",
+              "what": "Fields: created (when the entry was booked), amount, fee, fee_details, net ('amount - fee'), status ('either available or pending'), available_on ('The date that the transaction's net funds become available in the Stripe balance'), type, reporting_category, source, balance_type, exchange_rate.",
               "shows": "The availability date is a property of each entry, which is the design the chapter recommends copying.",
               "source": "Stripe API reference, 'The Balance Transaction object', https://docs.stripe.com/api/balance_transactions/object (n.d., accessed November 2026)"
             },
@@ -662,7 +662,7 @@
         },
         {
           "id": "p19",
-          "controlling_idea": "Adyen pays net, and what it deducts is booked when it occurs, so a batch contains refunds and chargebacks that belong to other days' sales, and fees are corrected again after a monthly invoice.",
+          "controlling_idea": "Adyen pays net, and what it deducts is booked when it occurs, so a batch contains refunds and chargebacks that belong to other days' sales.",
           "function": "evidence",
           "evidence": [
             {
@@ -670,12 +670,6 @@
               "what": "'Refunds, chargebacks, and other adjustments are added to the payable batch as they occur and are not related to the sales day of the original transaction.'",
               "shows": "A day's payout cannot be recomputed from that day's sales.",
               "source": "Adyen docs, 'Sales day payout', https://docs.adyen.com/account/sales-day-payout (n.d., accessed November 2026)"
-            },
-            {
-              "kind": "quotation",
-              "what": "'Each month, Adyen gives you a Payment processing invoice'; 'There can be a difference between the costs in the invoice and the deductions from your settlement batches during the month. Adyen will credit or debit the difference to the next settlement batch'.",
-              "shows": "Fees reach the merchant twice: netted in the batch and trued up after the invoice.",
-              "source": "Adyen docs, 'Payment processing invoice', https://docs.adyen.com/reporting/invoice-reconciliation/payment-processing-invoice (n.d., accessed November 2026)"
             }
           ],
           "transition_in": {
@@ -687,13 +681,33 @@
           }
         },
         {
+          "id": "p19a",
+          "controlling_idea": "Fees reach an Adyen merchant twice: netted in the batch, then trued up in a later batch after the monthly invoice.",
+          "function": "evidence",
+          "evidence": [
+            {
+              "kind": "quotation",
+              "what": "'Each month, Adyen gives you a Payment processing invoice'; 'There can be a difference between the costs in the invoice and the deductions from your settlement batches during the month. Adyen will credit or debit the difference to the next settlement batch'.",
+              "shows": "Fees reach the merchant twice: netted in the batch and trued up after the invoice.",
+              "source": "Adyen docs, 'Payment processing invoice', https://docs.adyen.com/reporting/invoice-reconciliation/payment-processing-invoice (n.d., accessed November 2026)"
+            }
+          ],
+          "transition_in": {
+            "relationship": "additional_support",
+            "carries_over": "A batch that mixes one day's sales with entries belonging to other days.",
+            "introduces": "The fee correction as one more such entry.",
+            "form": "sentence",
+            "placement": "start_of_this"
+          }
+        },
+        {
           "id": "p20",
           "controlling_idea": "Adyen's 'available funds' is a sum that includes 'pending' and 'next payout', so 'available' at Adyen does not mean what it means at Stripe.",
           "function": "description",
           "evidence": [
             {
               "kind": "quotation",
-              "what": "'Pending: the gross amount of sales and refunds that have not yet been settled by the respective card scheme or payment method'; 'Next payout: the current amount to be settled to your bank account at the next moment of payout'. The two further parts of the sum and the separate deposit are holds and buffers, explained in leaving-without-payout.",
+              "what": "'Pending: the gross amount of sales and refunds that have not yet been settled by the respective card scheme or payment method'; 'Next payout: the current amount to be settled to your bank account at the next moment of payout'. The two further parts of the sum and the separate deposit are holds and buffers, explained in leaving-without-payout. The negative refund allowance is glossed at first use with Adyen's definition: 'the additional balance to issue refunds even when your reserve is too low or insufficient'.",
               "shows": "The same words name different things than at Stripe, which is why mapping by name fails.",
               "source": "Adyen docs, 'Balances', https://docs.adyen.com/account/balances (n.d., accessed November 2026)"
             }
@@ -764,7 +778,7 @@
           "evidence": [
             {
               "kind": "reasoning",
-              "what": "If the payout date is fixed (two business days) and schemes settle on their own timelines (Adyen: American Express 'has a settlement delay of 7 days'), then on some payments the provider has paid out money it has not received.",
+              "what": "If the payout date is fixed (two business days) and schemes settle on their own timelines (Adyen: American Express 'has a settlement delay of 7 days'), then on some payments the provider has paid out money it has not received. The scheme's 'settlement delay' is glossed as its own delay in paying Adyen, distinct from the platform setting of the same name.",
               "shows": "Shows the gap exists by arithmetic before any provider statement is quoted.",
               "source": "Adyen docs, 'Sales day payout', https://docs.adyen.com/account/sales-day-payout (n.d., accessed November 2026)"
             }
@@ -806,6 +820,12 @@
               "what": "'Prefinancing is capped at 30 days. If the card scheme, payment method, or acquirer does not settle the funds within 30 days, Adyen reverses the prefinanced amount from your payable batch. These reversals appear as SettledReversed and RefundNotCleared entries.' 'If Adyen receives the funds after 30 days, you see an additional Settled booking.'",
               "shows": "A paid-out amount can be debited weeks later with no action by the merchant or the customer.",
               "source": "Adyen docs, 'Upgrade to Sales day payout', https://docs.adyen.com/account/sales-day-payout/upgrade-to-sdp (n.d., accessed November 2026)"
+            },
+            {
+              "kind": "fact",
+              "what": "Settlement details report: SettledReversed is a debit that 'reverses a Settled entry', booked when Adyen does not receive the funds within 30 days after capture; RefundNotCleared is a credit that 'reverses a Refunded entry', booked 'when the acquirer does not process the refund within 30 days after it was initiated'.",
+              "shows": "Of the two reversal entries, SettledReversed is the one that takes back a pre-funded sale; RefundNotCleared gives back a refund that never cleared.",
+              "source": "Adyen docs, 'Settlement details report', https://docs.adyen.com/reporting/settlement-reconciliation/transaction-level/settlement-details-report (n.d., accessed November 2026)"
             },
             {
               "kind": "fact",
@@ -932,12 +952,12 @@
       "paragraphs": [
         {
           "id": "p28",
-          "controlling_idea": "A balance can fall with no payout for six reasons, and at each provider one itemized record says which: the balance transactions at Stripe, the journal types of the settlement details report at Adyen.",
+          "controlling_idea": "A balance can fall with no payout for six reasons, and at each provider one itemized record says which: the balance transactions at Stripe, the journal types of the settlement details report at Adyen. Fees and holds are rows of the list; a negative balance (what remains when the movements exceed the credits) and currency conversion are the section's other two subjects, taken up after the holds.",
           "function": "comparison",
           "evidence": [
             {
               "kind": "table",
-              "what": "Table: Movement | Stripe record (balance transaction type) | Adyen record (journal type). Rows: refund (refund | Refunded); chargeback (adjustment with a dispute as source | Chargeback, SecondChargeback); fee debited apart from the sale (stripe_fee | Fee, InvoiceDeduction); hold raised by the provider (reserve_hold, reserved_funds | DepositCorrection); pre-funded amount taken back (not documented for standard payouts | SettledReversed, CaptureFailed); merchant's own buffer topped up from sales (payout_minimum_balance_hold | ReserveAdjustment).",
+              "what": "Table: Movement | Stripe record (balance transaction type) | Adyen record (journal type). Rows: refund (refund | Refunded); chargeback (adjustment with a dispute as source | Chargeback, SecondChargeback); fee debited apart from the sale (stripe_fee | Fee, InvoiceDeduction); hold raised by the provider (reserve_hold, reserved_funds | DepositCorrection); pre-funded amount taken back (not documented for standard payouts | SettledReversed); merchant's own buffer topped up from sales (payout_minimum_balance_hold | ReserveAdjustment).",
               "shows": "Gives the reader the list AC-1 asks for and the record that settles which movement it was.",
               "source": "Stripe API reference, 'The Balance Transaction object', https://docs.stripe.com/api/balance_transactions/object (n.d., accessed November 2026); Stripe docs, 'Balance transaction types', https://docs.stripe.com/reports/balance-transaction-types (n.d., accessed November 2026); Adyen docs, 'Settlement details report', https://docs.adyen.com/reporting/settlement-reconciliation/transaction-level/settlement-details-report (n.d., accessed November 2026)"
             }
@@ -1729,6 +1749,10 @@
     {
       "date": "2026-11-17",
       "change": "Visual layer: 3 figures generated and inspected (article-illustrator)."
+    },
+    {
+      "date": "2026-11-24",
+      "change": "Revision after round-1 draft check: p19 split into p19 (adjustments booked as they occur) and p19a (fees reach the merchant twice); p28 table's Adyen reversal type corrected to SettledReversed only, matching the settlement details report (CaptureFailed removed; RefundNotCleared clarified in p24 as a credit reversing an uncleared refund); p28 controlling idea relates the six rows to the section heading; glosses recorded for created (p14), negative refund allowance (p20) and the scheme's settlement delay (p22)."
     }
   ],
   "length": {
