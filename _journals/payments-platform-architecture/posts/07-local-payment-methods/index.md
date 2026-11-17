@@ -240,12 +240,12 @@ These answers vary along two lines: whether the customer must act before the pay
 *Company, product and investor sources*
 
 - [Payment Methods API](https://docs.stripe.com/payments/payment-methods), Stripe, n.d., accessed 2026-11 — the PaymentMethod object, `next_action`, the webhook advice, the “succeeded” sentence, activation.
-- [Stripe Sub-Processors List](https://stripe.com/legal/service-providers), Stripe, last updated 2026-09-27 — three "Payment method integration service providers": PPRO Payment Services S.A., Payla Services GmbH, NETSTARS Co., Ltd.
+- [Stripe Service Providers, Sub-Processors & Affiliates](https://stripe.com/legal/service-providers), Stripe, last updated 2026-09-27 — three "Payment method integration service providers": PPRO Payment Services S.A., Payla Services GmbH, NETSTARS Co., Ltd.
 - [Payment method overview](https://docs.stripe.com/payments/payment-methods/overview), Stripe, n.d., accessed 2026-11 — the ten families, the one-line description of each, Wero marked “Public preview”.
 - [Dynamic payment methods](https://docs.stripe.com/payments/payment-methods/dynamic-payment-methods), Stripe, n.d., accessed 2026-11 — Stripe chooses the methods displayed; API version 2023-08-16.
 - [Introducing dynamic payment methods](https://stripe.com/blog/dynamic-payment-methods), Stripe, 2023-08-17 — the change of default (evidence age: 3 years).
 - [Automatic payment methods enabled by default](https://docs.stripe.com/changelog/2023-08-16/automatic-payment-methods), Stripe changelog, 2023-08-16 — the previous default of cards only (evidence age: 3 years).
-- [SEPA Direct Debit](https://docs.stripe.com/payments/sepa-debit), Stripe, n.d., accessed 2026-11 — access type, confirmation timing, capture, disputes, refunds, failure codes, mandate text including the PPRO mention.
+- [SEPA Direct Debit payments](https://docs.stripe.com/payments/sepa-debit), Stripe, n.d., accessed 2026-11 — access type, confirmation timing, capture, disputes, refunds, failure codes, mandate text including the PPRO mention.
 - [iDEAL | Wero](https://docs.stripe.com/payments/ideal), Stripe, n.d., accessed 2026-11 — properties, refunds, migration notice.
 - [Wero](https://docs.stripe.com/payments/wero), Stripe, n.d., accessed 2026-11 — manual capture support, no dispute support (public preview; volatile).
 - [Bancontact](https://docs.stripe.com/payments/bancontact), Stripe, n.d., accessed 2026-11 — no chargeback through the payer's bank.
@@ -271,8 +271,8 @@ These answers vary along two lines: whether the customer must act before the pay
 
 *Standards, regulation and official documentation*
 
-- [Directive (EU) 2015/2366 (PSD2)](http://publications.europa.eu/resource/celex/32015L2366), Official Journal of the European Union, 2015-12-23 — Articles 71, 76 and 77: the thirteen-month and eight-week rights (evidence age: 11 years; in force).
-- [Regulation (EU) 2024/886 on instant credit transfers in euro](http://publications.europa.eu/resource/celex/32024R0886), Official Journal of the European Union, 2024-03-19 — the ten-second obligation.
+- [Directive (EU) 2015/2366 on payment services (PSD2)](http://publications.europa.eu/resource/celex/32015L2366), Official Journal of the European Union, 2015-12-23 — Articles 71, 76 and 77: the thirteen-month and eight-week rights (evidence age: 11 years; in force).
+- [Regulation (EU) 2024/886 (instant payments)](http://publications.europa.eu/resource/celex/32024R0886), Official Journal of the European Union, 2024-03-19 — the ten-second obligation.
 - [From iDEAL to Wero](https://ideal.nl/en/naar-wero), iDEAL (Currence iDEAL B.V.), n.d., accessed 2026-11 — the end-of-2027 transition and its caveat; the banks behind Wero (volatile).
 - [About the FedNow Service](https://www.federalreserve.gov/paymentsystems/fednow_about.htm), Board of Governors of the Federal Reserve System, last updated 2023-07-20 — launch date and nature of the service (evidence age: 3 years).
 - [The Direct Debit Guarantee](https://www.directdebit.co.uk/direct-debit-guarantee/), Pay.UK, n.d., accessed 2026-11 — the refund promise for Bacs debits.

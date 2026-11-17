@@ -233,7 +233,7 @@ Ironworks is now a verified seller, and its capabilities to receive payments and
 
 *Company, product and investor sources*
 
-- [Release notes: platforms and financial products](https://docs.adyen.com/release-notes/platforms-and-financial-products.md), Adyen, entry of 2026-05-04 — the hosted onboarding link can be emailed automatically in the invite flow.
+- [Platforms and financial products (release notes)](https://docs.adyen.com/release-notes/platforms-and-financial-products.md), Adyen, entry of 2026-05-04 — the hosted onboarding link can be emailed automatically in the invite flow.
 - [A new and improved onboarding flow for Express accounts](https://stripe.com/blog/connect-express-onboarding), Stripe blog (Ryan Orbuch), 2019-06-24 — the vendor's claim of a 5.3% average increase in conversion after a redesign of Express onboarding, and one customer's 17% (evidence age: 7 years).
 
 *Standards, regulation and official documentation*
@@ -243,14 +243,14 @@ Ironworks is now a verified seller, and its capabilities to receive payments and
 - [Handle verification with the API (Accounts v2)](https://docs.stripe.com/connect/handling-api-verification.md?accounts-namespace=v2), Stripe documentation, n.d., accessed 2026-11 — definition of requirements; the monitoring duty of responsible platforms; risk-review requirements not providable by API.
 - [Handle verification with the API (Accounts v1)](https://docs.stripe.com/connect/handling-api-verification.md?accounts-namespace=v1), Stripe documentation, n.d., accessed 2026-11 — payouts typically disabled at the deadline, charges possibly later.
 - [Stripe-hosted onboarding](https://docs.stripe.com/connect/hosted-onboarding.md?accounts-namespace=v2), Stripe documentation, n.d., accessed 2026-11 — Account Links, the return and refresh URLs, sending an account back through onboarding.
-- [Connected account configuration](https://docs.stripe.com/connect/accounts-v2/connected-account-configuration.md), Stripe documentation, n.d., accessed 2026-11 — who collects requirements is derived from loss responsibility and dashboard.
+- [Configure the behavior of connected accounts](https://docs.stripe.com/connect/accounts-v2/connected-account-configuration.md), Stripe documentation, n.d., accessed 2026-11 — who collects requirements is derived from loss responsibility and dashboard.
 - [Identity verification for connected accounts](https://docs.stripe.com/connect/identity-verification.md), Stripe documentation, n.d., accessed 2026-11 — what requirements depend on; thresholds; up-front and incremental onboarding.
 - [Handle verification updates](https://docs.stripe.com/connect/handle-verification-updates.md?accounts-namespace=v1), Stripe documentation, n.d., accessed 2026-11 — requirement changes and future requirements.
 - [Get started with Connect embedded components](https://docs.stripe.com/connect/get-started-connect-embedded-components.md?platform=web), Stripe documentation, n.d., accessed 2026-11 — the AccountSession.
 - [Notification banner](https://docs.stripe.com/connect/supported-embedded-components/notification-banner.md), Stripe documentation, n.d., accessed 2026-11 — the component that lists open tasks.
 - [Custom connected account onboarding requirements](https://support.stripe.com/questions/custom-connected-account-onboarding-requirements), Stripe support, n.d., accessed 2026-11 — the typical 14 and 28 days after an updated requirement falls due.
 - [KYC Refresh: Upcoming periodic confirmation requirements](https://support.stripe.com/questions/kyc-refresh-upcoming-periodic-confirmation-requirements), Stripe support, last updated 2026-10 — periodic attestation requirements announced, first in Europe; private preview in 2026, public preview planned for Q1 2027.
-- [Risk management with Connect](https://docs.stripe.com/connect/risk-management.md), Stripe documentation, n.d., accessed 2026-11 — pausing payments or payouts depends on who is responsible for negative balances.
+- [Risk and liability management with Connect](https://docs.stripe.com/connect/risk-management.md), Stripe documentation, n.d., accessed 2026-11 — pausing payments or payouts depends on who is responsible for negative balances.
 - [View onboarding insights](https://docs.stripe.com/connect/dashboard/onboarding-insights.md), Stripe documentation, n.d., accessed 2026-11 — the platform's own onboarding funnel for hosted and embedded onboarding; API onboarding excluded.
 - [Verification process](https://docs.adyen.com/platforms/verification-overview.md), Adyen documentation, n.d., accessed 2026-11 — why Adyen verifies; the events that trigger verification; default capabilities; standard 30- and 60-day deadlines; no webhook for legal-entity data changes (volatile).
 - [Capabilities](https://docs.adyen.com/platforms/verification-overview/capabilities.md), Adyen documentation, n.d., accessed 2026-11 — the `allowed` and `enabled` settings; verification statuses; `rejected` is final.
@@ -258,7 +258,7 @@ Ironworks is now a verified seller, and its capabilities to receive payments and
 - [Data review process](https://docs.adyen.com/platforms/verification-overview/data-review-process.md), Adyen documentation, n.d., accessed 2026-11 — periodic reviews, error 3_10, the confirmation call.
 - [Onboard and verify users](https://docs.adyen.com/platforms/onboard-users.md), Adyen documentation, n.d., accessed 2026-11 — hosted onboarding (on invite, API-initiated), the link and SMS authentication, the View Verification Status component, inviting decision-makers, API-only onboarding.
 - [Onboarding components](https://docs.adyen.com/platforms/onboard-users/components.md), Adyen documentation, n.d., accessed 2026-11 — components cover only certain functionality.
-- [Determine the verification requirements](https://docs.adyen.com/platforms/verification-requirements.md), Adyen documentation, n.d., accessed 2026-11 — requirements by country and legal entity type; what is collected for an organization; the 25% ownership criterion.
+- [Verification requirements](https://docs.adyen.com/platforms/verification-requirements.md), Adyen documentation, n.d., accessed 2026-11 — requirements by country and legal entity type; what is collected for an organization; the 25% ownership criterion.
 - [Platform account structure](https://docs.adyen.com/platforms/account-structure-resources/platform-structure.md), Adyen documentation, n.d., accessed 2026-11 — legal entity, account holder, balance account and stores per user.
 - [KYC verification insights](https://docs.adyen.com/platforms/kyc-insights.md), Adyen documentation, n.d., accessed 2026-11 — the platform's own first-attempt success rate and verification time, filterable by integration type.
 

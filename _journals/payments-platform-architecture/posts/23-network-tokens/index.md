@@ -255,7 +255,7 @@ A vault and a token protect the stored credential. Neither can tell whether the 
 - [Acceptance analytics](https://docs.stripe.com/payments/analytics/acceptance), Stripe documentation, n.d., accessed 2026-11 — the "Network token usage" dimension and its description of restriction.
 - [The Charge object](https://docs.stripe.com/api/charges/object), Stripe API reference, n.d., accessed 2026-11 — the `network_token.used` field (in the HTML page, marked with a feature flag; absent from the Markdown copy).
 - [Cards](https://docs.stripe.com/payments/cards/overview), Stripe documentation, n.d., accessed 2026-11 — the automatic-update event and the fingerprint change.
-- [Authorisation Boost](https://stripe.com/ie/authorization-boost), Stripe product page (Ireland locale), n.d., accessed 2026-11 — the 3.8% claim, external tokens, per-token price.
+- [Authorisation Boost](https://stripe.com/authorization-boost), Stripe product page (Ireland locale), n.d., accessed 2026-11 — the 3.8% claim, external tokens, per-token price.
 - [Stripe documentation index](https://docs.stripe.com/llms.txt), Stripe, n.d., accessed 2026-11 — the eligibility warning in its guidance for AI agents; no page on card passkeys.
 - [Secure Remote Commerce program guide](https://docs.stripe.com/secure-remote-commerce), Stripe documentation, n.d., accessed 2026-11 — Click to Pay on Stripe: United States only, onboarding paused.
 - [India network tokenization](https://docs.stripe.com/india-network-tokenization), Stripe documentation, n.d., accessed 2026-11 — the RBI mandate as Stripe applies it.

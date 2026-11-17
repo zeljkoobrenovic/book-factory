@@ -276,7 +276,7 @@ Between allow and block a risk rule has a third course, "request 3-D Secure", an
 - [Fine-tuning LLMs for risk assessment](https://stripe.dev/blog/training-llms-for-risk-assessment), Hangzhi Guo and others, Stripe, 2026-10-09 — the list of risk decisions about businesses.
 - [Counterfactual Evaluation of Machine Learning Models](https://www.infoq.com/presentations/stripe-ml-models-fraud), Michael Manapat, Stripe, talk at QCon.ai, transcript published 2018-05-10 — letting through a random fraction of blocked payments (evidence age: 8 years).
 - [Railyard: how we rapidly train machine learning models with Kubernetes](https://stripe.com/blog/railyard-training-models), Rob Story, Stripe, 2019-05-07 — daily retraining of Radar's models (evidence age: 7 years).
-- [Reserves: Frequently asked questions](https://support.stripe.com/questions/reserves-frequently-asked-questions), Stripe support, n.d., accessed 2026-11 — reserve factors.
+- [Reserves - Frequently Asked Questions](https://support.stripe.com/questions/reserves-frequently-asked-questions), Stripe support, n.d., accessed 2026-11 — reserve factors.
 - [Prohibited and Restricted Businesses](https://stripe.com/legal/restricted-businesses), Stripe, last updated 2026-09-22 — businesses Stripe refuses.
 - [Using AI to optimize payments performance with the Payments Intelligence Suite](https://stripe.com/blog/using-ai-optimize-payments-performance-payments-intelligence-suite), Stripe, 2025-05-15 — the card-testing claim and the foundation-model announcement (vendor claim).
 - [Risk management](https://docs.adyen.com/risk-management), Adyen documentation, n.d., accessed 2026-11 — basic and premium tiers, cross-channel signal.

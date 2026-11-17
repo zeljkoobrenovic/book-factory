@@ -277,8 +277,8 @@ A returned payout leaves two records of the same money that disagree: paid at th
 - [Manage payouts](https://docs.stripe.com/global-payouts/manage-payouts), Stripe, n.d., accessed 2026-11 — OutboundPayment statuses, `posted` and `returned`, risk review, reversals, causes of returns.
 - [Send payouts](https://docs.stripe.com/global-payouts/send-money), Stripe, n.d., accessed 2026-11 — `preferred_networks`, no automatic retry, Confirmation of Payee outcomes in the Dashboard and the API.
 - [Supplemental pricing information](https://docs.stripe.com/global-payouts/supplemental-pricing-information), Stripe, n.d., accessed 2026-11 — per-rail and FX fees for Global Payouts (volatile).
-- [Compare Global Payouts and Connect](https://docs.stripe.com/connect/cross-border-payouts-to-recipients/compare-global-payouts), Stripe, n.d., accessed 2026-11 — ledgering responsibility for recipient funds.
-- [Instant Payouts](https://docs.stripe.com/payouts/instant-payouts), Stripe, n.d., accessed 2026-11 — timing, daily and per-payout limits, fee (volatile).
+- [Understand differences between Global Payouts and Connect cross-border payouts](https://docs.stripe.com/connect/cross-border-payouts-to-recipients/compare-global-payouts), Stripe, n.d., accessed 2026-11 — ledgering responsibility for recipient funds.
+- [Instant Payouts for Stripe Dashboard users](https://docs.stripe.com/payouts/instant-payouts), Stripe, n.d., accessed 2026-11 — timing, daily and per-payout limits, fee (volatile).
 - [Connect pricing](https://stripe.com/connect/pricing), Stripe, n.d., accessed 2026-11 — Instant Payouts at 1% of payout volume as shown in euros; other countries not checked (volatile).
 - [Verification of Payee support for Treasury](https://support.stripe.com/questions/verification-of-payee-support-for-treasury), Stripe Support, n.d., accessed 2026-11 — the EU check on Dashboard payouts and what the sender is asked to do on a mismatch.
 - [Payout lifecycle](https://docs.adyen.com/payouts/payout-service/payout-lifecycle), Adyen, n.d., accessed 2026-11 — accounting and tracking events, review after booking, returns as new transactions.
@@ -293,7 +293,7 @@ A returned payout leaves two records of the same money that disagree: paid at th
 
 *Standards, regulation and official documentation*
 
-- [Regulation (EU) 2024/886 on instant credit transfers in euro](http://publications.europa.eu/resource/celex/32024R0886), Official Journal, 2024-03-19 — the definition of an instant credit transfer, the 10 seconds, sending and receiving deadlines, charges, and verification of the payee (Article 5c) with its dates and liability rule; the Publications Office link serves the English text to a browser (a client that sends no language header gets an error).
+- [Regulation (EU) 2024/886 (instant payments)](http://publications.europa.eu/resource/celex/32024R0886), Official Journal, 2024-03-19 — the definition of an instant credit transfer, the 10 seconds, sending and receiving deadlines, charges, and verification of the payee (Article 5c) with its dates and liability rule; the Publications Office link serves the English text to a browser (a client that sends no language header gets an error).
 - [Confirmation of Payee](https://www.wearepay.uk/what-we-do/overlay-services/confirmation-of-payee/), Pay.UK, n.d., accessed 2026-11 — launch year, adoption, peer-to-peer design.
 
 *Research and practitioner sources*

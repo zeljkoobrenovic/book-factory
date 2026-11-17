@@ -241,22 +241,22 @@ Pacing leaves one problem open. A payment system cannot be stopped for its peaks
 
 *Company, product and investor sources*
 
-- [Businesses process more than $18.6 billion on Stripe over Black Friday and Cyber Monday](https://stripe.com/us/newsroom/news/bfcm2023), Stripe, 2023-11-28 — 2023 volume, transactions, peak transactions per minute, peak requests per second, uptime wording.
-- [Stripe Black Friday and Cyber Monday 2024 press release](https://stripe.com/us/newsroom/news/bfcm2024), Stripe, 2024-12-03 — 2024 volume, 465 million transactions, 137,000 per minute, uptime wording.
-- [Businesses on Stripe processed more than $40 billion from Black Friday through Cyber Monday](https://stripe.com/us/newsroom/news/bfcm2025), Stripe, 2025-12-02 — 2025 volume, transactions, 152,000 per minute, uptime wording.
+- [Businesses process more than $18.6 billion on Stripe over Black Friday and Cyber Monday](https://stripe.com/newsroom/news/bfcm2023), Stripe, 2023-11-28 — 2023 volume, transactions, peak transactions per minute, peak requests per second, uptime wording.
+- [Stripe's Black Friday and Cyber Monday 2024 release](https://stripe.com/newsroom/news/bfcm2024), Stripe, 2024-12-03 — 2024 volume, 465 million transactions, 137,000 per minute, uptime wording.
+- [Businesses on Stripe processed more than $40 billion from Black Friday through Cyber Monday](https://stripe.com/newsroom/news/bfcm2025), Stripe, 2025-12-02 — 2025 volume, transactions, 152,000 per minute, uptime wording.
 - [Turn our Black Friday/Cyber Monday insights into your 2025 retail opportunities](https://www.adyen.com/knowledge-hub/black-friday-cyber-monday-payment-insights), Adyen, 2024-12-09 — $34 billion, 670 million transactions, nearly 100 million in person; methodology note.
 - [Black Friday/Cyber Monday weekend 2025: Three learnings](https://www.adyen.com/knowledge-hub/bfcm), Adyen, 2025-12-09 — $43 billion, up to 199,000 transactions per minute, over 127 million in-person transactions.
 - [Adyen publishes H2 2025 financial results](https://www.adyen.com/press-and-media/adyen-publishes-h2-2025-financial-results-3pgu2), Adyen, 2026-02-12 — 837 million transactions and 99.9999% uptime over the 2025 weekend.
 - [Adyen publishes H1 2026 financial results](https://www.adyen.com/press-and-media/adyen-publishes-h1-2026-financial-results-3wjne), Adyen, 2026-08-13 — investment pulled forward to secure compute and storage.
-- [Amazon-Stripe partnership accelerates ecommerce and streamlines online payments](https://stripe.com/us/newsroom/news/amazon-and-stripe), Stripe, 2023-01-23 — Amazon Web Services as Stripe's cloud infrastructure provider (evidence age: 3 years).
+- [Amazon-Stripe partnership accelerates ecommerce and streamlines online payments](https://stripe.com/newsroom/news/amazon-and-stripe), Stripe, 2023-01-23 — Amazon Web Services as Stripe's cloud infrastructure provider (evidence age: 3 years).
 - [How Stripe's document databases supported 99.999% uptime with zero-downtime data migrations](https://stripe.dev/blog/how-stripes-document-databases-supported-99.999-uptime-with-zero-downtime-data-migrations), Jimmy Morzaria and Suraj Narkhede, Stripe, 2024-06-06 — shards split in surges and merged when quiet; shard autoscaling in progress; Amazon S3 as storage.
-- [Building a culture of system reliability](https://stripe.com/us/sessions/2024/building-a-culture-of-system-reliability), Rahul Patil with Farhan Thawar, Stripe Sessions, 2024-04-25 — synthetic load at 20x the worst case, repeated in production; "no code freeze" on the conference day.
+- [Building a culture of system reliability](https://stripe.com/sessions/2024/building-a-culture-of-system-reliability), Rahul Patil with Farhan Thawar, Stripe Sessions, 2024-04-25 — synthetic load at 20x the worst case, repeated in production; "no code freeze" on the conference day.
 - [Building a data plane from scratch: Stripe's own high-performance distributed proxy](https://stripe.dev/blog/building-a-data-plane-from-scratch-stripes-own-high-performance-distributed-proxy), Jack Loughran and Cara Mecozzi, Stripe, 2026-08-26 — 15–20% more headroom before bursts.
 - [Scaling your API with rate limiters](https://stripe.com/blog/rate-limiters), Paul Tarjan, Stripe, 2017-03-30 — a bucket per user; burst allowance for flash sales (evidence age: 9 years).
 - [Design to Duty: How we make architecture decisions at Adyen](https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture), Adyen, 2021-07-28 (the page says "Updated June 2022") — own infrastructure in data centers; move toward an internal cloud (evidence age: 5 years).
 - [Design to Duty: The Accounting and Reporting Systems at Adyen](https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2), Willem Pino, Adyen, 2021-08-23 — the 20x rule of thumb (evidence age: 5 years).
 - [The Adyen way of engineering: we design for 20x](https://www.adyen.com/knowledge-hub/the-adyen-way-of-engineering--we-design-for-20x), Miguel Gonzalez, Adyen, 2020-10-22 — asynchronous processing as control over when requests run, on Adyen for Platforms (evidence age: 6 years).
-- [A Deep Dive into Table partitioning, Part 5: Partitioning an environment not individual tables](https://www.adyen.com/knowledge-hub/partitioning-an-environment-not-individual-tables), Derk van Veen, Adyen, 2025-09-16 — the near miss before a December season.
+- [A Deep Dive into Table Partitioning, Part 5: Partitioning an environment, not individual tables](https://www.adyen.com/knowledge-hub/partitioning-an-environment-not-individual-tables), Derk van Veen, Adyen, 2025-09-16 — the near miss before a December season.
 
 *Standards, regulation and official documentation*
 
@@ -264,8 +264,8 @@ Pacing leaves one problem open. A payment system cannot be stopped for its peaks
 - [Advanced error handling](https://docs.stripe.com/error-low-level.md), Stripe documentation, n.d., accessed 2026-11 — a rate-limited request does not begin execution.
 - [Decline codes](https://docs.stripe.com/declines/codes.md), Stripe documentation, n.d., accessed 2026-11 — `issuer_not_available`.
 - [Refusal reasons](https://docs.adyen.com/development-resources/refusal-reasons.md), Adyen documentation, n.d., accessed 2026-11 — refusal reason 9, Issuer Unavailable.
-- [Response handling](https://docs.adyen.com/development-resources/response-handling.md), Adyen documentation, n.d., accessed 2026-11 — HTTP 429 and backoff with jitter.
-- [Documentation index](https://docs.adyen.com/llms.txt), Adyen documentation, n.d., accessed 2026-11 — no page on API rate limits for payments; none either in the documentation sitemap, the help center or a web search of Adyen's domains (17 November 2026). The error-code page lists "705 - Rate limited" without a figure.
+- [HTTP status codes](https://docs.adyen.com/development-resources/response-handling.md), Adyen documentation, n.d., accessed 2026-11 — HTTP 429 and backoff with jitter.
+- [Adyen documentation index](https://docs.adyen.com/llms.txt), Adyen documentation, n.d., accessed 2026-11 — no page on API rate limits for payments; none either in the documentation sitemap, the help center or a web search of Adyen's domains (17 November 2026). The error-code page lists "705 - Rate limited" without a figure.
 - [Troubleshoot webhooks](https://docs.adyen.com/development-resources/webhooks/troubleshoot.md), Adyen documentation, n.d., accessed 2026-11 — queued webhooks sent in a short timeframe after an endpoint recovers.
 - [Peak season readiness](https://docs.adyen.com/industries/peak-season.md), Adyen documentation, n.d., accessed 2026-11 — utilization under 30%; load tests with merchants; code freeze on peak days; no capacity figure; plan and test in advance.
 - [Batch processing](https://docs.adyen.com/development-resources/batch-processing.md), Adyen documentation, n.d., accessed 2026-11 — bulk payment and modification requests by uploaded file.

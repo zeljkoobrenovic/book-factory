@@ -236,13 +236,13 @@ This part showed what an API can hide when its contracts and their edges are des
 - [Account structure](https://docs.adyen.com/account/account-structure.md), Adyen documentation, n.d., accessed 2026-11 — company and merchant accounts.
 - [Client-side authentication](https://docs.adyen.com/development-resources/client-side-authentication.md), Adyen documentation, n.d., accessed 2026-11 — the client key makes no API requests.
 - [Live endpoints](https://docs.adyen.com/development-resources/live-endpoints.md), Adyen documentation, n.d., accessed 2026-11 — live account and hostname per company account.
-- [Set up and manage webhooks](https://docs.adyen.com/development-resources/webhooks/configure-and-manage.md), Adyen documentation, n.d., accessed 2026-11 — no copy of webhook configuration from test to live.
+- [Configure and manage webhooks](https://docs.adyen.com/development-resources/webhooks/configure-and-manage.md), Adyen documentation, n.d., accessed 2026-11 — no copy of webhook configuration from test to live.
 - [Troubleshoot webhooks](https://docs.adyen.com/development-resources/webhooks/troubleshoot.md), Adyen documentation, n.d., accessed 2026-11 — retries for up to 30 days.
 - [HTTP status codes](https://docs.adyen.com/development-resources/response-handling.md), Adyen documentation, n.d., accessed 2026-11 — HTTP 429 and backoff with jitter.
 - [Alternative payment methods test credentials](https://docs.adyen.com/development-resources/test-cards-and-credentials/alternative-payment-method-credentials.md), Adyen documentation, n.d., accessed 2026-11 — MobilePay cannot be tested in the test environment.
-- [Documentation index](https://docs.adyen.com/llms.txt) and [sitemap](https://docs.adyen.com/sitemap.xml), Adyen documentation, n.d., accessed 2026-11 — no rate-limit page and no command-line tool listed; the help center and Adyen's knowledge hub were searched as well.
+- [Adyen documentation index](https://docs.adyen.com/llms.txt) and [sitemap](https://docs.adyen.com/sitemap.xml), Adyen documentation, n.d., accessed 2026-11 — no rate-limit page and no command-line tool listed; the help center and Adyen's knowledge hub were searched as well.
 - [Adyen OpenAPI definitions](https://github.com/Adyen/adyen-openapi), Adyen, accessed 2026-11 — Legal Entity Management API v4 limits; Checkout API v72 declares no 429.
-- [Automating terminal management](https://docs.adyen.com/point-of-sale/automating-terminal-management.md), Adyen documentation, n.d., accessed 2026-11 — Management API limits, "indicative".
+- [Automate the management of your terminals](https://docs.adyen.com/point-of-sale/automating-terminal-management.md), Adyen documentation, n.d., accessed 2026-11 — Management API limits, "indicative".
 - [API idempotency](https://docs.adyen.com/development-resources/api-idempotency.md), Adyen documentation, n.d., accessed 2026-11 — keys valid 7 to 14 days.
 - [Upgrade your integration](https://docs.adyen.com/online-payments/upgrade-your-integration.md), Adyen documentation, n.d., accessed 2026-11 — two years to upgrade after deprecation.
 - [API logs](https://docs.adyen.com/development-resources/logs-resources/api-logs.md), Adyen documentation, n.d., accessed 2026-11 — thirty days of API logs, JSON requests only.

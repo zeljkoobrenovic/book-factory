@@ -239,7 +239,7 @@ On 1 April nobody was present at the charge except a record. It held Mila's memb
 - [Auto Rescue for card payments](https://docs.adyen.com/online-payments/auto-rescue/cards), Adyen documentation, n.d., accessed 2026-11 — enablement, the rescue window, `merchantOrderReference`, webhooks, the payment link, cancellation.
 - [Raw acquirer responses](https://docs.adyen.com/development-resources/raw-acquirer-responses), Adyen documentation, n.d., accessed 2026-11 — the network's raw response code, returned once enabled for the account.
 - [Recurring payments: A guide for enterprise businesses](https://www.adyen.com/knowledge-hub/recurring-payments), Adyen knowledge hub, 2026-06-16 — one customer's Auto Rescue recovery figure (vendor marketing article).
-- [Adyen closes Talon.One and Orb acquisitions](https://www.adyen.com/press-and-media/adyen-closes-talonone-and-orb-acquisitions-announces-leadership-updates), Adyen press release, 2026-07-01 — the closing date of the Orb acquisition.
+- [Adyen Closes Talon.One and Orb Acquisitions; Announces Leadership Updates Across Product and Finance](https://www.adyen.com/press-and-media/adyen-closes-talonone-and-orb-acquisitions-announces-leadership-updates), Adyen press release, 2026-07-01 — the closing date of the Orb acquisition.
 
 *Standards, regulation and official documentation*
 

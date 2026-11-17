@@ -73,6 +73,12 @@ Rules that give the page its character:
 - **A running tally.** After the steps, one table: `Step | What it made
   possible | What it added | New party or delay | What can now go wrong`. The last column uses the book's
   failure-pattern names where one applies, and plain words where none does.
+- **An anchor timeline, if the page has dates.** After the tally, a small
+  table `Year | What its source dates to that year | Step`, holding only the
+  dated facts the steps already gave, in order of time. It adds no date, and
+  says why the undated steps (common practice, not events) are absent. It
+  shows the reader how old or how recent each step is; it does not replace
+  the walk, which stays in the order of the ideas.
 - **End on today.** The last step is the present state of the field as the
   book describes it (not a forecast), and the closing paragraph says how many
   parties, records and promises now stand behind the simple act the page
@@ -165,7 +171,8 @@ belong to the skills it calls.
 
 ## Anti-patterns
 
-- A timeline of events and founders. (History, not explanation.)
+- A page that is a timeline of events and founders. (History, not
+  explanation. A short anchor timeline after the tally is fine.)
 - A step that adds a date but no concept.
 - Terms first, meaning later; or three new terms in one paragraph.
 - "Then technology made everything faster" steps that name no new party,

@@ -278,7 +278,7 @@ So what was retried on 4 April? Nothing was. April's debt stayed open after a so
 - [Automate customer emails](https://docs.stripe.com/billing/revenue-recovery/customer-emails), Stripe documentation, n.d., accessed 2026-11 — failed-payment and expiring-card emails with a link to update the payment method.
 - [Card declines](https://docs.stripe.com/declines/card), Stripe documentation, n.d., accessed 2026-11 — the recommendation of at most eight retries.
 - [How cards work](https://docs.stripe.com/payments/cards/overview), Stripe documentation, n.d., accessed 2026-11 — automatic card updates and their coverage.
-- [SEPA Direct Debit](https://docs.stripe.com/payments/sepa-debit), Stripe documentation, n.d., accessed 2026-11 — failure reasons and timing of a failed debit.
+- [SEPA Direct Debit payments](https://docs.stripe.com/payments/sepa-debit), Stripe documentation, n.d., accessed 2026-11 — failure reasons and timing of a failed debit.
 - [Bank transfers](https://docs.stripe.com/payments/bank-transfers), Stripe documentation, n.d., accessed 2026-11 — the customer balance and the 75-day return of unreconciled funds.
 - [Bank transfer payments on invoices](https://docs.stripe.com/invoicing/bank-transfer), Stripe documentation, n.d., accessed 2026-11 — virtual bank account numbers and partial payments.
 - [Reconciliation](https://docs.stripe.com/payments/customer-balance/reconciliation), Stripe documentation, n.d., accessed 2026-11 — the order in which arrived funds are applied to invoices.
@@ -295,7 +295,7 @@ So what was retried on 4 April? Nothing was. April's debt stayed open after a so
 - [Rescuing failed subscription payments using contextual multi-armed bandits](https://www.adyen.com/knowledge-hub/rescuing-failed-subscription-payments-using-contextual-multi-armed-bandits), Ralph Myers and Richard Price, Adyen, 2020-12-03 — the Auto Rescue model (contextual bandit on a random forest) and one experiment against a four-day fixed schedule (vendor post; evidence age 6 years).
 - [Recurring payments: A guide for enterprise businesses](https://www.adyen.com/knowledge-hub/recurring-payments), Adyen knowledge hub, 2026-06-16 — one customer's Auto Rescue result (vendor marketing article).
 - [Rescuing failed payments to make subscriptions unstoppable](https://www.adyen.com/en_GB/knowledge-hub/rescue-failed-subscription-payments), Gill Wells, Adyen knowledge hub, 2020-12-04 — the customer quotation behind that result (evidence age: 6 years).
-- [Adyen Closes Talon.One and Orb Acquisitions](https://www.adyen.com/press-and-media/adyen-closes-talonone-and-orb-acquisitions-announces-leadership-updates), Adyen press release, 2026-07-01 — the closing date of the Orb acquisition.
+- [Adyen Closes Talon.One and Orb Acquisitions; Announces Leadership Updates Across Product and Finance](https://www.adyen.com/press-and-media/adyen-closes-talonone-and-orb-acquisitions-announces-leadership-updates), Adyen press release, 2026-07-01 — the closing date of the Orb acquisition.
 - [Essential dunning](https://docs.withorb.com/financial-operations/essential-dunning), Orb documentation, n.d., accessed 2026-11 — a fixed retry schedule in a billing system above the payment provider.
 - [Adyen](https://docs.withorb.com/integrations-and-exports/adyen), Orb documentation, n.d., accessed 2026-11 — Adyen as one of the payment gateways Orb collects through.
 - [Involuntary churn](https://docs.recurly.com/recurly-subscriptions/docs/involuntary-churn), Recurly documentation, updated 2026-07 — a vendor's definition of involuntary churn.

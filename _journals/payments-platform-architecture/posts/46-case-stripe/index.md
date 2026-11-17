@@ -281,9 +281,9 @@ Stripe built the interface first and the regulated layer afterward, as a non-ban
 *Company, product and investor sources*
 
 - [Stripe annual letter 2022](https://stripe.com/annual-updates/2022), Patrick and John Collison, 2023-04-05 — "total volume" for 2022, the mission and its four ways, "grew up with companies in the technology sector" (evidence age: 3.5 years).
-- [Stripe annual letter 2023](https://stripe.com/annual-updates/2023), Patrick and John Collison, 2024-03-13 — launch in 2011, $1 trillion, "cashflow positive", deploy, test and rollout figures.
+- [Stripe's annual letter 2023](https://stripe.com/annual-updates/2023), Patrick and John Collison, 2024-03-13 — launch in 2011, $1 trillion, "cashflow positive", deploy, test and rollout figures.
 - [Stripe annual letter 2024](https://stripe.com/annual-updates/2024), Patrick and John Collison, 2025-02-27 — $1.4 trillion, "profitable in 2024", the suite's $500 million run rate, Billing customer count, Bridge announced in October 2024.
-- [Stripe annual letter 2025](https://stripe.com/annual-updates/2025), Patrick and John Collison, 2026-02-24 — $1.9 trillion, 5 million businesses, "robustly profitable", the Revenue suite run rate, Privy, Tempo.
+- [Stripe's 2025 annual letter](https://stripe.com/annual-updates/2025), Patrick and John Collison, 2026-02-24 — $1.9 trillion, 5 million businesses, "robustly profitable", the Revenue suite run rate, Privy, Tempo.
 - [Stripe's 2025 annual letter and tender offer](https://stripe.com/newsroom/news/stripe-2025-update), Stripe newsroom, 2026-02-24 — $159 billion tender offer, "partners since 2010", "the 'long tail' is much of the dog", self-description.
 - [Stripe announces tender offer (February 2025)](https://stripe.com/newsroom/news/employee-liquidity-feb-2025), Stripe newsroom, 2025-02-27 — $91.5 billion tender offer.
 - [Stripe announces tender offer (February 2024)](https://stripe.com/newsroom/news/employee-liquidity-feb-2024), Stripe newsroom, 2024-02-28 — $65 billion tender offer; "a financial infrastructure platform for businesses"; an investor's "first partnered with Stripe in 2010".
@@ -293,7 +293,7 @@ Stripe built the interface first and the regulated layer afterward, as a non-ban
 - [The new Connect](https://stripe.com/blog/the-new-connect), Stripe blog, 2015-03-23 — Connect launched in October 2012 (evidence age: 11 years).
 - [Stripe launches Billing](https://stripe.com/newsroom/news/stripe-launches-billing), Stripe newsroom, 2018-04-05 — launch date and description (evidence age: 8 years).
 - [Stripe launches Issuing](https://stripe.com/newsroom/news/stripe-launches-issuing), Stripe newsroom, 2018-07-26 — launch date (evidence age: 8 years).
-- [Stripe launches Terminal](https://stripe.com/newsroom/news/stripe-launches-terminal), Stripe newsroom, 2018-09-17 — launch date (evidence age: 8 years).
+- [Stripe announces Stripe Terminal, a programmable point of sale for in-person payments](https://stripe.com/newsroom/news/stripe-launches-terminal), Stripe newsroom, 2018-09-17 — launch date (evidence age: 8 years).
 - [Stripe Capital](https://stripe.com/newsroom/news/stripe-capital), Stripe newsroom, 2019-09-05 — launch date (evidence age: 7 years).
 - [Stripe launches Stripe Tax](https://stripe.com/newsroom/news/stripe-launches-stripe-tax), Stripe newsroom, 2021-06-10 — launch date (evidence age: 5 years).
 - [Stripe launches Identity](https://stripe.com/newsroom/news/stripe-launches-identity), Stripe newsroom, 2021-07-14 — launch date (evidence age: 5 years).
@@ -315,11 +315,11 @@ Stripe built the interface first and the regulated layer afterward, as a non-ban
 - [Acquirer Disclosure & Acquirer Terms](https://stripe.com/legal/acquirer-disclosure), Stripe, n.d., accessed 2026-11-17 — the acquirer named per country (volatile).
 - [Stripe MALPB Acquirer Terms](https://stripe.com/legal/stripe-malpb-acquirer-terms), Stripe, last updated 2026-05-28 — Stripe's Georgia bank as a network member and acquirer.
 - [Stripe Technology Europe, Limited: legal information](https://stripe.com/legal/stel), Stripe, 2019-04-05 — e-money authorization by the Central Bank of Ireland (evidence age: 7.5 years).
-- [Stripe Payments UK Ltd: legal information](https://stripe.com/gb/legal/spukl), Stripe, 2017-01-26 — e-money authorization by the FCA (evidence age: almost 10 years).
+- [Stripe Payments UK Ltd: legal information](https://stripe.com/legal/spukl), Stripe, 2017-01-26 — e-money authorization by the FCA (evidence age: almost 10 years).
 - [Stripe Payments Company Terms](https://stripe.com/legal/spc), Stripe, last updated 2025-11-18 — "state-licensed money transmitter".
 - [Issuing Bank Terms: Spend Card](https://stripe.com/legal/celtic-spend-card), Stripe, last updated 2025-08-29 — Celtic Bank as issuing bank of one US card program.
 - [Treasury](https://docs.stripe.com/treasury.md), Stripe documentation, n.d., accessed 2026-11 — "Stripe is not a bank"; Fifth Third Bank (volatile).
-- [Stripe now connects directly to six card networks](https://stripe.com/en-ca/newsroom/news/direct-platform), Stripe newsroom, 2020-04-23 — direct integrations with card networks (evidence age: 6.5 years).
+- [Major updates to Stripe's payments platform increase revenue and reliability for businesses](https://stripe.com/newsroom/news/direct-platform), Stripe newsroom, 2020-04-23 — direct integrations with card networks (evidence age: 6.5 years).
 - [Stripe's payments APIs: The first 10 years](https://stripe.dev/blog/payment-api-design), Michelle Bu, Stripe, 2020-12-15 — the API's history and the cost of the redesign (evidence age: almost 6 years).
 - [Designing robust and predictable APIs with idempotency](https://stripe.com/blog/idempotency), Brandur Leach, Stripe, 2017-02-22 — idempotency keys (evidence age: 9 years).
 - [APIs as infrastructure: future-proofing Stripe with versioning](https://stripe.com/blog/api-versioning), Brandur Leach, Stripe, 2017-08-05 — dated versions and pinning (evidence age: 9 years).
@@ -331,19 +331,19 @@ Stripe built the interface first and the regulated layer afterward, as a non-ban
 - [Older payment APIs](https://docs.stripe.com/payments/older-apis.md), Stripe documentation, n.d., accessed 2026-11 — status of Charges, Tokens and Sources.
 - [Basic usage-based billing](https://docs.stripe.com/billing/subscriptions/usage-based.md), Stripe documentation, n.d., accessed 2026-11 — the Meters API stays supported for existing integrations.
 - [Compare basic usage-based billing and Metronome](https://docs.stripe.com/billing/subscriptions/usage-based/compare-metronome.md), Stripe documentation, n.d., accessed 2026-11 — Metronome as the recommended path; division of work.
-- [Managed Payments changelog entry](https://docs.stripe.com/changelog/dahlia/2026-04-22/managed-payments.md), Stripe documentation, 2026-04-22 — the merchant-of-record product in the API.
+- [Adds support for Managed Payments, Stripe's merchant of record solution](https://docs.stripe.com/changelog/dahlia/2026-04-22/managed-payments.md), Stripe documentation, 2026-04-22 — the merchant-of-record product in the API.
 - [Radar for multiple processors](https://docs.stripe.com/radar/multiprocessor.md), Stripe documentation, n.d., accessed 2026-11 — evaluating payments from any processor.
-- [Our biggest ever upgrades to Stripe Billing](https://stripe.com/blog/our-biggest-ever-upgrades-to-stripe-billing), Stripe, 2024-10-29 — Billing with other payment providers.
+- [Our biggest-ever upgrades to Stripe Billing](https://stripe.com/blog/our-biggest-ever-upgrades-to-stripe-billing), Stripe, 2024-10-29 — Billing with other payment providers.
 - [Stablecoins in Treasury](https://docs.stripe.com/treasury/stablecoins.md), Stripe documentation, n.d., accessed 2026-11 — public preview in the United States, private preview elsewhere (volatile).
 - [Collect card payments](https://docs.stripe.com/terminal/payments/collect-card-payment.md), Stripe documentation, n.d., accessed 2026-11 — Terminal payments use the PaymentIntent object.
 - [Ledger: Stripe's system for tracking and validating money movement](https://stripe.dev/blog/ledger-stripe-system-for-tracking-and-validating-money-movement), Ilya Ganelin, Stripe, 2024-02-16 — the Ledger, clearing accounts, scale.
-- [How we built Stripe credits](https://stripe.dev/blog/how-we-built-stripe-credits-a-programmable-auditable-way-to-pay-your-stripe-fees), Pratik Gupta and Sai Samant, Stripe, 2026-04-16 — financial accounts and the transfer lifecycle.
+- [How we built Stripe Credits: A programmable, auditable way to pay your Stripe fees](https://stripe.dev/blog/how-we-built-stripe-credits-a-programmable-auditable-way-to-pay-your-stripe-fees), Pratik Gupta and Sai Samant, Stripe, 2026-04-16 — financial accounts and the transfer lifecycle.
 - [How Stripe's document databases supported 99.999% uptime with zero-downtime data migrations](https://stripe.dev/blog/how-stripes-document-databases-supported-99.999-uptime-with-zero-downtime-data-migrations), Jimmy Morzaria and Suraj Narkhede, Stripe, 2024-06-06 — the database platform and its scale.
 - [How Stripe uses graph search and state machines to auto-remediate a global database fleet](https://stripe.dev/blog/how-stripe-uses-graph-search-and-state-machines-to-auto-remediate-a-global-database-fleet), Pragya Mehta and Sai Samant, Stripe, 2026-07-16 — 2,000 shards in 2026.
 - [How we built it: Usage-based billing](https://stripe.com/blog/how-we-built-it-usage-based-billing), Taras Mitran and Karan Dhabalia, Stripe, 2025-01-28 — usage events processed in two regions at once, with automatic failover; not about payments.
 - [How we built Stripe Credits: A programmable, auditable way to pay your Stripe fees](https://stripe.dev/blog/how-we-built-stripe-credits-a-programmable-auditable-way-to-pay-your-stripe-fees), Pratik Gupta and Sai Samant, Stripe, 2026-04-16 — the Money Movement and Storage platform, financial accounts, the three phases of a transfer through the ledger.
-- [Selective Test Execution at Stripe](https://stripe.dev/blog/selective-test-execution-at-stripe-fast-ci-for-a-50m-line-ruby-monorepo), Aditya Anchuri, Stripe, 2026-04-09 — monorepo size.
-- [Building a data plane from scratch](https://stripe.dev/blog/building-a-data-plane-from-scratch-stripes-own-high-performance-distributed-proxy), Jack Loughran and Cara Mecozzi, Stripe, 2026-08-26 — the 99.9995% target.
+- [Selective Test Execution at Stripe: Fast CI for a 50M-line Ruby monorepo](https://stripe.dev/blog/selective-test-execution-at-stripe-fast-ci-for-a-50m-line-ruby-monorepo), Aditya Anchuri, Stripe, 2026-04-09 — monorepo size.
+- [Building a data plane from scratch: Stripe's own high-performance distributed proxy](https://stripe.dev/blog/building-a-data-plane-from-scratch-stripes-own-high-performance-distributed-proxy), Jack Loughran and Cara Mecozzi, Stripe, 2026-08-26 — the 99.9995% target.
 - [Root cause analysis: significantly elevated error rates on 2019-07-10](https://stripe.com/rcas/2019-07-10), David Singleton, Stripe, 2019-07-12 — the first published root-cause analysis (evidence age: 7 years).
 - [Root cause analysis: Stripe Atlas founder data potentially accessible](https://stripe.com/rcas/2020-01-06), Stripe, 2020-01-06 — the second (evidence age: almost 7 years).
 - [Test clocks: How we made it easier to test Stripe Billing integrations](https://stripe.dev/blog/test-clocks-how-we-made-it-easier-to-test-stripe-billing-integrations), Ji Huang, Stripe, 2024-05-09 — "a scheduling service that looks for database records meeting certain criteria".

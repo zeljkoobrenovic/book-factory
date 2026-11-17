@@ -274,19 +274,19 @@ This chapter was about cards, whose networks hand back an issuer's answer within
 - [STEL Acquirer Terms](https://stripe.com/legal/stel-financial-terms), Stripe, n.d., accessed 2026-11 — Stripe Technology Europe as "a member of the Networks".
 - [Stripe MALPB Acquirer Terms](https://stripe.com/legal/stripe-malpb-acquirer-terms), Stripe, last updated 2026-05-28 — Stripe MALPB as a Georgia merchant acquirer limited purpose bank, network member and acquirer, with Stripe registered as its payment facilitator.
 - [Cross River Bank Acquirer Terms](https://stripe.com/legal/crb-acquirer-terms), Stripe, last updated 2025-11-18 — a US bank's terms and the USD 1 million threshold at which they take effect.
-- [Stripe Services Terms](https://stripe.com/legal/ssa-service-terms), Stripe, last modified 2026-09-28 — the definition of "Payment Method Acquirer".
-- [STEL Authorised Payment Services](https://stripe.com/legal/stel), Stripe, 2019-04-05 — the Irish e-money authorization including "acquire payment transactions" (evidence age: 7 years).
-- [SPUKL Authorised Payment Services](https://stripe.com/legal/spukl), Stripe, 2017-01-26 — the UK e-money authorization (evidence age: 9 years).
-- [Major updates to Stripe's payments platform increase revenue and reliability for businesses](https://stripe.com/en-ca/newsroom/news/direct-platform), Stripe newsroom, 2020-04-23 — direct integrations with six card networks (evidence age: 6.5 years).
+- [Stripe Services Agreement: Services Terms](https://stripe.com/legal/ssa-service-terms), Stripe, last modified 2026-09-28 — the definition of "Payment Method Acquirer".
+- [Stripe Technology Europe, Limited: legal information](https://stripe.com/legal/stel), Stripe, 2019-04-05 — the Irish e-money authorization including "acquire payment transactions" (evidence age: 7 years).
+- [Stripe Payments UK Ltd: legal information](https://stripe.com/legal/spukl), Stripe, 2017-01-26 — the UK e-money authorization (evidence age: 9 years).
+- [Major updates to Stripe's payments platform increase revenue and reliability for businesses](https://stripe.com/newsroom/news/direct-platform), Stripe newsroom, 2020-04-23 — direct integrations with six card networks (evidence age: 6.5 years).
 - [Authorization Boost](https://stripe.com/authorization-boost), Stripe, n.d., accessed 2026-11 — the current "direct connections to card networks" wording.
 - [Local acquiring 101](https://stripe.com/resources/more/local-acquiring-101), Stripe, last updated 2023-08-15 — the direction of the approval and cost effect, without figures (evidence age: 3 years).
 - [Twilio increases its authorization rates by 10% with Stripe](https://stripe.com/newsroom/stories/twilio), Stripe newsroom, 2020-11-17 — the 5.5% customer-story figure for direct connections and local processing (evidence age: 6 years).
-- [Licenses & Disclosures: EMEA](https://www.adyen.com/licenses/emea) and [United States](https://www.adyen.com/licenses/united-states), Adyen, n.d., accessed 2026-11 — the credit-institution license and its EEA passport, the UK permission, the US federal branch.
+- [Licenses and disclosures: EMEA](https://www.adyen.com/licenses/emea) and [United States](https://www.adyen.com/licenses/united-states), Adyen, n.d., accessed 2026-11 — the credit-institution license and its EEA passport, the UK permission, the US federal branch.
 - [Adyen granted US branch license](https://www.adyen.com/press-and-media/adyen-granted-us-branch-license), Adyen, 2021-06-14 — the Comptroller's approval; European license "obtained in 2017" (evidence age: 5 years).
 - [Adyen granted UK banking authorization](https://www.adyen.com/press-and-media/adyen-granted-uk-banking-authorization), Adyen, 2023-09-07 — the UK authorization (evidence age: 3 years).
 - [Annual Report 2025](https://investors.adyen.com/financials/2025), Adyen N.V., signed 2026-03-05 — the 84% full-stack share, banking partners as concentration risk, the stated reasons for its own licenses.
-- [H1 2026 Shareholder Letter](https://investors.adyen.com/financials/h1-2026-c2a1a) and [H1 2026 results release](https://www.adyen.com/press-and-media/adyen-publishes-h1-2026-financial-results-3wjne), Adyen, 2026-08-13 — "direct access to payment networks"; France's clearing system and CB membership.
-- [Global acquiring](https://www.adyen.com/global-acquiring), Adyen, n.d., accessed 2026-11 — the local processing statement.
+- [H1 2026 Shareholder Letter](https://investors.adyen.com/financials/h1-2026-c2a1a) and [Adyen publishes H1 2026 financial results](https://www.adyen.com/press-and-media/adyen-publishes-h1-2026-financial-results-3wjne), Adyen, 2026-08-13 — "direct access to payment networks"; France's clearing system and CB membership.
+- [Global Payment Processing: Accept, Process, And Settle](https://www.adyen.com/global-acquiring), Adyen, n.d., accessed 2026-11 — the local processing statement.
 - [What's an acquiring bank and why you need one](https://www.adyen.com/knowledge-hub/acquiring-bank), Adyen, n.d., accessed 2026-11 — acquirers licensed by regulators and card schemes.
 - [Credit card processing fees: what determines your rate and why the lowest isn't always the cheapest](https://www.adyen.com/knowledge-hub/credit-card-processing-fees), Adyen, 2026-07-03 — "principal membership of Visa and Mastercard in major markets" (vendor claim, no list).
 - [Licenses and disclosures: Japan](https://www.adyen.com/licenses/japan) and [Singapore](https://www.adyen.com/licenses/singapore), Adyen, n.d., accessed 2026-11 — Adyen Japan KK's registration as merchant acquirer; Adyen Singapore's license for merchant acquisition.
@@ -304,8 +304,8 @@ This chapter was about cards, whose networks hand back an issuer's answer within
 *Research and practitioner sources*
 
 - [Georgia approves Stripe application to form MALPB](https://www.icba.org/w/georgia-approves-stripe-application-to-form-malpb), Independent Community Bankers of America, 2025-07-08 — the charter's scope and approval (secondary source).
-- [Financial Institutions Today, May 2026](https://dbf.georgia.gov/financial-institutions-bulletin-2026), Georgia Department of Banking and Finance, 2026-05 — Stripe MALPB: approved 30 June 2025, began business 28 May 2026.
-- [Stripe seeks Georgia special banking charter](https://www.bankingdive.com/news/stripe-georgia-special-banking-charter-credit-card-payments/744921/), Banking Dive, 2025-04-07 — the Stripe spokesperson's description of the application (secondary source).
+- [Financial Institutions Bulletin, May 2026](https://dbf.georgia.gov/financial-institutions-bulletin-2026), Georgia Department of Banking and Finance, 2026-05 — Stripe MALPB: approved 30 June 2025, began business 28 May 2026.
+- [Stripe seeks special banking charter in Georgia](https://www.bankingdive.com/news/stripe-georgia-special-banking-charter-credit-card-payments/744921/), Banking Dive, 2025-04-07 — the Stripe spokesperson's description of the application (secondary source).
 - [Stripe's John Collison On Art Of Authorization](https://www.pymnts.com/digital-payments/2020/stripes-john-collison-on-improving-the-art-of-authorization-amid-a-digital-payments-boom/), PYMNTS, 2020-04-23 — the "half a percentage point" remark on direct connectivity (secondary source; evidence age: 6.5 years).
 - [[payments-fundamentals]] in RECONCILED — the finance-side treatment of the parties and of acquiring.
 

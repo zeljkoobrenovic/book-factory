@@ -189,20 +189,20 @@ This chapter documented one clear difference in hosting: Stripe rents cloud capa
 *Company, product and investor sources*
 
 - [How we built it: Usage-based billing](https://stripe.com/blog/how-we-built-it-usage-based-billing), Taras Mitran and Karan Dhabalia, Stripe, 2025-01-28 — usage events processed in two regions at once with automatic failover; not about payments.
-- [Amazon-Stripe partnership accelerates ecommerce and streamlines online payments](https://stripe.com/us/newsroom/news/amazon-and-stripe), Stripe newsroom, 2023-01-23 — Stripe's reliance on AWS; the Singleton quotation (evidence age: nearly 4 years).
+- [Amazon-Stripe partnership accelerates ecommerce and streamlines online payments](https://stripe.com/newsroom/news/amazon-and-stripe), Stripe newsroom, 2023-01-23 — Stripe's reliance on AWS; the Singleton quotation (evidence age: nearly 4 years).
 - [How Stripe architected massive scale observability solution on AWS](https://aws.amazon.com/blogs/mt/how-stripe-architected-massive-scale-observability-solution-on-aws/), AWS Cloud Operations blog, co-written with Stripe engineers, 2024-10-24 — "built on top of AWS".
 - [Security at Stripe](https://docs.stripe.com/security), Stripe documentation, n.d., accessed 2026-11 — the card data vault in an isolated AWS environment.
 - [API reference](https://docs.stripe.com/api), Stripe documentation, n.d., accessed 2026-11 — the single base URL.
 - [Important updates on Stripe data storage migration in India](https://stripe.com/india-data-storage-faq), Stripe, last updated 2023-05-16 — the move of the servers that store India data; cloning, fingerprint and feature changes (evidence age: 3.5 years).
-- [Privacy Center](https://stripe.com/us/legal/privacy-center), Stripe, n.d., accessed 2026-11 — storage of payment system data in India; international transfers of personal data; data centers in the United States and India for login and identity data.
-- [Stripe Service Providers, Sub-Processors & Affiliates](https://stripe.com/us/legal/service-providers), Stripe, last updated 2026-09-27 — certain data stored on servers in India.
-- [Data Processing Agreement FAQs](https://stripe.com/us/legal/dpa/faqs), Stripe, n.d., accessed 2026-11 — transfer mechanisms for European personal data.
+- [Privacy Center](https://stripe.com/legal/privacy-center), Stripe, n.d., accessed 2026-11 — storage of payment system data in India; international transfers of personal data; data centers in the United States and India for login and identity data.
+- [Stripe Service Providers, Sub-Processors & Affiliates](https://stripe.com/legal/service-providers), Stripe, last updated 2026-09-27 — certain data stored on servers in India.
+- [Data Processing Agreement FAQs](https://stripe.com/legal/dpa/faqs), Stripe, n.d., accessed 2026-11 — transfer mechanisms for European personal data.
 - [Design to Duty: How we make architecture decisions at Adyen](https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture), Adyen, 2021-07-28 (updated June 2022) — own infrastructure in several data centers; reasons for not using a public cloud (evidence age: 5 years).
-- [Strengthening our platform resilience](https://www.adyen.com/knowledge-hub/strengthening-our-platform-resilience), Tom Adams, Adyen, 2025-10-31 — ownership "from our data centers to our application logic".
+- [Strengthening Our Platform Resilience: An Update](https://www.adyen.com/knowledge-hub/strengthening-our-platform-resilience), Tom Adams, Adyen, 2025-10-31 — ownership "from our data centers to our application logic".
 - [Building a GlobalStream: Replication Challenges and Optimizations](https://www.adyen.com/knowledge-hub/building-a-global-stream), Gaurav Singh and Luciano Sabença, Adyen, 2025-10-06 — data close to producers for latency and regulation.
 - [We built Architect for humans. Agents made it transformative.](https://www.adyen.com/knowledge-hub/architect-blog-1), Mat Jones, Omar Hommos and Micaela Stump, Adyen, 2026-08-23 — "tens of data centres".
 - [Adyen publishes H1 2026 financial results](https://www.adyen.com/press-and-media/adyen-publishes-h1-2026-financial-results-3wjne), Adyen, 2026-08-13 — capital expenditure invested in data centers.
-- [Infrastructure](https://www.adyen.com/infrastructure), Adyen corporate website, n.d., accessed 2026-11 — where Adyen hosts its main systems; where processed payments are stored; acceptance in several hosting locations at once (the Dutch and Portuguese versions of the page list fewer places).
+- [Payments platform infrastructure](https://www.adyen.com/infrastructure), Adyen corporate website, n.d., accessed 2026-11 — where Adyen hosts its main systems; where processed payments are stored; acceptance in several hosting locations at once (the Dutch and Portuguese versions of the page list fewer places).
 - [Incident update: Mitigating a DDoS attack on April 21, 2025](https://www.adyen.com/knowledge-hub/mitigating-a-ddos-april-2025), Tom Adams, Adyen, 2025-04-21 — the attack on "our European datacenters".
 - [Peak season readiness](https://docs.adyen.com/industries/peak-season), Adyen documentation, n.d., accessed 2026-11 — the "active/active, stateless architecture"; load balancers that manage failover between data centers.
 - [Best practices for web integrations](https://docs.adyen.com/online-payments/web-best-practices), Adyen documentation, n.d., accessed 2026-11 — the five live regions for client-side resources.
@@ -216,10 +216,10 @@ This chapter documented one clear difference in hosting: Stripe rents cloud capa
 
 - [Storage of Payment System Data, RBI/2017-18/153](https://www.rbi.org.in/Scripts/NotificationUser.aspx?Id=11244&Mode=0), Reserve Bank of India, 2018-04-06 — the storage rule and its reason (evidence age: 8 years).
 - [Frequently Asked Questions: Storage of Payment System Data](https://www.rbi.org.in/Scripts/FAQView.aspx?Id=130), Reserve Bank of India, 2019-06-26 — processing abroad, the 24-hour return, the entities in scope (evidence age: 7 years).
-- [Regulation (EU) 2022/2554 on digital operational resilience for the financial sector (DORA)](http://publications.europa.eu/resource/celex/32022R2554), Official Journal of the European Union, 2022-12-27 (adopted 2022-12-14) — recital 82 on localization; application from 17 January 2025 (evidence age: nearly 4 years; in application).
+- [Regulation (EU) 2022/2554 (DORA)](http://publications.europa.eu/resource/celex/32022R2554), Official Journal of the European Union, 2022-12-27 (adopted 2022-12-14) — recital 82 on localization; application from 17 January 2025 (evidence age: nearly 4 years; in application).
 
 *Research and practitioner sources*
 
-- [Engineering Uber's Next-Gen Payments Platform](https://www.uber.com/blog/payments-platform/), Uber Engineering, 2018-12-05 — an example of a published active-active design goal (evidence age: 8 years).
+- [Engineering Uber's next-gen payments platform](https://www.uber.com/blog/payments-platform/), Uber Engineering, 2018-12-05 — an example of a published active-active design goal (evidence age: 8 years).
 
 Larkfield is fictional; architectural recommendations, labeled inferences and labeled assumptions are the author's judgement.

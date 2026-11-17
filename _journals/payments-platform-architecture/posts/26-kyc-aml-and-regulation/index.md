@@ -289,17 +289,17 @@ This part ([[part-5]]) dealt with controls on payments that somebody starts: a p
 - [Radar rules](https://docs.stripe.com/radar/rules.md), Stripe documentation, n.d., accessed 2026-11 — account-level fraud risk uses KYC information.
 - [KYC Refresh: Upcoming periodic confirmation requirements](https://support.stripe.com/questions/kyc-refresh-upcoming-periodic-confirmation-requirements), Stripe support, last updated 2026-10 — periodic attestation requirements; private preview in 2026, public preview planned for Q1 2027.
 - [Ongoing seller compliance monitoring: AML, transaction, and sanctions checks](https://stripe.com/resources/more/ongoing-seller-compliance-monitoring), Stripe, last updated 2026-08-31 — a general guide to monitoring patterns, not a description of Stripe's system.
-- [Prohibited and restricted businesses](https://stripe.com/legal/restricted-businesses), Stripe, last updated 2026-09-22 — prohibited and restricted categories and jurisdiction-specific additions (paraphrased).
+- [Prohibited and Restricted Businesses](https://stripe.com/legal/restricted-businesses), Stripe, last updated 2026-09-22 — prohibited and restricted categories and jurisdiction-specific additions (paraphrased).
 - [Financial Crimes Risk Appetite Policy Statement](https://support.stripe.com/questions/financial-crimes-risk-appetite-policy-statement), Stripe support, dated November 2023, accessed 2026-11 — ongoing sanctions screening and transaction monitoring, stated as policy.
 - [Custom connected account onboarding requirements](https://support.stripe.com/questions/custom-connected-account-onboarding-requirements), Stripe support, n.d., accessed 2026-11 — the typical 14 and 28 days after an updated requirement falls due.
 - [Compliance obligations](https://www.adyen.com/privacy-policy/compliance-obligations), Adyen privacy statement, n.d., accessed 2026-11 — monitoring of behavior and transactions, machine learning models included.
 - [Adyen glossary](https://docs.adyen.com/adyen-glossary), Adyen documentation, n.d., accessed 2026-11 — definition of party screening.
-- [Verification overview](https://docs.adyen.com/platforms/verification-overview.md), Adyen documentation, n.d., accessed 2026-11 — when Adyen verifies, standard deadlines, ongoing monitoring, the webhook gap.
+- [Verification process](https://docs.adyen.com/platforms/verification-overview.md), Adyen documentation, n.d., accessed 2026-11 — when Adyen verifies, standard deadlines, ongoing monitoring, the webhook gap.
 - [Capabilities](https://docs.adyen.com/platforms/verification-overview/capabilities.md), Adyen documentation, n.d., accessed 2026-11 — the three flags and the verification statuses.
 - [Data review process](https://docs.adyen.com/platforms/verification-overview/data-review-process.md), Adyen documentation, n.d., accessed 2026-11 — the periodic review, error 3_10.
 - [Verification types](https://docs.adyen.com/platforms/verification-overview/verification-types.md), Adyen documentation, n.d., accessed 2026-11 — staggered verification and tiers.
 - [Verification requirements](https://docs.adyen.com/platforms/verification-requirements.md), Adyen documentation, n.d., accessed 2026-11 — beneficial owners through ownership and control.
-- [Release notes: Platforms and financial products](https://docs.adyen.com/release-notes/platforms-and-financial-products.md), Adyen documentation, dated entries to 2026-11-13 — where changes to verification requirements are announced.
+- [Platforms and financial products (release notes)](https://docs.adyen.com/release-notes/platforms-and-financial-products.md), Adyen documentation, dated entries to 2026-11-13 — where changes to verification requirements are announced.
 - [Prohibited and Restricted Products and Services](https://www.adyen.com/legal/list-restricted-prohibited), Adyen, last update 2025-11-13 — the "R" and "P" list and its reasons.
 - [PSD3 and PSR Explained](https://www.adyen.com/knowledge-hub/psd3), Adyen, 2026-10-12 — a provider's expectation of the timeline.
 

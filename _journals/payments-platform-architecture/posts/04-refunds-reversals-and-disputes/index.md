@@ -306,11 +306,11 @@ The chain is now complete in both directions: an issuer that promises and can ta
 - [The Dispute object](https://docs.stripe.com/api/disputes/object), Stripe API reference, n.d., accessed 2026-11 — statuses, `evidence_details.due_by`, `charge`, `balance_transactions`.
 - [Card monitoring programs](https://docs.stripe.com/disputes/monitoring-programs), Stripe documentation, n.d., accessed 2026-11 — what the programs count; Stripe's rendering of Mastercard's thresholds.
 - [Dispute prevention](https://docs.stripe.com/disputes/prevention-preview), Stripe documentation, n.d., accessed 2026-11 — Verifi and Ethoca integration; resolved disputes not counted.
-- [Types of fraud](https://docs.stripe.com/disputes/prevention/fraud-types), Stripe documentation, n.d., accessed 2026-11 — the definition of friendly fraud.
-- [SEPA Direct Debit](https://docs.stripe.com/payments/sepa-debit), Stripe documentation, n.d., accessed 2026-11 — SEPA disputes cannot be countered.
+- [Common types of online fraud](https://docs.stripe.com/disputes/prevention/fraud-types), Stripe documentation, n.d., accessed 2026-11 — the definition of friendly fraud.
+- [SEPA Direct Debit payments](https://docs.stripe.com/payments/sepa-debit), Stripe documentation, n.d., accessed 2026-11 — SEPA disputes cannot be countered.
 - [iDEAL | Wero](https://docs.stripe.com/payments/ideal), Stripe documentation, n.d., accessed 2026-11 — no disputes through the payer's bank.
 - [Disputes on Connect platforms](https://docs.stripe.com/connect/disputes), Stripe documentation, n.d., accessed 2026-11 — which balance is debited by charge type.
-- [Pricing, Netherlands](https://stripe.com/en-nl/pricing), Stripe, n.d., accessed 2026-11 — dispute received and countered fees; resolution fees; Verifi and Ethoca named as Visa's and Mastercard's services.
+- [Pricing (Netherlands)](https://stripe.com/en-nl/pricing), Stripe, n.d., accessed 2026-11 — dispute received and countered fees; resolution fees; Verifi and Ethoca named as Visa's and Mastercard's services.
 - [Refund](https://docs.adyen.com/online-payments/refund), Adyen documentation, n.d., accessed 2026-11 — refunds only after capture, asynchronous outcome, late failure, 40 business days, failure reasons, the payment accounting report.
 - [Reversal](https://docs.adyen.com/online-payments/reversal), Adyen documentation, n.d., accessed 2026-11 — the request for a payment whose capture state is unknown; its exclusions (multiple partial captures, split data).
 - [Cancel](https://docs.adyen.com/online-payments/cancel), Adyen documentation, n.d., accessed 2026-11 — cancel only before capture; cancel by merchant reference for 24 hours.
@@ -323,9 +323,9 @@ The chain is now complete in both directions: an issuer that promises and can ta
 - [Dispute reason codes](https://docs.adyen.com/risk-management/understanding-disputes/dispute-reason-codes), Adyen documentation, n.d., accessed 2026-11 — Mastercard codes as Adyen lists them.
 - [Dispute and fraud monitoring](https://docs.adyen.com/risk-management/dispute-and-fraud-monitoring), Adyen documentation, n.d., accessed 2026-11 — Adyen's rendering of Visa and Mastercard thresholds.
 - [SEPA Direct Debit](https://docs.adyen.com/payment-methods/sepa-direct-debit), Adyen documentation, n.d., accessed 2026-11 — SEPA chargebacks cannot be defended; what a notification can mean.
-- [Chargebacks on split payments](https://docs.adyen.com/platforms/online-payments/split-transactions/split-chargebacks), Adyen documentation, n.d., accessed 2026-11 — the default debit of the liable balance account and its alternatives.
+- [Split chargebacks](https://docs.adyen.com/platforms/online-payments/split-transactions/split-chargebacks), Adyen documentation, n.d., accessed 2026-11 — the default debit of the liable balance account and its alternatives.
 - [Pricing](https://www.adyen.com/pricing), Adyen, n.d., accessed 2026-11 — a refund fee column; no chargeback fee amount on this page.
-- [Terms and Conditions](https://www.adyen.com/legal/adyen-terms-and-conditions), Adyen, last update 2023-11-01 — clause 8.2: a non-refundable chargeback fee "as set out in the Agreement".
+- [Adyen Terms and Conditions](https://www.adyen.com/legal/adyen-terms-and-conditions), Adyen, last update 2023-11-01 — clause 8.2: a non-refundable chargeback fee "as set out in the Agreement".
 - [Information summary and fee disclosure box](https://www.adyen.com/licenses/canada-information-summary-box), Adyen Canada, n.d., accessed 2026-11 — standard template terms for Canada: chargeback fee CAD 24.00 per transaction.
 
 *Standards, regulation and official documentation*

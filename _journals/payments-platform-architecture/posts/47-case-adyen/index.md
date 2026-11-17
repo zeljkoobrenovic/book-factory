@@ -262,7 +262,7 @@ Both records have now been read on their own terms: Stripe built the interface f
 *Company, product and investor sources*
 
 - [Annual Report 2025](https://investors.adyen.com/financials/2025), Adyen N.V., signed 2026-03-05 — the strategic choice, the three layers, capital expenditure, full-stack share, banking partners, finance income, take rate, pillars, top-ten merchants, the multi-provider risk statement, the definition of net revenue, "data center partners" (audited; read in the PDF this page offers for download, a "printed version" that names the electronic reporting package as the official filing).
-- [H1 2026 Shareholder Letter and interim financial statements](https://investors.adyen.com/financials/h1-2026-c2a1a), Adyen, 2026-08-13 — licenses and control over funds, total cash, take rate of 16.2 basis points, share of wallet, the margin attribution, Talon.One integration wording, notes on both acquisitions (unaudited).
+- [H1 2026 Shareholder Letter](https://investors.adyen.com/financials/h1-2026-c2a1a), Adyen, 2026-08-13 — licenses and control over funds, total cash, take rate of 16.2 basis points, share of wallet, the margin attribution, Talon.One integration wording, notes on both acquisitions (unaudited).
 - [H2 2025 Shareholder Letter](https://investors.adyen.com/financials/h2-2025-4r9rc), Adyen, 2026-02-12 — processed volume with and without the single large-volume customer.
 - [Q3 2026 Business Update](https://investors.adyen.com/financials/q3-2026-10c88s), Adyen, 2026-10-28 — transacting terminals, pillar figures, platform customers, tiered pricing, Orb customers won, full-time staff, the 2026 margin expectation and the discontinued objective (unaudited).
 - [Adyen publishes Q3 2026 business update](https://www.adyen.com/press-and-media/adyen-publishes-q3-2026-business-update-6r9vz0), Adyen, 2026-10-28 — the same figures and guidance in release form; "the successful ongoing integration of Talon.One and Orb".
@@ -273,8 +273,8 @@ Both records have now been read on their own terms: Stripe built the interface f
 - [Adyen publishes H1 2023 financial results](https://www.adyen.com/press-and-media/adyen-publishes-h1-2023-financial-results), Adyen, 2023-08-17 — margin of 43% and its attribution to team growth (evidence age: 3 years).
 - [Adyen hosts Investor Day 2025 in Amsterdam](https://www.adyen.com/press-and-media/adyen-hosts-investor-day-2025-in-amsterdam), Adyen, 2025-11-11 — the objective of an EBITDA margin above 55% by 2028.
 - [Adyen to acquire Talon.One](https://www.adyen.com/press-and-media/2i4hnm0pfcpvc7), Adyen, 2026-04-23 — description, price, financing, expected recurring revenue.
-- [Adyen to acquire Orb](https://www.adyen.com/press-and-media/jtrg4qd7j3p4rj), Adyen, 2026-06-11 — description, price, the incubator model, multi-PSP support, convergence as intent.
-- [Adyen closes Talon.One and Orb acquisitions, announces leadership updates](https://www.adyen.com/press-and-media/adyen-closes-talonone-and-orb-acquisitions-announces-leadership-updates), Adyen, 2026-07-01 — closing date; "multi-product reality".
+- [Adyen to acquire Orb to unify billing and payments infrastructure for enterprise merchants](https://www.adyen.com/press-and-media/jtrg4qd7j3p4rj), Adyen, 2026-06-11 — description, price, the incubator model, multi-PSP support, convergence as intent.
+- [Adyen Closes Talon.One and Orb Acquisitions; Announces Leadership Updates Across Product and Finance](https://www.adyen.com/press-and-media/adyen-closes-talonone-and-orb-acquisitions-announces-leadership-updates), Adyen, 2026-07-01 — closing date; "multi-product reality".
 - [Adyen launches Intelligent Money Movement](https://www.adyen.com/press-and-media/adyen-launches-intelligent-money-movement), Adyen, 2026-04-09 — the sentence on "a patchwork of acquired technologies".
 - [Why billing and payments belong together](https://www.adyen.com/knowledge-hub/why-adyen-acquired-orb), Adyen, 2026-09-29 — the stated reason for buying instead of building; "You'll soon see".
 - [About Adyen](https://www.adyen.com/about), Adyen, n.d., accessed 2026-11 — founding, history by period, "Built for enterprise", the acquisitions in the history.
@@ -296,19 +296,19 @@ Both records have now been read on their own terms: Stripe built the interface f
 - [Design to Duty: How we make architecture decisions at Adyen](https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture), Adyen, 2021-07-28 (the page says "Updated June 2022") — own infrastructure and the reasons, the Java monorepo, the stateless edge, "Cockroach, a distributed database", when Adyen buys (evidence age: 5 years).
 - [Design to Duty: The Accounting and Reporting Systems at Adyen](https://www.adyen.com/knowledge-hub/design-to-duty-adyen-architecture-part2), Willem Pino, Adyen, 2021-08-23 — templates, the zero-sum guarantee, the local queue, sharding and its cost, one accounting system for the banking platform (evidence age: 5 years).
 - [From 0 — $100 billion: Scaling infrastructure and workflow at Adyen](https://www.adyen.com/knowledge-hub/from-0-100-billion-scaling-infrastructure-and-workflow-at-adyen), Michiel Toneman, Adyen, 2018-01-03 — main-line development, feature toggles and canaries (evidence age: 8 years).
-- [We built Architect for humans](https://www.adyen.com/knowledge-hub/architect-blog-1), Adyen, 2026-08-23 — service, host and data-center counts; more than one repository.
+- [We built Architect for humans. Agents made it transformative.](https://www.adyen.com/knowledge-hub/architect-blog-1), Adyen, 2026-08-23 — service, host and data-center counts; more than one repository.
 - [Incident update: Mitigating a DDoS attack on April 21, 2025](https://www.adyen.com/knowledge-hub/mitigating-a-ddos-april-2025), Adyen, 2025-04-21 — the attack, its resolution time, the review promised to customers.
 - [A Deep Dive into Table Partitioning, Part 2: Partitioning at Adyen](https://www.adyen.com/knowledge-hub/partitioning-at-adyen), Derk van Veen and Cosmin Octavian Pene, Adyen, 2023-10-06 — the first of the partitioning posts counted (evidence age: 3 years).
 - [A Deep Dive into Table Partitioning, Part 5: Partitioning an environment, not individual tables](https://www.adyen.com/knowledge-hub/partitioning-an-environment-not-individual-tables), Derk van Veen, Adyen, 2025-09-16 — the latest of the partitioning posts counted.
-- [Strengthening our platform resilience](https://www.adyen.com/knowledge-hub/strengthening-our-platform-resilience), Adyen, 2025-10-31 — outside mitigation partners added after the attack.
-- [Adyen OpenAPI specifications](https://github.com/Adyen/adyen-openapi), Adyen, n.d., accessed 2026-11 — the API families, their hosts and versions; no call that returns a payment in the Checkout API.
+- [Strengthening Our Platform Resilience: An Update](https://www.adyen.com/knowledge-hub/strengthening-our-platform-resilience), Adyen, 2025-10-31 — outside mitigation partners added after the attack.
+- [Adyen OpenAPI definitions](https://github.com/Adyen/adyen-openapi), Adyen, n.d., accessed 2026-11 — the API families, their hosts and versions; no call that returns a payment in the Checkout API.
 
 *Standards, regulation and official documentation*
 
-- [Sales day payout: upgrade guide](https://docs.adyen.com/account/sales-day-payout/upgrade-to-sdp), Adyen documentation, n.d., accessed 2026-11 — "Prefinancing is capped at 30 days".
+- [Upgrade to Sales day payout](https://docs.adyen.com/account/sales-day-payout/upgrade-to-sdp), Adyen documentation, n.d., accessed 2026-11 — "Prefinancing is capped at 30 days".
 - [Supported payout currencies](https://docs.adyen.com/account/supported-currencies), Adyen documentation, n.d., accessed 2026-11 — 14 countries and regions with an Adyen acquiring connection; "one of our acquiring entities, for example Adyen Singapore".
 - [Versioning](https://docs.adyen.com/development-resources/versioning), Adyen documentation, n.d., accessed 2026-11 — a version number in each API URL.
-- [Web best practices](https://docs.adyen.com/online-payments/web-best-practices), Adyen documentation, n.d., accessed 2026-11 — the five live regions.
+- [Best practices for web integrations](https://docs.adyen.com/online-payments/web-best-practices), Adyen documentation, n.d., accessed 2026-11 — the five live regions.
 - [Terminal API](https://docs.adyen.com/point-of-sale/design-your-integration/terminal-api), Adyen documentation, n.d., accessed 2026-11 — the nexo Retailer Protocol.
 - [Update to a new release](https://docs.adyen.com/point-of-sale/release-updating), Adyen documentation, n.d., accessed 2026-11 — terminal software every four weeks, rolled out gradually.
 - [Peak season readiness](https://docs.adyen.com/industries/peak-season), Adyen documentation, n.d., accessed 2026-11 — active/active stateless architecture, failover by load balancers, utilization under 30%, the deployment freeze.

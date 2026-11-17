@@ -234,7 +234,7 @@ At 19:42 the screen said the payment had succeeded. You can now say that it repo
 - [Settle funds](https://docs.adyen.com/platforms/settle-funds), Adyen for Platforms documentation, n.d., accessed 2026-11 — settlement after the sales day and the settlement delay; reversal after 30 days.
 - [Balance Platform Accounting Report](https://docs.adyen.com/platforms/reports-and-fees/balance-platform-accounting-report), Adyen documentation, n.d., accessed 2026-11 — daily report of balance changes; booking date and value date.
 - [Split chargebacks](https://docs.adyen.com/platforms/online-payments/split-transactions/split-chargebacks), Adyen documentation, n.d., accessed 2026-11 — the request validates only the format of split instructions.
-- [Payout webhooks](https://docs.adyen.com/platforms/payout-webhooks), Adyen for Platforms documentation, n.d., accessed 2026-11 — `booked` is not final; returned transfers; the estimated arrival time on transfers that are not instant.
+- [Payout transfer webhooks](https://docs.adyen.com/platforms/payout-webhooks), Adyen for Platforms documentation, n.d., accessed 2026-11 — `booked` is not final; returned transfers; the estimated arrival time on transfers that are not instant.
 - [Deposit](https://docs.adyen.com/account/balances/deposit), Adyen documentation, n.d., accessed 2026-11 — sales booked to a deposit when the requirement rises.
 - [Automatically get reports](https://docs.adyen.com/reporting/automatically-get-reports), Adyen documentation, n.d., accessed 2026-11 — the `REPORT_AVAILABLE` webhook.
 - [Get platform reports](https://docs.adyen.com/platforms/prepare-reports/generate-download-reports), Adyen documentation, n.d., accessed 2026-11 — the `balancePlatform.report.created` webhook.
@@ -248,17 +248,17 @@ At 19:42 the screen said the payment had succeeded. You can now say that it repo
 - [Stripe Services Agreement: Services Terms](https://stripe.com/legal/ssa-service-terms), Stripe, last modified 2026-09-28 — the definition of Payout Delay (a financial provider's failure to settle to Stripe).
 - [Adyen OpenAPI definitions](https://github.com/Adyen/adyen-openapi), Adyen, Checkout API version 72, accessed 2026-11 — three GET operations, none returning a payment.
 - [How Payment Intents and Setup Intents work](https://docs.stripe.com/payments/paymentintents/lifecycle), Stripe documentation, n.d., accessed 2026-11 — the meaning Stripe gives `succeeded`.
-- [Payment methods](https://docs.stripe.com/payments/payment-methods), Stripe documentation, n.d., accessed 2026-11 — what a `succeeded` status leaves open.
+- [Payment Methods API](https://docs.stripe.com/payments/payment-methods), Stripe documentation, n.d., accessed 2026-11 — what a `succeeded` status leaves open.
 - [Place a hold on a payment method](https://docs.stripe.com/payments/place-a-hold-on-a-payment-method), Stripe documentation, n.d., accessed 2026-11 — an expired authorization becomes `canceled`; the 7-day window for a customer-initiated Visa payment.
 - [Transaction risk prevention](https://docs.stripe.com/radar/transaction-risk-prevention), Stripe documentation, n.d., accessed 2026-11 — a risk block recorded as not sent to the network.
 - [Retrieve a PaymentIntent](https://docs.stripe.com/api/payment_intents/retrieve), Stripe API reference, n.d., accessed 2026-11 — a payment can be read back by its identifier.
-- [Instant Payouts](https://docs.stripe.com/payouts/instant-payouts), Stripe documentation, n.d., accessed 2026-11 — card funds paid out before they are available.
+- [Instant Payouts for Stripe Dashboard users](https://docs.stripe.com/payouts/instant-payouts), Stripe documentation, n.d., accessed 2026-11 — card funds paid out before they are available.
 - [Reserves - Frequently Asked Questions](https://support.stripe.com/questions/reserves-frequently-asked-questions), Stripe support, n.d., accessed 2026-11 — what a reserve is.
 - [Idempotent requests](https://docs.stripe.com/api/idempotent_requests), Stripe API reference, n.d., accessed 2026-11 — keys kept at least 24 hours.
 - [Create destination charges](https://docs.stripe.com/connect/destination-charges), Stripe documentation, n.d., accessed 2026-11 — the charge type, `on_behalf_of`, the application fee.
 - [Balances and settlement time](https://docs.stripe.com/payments/balances), Stripe documentation, n.d., accessed 2026-11 — pending to available at `available_on`; the Dutch timing (volatile).
 - [The Balance Transaction object](https://docs.stripe.com/api/balance_transactions/object), Stripe API reference, n.d., accessed 2026-11 — `amount`, `fee`, `net`, `available_on`.
-- [Receive payouts](https://docs.stripe.com/payouts), Stripe documentation, n.d., accessed 2026-11 — what "T" counts from.
+- [Receive payouts from Stripe](https://docs.stripe.com/payouts), Stripe documentation, n.d., accessed 2026-11 — what "T" counts from.
 - [The Payout object](https://docs.stripe.com/api/payouts/object), Stripe API reference, n.d., accessed 2026-11 — `paid` can change to `failed`.
 - [Payout reconciliation report](https://docs.stripe.com/reports/payout-reconciliation), Stripe documentation, n.d., accessed 2026-11 — itemization by payout.
 - [Google Pay API tutorial](https://developers.google.com/pay/api/web/guides/tutorial), Google, n.d., accessed 2026-11 — the device token with a cryptogram.

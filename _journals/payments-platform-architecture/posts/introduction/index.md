@@ -208,8 +208,8 @@ Facts about Stripe and Adyen on this page are repeated from the chapters linked 
 *Company, product and investor sources*
 
 - [Annual Report 2025](https://investors.adyen.com/financials/2025), Adyen N.V., signed 2026-03-05 — the stated choice to operate the layers of the financial stack itself, the 84% full-stack share, processed volume and net revenue (audited; read in the PDF this page offers for download).
-- [Adyen closes Talon.One and Orb acquisitions, announces leadership updates](https://www.adyen.com/press-and-media/adyen-closes-talonone-and-orb-acquisitions-announces-leadership-updates), Adyen, 2026-07-01 — the closing of two acquisitions.
-- [Stripe annual letter 2025](https://stripe.com/annual-updates/2025), Patrick and John Collison, 2026-02-24 — “$1.9 trillion in total volume”, with no definition of the measure; no revenue figure for the company (read in the PDF this page links).
+- [Adyen Closes Talon.One and Orb Acquisitions; Announces Leadership Updates Across Product and Finance](https://www.adyen.com/press-and-media/adyen-closes-talonone-and-orb-acquisitions-announces-leadership-updates), Adyen, 2026-07-01 — the closing of two acquisitions.
+- [Stripe's 2025 annual letter](https://stripe.com/annual-updates/2025), Patrick and John Collison, 2026-02-24 — “$1.9 trillion in total volume”, with no definition of the measure; no revenue figure for the company (read in the PDF this page links).
 - [Acquirer Disclosure & Acquirer Terms](https://stripe.com/legal/acquirer-disclosure), Stripe, n.d., accessed 2026-11 — Stripe Technology Europe, Ltd. as acquirer in the European Economic Area; Stripe MALPB among the US acquirers.
 - [Designing robust and predictable APIs with idempotency](https://stripe.com/blog/idempotency), Brandur Leach, Stripe, 2017-02-22 — the date of Stripe's idempotency post and the key it introduces; it gives no retention period (evidence age: 9 years).
 - [Scaling your API with rate limiters](https://stripe.com/blog/rate-limiters), Paul Tarjan, Stripe, 2017-03-30 — the date of Stripe's rate-limiting post (evidence age: 9 years).

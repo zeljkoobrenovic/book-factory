@@ -75,7 +75,7 @@ In plain words: a change to what moves a payment into a state, or to which repor
 
 ## <a id="tool-1"></a>Tool 1: Dispute Evidence Card
 
-**What it records.** The decision, taken before any dispute arrives, about which evidence a sale leaves behind, which message starts the deadline, who answers and by what policy in amounts. Built from the Larkfield section and questions 5 to 7 of [[refunds-reversals-and-disputes]] and questions 3 and 4 of [[journey-dispute]].
+**What it records.** The decision, taken before any dispute arrives, about which evidence a sale leaves behind, which message starts the deadline, who answers and by what policy in amounts. Built from the Larkfield section and questions 5 to 7 of [[refunds-reversals-and-disputes]] and questions 3 to 6 of [[journey-dispute]].
 
 **The template.** One card per provider for the policy rows; one per dispute for the rest.
 
@@ -109,7 +109,7 @@ The evidence existed only because the booking app had written it for scheduling,
 
 ## <a id="tool-2"></a>Tool 2: Payment State Card
 
-**What it records.** What each state of your own payment record promises, and which provider message or read may move a row into it. Built from the Larkfield section and the eight questions of [[payment-state-machines]].
+**What it records.** What each state of your own payment record promises, and which provider message or read may move a row into it. Built from the Larkfield section and questions 1, 3, 4, 5, 7 and 8 of [[payment-state-machines]].
 
 **The template.** The first two rows repeat per state; the rest are answered once for the record.
 
@@ -142,7 +142,7 @@ None of the five words means *settled*. `paid` promises only that the provider h
 
 ## <a id="tool-3"></a>Tool 3: Routing Rule Card
 
-**What it records.** What decides which provider a payment goes to, what a switch to the other provider moves, and what it leaves behind. Built from the Larkfield section and questions 1, 6 and 8 of [[payment-routing-and-orchestration]].
+**What it records.** What decides which provider a payment goes to, what a switch to the other provider moves, and what it leaves behind. Built from the Larkfield section and questions 6, 7 and 8 of [[payment-routing-and-orchestration]].
 
 **The template.**
 
@@ -204,7 +204,7 @@ None of the three figures is a bank account of the studio's, and Larkfield holds
 
 ## <a id="tool-5"></a>Tool 5: Payout Exception Card
 
-**What it records.** What you call a payout between the provider's "paid" and the money landing, how long it stays open, and who works a return. Built from the Larkfield section and questions 1 to 7 of [[payouts-and-money-movement]].
+**What it records.** What you call a payout between the provider's "paid" and the money landing, how long it stays open, and who works a return. Built from the Larkfield section and questions 1 to 4 and 6 of [[payouts-and-money-movement]].
 
 **The template.**
 
@@ -224,7 +224,7 @@ None of the three figures is a bank account of the studio's, and Larkfield holds
 | States | `instructed`; `sent` (Adyen's transfer webhook reports `booked`; Stripe sends `payout.paid`); `arrived`; `returned` (on Stripe, a later `payout.failed`) |
 | Open window | 10 business days on both providers *(Larkfield's choice, an assumption)*: sent on Thursday 11 March 2027, marked arrived on Thursday 25 March |
 | Record that is the truth | "Payouts in transit" must return to zero, and what stays in it beyond the window is the list of stranded payouts. Webhooks move the state; ledger entries come from report lines |
-| Owner of a return | A named team's queue from the first day (the chapter names neither the team nor a deadline); an item open more than five business days goes to Priya Raman's weekly review |
+| Owner of a return | A named team's queue from the first day (the chapter names neither the team nor a deadline); an unmatched item open more than five business days goes to Priya Raman's weekly review (Tool 6) |
 
 Replay the Payout That Bounced against the card. Each of the 412 returns of June 2026 would have matched a payout that was still open. The €386,000 would have been a queue on the first day and not a discovery over 19 days. Since then a change of bank details triggers a check of the account holder's name and holds the studio's next payout.
 
@@ -232,7 +232,7 @@ Replay the Payout That Bounced against the card. Each of the 412 returns of June
 
 ## <a id="tool-6"></a>Tool 6: Reconciliation Card
 
-**What it records.** Which provider report the books are written from, which signal says it is ready, which key ties a bank credit to its lines, and who owns what does not match. Built from the Larkfield section and questions 1 to 7 of [[payment-reconciliation-and-reporting]].
+**What it records.** Which provider report the books are written from, which signal says it is ready, which key ties a bank credit to its lines, and who owns what does not match. Built from the Larkfield section and questions 1 to 3 and 5 of [[payment-reconciliation-and-reporting]].
 
 **The template.** One card per provider.
 
@@ -262,7 +262,7 @@ After that close the job held three open items *(illustrative assumptions)*: a �
 
 ## <a id="tool-7"></a>Tool 7: Idempotency Key Card
 
-**What it records.** For one call that moves money: the business event its key is derived from, how long a repeat is safe, and what you do when the outcome is unknown. An idempotency key is an identifier sent with a request so that the provider can recognize a repeat and not perform it twice. Built from the Larkfield section and the nine questions of [[idempotency-and-retries]].
+**What it records.** For one call that moves money: the business event its key is derived from, how long a repeat is safe, and what you do when the outcome is unknown. An idempotency key is an identifier sent with a request so that the provider can recognize a repeat and not perform it twice. Built from the Larkfield section and questions 1 to 6 of [[idempotency-and-retries]].
 
 **The template.** One card per call that moves money.
 
@@ -298,7 +298,7 @@ Under this card none of the 1,840 duplicates of the Double Charge is created, an
 
 ## <a id="tool-8"></a>Tool 8: Webhook Consumer Contract
 
-**What it records.** What a receiver may assume about a provider's events, and what it does when an event never arrives. Built from the section on the receiver's contract, the Larkfield section and the eight questions of [[payment-webhooks-and-events]].
+**What it records.** What a receiver may assume about a provider's events, and what it does when an event never arrives. Built from the section on the receiver's contract, the Larkfield section and questions 1, 2, 4, 5, 6 and 8 of [[payment-webhooks-and-events]].
 
 **The template.** One contract per provider endpoint.
 
@@ -330,7 +330,7 @@ Replay the Silent Webhook under the contract. The expired certificate of Monday 
 
 ## <a id="tool-9"></a>Tool 9: PCI Scope Card
 
-**What it records.** The path a card number takes from the keyboard to the provider, the questionnaire that path leads to, and what stays yours. PCI scope is every system a card number passes through. Built from the Larkfield section and questions 1 to 5 of [[tokenization-vaulting-and-pci]].
+**What it records.** The path a card number takes from the keyboard to the provider, the questionnaire that path leads to, and what stays yours. PCI (Payment Card Industry) scope is every system a card number passes through. Built from the Larkfield section and questions 1 to 4 of [[tokenization-vaulting-and-pci]].
 
 **The template.**
 
@@ -362,7 +362,7 @@ The card numbers moved to the two providers. The page around the fields stayed, 
 
 ## <a id="tool-10"></a>Tool 10: Billing Retry Schedule Card
 
-**What it records.** What is tried again after a failed charge, on which days, which one system schedules it, and in what state the debt ends. Built from the Larkfield section and questions 1 to 7 of [[invoicing-collections-and-dunning]].
+**What it records.** What is tried again after a failed charge, on which days, which one system schedules it, and in what state the debt ends. Built from the Larkfield section and questions 1 to 6 of [[invoicing-collections-and-dunning]].
 
 **The template.**
 
@@ -420,7 +420,7 @@ The record that is the truth is the period record: one row per membership and bi
 | What do the €120.00 chargeback and its €15.00 fee debit first? | The studio's balance account, by the chargeback instruction | Larkfield's platform balance; Larkfield then tries to reverse the transfer |
 | What if the studio cannot cover it? | The studio's balance account goes negative; after more than 30 days Larkfield's reserved compensation account is debited | Larkfield's balance has already paid; what it cannot pull back stays its loss |
 | What is the record that is the truth? | Stored per studio and provider: the merchant, the booking rule, the loss bearer and whether the assignment can still change | The same |
-| Exposure, owner and date | About €156 million of paid-out online card volume is inside the 120-day dispute window at any time; about €64,000 for Studio Noord *(assumption)*. Finance reports the figure; in June 2027 a limit and an owner per studio were still to be set | The same |
+| Exposure, owner and date | About €156 million of paid-out online card volume is inside the 120-day dispute window at any time; about €64,000 for Studio Noord *(assumption; [[splits-balances-and-platform-payouts]])*. Finance reports the figure; in June 2027 ([[embedded-finance]]) a limit and an owner per studio were still to be set | The same |
 
 The card exists because "we never hold the funds" had been read for years as "we never carry the loss".
 
@@ -485,7 +485,7 @@ The owner and the daily re-read are what was missing when 230 studios missed the
 | Field | Value |
 | --- | --- |
 | Peak | The 1st of each month: about 357,000 renewals worth €17.5 million, 38% of the month's renewals |
-| First limit per provider | On Stripe, the limit of 25 requests a second to one endpoint, as [[payment-developer-platform]] gives it. Adyen publishes no rate limit for payments; Larkfield allows itself 5 a second until a figure is agreed |
+| First limit per provider | On Stripe, the limit of 25 requests a second to one endpoint, as [[payment-developer-platform]] gives it. Adyen publishes no rate limit for payments (both from documentation accessed November 2026); Larkfield allows itself 5 a second until a figure is agreed |
 | Pacing | 18 hours from midnight; one token bucket per provider and endpoint, 10 requests a second on Stripe and 5 on Adyen |
 | What gives way | Three lanes in strict order: members at checkout, then confirmations and retries of unknown outcomes, then the batch. |
 | Not attempted yet | The period record stays open and no message goes out; renewals not attempted by the end of the window carry to the next morning |

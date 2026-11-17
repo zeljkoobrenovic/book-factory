@@ -89,6 +89,14 @@ NOTES_FILE = os.path.join(HERE, 'link-check-notes.json')  # URL -> hand-written 
 
 def report(urls, cache, D):
     notes = json.load(open(NOTES_FILE)) if os.path.exists(NOTES_FILE) else {}
+    def decide(r):  # the decision for a redirect: a hand-written note, or one of the two rules that need none
+        if r['url'] in notes: return notes[r['url']]
+        strip = lambda u: re.sub(r'^(https?://(?:www\.)?(?:docs\.)?(?:stripe|adyen)\.com)/[a-z]{2}(?:-[a-z]{2})?(?=/|$)', r'\1', u)
+        if same(strip(r['url']), strip(r['final'])):
+            return "locale redirect chosen from the requester's location; not a move; cited URL kept"
+        if 'publications.europa.eu/resource/celex/' in r['url']:
+            return "the Publications Office's persistent CELEX identifier, which resolves to the stored document; cited URL kept"
+        return 'UNDECIDED'
     cited = {}
     for s in D['srcs']:
         for pm, t, m, u in s.get('by', []):
@@ -107,10 +115,10 @@ def report(urls, cache, D):
         out.append(f"| {r['status'] or 'error'} | {r['url']} | {', '.join(cited.get(r['url'], []))} | {notes.get(r['url'], r['error'] or 'UNDECIDED')} |")
     out += ['', '## Redirected (200 at another URL)', '', '| URL | Final URL | Cited in | Decision |', '| --- | --- | --- | --- |']
     for r in moved:
-        out.append(f"| {r['url']} | {r['final']} | {', '.join(cited.get(r['url'], []))} | {notes.get(r['url'], 'UNDECIDED')} |")
+        out.append(f"| {r['url']} | {r['final']} | {', '.join(cited.get(r['url'], []))} | {decide(r)} |")
     out += ['', '## All URLs', '', '| Status | URL | Final URL (when different) | Page title |', '| --- | --- | --- | --- |']
     for r in rows:
-        out.append(f"| {r['status'] or 'error'} | {r['url']} | {'' if same(r['url'], r['final']) else r['final']} | {r['title'].replace('|', '/')[:90]} |")
+        out.append(f"| {r['status'] or 'error'} | {r['url']} | {'' if same(r['url'], r['final']) else r['final']} | {r['title'].replace('|', '/')[:90]}{' (' + r['retry'] + ')' if r.get('retry') else ''} |")
     open(os.path.join(HERE, 'link-check.md'), 'w').write('\n'.join(out) + '\n')
     print(f'{len(rows)} URLs: {len(ok)} ok, {len(moved)} redirected, {len(bad)} not 200 -> link-check.md')
 

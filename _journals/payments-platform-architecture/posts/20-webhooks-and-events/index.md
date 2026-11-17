@@ -277,7 +277,7 @@ A receiver built this way reads the provider's record after every event, sweeps 
 - [Verify HMAC signatures](https://docs.adyen.com/development-resources/webhooks/secure-webhooks/verify-hmac-signatures), Adyen, n.d., accessed 2026-11 — the eight signed fields and where the signature travels.
 - [Webhook structure and types](https://docs.adyen.com/development-resources/webhooks/webhook-types), Adyen, n.d., accessed 2026-11 — no webhook when a payment settles successfully; the Standard webhook's fields and event codes.
 - [Optimizing Webhook Integration: a new approach to accept events from the Adyen platform](https://www.adyen.com/knowledge-hub/webhooks-accept-2xx), Beppe Catanese, Adyen knowledge hub, 2024-05-01 — the earlier `[accepted]` acknowledgement, the 10-second deadline and the migration.
-- [Adyen OpenAPI specifications](https://github.com/Adyen/adyen-openapi), Adyen, n.d., accessed 2026-11 — Checkout API v72 (`CheckoutService-v72.json`) has no operation returning a payment by its PSP reference; the transfer webhook's sequence number (`BalancePlatformTransferNotification-v4.json`); the Standard webhook's fields and 16-character PSP reference (`Webhooks-v1.json`).
+- [Adyen OpenAPI definitions](https://github.com/Adyen/adyen-openapi), Adyen, n.d., accessed 2026-11 — Checkout API v72 (`CheckoutService-v72.json`) has no operation returning a payment by its PSP reference; the transfer webhook's sequence number (`BalancePlatformTransferNotification-v4.json`); the Standard webhook's fields and 16-character PSP reference (`Webhooks-v1.json`).
 
 *Standards, regulation and official documentation*
 

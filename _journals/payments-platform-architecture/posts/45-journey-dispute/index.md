@@ -247,7 +247,7 @@ The four journeys also showed every step twice: a fetchable object on Stripe and
 - [The Dispute object](https://docs.stripe.com/api/disputes/object), Stripe API reference, n.d., accessed 2026-11 — `status` and `evidence_details.due_by`.
 - [Disputes on Connect platforms](https://docs.stripe.com/connect/disputes), Stripe documentation, n.d., accessed 2026-11 — the balance debited per charge type, timing of the transfer reversal, the application fee.
 - [Card monitoring programs](https://docs.stripe.com/disputes/monitoring-programs), Stripe documentation, n.d., accessed 2026-11 — what the programs count and when; Stripe's rendering of Mastercard's chargeback and fraud program thresholds; how Visa identifies an account.
-- [Pricing, Netherlands](https://stripe.com/en-nl/pricing), Stripe, n.d., accessed 2026-11 — dispute received and countered fees; the Mastercard resolution fee.
+- [Pricing (Netherlands)](https://stripe.com/en-nl/pricing), Stripe, n.d., accessed 2026-11 — dispute received and countered fees; the Mastercard resolution fee.
 
 *Standards, regulation and official documentation*
 

@@ -257,7 +257,7 @@ Chapters 27 to 31 have left the seller with a long list: a billing engine to run
 - [Reconcile your Stripe balance with Revenue Recognition](https://docs.stripe.com/revenue-recognition/data-reconciliation.md), Stripe documentation, n.d., accessed 2026-11 — open invoices keep being recognized; timestamp differences.
 - [Stripe Connector for NetSuite](https://docs.stripe.com/use-stripe-apps/netsuite/overview.md), Stripe documentation, n.d., accessed 2026-11 — the separate connector for one accounting system.
 - [Stripe documentation index](https://docs.stripe.com/llms.txt) and [sitemap](https://docs.stripe.com/sitemap.xml), Stripe, fetched 2026-11-17 — searched for a page on revenue contracts; none found (the index does not list every page).
-- [Stripe Revenue Recognition](https://stripe.com/en-nl/revenue-recognition), Stripe product page, n.d., accessed 2026-11 — the heading "A centralised revenue subledger" (English edition served for the Netherlands; vendor marketing page).
+- [Stripe Revenue Recognition](https://stripe.com/revenue-recognition), Stripe product page, n.d., accessed 2026-11 — the heading "A centralised revenue subledger" (English edition served for the Netherlands; vendor marketing page).
 - [Activity breakdown](https://docs.stripe.com/revenue-recognition/reports/activity-breakdown.md), Stripe documentation, n.d., accessed 2026-11 — the report column "Stripe subledger account".
 - [Reporting](https://docs.adyen.com/reporting.md), Adyen documentation, n.d., accessed 2026-11 — what Adyen's reports describe.
 - [Settlement details report](https://docs.adyen.com/reporting/settlement-reconciliation/transaction-level/settlement-details-report.md), Adyen documentation, n.d., accessed 2026-11 — contents of the settlement report.
@@ -267,7 +267,7 @@ Chapters 27 to 31 have left the seller with a long list: a billing engine to run
 - [Adyen help center sitemap](https://help.adyen.com/sitemap.xml), Adyen, fetched 2026-11-17 — searched article addresses for revenue recognition, deferred, billing and Orb; only articles on Adyen's own invoices to merchants.
 - [Orb](https://www.adyen.com/partners/orb), Adyen partner page, n.d., accessed 2026-11 — Adyen's description of Orb's reporting for revenue recognition.
 - [Usage-based billing, explained](https://www.adyen.com/knowledge-hub/usage-based-billing), Adyen, 2026-10-22 — revenue recognition named as a concern of usage-based billing.
-- [Adyen closes Talon.One and Orb acquisitions](https://www.adyen.com/press-and-media/adyen-closes-talonone-and-orb-acquisitions-announces-leadership-updates), Adyen, 2026-07-01 — closing date.
+- [Adyen Closes Talon.One and Orb Acquisitions; Announces Leadership Updates Across Product and Finance](https://www.adyen.com/press-and-media/adyen-closes-talonone-and-orb-acquisitions-announces-leadership-updates), Adyen, 2026-07-01 — closing date.
 - [Why billing and payments belong together](https://www.adyen.com/knowledge-hub/why-adyen-acquired-orb), Blake Breathitt, Adyen, 2026-09-29 — integration stated as future.
 - [Recognition methodology](https://docs.withorb.com/revenue-reporting/revenue-recognition.md), Orb documentation, n.d., accessed 2026-11 — Orb's recognition principles, usage timing, payment status, period locks (describes Orb's product, not Adyen's platform).
 - [Payments](https://docs.withorb.com/invoicing/payments.md), Orb documentation, n.d., accessed 2026-11 — Orb collects through payment gateways "like Adyen and Stripe".

@@ -264,10 +264,10 @@ Return to the 61,000 stolen numbers of the Card-Testing Weekend. They bypassed L
 *Company, product and investor sources*
 
 - [Security at Stripe](https://docs.stripe.com/security), Stripe documentation, n.d., accessed 2026-11 — the "Dedicated card technology" section: separate hosting, no shared credentials, the isolated environment and its team, AES-256, keys on separate machines, internal tokenization, the static allowlist; the scope of Stripe's Level 1 audit.
-- [PCI DSS compliance guide](https://stripe.com/guides/pci-compliance), Stripe, n.d., accessed 2026-11 — merchant levels, the questionnaire per integration, the "300+ security controls" figure, Radar's dependence on client-side tokenization, the founding of the PCI SSC (Stripe's summary).
+- [What is PCI DSS compliance?](https://stripe.com/guides/pci-compliance), Stripe, n.d., accessed 2026-11 — merchant levels, the questionnaire per integration, the "300+ security controls" figure, Radar's dependence on client-side tokenization, the founding of the PCI SSC (Stripe's summary).
 - [Integration security guide](https://docs.stripe.com/security/guide), Stripe documentation, n.d., accessed 2026-11 — collection without passing through the merchant's servers, card data a merchant may store, the third-party script warning, content security policy directives.
 - [Tokens](https://docs.stripe.com/api/tokens), Stripe API reference, n.d., accessed 2026-11 — single-use tokens; Radar "performs best" with client-side tokenization.
-- [Payment Methods](https://docs.stripe.com/payments/payment-methods), Stripe documentation, n.d., accessed 2026-11 — the reusable PaymentMethod.
+- [Payment Methods API](https://docs.stripe.com/payments/payment-methods), Stripe documentation, n.d., accessed 2026-11 — the reusable PaymentMethod.
 - [The Card object](https://docs.stripe.com/api/cards/object), Stripe API reference, n.d., accessed 2026-11 — the card fingerprint.
 - [Understanding the benefits of network tokens](https://stripe.com/guides/understanding-benefits-of-network-tokens), Stripe guide, n.d., accessed 2026-11 — Stripe's definition of its own tokens.
 - [Stripe Checkout](https://docs.stripe.com/payments/checkout), Stripe documentation, n.d., accessed 2026-11 — the Stripe-hosted page reached by redirect.

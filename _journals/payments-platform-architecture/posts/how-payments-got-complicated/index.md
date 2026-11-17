@@ -184,6 +184,19 @@ Here are the nine steps side by side, each with what it made possible and what i
 | Platform | The smallest seller takes cards | The payment facilitator, the balance, the payout | A party in the middle; a wait for the payout | **The Frozen Seller**, **The Stranded Payout**, **The Accidental Bank** |
 | Today | Anyone buys from anyone, anywhere, at any hour | The business's own record, built from answers, notifications and reports | Your own software | **The Trusted Doorbell**, **The Version Cliff**, **A Card by Any Other Name**, **The Borrowed Blueprint** |
 
+The table is in the order of the ideas. The dates this page has given place the same steps in time, and they show how recent most of them are: the clearing of checks is about 170 years old, the card about 75, and the payment provider about 20. Cash and credit at the shop carry no date, because they are common practice and not events.
+
+| Year | What its source dates to that year | Step |
+| --- | --- | --- |
+| 1853 | The banking association now called The Clearing House, by its own account | Check |
+| 1950 | Diners Club's charge card, by the company's account | Card |
+| 1958 | BankAmericard, by Visa's history page | Card |
+| 1976 | The program takes the name Visa | Card network |
+| 1987 | The message standard ISO 8583, according to Stripe's explainer | Card network |
+| 2006 | The card industry's security standards council; Adyen | Paying at a distance |
+| 2011 | Stripe | Paying at a distance |
+| 2015 | The European directive that adds a second check of the payer and protects funds held for others | Paying at a distance; platform |
+
 Count what stands behind Mila's tap that did not stand behind the baker's coin. There are seven parties, five promises made in turn, and about 120 days before the usual time limit for a dispute has passed. **Every step moved the keeping of a promise further from the making of it**: farther away, later, through more hands. The answer to “when is it really paid?” grew from “now” to four installments.
 
 It is tempting to read the result as bad design that a clean start or a new technology would sweep away. It is the opposite: **the complexity is the price of all that trade, not a mistake**. Each step was a bargain that buyers and sellers wanted, and each answers a limit that has not gone away. Sellers still deal with strangers, buyers are still far away or absent, and small sellers still cannot arrange it all alone. A new way to pay has to answer the same limits or hand them to someone else. So expect every one of these steps to stay, and **expect a failure wherever a promise and its keeping are apart**.
@@ -199,9 +212,9 @@ Each date was read on its source's page on 17 November 2026. Mastercard's histor
 - [About Visa](https://corporate.visa.com/en/about-visa.html), Visa, n.d., accessed 2026-11 — the history timeline: BankAmericard in 1958, described by Visa as the first card with a “revolving credit” feature; renamed Visa in 1976 (the former “History of Visa” address redirects to this page).
 - [History and Legacy](https://www.dinersclub.com/about-us/history/), Diners Club International, n.d., accessed 2026-11 — the charge card dated to 1950 (the company's own account).
 - [Form 10-K for fiscal 2026](https://www.sec.gov/Archives/edgar/data/1403161/000140316126000134/v-20260930.htm), Visa Inc., 2026-11-05 — the “four-party” model; “Visa is not a financial institution”.
-- [ISO 8583: The message standard behind card authorisations](https://stripe.com/en-nl/resources/more/iso-8583), Stripe, updated 2026-09-18 — published in 1987; what the message standard defines (a company's explainer of a paid standard; ISO's own catalogue page could not be read).
+- [ISO 8583: The message standard behind card authorisations](https://stripe.com/resources/more/iso-8583), Stripe, updated 2026-09-18 — published in 1987; what the message standard defines (a company's explainer of a paid standard; ISO's own catalogue page could not be read).
 - [About Adyen](https://www.adyen.com/about), Adyen, n.d., accessed 2026-11 — founded in Amsterdam in 2006.
-- [Stripe annual letter 2023](https://stripe.com/annual-updates/2023), Patrick and John Collison, 2024-03-13 — “when Stripe launched in 2011” (in the letter's PDF, linked from this page).
+- [Stripe's annual letter 2023](https://stripe.com/annual-updates/2023), Patrick and John Collison, 2024-03-13 — “when Stripe launched in 2011” (in the letter's PDF, linked from this page).
 
 *Standards, regulation and official documentation*
 
@@ -209,7 +222,7 @@ Each date was read on its source's page on 17 November 2026. Mastercard's histor
 - [Our History](https://www.theclearinghouse.org/about/history), The Clearing House, n.d., accessed 2026-11 — “a banking association and payments company that is owned by the largest commercial banks and dates back to 1853”.
 - [Visa Core Rules and Visa Product and Service Rules](https://usa.visa.com/dam/VCOM/download/about-visa/visa-rules-public.pdf), Visa, 2026-10-24 — the definition of a payment facilitator (Glossary) and the 120-day dispute time limit (Product and Service Rules), as cited in the linked chapters.
 - [About us](https://www.pcisecuritystandards.org/about_us/), PCI Security Standards Council, n.d., accessed 2026-11 — founded in 2006 by American Express, Discover, JCB International, MasterCard and Visa Inc.
-- [Directive (EU) 2015/2366 (PSD2)](http://publications.europa.eu/resource/celex/32015L2366), Official Journal, 2015-12-23 — Article 4(30), strong customer authentication “based on the use of two or more elements”; Article 97, when it is required; Article 10, safeguarding (evidence age: 11 years; in force, replacement pending).
+- [Directive (EU) 2015/2366 on payment services (PSD2)](http://publications.europa.eu/resource/celex/32015L2366), Official Journal, 2015-12-23 — Article 4(30), strong customer authentication “based on the use of two or more elements”; Article 97, when it is required; Article 10, safeguarding (evidence age: 11 years; in force, replacement pending).
 
 *Research and practitioner sources*
 

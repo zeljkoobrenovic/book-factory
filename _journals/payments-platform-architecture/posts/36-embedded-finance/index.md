@@ -203,17 +203,17 @@ From [[part-2]] through [[part-7]], each mechanism was described for one payment
 - [Real-time authorizations](https://docs.stripe.com/issuing/controls/real-time-authorizations.md) and [Spending controls](https://docs.stripe.com/issuing/controls/spending-controls.md), Stripe documentation, n.d., accessed 2026-11 — the 2-second window, timeout settings, Autopilot (public preview), the balance check, monitoring by reason.
 - [How Capital for platforms works](https://docs.stripe.com/capital/how-capital-for-platforms-works.md), Stripe documentation, n.d., accessed 2026-11 — countries, lenders per country, repayment by withholding (volatile).
 - [Product release phases](https://docs.stripe.com/release-phases.md), Stripe documentation, n.d., accessed 2026-11 — what private preview, public preview and general availability mean at Stripe.
-- [Risk management with Connect](https://docs.stripe.com/connect/risk-management.md), Stripe documentation, n.d., accessed 2026-11 — no Treasury or Issuing where Stripe bears negative balances.
+- [Risk and liability management with Connect](https://docs.stripe.com/connect/risk-management.md), Stripe documentation, n.d., accessed 2026-11 — no Treasury or Issuing where Stripe bears negative balances.
 - [Instant Payouts for Connect](https://docs.stripe.com/connect/instant-payouts.md), Stripe documentation, n.d., accessed 2026-11 — arrival within 30 minutes; the platform's liability for instantly paid out funds.
 - [Business accounts](https://docs.adyen.com/business-accounts.md) and [Get started](https://docs.adyen.com/business-accounts/get-started.md), Adyen documentation, n.d., accessed 2026-11 — "in development phase", the country list (20 eurozone countries, the UK, the US), enabling per balance platform, the Authentication SDK (volatile).
 - [Adyen Issuing](https://docs.adyen.com/issuing.md), [Authorisation](https://docs.adyen.com/issuing/authorisation.md) and [Relayed authorisation](https://docs.adyen.com/issuing/authorisation/relayed-authorisation.md), Adyen documentation, n.d., accessed 2026-11 — regions, payment instruments, the platform as point of contact, the order of checks, the 2,000-millisecond window and fallback.
 - [Capital](https://docs.adyen.com/capital.md) and [How Capital works](https://docs.adyen.com/capital/how-capital-works.md), Adyen documentation, n.d., accessed 2026-11 — countries, repayment from processed volume, repeat grants in pilot (volatile).
-- [Adyen for Platforms](https://docs.adyen.com/platforms.md), [Verification requirements](https://docs.adyen.com/platforms/verification-requirements.md) and [Account structure and resources](https://docs.adyen.com/platforms/account-structure-resources.md), Adyen documentation, n.d., accessed 2026-11 — financing "from Adyen", added verification per product, a second and shorter country list for business accounts, "invite-only", the liable balance account.
+- [Adyen for Platforms](https://docs.adyen.com/platforms.md), [Verification requirements](https://docs.adyen.com/platforms/verification-requirements.md) and [Account structure](https://docs.adyen.com/platforms/account-structure-resources.md), Adyen documentation, n.d., accessed 2026-11 — financing "from Adyen", added verification per product, a second and shorter country list for business accounts, "invite-only", the liable balance account.
 - [Initiate on-demand payouts](https://docs.adyen.com/platforms/custom-payouts/on-demand-payouts.md), Adyen documentation, n.d., accessed 2026-11 — the instant transfer priority, which some banks do not support.
 
 *Standards, regulation and official documentation*
 
-- [Directive (EU) 2015/2366 (PSD2)](http://publications.europa.eu/resource/celex/32015L2366), Official Journal, 2015-12-23 — Article 97, strong customer authentication (evidence age: 11 years; in force, replacement pending).
+- [Directive (EU) 2015/2366 on payment services (PSD2)](http://publications.europa.eu/resource/celex/32015L2366), Official Journal, 2015-12-23 — Article 97, strong customer authentication (evidence age: 11 years; in force, replacement pending).
 
 *Research and practitioner sources*
 

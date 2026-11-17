@@ -279,14 +279,14 @@ At 19:43 on 9 March the screen said the payment had succeeded and the €120 had
 
 - [Form 10-K for fiscal 2026](https://www.sec.gov/Archives/edgar/data/1403161/000140316126000134/v-20260930.htm), Visa Inc., 2026-11-05 — the four-party model, the walkthrough of one payment, "not a financial institution", the settlement indemnity.
 - [Form 10-K for 2025](https://www.sec.gov/Archives/edgar/data/1141391/000114139126000013/ma-20251231.htm), Mastercard Incorporated, 2026-02-11 — the four participants, the three services, the limit of the settlement guarantee.
-- [Acquirer Disclosure & Acquirer Terms](https://stripe.com/en-us/legal/acquirer-disclosure), Stripe, n.d., accessed 2026-11 — the acquirer or Stripe's stated role per country (volatile: the list of banks changes).
-- [Stripe Technology Europe Limited: legal](https://stripe.com/legal/stel), Stripe, 2019-04-05 — the e-money authorization by the Central Bank of Ireland (evidence age: 7 years; the entity is named in the current acquirer disclosure).
+- [Acquirer Disclosure & Acquirer Terms](https://stripe.com/legal/acquirer-disclosure), Stripe, n.d., accessed 2026-11 — the acquirer or Stripe's stated role per country (volatile: the list of banks changes).
+- [Stripe Technology Europe, Limited: legal information](https://stripe.com/legal/stel), Stripe, 2019-04-05 — the e-money authorization by the Central Bank of Ireland (evidence age: 7 years; the entity is named in the current acquirer disclosure).
 - [Stripe Services Agreement: Services Terms](https://stripe.com/legal/ssa-service-terms), Stripe, last modified 2026-09-28 — the definition of a Payment Method Acquirer; the definition of Payout Delay (a financial provider's failure to settle to Stripe).
 - [STEL Acquirer Terms](https://stripe.com/legal/stel-financial-terms), Stripe, n.d., accessed 2026-11 — Stripe Technology Europe as "a member of the Networks"; the US limited-purpose bank's terms on the acquirer disclosure use the same words.
 - [Credit card processing fees: what determines your rate and why the lowest isn't always the cheapest](https://www.adyen.com/knowledge-hub/credit-card-processing-fees), Adyen, 2026-07-03 — "principal membership of Visa and Mastercard in major markets" (vendor claim, no list).
 - [Licenses and disclosures: Japan](https://www.adyen.com/licenses/japan) and [Singapore](https://www.adyen.com/licenses/singapore), Adyen, n.d., accessed 2026-11 — Adyen Japan KK's registration as merchant acquirer; Adyen Singapore's license for merchant acquisition.
-- [Announcement of direct card-network integrations](https://stripe.com/en-ca/newsroom/news/direct-platform), Stripe newsroom, 2020-04-23 — direct integrations with six card networks (evidence age: 6 years).
-- [Payment methods](https://docs.stripe.com/payments/payment-methods), Stripe documentation, n.d., accessed 2026-11 — what a `succeeded` status does and does not mean.
+- [Major updates to Stripe's payments platform increase revenue and reliability for businesses](https://stripe.com/newsroom/news/direct-platform), Stripe newsroom, 2020-04-23 — direct integrations with six card networks (evidence age: 6 years).
+- [Payment Methods API](https://docs.stripe.com/payments/payment-methods), Stripe documentation, n.d., accessed 2026-11 — what a `succeeded` status does and does not mean.
 - [Payouts](https://docs.stripe.com/payouts), Stripe documentation, n.d., accessed 2026-11 — what "T" counts from; settlement timing per country (volatile).
 - [Wallets](https://docs.stripe.com/payments/wallets), Stripe documentation, n.d., accessed 2026-11 — the two kinds of wallet.
 - [iDEAL | Wero payments](https://docs.stripe.com/payments/ideal), Stripe documentation, n.d., accessed 2026-11 — no disputes on iDEAL.
@@ -295,7 +295,7 @@ At 19:43 on 9 March the screen said the payment had succeeded and the €120 had
 - [Licenses and disclosures: EMEA](https://www.adyen.com/licenses/emea), Adyen, n.d., accessed 2026-11 — the credit-institution license and what it covers.
 - [Licenses and disclosures: United States](https://www.adyen.com/licenses/united-states), Adyen, n.d., accessed 2026-11 — the federal branch.
 - [Annual Report 2025](https://investors.adyen.com/financials/2025), Adyen N.V., 2026-03-05 — 84% full-stack volume; banking partners where Adyen has no acquiring license.
-- [Acquiring bank](https://www.adyen.com/knowledge-hub/acquiring-bank), Adyen knowledge hub, n.d., accessed 2026-11 — acquirers need a regulator's and a scheme's license.
+- [What's an acquiring bank and why you need one](https://www.adyen.com/knowledge-hub/acquiring-bank), Adyen knowledge hub, n.d., accessed 2026-11 — acquirers need a regulator's and a scheme's license.
 - [Capture](https://docs.adyen.com/online-payments/capture), Adyen documentation, n.d., accessed 2026-11 — automatic capture by default.
 - [Sales day payout](https://docs.adyen.com/account/sales-day-payout), Adyen documentation, n.d., accessed 2026-11 — payout independent of scheme settlement; typical payout delays (volatile).
 - [Supported payout currencies](https://docs.adyen.com/account/supported-currencies), Adyen documentation, n.d., accessed 2026-11 — the countries and regions with an Adyen acquiring connection; "one of our acquiring entities".

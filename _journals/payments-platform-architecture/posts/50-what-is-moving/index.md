@@ -276,7 +276,7 @@ All pages were fetched on 17 November 2026; undated documentation is cited as ac
 - [Machine payments](https://docs.stripe.com/payments/machine), Stripe documentation, n.d., accessed 2026-11 — Shared Payment Tokens as scoped grants, settlement to the Stripe balance, MPP and x402 (volatile).
 - [Link Agent Wallet](https://docs.stripe.com/agentic-commerce/agents/link-agent-wallet), Stripe documentation, n.d., accessed 2026-11 — agent payments for US and Canadian customers (volatile).
 - [Stripe completes Bridge acquisition](https://stripe.com/newsroom/news/stripe-completes-bridge-acquisition), Stripe, 2025-02-04 — completion date.
-- [Stripe publishes 2025 annual letter](https://stripe.com/newsroom/news/stripe-2025-update), Stripe, 2026-02-24 — Privy, Tempo, the industry estimate of stablecoin volume.
+- [Stripe's 2025 annual letter and tender offer](https://stripe.com/newsroom/news/stripe-2025-update), Stripe, 2026-02-24 — Privy, Tempo, the industry estimate of stablecoin volume.
 - [OUSD is now available on Stripe](https://stripe.com/newsroom/news/ousd-is-now-available-on-stripe), Stripe, 2026-09-30 — Open Standard and its five founders.
 - [Stablecoins in Treasury](https://docs.stripe.com/treasury/stablecoins), Stripe documentation, n.d., accessed 2026-11 — public and private preview of stablecoin balances (volatile).
 - [Stablecoin payments](https://docs.stripe.com/payments/stablecoin-payments), Stripe documentation, n.d., accessed 2026-11 — settlement in local currency, no dispute support, business locations (volatile).
@@ -289,7 +289,7 @@ All pages were fetched on 17 November 2026; undated documentation is cited as ac
 - [What platforms and marketplaces can expect from PSD3](https://stripe.com/guides/what-platforms-and-marketplaces-can-expect-from-psd3), Stripe, last updated 2025-12-24 — Stripe's guide, older than the final texts.
 - [Tokenization and passkeys: How Italian companies can reduce cart abandonment](https://stripe.com/resources/more/tokenization-and-passkeys-italy), Stripe, last updated 2026-07-13 — a general article on passkeys.
 - [Stripe documentation index](https://docs.stripe.com/llms.txt), Stripe, n.d., accessed 2026-11 — no page on card-scheme passkeys listed; none either in the documentation and support sitemaps or a web search of Stripe's domains, where passkey pages concern Dashboard sign-in (17 November 2026; volatile).
-- [Acquirer Disclosure](https://stripe.com/en-us/legal/acquirer-disclosure), Stripe, n.d., accessed 2026-11 — "Stripe MALPB" among the US acquirers.
+- [Acquirer Disclosure & Acquirer Terms](https://stripe.com/legal/acquirer-disclosure), Stripe, n.d., accessed 2026-11 — "Stripe MALPB" among the US acquirers.
 - [Stripe acquires Lemon Squeezy](https://www.lemonsqueezy.com/blog/stripe-acquires-lemon-squeezy), Lemon Squeezy, 2024-07-26, banner accessed 2026-11 — shutdown on 31 March 2027.
 - [Tempo Mainnet Is Live](https://tempo.xyz/blog/mainnet), Tempo, 2026-03-18 — mainnet and the Machine Payments Protocol.
 - [Adyen Announces Adyen Agentic](https://www.adyen.com/press-and-media/adyen-agentic), Adyen, 2026-06-16 — limited availability at announcement, early endorsement of UCP, AP2 and ACP, the Mastercard quotation.
@@ -298,15 +298,15 @@ All pages were fetched on 17 November 2026; undated documentation is cited as ac
 - [Agentic commerce for merchants](https://docs.adyen.com/online-payments/agentic-commerce/merchant), Adyen documentation, n.d., accessed 2026-11 — integrations for ACP and UCP (volatile).
 - [Adyen publishes H1 2026 financial results](https://www.adyen.com/press-and-media/adyen-publishes-h1-2026-financial-results-3wjne), Adyen, 2026-08-13 — the clause on Open Standard and OpenUSD; France's clearing system.
 - [H1 2026 Shareholder Letter](https://investors.adyen.com/financials/h1-2026-c2a1a), Adyen, 2026-08-13 — finance income from "balances at central and commercial banks".
-- [Adyen publishes Q3 2026 Business Update](https://www.adyen.com/press-and-media/adyen-publishes-q3-2026-business-update-6r9vz0), Adyen, 2026-10-28 — Personal Agent Protocol; the digital euro pilot.
+- [Adyen publishes Q3 2026 business update](https://www.adyen.com/press-and-media/adyen-publishes-q3-2026-business-update-6r9vz0), Adyen, 2026-10-28 — Personal Agent Protocol; the digital euro pilot.
 - [About Adyen](https://www.adyen.com/about), Adyen, n.d., accessed 2026-11 — FedNow adoption.
 - [Wero](https://docs.adyen.com/payment-methods/wero), Adyen documentation, n.d., accessed 2026-11-17 — in development; the payment guarantee, capture failure, the dispute process from February 2027 (volatile).
-- [PSD3 and PSR: what businesses need to know](https://www.adyen.com/knowledge-hub/psd3), Adyen, updated 2026-10-12 — expected timeline and a provider's reading of the texts.
+- [PSD3 and PSR Explained](https://www.adyen.com/knowledge-hub/psd3), Adyen, updated 2026-10-12 — expected timeline and a provider's reading of the texts.
 - [Adyen Rolls Out Visa Payment Passkey](https://www.adyen.com/press-and-media/adyen-visa-payment-passkey), Adyen, 2026-10-29 — UK first, expansion planned for 2027.
 - [Scheme passkeys](https://docs.adyen.com/online-payments/authentication/scheme-passkeys), Adyen documentation, n.d., accessed 2026-11 — pilot phase (volatile).
-- [Adyen closes Talon.One and Orb acquisitions](https://www.adyen.com/press-and-media/adyen-closes-talonone-and-orb-acquisitions-announces-leadership-updates), Adyen, 2026-07-01 — closing date.
-- [Adyen to acquire Orb](https://www.adyen.com/press-and-media/jtrg4qd7j3p4rj), Adyen, 2026-06-11 — the incubator model and continued support for other providers.
-- [Adyen Launches Intelligent Money Movement](https://www.adyen.com/press-and-media/adyen-launches-intelligent-money-movement), Adyen, 2026-04-09 — "a patchwork of acquired technologies".
+- [Adyen Closes Talon.One and Orb Acquisitions; Announces Leadership Updates Across Product and Finance](https://www.adyen.com/press-and-media/adyen-closes-talonone-and-orb-acquisitions-announces-leadership-updates), Adyen, 2026-07-01 — closing date.
+- [Adyen to acquire Orb to unify billing and payments infrastructure for enterprise merchants](https://www.adyen.com/press-and-media/jtrg4qd7j3p4rj), Adyen, 2026-06-11 — the incubator model and continued support for other providers.
+- [Adyen launches Intelligent Money Movement](https://www.adyen.com/press-and-media/adyen-launches-intelligent-money-movement), Adyen, 2026-04-09 — "a patchwork of acquired technologies".
 - [Find and Buy with AI: Visa Unveils New Era of Commerce](https://usa.visa.com/about-visa/newsroom/press-releases.releaseId.21361.html), Visa, 2025-04-30 — Visa Intelligent Commerce.
 - [Announcing Agent Payments Protocol (AP2)](https://cloud.google.com/blog/products/ai-machine-learning/announcing-agents-to-payments-ap2-protocol), Google Cloud, 2025-09-16 — the protocol and its supporters.
 - [Under the Hood: Universal Commerce Protocol (UCP)](https://developers.googleblog.com/under-the-hood-universal-commerce-protocol-ucp/), Google Developers Blog, 2026-01-11 — endorsers; the merchant remains merchant of record.
@@ -318,7 +318,7 @@ All pages were fetched on 17 November 2026; undated documentation is cited as ac
 - [GENIUS Act, Public Law 119-27](https://www.govinfo.gov/content/pkg/PLAW-119publ27/html/PLAW-119publ27.htm), United States Congress, 2025-07-18 — the effective-date section.
 - [OCC Bulletin 2026-50, GENIUS Act Regulations: Final Rule](https://occ.gov/news-issuances/bulletins/2026/bulletin-2026-50.html), Office of the Comptroller of the Currency, 2026-10-21 — effective date of 18 January 2027.
 - [Markets in Crypto-Assets Regulation (MiCA)](https://www.esma.europa.eu/esmas-activities/digital-finance-and-innovation/markets-crypto-assets-regulation-mica), European Securities and Markets Authority, n.d., accessed 2026-11 — entry into force and the transition period.
-- [Regulation (EU) 2024/886 on instant credit transfers in euro](http://publications.europa.eu/resource/celex/32024R0886), Official Journal of the European Union, 2024-03-19 (adopted 2024-03-13) — the 10 seconds and the deadlines by kind of institution.
+- [Regulation (EU) 2024/886 (instant payments)](http://publications.europa.eu/resource/celex/32024R0886), Official Journal of the European Union, 2024-03-19 (adopted 2024-03-13) — the 10 seconds and the deadlines by kind of institution.
 - [FedNow Service Volume and Value Statistics](https://www.frbservices.org/resources/financial-services/fednow-service-resources/fednow-service-volume-value-statistics/), Federal Reserve Financial Services, accessed 2026-11 — annual and quarterly figures.
 - [Procedure file 2023/0210(COD), Payment Services Regulation](https://oeil.europarl.europa.eu/oeil/en/procedure-file?reference=2023/0210%28COD%29) and [procedure file 2023/0209(COD), PSD3](https://oeil.europarl.europa.eu/oeil/en/procedure-file?reference=2023/0209%28COD%29), European Parliament Legislative Observatory, accessed 2026-11-17 — status and the indicative plenary date, the same in both files.
 - [Wero key figures](https://epicompany.eu/key-figures/), European Payments Initiative, n.d., accessed 2026-11 — users, rollout and planned migrations.

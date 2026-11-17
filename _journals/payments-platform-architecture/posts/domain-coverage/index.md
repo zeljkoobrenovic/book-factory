@@ -60,7 +60,7 @@ Read group by group, the tally is **20 at chapter level, 6 at section level, 3 m
 | Invoicing and Collections (`invo`) | Revenue Automation | Chapter | [[invoicing-collections-and-dunning]] ([[journey-failed-renewal]]) |
 | Tax Determination and Registration (`taxx`) | Revenue Automation | Chapter | [[billing-and-payment-tax]] ([[merchant-of-record]]) |
 | Revenue Recognition (`revn`) | Revenue Automation | Chapter | [[billing-revenue-recognition]] |
-| Reporting and Data Export (`rpts`) | Revenue Automation | Section | [[payment-reconciliation-and-reporting]] |
+| Reporting, Sigma, and Data Export (`rpts`) | Revenue Automation | Section | [[payment-reconciliation-and-reporting]] |
 | Merchant-of-Record Responsibility and Support (`morc`) | Revenue Automation | Chapter | [[merchant-of-record]] |
 
 The platform and shared-foundation groups complete the map in the same way. Accounts, verification, splits, payouts, fraud, disputes, ledgers, reconciliation, webhooks and the developer platform each have a chapter. Issued cards, financing, financial accounts and delegated authority get a section. Identity verification as a product of its own gets a mention. With these fifteen rows the tally can be checked: 20 + 6 + 3 = 29.
@@ -95,9 +95,9 @@ Twenty capabilities have a chapter; nine do not. Those nine are either product s
 | Payment fields embedded in the merchant's page | Section | Two sections of [[tokenization-vaulting-and-pci]]: how a card number reaches the provider without passing through the merchant, and what stays the merchant's on the page around the fields | The fields matter as the boundary of card-data scope, which is that chapter's subject |
 | Reporting and data export | Section | The section on what customers get in [[payment-reconciliation-and-reporting]]: reports itemized by payout and by batch, and the data offered as tables | Reports are taught as the input to reconciliation, not as an analytics product |
 | Issued cards and spend controls | Section | The section on issuing from the issuer's side in [[embedded-finance]] | A separate product with its own license; the chapter says what it demands of a platform |
-| Financing offers | Section | One of three products in a shared section of [[embedded-finance]], and a row in its availability table | Little is public beyond eligibility and repayment terms; the chapter is short and says so |
+| Financing offers | Section | One of three products in a shared section of [[embedded-finance]], and a row in its availability table | The chapter teaches who lends, how an advance is repaid and where it is offered, not how an offer is priced or underwritten |
 | Financial accounts and business liquidity | Section | Accounts for a platform's sellers in [[embedded-finance]]; the licenses behind held funds in [[licences-and-safeguarding]] | The book takes the platform's side; a company's own treasury operations are left out (below) |
-| Delegated authority and approvals | Section | The section on agents that pay in [[payments-what-is-moving]] | Most of it was announced or in preview at the research cut-off; the chapter labels each item and teaches only what was released |
+| Delegated authority and approvals | Section | The section on agents that pay in [[payments-what-is-moving]] | Most of it was announced or in preview at the research cut-off; the chapter labels each item's release stage and advises building only what every variant needs |
 
 Beyond whole capabilities, some parts of capabilities the book does cover are left out by decision. Most belong to a sibling book that already teaches them. The table names each part, the capability it belongs to, where to go instead and why.
 
@@ -163,11 +163,11 @@ The book also reuses the model's customers, as reading routes. The model describ
 
 | Role in the model | Responsible for | Nearest seat at Larkfield | Start with |
 | --- | --- | --- | --- |
-| Growth commerce lead (direct merchant) | Conversion, approval rates, expansion to new markets | No exact seat; the payments team under Femke de Graaf owns acceptance | [[authorization-optimization]], [[local-payment-methods]], [[payment-fraud-and-risk]] |
-| Revenue operations lead (recurring revenue) | Subscriptions, usage pricing, invoices that can be explained | The team that runs Larkfield's own subscription billing | [[subscriptions-and-billing-engines]], [[invoicing-collections-and-dunning]], [[journey-failed-renewal]] |
-| Platform payments lead | Onboarding sellers, moving their money, carrying or assigning loss | Femke de Graaf, Head of Payments Engineering; Jonas Weber, Risk and Compliance Lead | [[platform-payment-models]], [[platform-onboarding-and-verification]], [[splits-balances-and-platform-payouts]] |
-| Platform seller and payout recipient | Getting verified, getting paid, knowing why a payout is late | Ines Bakker of Studio Noord; Ravi Shah of Ironworks Climbing | [[journey-platform-payment]], [[payouts-and-money-movement]] |
-| Treasury and finance controller | Cash availability, reconciliation, the close | Priya Raman, Finance Controller | [[balances-and-funds-flows]], [[payment-reconciliation-and-reporting]], [[billing-revenue-recognition]] |
+| Growth Commerce GM (direct merchants) | Conversion, approval rates, expansion to new markets | No exact seat; the payments team under Femke de Graaf owns acceptance | [[authorization-optimization]], [[local-payment-methods]], [[payment-fraud-and-risk]] |
+| SaaS Revenue Operations Lead (recurring revenue operators) | Subscriptions, usage pricing, invoices that can be explained | The team that runs Larkfield's own subscription billing | [[subscriptions-and-billing-engines]], [[invoicing-collections-and-dunning]], [[journey-failed-renewal]] |
+| Platform Payments GM | Onboarding sellers, moving their money, carrying or assigning loss | Femke de Graaf, Head of Payments Engineering; Jonas Weber, Risk and Compliance Lead | [[platform-payment-models]], [[platform-onboarding-and-verification]], [[splits-balances-and-platform-payouts]] |
+| Platform Seller and Payout Recipient | Getting verified, getting paid, knowing why a payout is late | Ines Bakker of Studio Noord; Ravi Shah of Ironworks Climbing | [[journey-platform-payment]], [[payouts-and-money-movement]] |
+| Treasury and Finance Controller | Cash availability, reconciliation, the close | Priya Raman, Finance Controller | [[balances-and-funds-flows]], [[payment-reconciliation-and-reporting]], [[billing-revenue-recognition]] |
 
 By contrast with the routes, the question differs. Each role in the model asks about an outcome: collected revenue, usable funds, a correct bill, explained cash. The book's reader is the engineer who builds for them, and asks something else: **which record proves the outcome, and what happens when two records disagree?** Every chapter adds that question to the model's.
 
