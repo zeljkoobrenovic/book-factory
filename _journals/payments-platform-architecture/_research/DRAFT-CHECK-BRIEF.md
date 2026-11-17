@@ -20,3 +20,11 @@ You coordinate the draft check of a few pages of **SETTLED: Architecting Payment
 ## Report back
 
 Under 250 words. Per page: final verdict (PASS / ESCALATE), rounds used, units revised (count and what kind of failure), and for an ESCALATE each remaining failure with its quote, whether the draft or the spec looks at fault and why, and the three options for the author (revise by hand, change the spec, waive). Then: minor findings left unfixed that the author may care about (one line each), and any reader that could not be run.
+
+## Changes decided by the author on 24 November 2026 (these override the text above)
+
+1. **One round, report only.** Run the check once per page (round 1) and finalize. **Do not revise the page yourself**, whatever the verdict, and do not start a second round. A separate reviser acts on your report. An ESCALATE verdict is expected and is not a problem to solve.
+2. **Waiver, book-wide.** The position of the book's required house-format sections ("Stripe and Adyen: Where They Differ", "In Practice at Larkfield", "When It Goes Wrong", "What to Take Away", "Questions to Ask", "Sources and Evidence", and the setting-the-scene section) is fixed by the format the author approved. If a reader or the judge fails a check only because of where such a section sits, record that result with `"verdict": "waived"` and `"waived_by": "author, 2026-11-24, book-wide: position of house-format sections"`. A weak sentence leading into such a section is still an ordinary failure of the transition or flow check.
+3. **Do not run the build** (`_wiring/build.py`): parallel builds collide and delete files under `docs/`. The editor builds once at the end.
+4. **Own scratch directory:** `<system temp scratch>/draft-check/<your first folder>/<folder>/`; never write helper files into another coordinator's directory.
+5. In your report, add for each page your own judgement as the coordinator who saw every reader's output: which blocking failures a reader would actually notice (list them first), and which are the judge being stricter than the page deserves.
