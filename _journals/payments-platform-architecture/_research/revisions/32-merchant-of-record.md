@@ -1,0 +1,37 @@
+# Revision of 32-merchant-of-record (round-1 report, 2026-11-24)
+
+- r3 one_controlling_idea p13 (spec): split p13 into p13 (Managed Payments framed as the worked case of the definition, with its fee) and p19a (release history and the 75/80 countries discrepancy), placed last in the section after Figure 2; spec and prose together.
+- r4 one_controlling_idea p39 (spec): split p39 into p39 (the chapter's own course of action: who the seller is, whose name is on the invoice) and p39a (the closing of Part VI, one short unit, bold lead "Part VI closes on that name"); Keel, K1 and K5 each glossed in a clause.
+- r6 paragraph_traces_to_thesis p39 (spec): resolved by the same split; the part-level material is now a marked part closing, not the chapter's take-away.
+- r8 evidence_is_explained p12: added what the three-role table shows (only the merchant of record changes the seller, statement name and tax owner; who pays for a lost dispute is left to the contract).
+- r9 evidence_is_explained p22: Apple paragraph finished from the agreement's own definition (Exhibit A to Schedules 2 and 3: commissionaire "concludes agreements in their own name but acts on behalf of other persons"; fetched to confirm the wording) and states what it shows: the model is not new, Apple sells in its own name in commissionaire regions, legal effect per country is where the record stops (ruling 46c).
+- r11 transition p13 (example): new opening "What the definition means in practice is clearest in one product."
+- r12 transition p35 (contrast): p35 moved (rule 7) to the end of "Stripe and Adyen: Where They Differ", after the inference block; new opening "That inference marks one of five points where the public record stops"; GA bullet shortened to avoid repeating p19a.
+- r13 flow p13 (spec): fixed by the split; release chronology no longer opens the section.
+- r14 flow p14: last sentence now says how to hold both terms (Link is merchant of record; the contract keeps the business as seller of record); Lemon Squeezy gloss moved here as a clause.
+- r15 flow p06: "factor of about 46" replaced by the calculation (€1.12 billion against €24.5 million, about 46 times).
+- r16 flow p22: as r9.
+- r17 flow p26: "It gives no reason" now has its subject: "For not offering the role itself, Adyen gives no reason."
+- r18 flow p27: the sale runs on Adyen (Studio Noord's provider, ledger); the Connect exclusion is stated as the counterfactual "had Studio Noord been on Stripe"; €2.53 derived (1.9% + €0.25, ledger).
+- r19 flow p28: €156 million derived (52% of €910 million online volume × 120/365; disputable, not expected loss; ledger 04 addition) and "online" added per the ledger.
+- r20 flow p29: "the previous section" corrected to "A Layer, a Bundle, a Store".
+- r21 flow p35 (spec): as r12.
+- r22 flow p39 (spec): as r4.
+- r23, r24: waived by the author (house-format positions); no action.
+- r25 minor (callout): KEY POINTS bullet 1 lead now "The provider becomes the seller, and only part of the seller's position moves with it"; p02 now says it takes over "the tax and the handling of fraud and disputes", matching the body.
+- r26 minor: "Read down the rows rather than across the prices" resolves the clash with "not comparable line for line".
+- r27 minor: Single Rail now named in the Lemon Squeezy paragraph of When It Goes Wrong.
+- r28 minor: p03 opening made concrete ("leaves the path ... to question one thing it took for granted: who sells").
+- r29 minor: "another member's bank (not Mila's)".
+- r30 minor: two parentheticals split into a separate sentence.
+- r31 minor: notice to customers when subscriptions are taken back now stated in p18 before the table.
+- r32 minor: "cancels the subscriptions you sold that customer".
+- r34 known_before_new K2: Keel and K2 glossed at first use in p32.
+- r35 known_before_new Keel/K1/K5: glossed in p39a.
+- r36 known_before_new commissionaire: as r9.
+- r37 minor: Lemon Squeezy's older product glossed (role covered a seller's whole account).
+- r38 minor (callout gloss): "Connect platforms (Stripe's product for platforms)".
+- r39 minor: Ironworks Climbing glossed (a three-location climbing studio in Manchester).
+- r41 no_weak_conclusion new subtopic (spec): as r4; the part closing is marked as such.
+- Spec alignment: p14, p18, p20, p22, p27, p28, p29, p32, p34, p35 wording and evidence aligned with the prose; p35 evidence no longer says Apple's agreement is behind a login (ruling 46c); flow rationales of managed-payments, where-they-differ, when-it-goes-wrong updated; conclusion transition no longer carries "limits of the evidence".
+- Length: max_words raised 5% to 5,775; draft 5,763 words; timetoread 25 min.
