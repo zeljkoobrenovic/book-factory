@@ -1,4 +1,4 @@
-# Revision of part-7-intro (round-1 report, 2026-11-24)
+# Revision of part-7-intro (round-1 report, 2026-11-17)
 
 - one_controlling_idea p04 (€156 million): the figure is now tied to Mila's refund ("one refund; what rides on the decision at Larkfield's scale") and to what it measures, as chapter 33 states it (paid-out online card volume inside the 120-day dispute window; disputable, not lost).
 - flow p04 (€156 million): as above.

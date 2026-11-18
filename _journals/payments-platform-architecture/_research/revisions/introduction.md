@@ -1,6 +1,6 @@
 # Revision after draft check, round 1 — introduction
 
-Date: 2026-11-24. Report judged: spec `4bd96c5ff11c1a86`, draft `cc6e3c977e04a9af` (39 failed results). One line per failed result. No fact, number, date, quotation, source entry, figure, caption, callout or `[[link]]` was changed. Words: 3,504 before, 3,725 after; `max_words` raised 5% (3,550 to 3,727).
+Date: 2026-11-17. Report judged: spec `4bd96c5ff11c1a86`, draft `cc6e3c977e04a9af` (39 failed results). One line per failed result. No fact, number, date, quotation, source entry, figure, caption, callout or `[[link]]` was changed. Words: 3,504 before, 3,725 after; `max_words` raised 5% (3,550 to 3,727).
 
 ## one_controlling_idea_per_paragraph (spec faults, repaired in spec and prose)
 

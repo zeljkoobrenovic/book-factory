@@ -1,6 +1,6 @@
 # Revision after draft check, round 1 — 27-subscriptions-and-billing-engines
 
-Date: 2026-11-24. Report judged: round 1, 23 failed results (16 major, 7 minor) and 1 waived. One line per failed result. Words (check_draft structure): 5,848 before, 6,393 after (spec `max_words` 6,500, unchanged). `timetoread` 25 to 28. Apart from the corrections listed under "Content", no fact, number, date, quotation, hedge, figure, caption, callout, source entry or `[[link]]` was changed.
+Date: 2026-11-17. Report judged: round 1, 23 failed results (16 major, 7 minor) and 1 waived. One line per failed result. Words (check_draft structure): 5,848 before, 6,393 after (spec `max_words` 6,500, unchanged). `timetoread` 25 to 28. Apart from the corrections listed under "Content", no fact, number, date, quotation, hedge, figure, caption, callout, source entry or `[[link]]` was changed.
 
 ## evidence_is_explained
 
@@ -21,7 +21,7 @@ Date: 2026-11-24. Report judged: round 1, 23 failed results (16 major, 7 minor) 
 - Scene table incidents unexplained: fixed; each incident glossed in the cell (from the ledger); row label now "2026 incident in the engine".
 - Keel mid-clause: fixed; Keel introduced in its own sentence before the punchline, with K1 to K8.
 - K1, K5, K2 as unseen labels: fixed; each named in words at first use (K1 one writer, one key; K5 Larkfield paces and rate-limits renewals, now in prose before the table; K2 the provider's record is the truth, the webhook the doorbell).
-- 3.33 / 0 USD example: fixed; the steps are added from Stripe's prorations page (fetched 2026-11-24): 10 USD paid 1 April, upgrade 11 April without proration, downgrade 21 April with a third of the month left; both modes debit 3.33 USD; classic credits 6.67 USD (example invoice -3.34 USD); flexible credits 3.33 USD, total 0 USD.
+- 3.33 / 0 USD example: fixed; the steps are added from Stripe's prorations page (fetched 2026-11-17): 10 USD paid 1 April, upgrade 11 April without proration, downgrade 21 April with a third of the month left; both modes debit 3.33 USD; classic credits 6.67 USD (example invoice -3.34 USD); flexible credits 3.33 USD, total 0 USD.
 - `past_due` on Larkfield's engine: fixed; "the state Larkfield's engine calls `past_due`, a name borrowed from Stripe's status list".
 - Silent Webhook late and contradicting "failed twice": fixed (content); the scene now names it as a third membership incident that sat in the webhook receiver, not in the renewal job (ledger: Stripe webhook receiver, Monday 14 September 2026, ruling 20); the failure section refers back to it. Spec p06 aligned.
 - Intro dates out of order: fixed; ¶3 opens "The book's examples run in 2027, the year after Larkfield's incidents" and gives Mila's membership (January) before her pass (March). Spec p03 aligned.

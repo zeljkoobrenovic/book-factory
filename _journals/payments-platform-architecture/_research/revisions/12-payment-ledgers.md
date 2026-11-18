@@ -1,6 +1,6 @@
 # Revision after draft check, round 1 — 12-payment-ledgers
 
-Date: 2026-11-24. Report judged: round 1, 23 failed results (17 major or blocker, 6 minor). Words 6,241 before, 6,701 after; `max_words` raised from 6,500 to 6,750 (3.8%). `timetoread` 27 to 29. Apart from the corrections listed below, no fact, number, quotation, hedge, figure, caption, callout, source entry or `[[link]]` changed.
+Date: 2026-11-17. Report judged: round 1, 23 failed results (17 major or blocker, 6 minor). Words 6,241 before, 6,701 after; `max_words` raised from 6,500 to 6,750 (3.8%). `timetoread` 27 to 29. Apart from the corrections listed below, no fact, number, quotation, hedge, figure, caption, callout, source entry or `[[link]]` changed.
 
 ## one_controlling_idea_per_paragraph
 
@@ -52,7 +52,7 @@ Date: 2026-11-24. Report judged: round 1, 23 failed results (17 major or blocker
 
 - Fixed: "Adyen's 50 rows per payment (2021) and Stripe's five billion events a day (2024)", dated from the page's Sources (Adyen post 2021-08-23; Stripe post 2024-02-16); Larkfield's 31.4 million payments dated 2026 from the ledger.
 
-## Content corrections (change 4 of 24 November)
+## Content corrections (change 4 of 17 November)
 
 1. Nightly query and nightly posting job made to agree with the ledger's chapter 12 line (two periods, stated as such).
 2. AC-3 years added (above).

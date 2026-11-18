@@ -1,4 +1,4 @@
-# Revision of 32-merchant-of-record (round-1 report, 2026-11-24)
+# Revision of 32-merchant-of-record (round-1 report, 2026-11-17)
 
 - r3 one_controlling_idea p13 (spec): split p13 into p13 (Managed Payments framed as the worked case of the definition, with its fee) and p19a (release history and the 75/80 countries discrepancy), placed last in the section after Figure 2; spec and prose together.
 - r4 one_controlling_idea p39 (spec): split p39 into p39 (the chapter's own course of action: who the seller is, whose name is on the invoice) and p39a (the closing of Part VI, one short unit, bold lead "Part VI closes on that name"); Keel, K1 and K5 each glossed in a clause.

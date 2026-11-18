@@ -1,6 +1,6 @@
 # Revision log — part-5-intro (draft check round 1, ESCALATE)
 
-Revised 2026-11-24. One line per failed result. No fact, number, date, quotation, hedge, figure, caption or `[[link]]` changed; every added clause repeats the owning chapter or the Part V thesis.
+Revised 2026-11-17. One line per failed result. No fact, number, date, quotation, hedge, figure, caption or `[[link]]` changed; every added clause repeats the owning chapter or the Part V thesis.
 
 ## Major
 
@@ -20,7 +20,7 @@ Revised 2026-11-24. One line per failed result. No fact, number, date, quotation
 
 ## Spec changes
 
-- Controlling ideas of p01, p03, p04, p09, p12; Figure 2 evidence wording; non-goal 4; `revised` and changelog entry dated 2026-11-24. No unit added, moved or removed. `max_words` unchanged (1,200).
+- Controlling ideas of p01, p03, p04, p09, p12; Figure 2 evidence wording; non-goal 4; `revised` and changelog entry dated 2026-11-17. No unit added, moved or removed. `max_words` unchanged (1,200).
 
 ## Checks
 

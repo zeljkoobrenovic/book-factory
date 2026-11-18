@@ -1,6 +1,6 @@
 # Revision log — 23-network-tokens (draft check round 1, ESCALATE)
 
-Revised 2026-11-24 (single revision; no second check). One line per failed result. No quotation, date, number, hedge, source entry, figure, caption or `[[link]]` changed, except the content correction listed below.
+Revised 2026-11-17 (single revision; no second check). One line per failed result. No quotation, date, number, hedge, source entry, figure, caption or `[[link]]` changed, except the content correction listed below.
 
 ## Major
 
@@ -63,7 +63,7 @@ Revised 2026-11-24 (single revision; no second check). One line per failed resul
 
 ## Spec changes
 
-- Hook content; controlling ideas of p03, p04, p07, p11, p14, p17, p18, p27, p32, p33, p38, p40, p41, p44; evidence of p03, p27, p37, p41; transitions of p03 and p46; ledger source entry; `max_words` 6500 -> 6825 (5%); `revised` and changelog dated 2026-11-24. No unit added, moved or removed.
+- Hook content; controlling ideas of p03, p04, p07, p11, p14, p17, p18, p27, p32, p33, p38, p40, p41, p44; evidence of p03, p27, p37, p41; transitions of p03 and p46; ledger source entry; `max_words` 6500 -> 6825 (5%); `revised` and changelog dated 2026-11-17. No unit added, moved or removed.
 
 ## Checks
 

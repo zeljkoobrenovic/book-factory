@@ -1,6 +1,6 @@
 # Revision log — 22-tokenization-vaulting-and-pci (draft check round 1, ESCALATE)
 
-Revised 2026-11-24. One line per failed result. No quotation, date, number, hedge, source entry, figure, caption or `[[link]]` changed, except the two content corrections listed under "Content corrections".
+Revised 2026-11-17. One line per failed result. No quotation, date, number, hedge, source entry, figure, caption or `[[link]]` changed, except the two content corrections listed under "Content corrections".
 
 ## Blocker
 
@@ -37,7 +37,7 @@ Revised 2026-11-24. One line per failed result. No quotation, date, number, hedg
 
 ## Spec changes
 
-- Hook content; controlling ideas of p03, p06, p14, p22, p23, p24, p29, p30, p37, p44, p46, p47; two transition `carries_over`; callback `how`; `max_words` 6500 -> 6825 (5%); `revised` and changelog dated 2026-11-24. No unit added, moved or removed.
+- Hook content; controlling ideas of p03, p06, p14, p22, p23, p24, p29, p30, p37, p44, p46, p47; two transition `carries_over`; callback `how`; `max_words` 6500 -> 6825 (5%); `revised` and changelog dated 2026-11-17. No unit added, moved or removed.
 
 ## Checks
 

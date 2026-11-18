@@ -1,6 +1,6 @@
 # Revision after draft check, round 1 — 09-authorization-optimization
 
-Date: 2026-11-24. Report judged: spec `399abeb3efade3f0`, draft `ed044a9e3412d4b7` (24 failed results: 16 major or blocker, 8 minor). One line per failed result. Words: 6,127 before, 6,586 after; `max_words` raised 1.5% (6,500 to 6,600). `timetoread` 26 to 29. Apart from the editor-authorized corrections listed at the end, no fact, number, date, quotation, hedge, figure, caption, callout or `[[link]]` was changed.
+Date: 2026-11-17. Report judged: spec `399abeb3efade3f0`, draft `ed044a9e3412d4b7` (24 failed results: 16 major or blocker, 8 minor). One line per failed result. Words: 6,127 before, 6,586 after; `max_words` raised 1.5% (6,500 to 6,600). `timetoread` 26 to 29. Apart from the editor-authorized corrections listed at the end, no fact, number, date, quotation, hedge, figure, caption, callout or `[[link]]` was changed.
 
 ## one_controlling_idea_per_paragraph
 
@@ -19,7 +19,7 @@ Date: 2026-11-24. Report judged: spec `399abeb3efade3f0`, draft `ed044a9e3412d4b
 - p02, "The remote system here": fixed. The spec's bridge sentence now precedes it.
 - p14, 82.3% against the scene's 82.0%: fixed ("The 82.3% is Adyen's rate per attempt; the scene's 82.0% was Stripe's").
 - p34, "the third design" before the table: fixed. The paragraph names the three designs before the rule, and the sentence reads "Adyen provides for the third design, the merchant's own schedule".
-- p36, cells "cited earlier" that were not: fixed by citing both earlier. p23 quotes Stripe's "Excessive retry prevention" (same documentation page as decline prevention, fetched 24 November 2026); p24 quotes Adyen's refusal reason 46.
+- p36, cells "cited earlier" that were not: fixed by citing both earlier. p23 quotes Stripe's "Excessive retry prevention" (same documentation page as decline prevention, fetched 17 November 2026); p24 quotes Adyen's refusal reason 46.
 - p37, the Checkout API clause: fixed. It is now its own sentence, tied to the attempt records ("Those records depend on webhooks: …").
 - p33 after the six rules (spec): repaired in spec and prose. p33 now precedes p32; both transitions and the section's flow rationale were rewritten. The Mastercard sentence stays in the unit, now introduced as a gap on the network side.
 
@@ -49,7 +49,7 @@ Date: 2026-11-24. Report judged: spec `399abeb3efade3f0`, draft `ed044a9e3412d4b
 
 ## AC-3 (blocker), editor-authorized content corrections
 
-- Stripe's "55%": moved to p33 and quoted from Stripe's Billing product page (n.d., accessed November 2026): "Businesses using Stripe recover 55% of failed payments on average", with its scope (the preceding sentence names Smart Retries, the card account updater and cancellation surveys together; not a Smart Retries figure; ruling 37c). Wording confirmed by fetch on 24 November 2026. Sources entry added, as in chapter 29.
+- Stripe's "55%": moved to p33 and quoted from Stripe's Billing product page (n.d., accessed November 2026): "Businesses using Stripe recover 55% of failed payments on average", with its scope (the preceding sentence names Smart Retries, the card account updater and cancellation surveys together; not a Smart Retries figure; ruling 37c). Wording confirmed by fetch on 17 November 2026. Sources entry added, as in chapter 29.
 - Adyen's "4%": quoted in p33 from the guide of 16 June 2026: "Pinterest saw a 4% improvement in recovery rate on retried transactions, with expectation of reaching 10% over time"; one customer, no baseline (ruling 37b). Confirmed by fetch. Sources entry added, as in chapter 29.
 - Adyen's "11% and 12%": quoted from the press release of 22 September 2026: "an 11% increase in payment conversion" at Too Good To Go (the customer's words: "11% relative increase during the pilot") and "an 12% increase in payment conversion on the eligible traffic" at Just Eat Takeaway.com; labeled testimonials for one module with no baseline or method (ruling 31d). Confirmed by fetch. Existing Sources entry reworded to say so.
 - Spec p33 evidence corrected: it still listed "any figure after Adyen's pilot of 60" as not found, against the verified page.

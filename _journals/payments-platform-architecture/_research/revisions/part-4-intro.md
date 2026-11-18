@@ -1,6 +1,6 @@
 # Revision log — part-4-intro (draft check round 1, ESCALATE)
 
-Revised 2026-11-24. One line per failed result. No fact, number, date, quotation, hedge, figure, caption or `[[link]]` changed; every added clause repeats the ledger or the owning chapter.
+Revised 2026-11-17. One line per failed result. No fact, number, date, quotation, hedge, figure, caption or `[[link]]` changed; every added clause repeats the ledger or the owning chapter.
 
 ## Major
 
@@ -22,7 +22,7 @@ Revised 2026-11-24. One line per failed result. No fact, number, date, quotation
 
 ## Spec changes
 
-- hook, p01 (controlling idea and evidence), p02, p03, p04 controlling ideas; decision log and changelog entries dated 2026-11-24; `revised` 2026-11-24; `max_words` raised 5% (1,200 to 1,260).
+- hook, p01 (controlling idea and evidence), p02, p03, p04 controlling ideas; decision log and changelog entries dated 2026-11-17; `revised` 2026-11-17; `max_words` raised 5% (1,200 to 1,260).
 
 ## Checks
 

@@ -1,0 +1,18 @@
+# Revision of 41-safe-change (round-1 report, 2026-11-17)
+
+- transition in-practice (p22, "Larkfield's payments team has 11 engineers."): opens with "Treating reconciliation as your own job does not mean copying a provider's machinery.", carrying over p27's recommendation (example).
+- transition p28 / flow p28 ("The first of them, the comparison"): now "The upgrade starts with the last of the four, the comparison, run dark before any live traffic meets the new version." The list order is unchanged; the sentence now matches it. Spec p28 aligned.
+- flow incidents-and-culture (monorepo, language, hardware paragraphs): each now says how it bears on safe change: p24 opens "Where the code lives, and in what language, decides how a change is tested before its first stage" and ends on test selection keeping the test stage, the first gate of every rollout, fast; p25 opens "What a company builds rather than buys decides which changes are its own to stage" and adds that in-house components and owned machines are changes the owner must make without stopping payments. Spec p24, p25 aligned.
+- flow p07 ("The chapter takes the four questions in order"): replaced by a true map: rollout answers the first two, the rollback paragraph and migrations the third, the reconciliation step and the May 2027 upgrade the fourth. Spec p07 aligned.
+- flow rollout opening (rollout seems to cause unknown outcomes): now says bounding exposure bounds how many payments can fail or be left unknown if the code is withdrawn. Spec p11 aligned.
+- flow p37/p39 (spec: part synthesis split around Questions to Ask): the part's two rules moved from p39 into p37 and conclusion.synthesis; p37 opens "This chapter also closes Part VIII"; p39 is the hand-off only; hand_off.carries_over adjusted. Validates.
+- flow callouts (Version Cliff, team of eleven before introduction): glossed in the FAILURE PATTERNS callout ("Larkfield's March 2026 billing upgrade"; "Larkfield's payments team"), per author's change 3. The Phantom Payment is now named in the recovery paragraph.
+- flow Figure 2 caption (2024 vs 2023): source checked in the verification file (row 5: the 2023 annual letter, PDF dated 13 March 2024). Caption corrected to "as Stripe's 2023 annual letter (published March 2024) described it"; the Differ "What is gated" cell dated "(2023 letter, published 2024)" to match the first row and the prose.
+- flow p14 (three cadences): introduced as "The first ... The second ... The third ...".
+- flow p27 ("this book's test for a single payment"): the test is now stated in the sentence ("that an answer is a promise until a later record confirms it").
+- minor p23 (DDoS is not a change; spec): clause added: it is an attack, not a change, cited only for how Adyen publishes an incident. Spec p23 aligned.
+- minor p09 (second reason arrives late): both reasons announced together, then "Take the first" / "Now the second". Spec p09 aligned.
+- minor p21 ("second column of gaps", "a fifth step"): now "Read down the column of what each design cannot catch, and one gap is in every row"; "a step of another kind". The release-window cell "Anything" includes that gap. Spec p21 aligned.
+- known_before_new "critical tier": first use now says it is "a term the company does not define".
+- Content checks against rulings 42, 43, 45, 46(e): two Stripe root-cause analyses, Adyen continuous releases, freeze, terminal and weekly core-system cadences, status pages not read, DDoS update dated 21 April 2025, RCA 12 July 2019, failover wording: all already in line; no correction needed beyond the caption and table date above.
+- Length: 6,317 words; max_words raised 6,100 -> 6,405 (5%). timetoread 26 -> 27 min.

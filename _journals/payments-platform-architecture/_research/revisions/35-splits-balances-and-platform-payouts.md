@@ -1,6 +1,6 @@
 # Revision after draft check, round 1 — 35-splits-balances-and-platform-payouts
 
-Date: 2026-11-24. Report judged: round 1, 21 failed results (15 major, 6 minor) and 1 waived. One line per failed result. Words: 6,022 before, 6,373 after (within `max_words` 6,500; unchanged). `timetoread` 26 to 28. Apart from the corrections listed under "Content", no fact, number, date, quotation, hedge, figure, caption, callout, source entry or `[[link]]` was changed.
+Date: 2026-11-17. Report judged: round 1, 21 failed results (15 major, 6 minor) and 1 waived. One line per failed result. Words: 6,022 before, 6,373 after (within `max_words` 6,500; unchanged). `timetoread` 26 to 28. Apart from the corrections listed under "Content", no fact, number, date, quotation, hedge, figure, caption, callout, source entry or `[[link]]` was changed.
 
 ## evidence_is_explained
 

@@ -1,6 +1,6 @@
 # Revision log — where-payment-systems-go-wrong (draft check round 1, ESCALATE)
 
-Revised 2026-11-24. One line per failed result. No fact, number, date, quotation, hedge, source, figure, caption or `[[link]]` changed.
+Revised 2026-11-17. One line per failed result. No fact, number, date, quotation, hedge, source, figure, caption or `[[link]]` changed.
 
 ## Major
 
@@ -36,7 +36,7 @@ Revised 2026-11-24. One line per failed result. No fact, number, date, quotation
 
 ## Spec changes
 
-- p02 split, new p129; p15 split, new p130 (evidence moved with it); p04 controlling idea extended with the table-term glosses; section flow note records the extra unit; `max_words` 6500 -> 6825 (5%), because the glosses and clauses add about 240 words and the page has no connective text of that size to trim; changelog entry dated 2026-11-24.
+- p02 split, new p129; p15 split, new p130 (evidence moved with it); p04 controlling idea extended with the table-term glosses; section flow note records the extra unit; `max_words` 6500 -> 6825 (5%), because the glosses and clauses add about 240 words and the page has no connective text of that size to trim; changelog entry dated 2026-11-17.
 
 ## Checks
 

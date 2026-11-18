@@ -40,7 +40,7 @@ Decide first whether you agree. A judge can be wrong; if a failure misreads the 
 - Stay within the spec's `max_words`; if repairs add words, trim connective sentences elsewhere (never evidence). If that is impossible, raise `max_words` by at most 5% and say so.
 - Keep callouts, front matter (including `icon:` and `logo:` lines), figure lines, captions and Sources untouched.
 - One front-matter line you DO update: `timetoread: N min read`, where N is the `check_draft.py structure` word count divided by 230, rounded to the nearest whole number. Do this last, after all other edits, because the check that follows is tied to the exact file.
-- Add one changelog entry to `spec.json` dated 2026-11-24 summarizing the repairs.
+- Add one changelog entry to `spec.json` dated 2026-11-17 summarizing the repairs.
 - `python3 _wiring/validate_spec.py payments-platform-architecture <folder>` passes; `python3 _wiring/check_draft.py structure ROOT/posts/<folder>` passes.
 - Do not run readers and do not write `check-report.json`: a separate session checks your revision with fresh readers.
 - Write `ROOT/_research/revisions/<folder>.md`: one line per failed result (id or check, what you did, or why not).
@@ -49,7 +49,7 @@ Decide first whether you agree. A judge can be wrong; if a failure misreads the 
 
 Under 200 words: failures fixed in the draft (count by kind); spec repairs made (each in one line); failures you judged wrong (count, with the two most significant); failures left for the editor (each with quote and recommendation); word count; checks run.
 
-## Changes decided by the author on 24 November 2026 (these override the text above where they differ)
+## Changes decided by the author on 17 November 2026 (these override the text above where they differ)
 
 1. **This is the only revision the page gets.** No second check follows, so be thorough and careful: fix every failure you agree with, including the minor ones that are cheap and plainly right.
 2. **Waiver, book-wide.** The position of the required house-format sections ("Stripe and Adyen: Where They Differ", "In Practice at Larkfield", "When It Goes Wrong", "What to Take Away", "Questions to Ask", "Sources and Evidence", the setting-the-scene section) is fixed. Never move one. Where a failure is about such a position, make the paragraph before the section and its opening sentence say why it comes there, and log it as "house format; transition strengthened".
@@ -58,3 +58,6 @@ Under 200 words: failures fixed in the draft (count by kind); spec repairs made 
 5. **Length:** stay within `max_words`; you may raise it by at most 5% but never above 6,900 for a chapter. Prefer trimming restatement.
 6. **Do not run the build** (`_wiring/build.py`): parallel builds collide. Validate and run the structure check only.
 7. **Spec faults about a paragraph that belongs in another section:** you may move a single paragraph unit to the section where both readers or the judge say it belongs, in spec and prose together, fixing the transitions on both sides, when the move loses nothing and the paragraph's content does not change. Whole sections still never move.
+
+8. **Never edit `journal-spec.json` directly**: it is generated. A change to a part-level or journal-level field goes into `_research/journal-spec-parts/<part>.json`, followed by `python3 _journals/payments-platform-architecture/_research/tools/assemble_journal_spec.py`; a change to one post's entry uses `_research/tools/fix_entry.py`.
+9. Date new changelog entries 2026-11-17.

@@ -1,6 +1,6 @@
 # Revision after draft check, round 1 — 05-payment-economics
 
-Date: 2026-11-24. Report judged: spec `20286b4050d1d0a7`, draft `a553c6302953f1eb` (22 failed results: 17 major, 5 minor). One line per failed result. Words: 6,437 before, 6,823 after; `max_words` raised 5% (6,500 to 6,825). `timetoread` 27 to 30. Apart from the editor-authorized additions listed at the end, no fact, number, date, quotation, hedge, figure, caption, callout, source entry or existing `[[link]]` was changed.
+Date: 2026-11-17. Report judged: spec `20286b4050d1d0a7`, draft `a553c6302953f1eb` (22 failed results: 17 major, 5 minor). One line per failed result. Words: 6,437 before, 6,823 after; `max_words` raised 5% (6,500 to 6,825). `timetoread` 27 to 30. Apart from the editor-authorized additions listed at the end, no fact, number, date, quotation, hedge, figure, caption, callout, source entry or existing `[[link]]` was changed.
 
 ## one_controlling_idea_per_paragraph
 

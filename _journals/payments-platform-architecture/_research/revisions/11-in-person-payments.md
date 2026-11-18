@@ -1,6 +1,6 @@
 # Revision after draft check, round 1 — 11-in-person-payments
 
-Date: 2026-11-24. Report judged: round 1, 21 failed results (16 major, 5 minor). One line per failed result. Words 6,147 before, 6,496 after (`max_words` 6,500, unchanged). `timetoread` 26 to 28. Apart from the corrections listed under "Content corrections", no fact, number, quotation, hedge, figure, caption, callout, source entry or `[[link]]` was changed.
+Date: 2026-11-17. Report judged: round 1, 21 failed results (16 major, 5 minor). One line per failed result. Words 6,147 before, 6,496 after (`max_words` 6,500, unchanged). `timetoread` 26 to 28. Apart from the corrections listed under "Content corrections", no fact, number, quotation, hedge, figure, caption, callout, source entry or `[[link]]` was changed.
 
 ## one_controlling_idea_per_paragraph
 
@@ -42,7 +42,7 @@ Date: 2026-11-24. Report judged: round 1, 21 failed results (16 major, 5 minor).
 - Floor limit vs store-and-forward maximum: fixed from Adyen's setup table (fetched): floor limits for offline EMV (chip and contactless), the store-and-forward maximum and count for store-and-forward.
 - Opening queue read as a Larkfield studio: fixed; the hook places it at "a gym whose terminals accept payments offline", and the close returns to "the gym's queue".
 
-## Content corrections (change 4 of 24 November)
+## Content corrections (change 4 of 17 November)
 
 1. Adyen documentation dates taken from page metadata (2023, 2025, May 2026, 2026) replaced by "n.d., accessed November 2026" in five places in the text and six table cells (ruling 30; verification rows 20, 24, 35, 49, 73, 80, 101 show these were `last_modified` stamps). The note before the table now says both companies' documentation is undated.
 2. Adyen wallet claim: supported (verification row 75); the quotation is restored, not removed.

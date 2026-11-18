@@ -1,4 +1,4 @@
-# meet-larkfield — revision after draft check round 1 (2026-11-24)
+# meet-larkfield — revision after draft check round 1 (2026-11-17)
 
 One line per failed result. Words: 4,994 before, 5,249 after; `max_words` raised 5,000 → 5,250 (5%). No fact, number, date, quotation, link, caption, callout, front matter or source entry changed.
 

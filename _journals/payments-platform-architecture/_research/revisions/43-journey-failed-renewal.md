@@ -1,0 +1,27 @@
+# Revision of 43-journey-failed-renewal (round-1 check, 2026-11-17)
+
+- evidence_is_explained (comparison table): agreed; the lead-in now says what the table shows: only the Stripe column names the provider as holder of the €49.00 debt, both Adyen columns the merchant's own record.
+- transition_expresses_declared_relationship / flow ("Consequently"): agreed; the opening now carries over the last failed attempt (13 April, nothing left to try before day 14) as the cause of the three decisions. Spec p32 transition updated.
+- flow_is_followable / known_before_new (K2 and "sweep"): agreed; K2 glossed at first use (the provider's own record is the truth; a job sweeps everything still pending), so the later "K2's sweep" is known. Spec p22 updated.
+- flow_is_followable ("loses three and gains three" vs eleven): agreed; rewritten without the arithmetic: three have no counterpart, three are new, Journey 1's later steps share one row, "and the renewal fits in eleven". Spec p08 wording matched to the page (it said "no risk screen", the page says "no first-time approval").
+- flow_is_followable / known_before_new (ContAuth, provider/network token, Category 2, €47.82/€1.18 in the step table): agreed; spec and prose: one-clause glosses in the paragraph before the table, with a signpost that the walk explains them. Spec p09 updated.
+- flow_is_followable ("second row" before the table): agreed; refers to the three kinds, named in the sentence that introduces them, not to rows.
+- flow_is_followable ("note the difference"): agreed; Visa's 20 attempts in 30 days stated in the same paragraph; "I cite Visa's rule". Spec p16 updated.
+- flow_is_followable ("holds the debt on both providers"): agreed; now "holds every member's debt, whichever provider takes the payment"; the Stripe section says its renewal job holds members' debts on both providers (ledger, chapter 27 line), removing the apparent contradiction.
+- flow_is_followable ("reads that sentence as covering a refusal"): agreed; now says Adyen's sentence does not name a refusal, chapter 18 reads it as covering one, and this walkthrough follows that reading. Claim unchanged.
+- flow_is_followable (two records become `paid`): agreed; "the attempt's payment record, not yet the period record" and "the period record, the debt's own record, becomes `paid` too".
+- flow_is_followable ("same fifth step"): agreed; "step 9 here, is the step Journey 1 numbered five".
+- flow_is_followable (evidence-age aside in a long sentence): agreed; split into three sentences with the age note after the first.
+- flow_is_followable (two reasons for 4 April): agreed; the last sentence now calls itself a second reason beside "one debt gets one scheduler".
+- flow_is_followable (Orb sentence between questions and answers): agreed; Larkfield's answers now follow the questions directly; the Orb sentence follows the Adyen point it supports. Nothing removed.
+- minor ("the same decline"): fixed ("a renewal that did not go through").
+- minor ("between two rows"): fixed ("where one step hands on to the next"); spec p09 "shows" updated.
+- minor (Auto Rescue unannounced): fixed in the roadmap ("with Adyen's own retry feature beside it"); spec p04 updated. Heading unchanged.
+- minor (Stripe figure not in the chapter): fixed ("Stripe also publishes a recovery figure, but not one for Smart Retries alone").
+- minor ("both of those things"): fixed ("removes her presence and the bank's yes").
+- minor (Lotte Smit aside): fixed; joined to the sentence whose point it illustrates.
+- minor ("third row, by contrast"): fixed ("The third kind, unlike Mila's").
+- minor ("Your own record" vs "Your period record"): fixed ("Your own debt record, such as a period record").
+- minor ("two parties to the money"): fixed ("the money went from the member to the studio").
+- flow_is_followable (waived, narrative close after Questions to Ask): house format; no change.
+- Length: 5,643 words (max_words 6,500). timetoread 25 min.

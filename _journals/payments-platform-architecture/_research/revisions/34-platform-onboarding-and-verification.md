@@ -1,6 +1,6 @@
 # Revision after draft check, round 1 — 34-platform-onboarding-and-verification
 
-Date: 2026-11-24. Report judged: round 1, 22 failed results (11 major, 11 minor), none waived. One line per failed result. Words: 6,300 before, 6,592 after; `max_words` raised 5% from 6,300 to 6,615. `timetoread` 27 to 29. Apart from the corrections listed under "Content", no fact, number, date, quotation, hedge, figure, caption, callout, source entry or `[[link]]` was changed.
+Date: 2026-11-17. Report judged: round 1, 22 failed results (11 major, 11 minor), none waived. One line per failed result. Words: 6,300 before, 6,592 after; `max_words` raised 5% from 6,300 to 6,615. `timetoread` 27 to 29. Apart from the corrections listed under "Content", no fact, number, date, quotation, hedge, figure, caption, callout, source entry or `[[link]]` was changed.
 
 ## one_controlling_idea_per_paragraph
 

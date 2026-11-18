@@ -1,6 +1,6 @@
 # Revision log — 17-api-design-and-object-models (draft check round 1, ESCALATE)
 
-Revised 2026-11-24. Report judged: spec `check-report.json` round 1 (15 failed results: 13 major, 2 minor). One line per failed result. No fact, number, date, quotation, hedge, figure, caption, source entry or `[[link]]` changed. Words 6,397 before, 6,591 after; `max_words` raised 1.5% (6,500 to 6,600). `timetoread` 27 to 29.
+Revised 2026-11-17. Report judged: spec `check-report.json` round 1 (15 failed results: 13 major, 2 minor). One line per failed result. No fact, number, date, quotation, hedge, figure, caption, source entry or `[[link]]` changed. Words 6,397 before, 6,591 after; `max_words` raised 1.5% (6,500 to 6,600). `timetoread` 27 to 29.
 
 ## evidence_is_explained
 

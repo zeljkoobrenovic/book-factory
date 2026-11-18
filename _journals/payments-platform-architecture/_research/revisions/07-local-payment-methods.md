@@ -1,4 +1,4 @@
-# 07-local-payment-methods — revision after draft check round 2 (2026-11-24)
+# 07-local-payment-methods — revision after draft check round 2 (2026-11-17)
 
 One line per failed result of the round-2 report. Words: 6,038 before, 6,180 after (`max_words` 6,500, unchanged). `timetoread` 24 → 27 min. Callouts, figures, captions, links and Sources untouched; the only content corrections are the three the editor authorized (marked EDITOR).
 

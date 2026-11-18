@@ -1,6 +1,6 @@
 # Revision log — 18-idempotency-and-retries (draft check round 1, ESCALATE)
 
-Revised 2026-11-24. 28 failed results (1 waived). One line per failed result. No fact, number, date, quotation, hedge, figure, caption, source entry or `[[link]]` changed. Words 6,089 before, 6,389 after (limit 6,500, unchanged). `timetoread` 26 to 28.
+Revised 2026-11-17. 28 failed results (1 waived). One line per failed result. No fact, number, date, quotation, hedge, figure, caption, source entry or `[[link]]` changed. Words 6,089 before, 6,389 after (limit 6,500, unchanged). `timetoread` 26 to 28.
 
 ## one_controlling_idea_per_paragraph
 

@@ -1,6 +1,6 @@
 # Revision log — 31-revenue-recognition (draft check round 1, ESCALATE)
 
-Revised 2026-11-24. One line per failed result. No fact, number, date, quotation, hedge, source, figure, caption or `[[link]]` changed, except the content corrections listed below.
+Revised 2026-11-17. One line per failed result. No fact, number, date, quotation, hedge, source, figure, caption or `[[link]]` changed, except the content corrections listed below.
 
 ## Major
 
@@ -34,7 +34,7 @@ Revised 2026-11-24. One line per failed result. No fact, number, date, quotation
 
 ## Spec changes
 
-- Introduction order p01, p02, p04, p03, with transitions updated; scene carry-over updated; controlling ideas of p02, p03, p08, p10, p11, p26, p29, p31 extended to match the prose; `max_words` 5500 -> 5775 (5%), because the glosses and transitions add about 200 words and no connective text of that size could be cut without evidence; changelog entry dated 2026-11-24.
+- Introduction order p01, p02, p04, p03, with transitions updated; scene carry-over updated; controlling ideas of p02, p03, p08, p10, p11, p26, p29, p31 extended to match the prose; `max_words` 5500 -> 5775 (5%), because the glosses and transitions add about 200 words and no connective text of that size could be cut without evidence; changelog entry dated 2026-11-17.
 
 ## Checks
 

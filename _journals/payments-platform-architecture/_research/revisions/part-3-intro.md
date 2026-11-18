@@ -1,6 +1,6 @@
 # Revision after draft check, round 1 — part-3-intro
 
-Date: 2026-11-24. Report judged: round 1, 12 failed results (8 major, 4 minor). Words 1,135 before, 1,196 after (cap 1,200, unchanged). `timetoread` stays 5. No fact, number, date, quotation, hedge, figure, caption, callout, source entry or `[[link]]` changed.
+Date: 2026-11-17. Report judged: round 1, 12 failed results (8 major, 4 minor). Words 1,135 before, 1,196 after (cap 1,200, unchanged). `timetoread` stays 5. No fact, number, date, quotation, hedge, figure, caption, callout, source entry or `[[link]]` changed.
 
 ## transition_expresses_declared_relationship
 

@@ -1,6 +1,6 @@
 # Revision log — 24-fraud-and-risk-systems (draft check round 1, ESCALATE)
 
-Revised 2026-11-24 (single revision; no second check). One line per failed result. No quotation, date, number, hedge, source entry, figure, caption or `[[link]]` changed; no fact added (the foundation model, K1 and the Connect point were already on the page and are only moved or glossed).
+Revised 2026-11-17 (single revision; no second check). One line per failed result. No quotation, date, number, hedge, source entry, figure, caption or `[[link]]` changed; no fact added (the foundation model, K1 and the Connect point were already on the page and are only moved or glossed).
 
 ## Major
 
@@ -45,7 +45,7 @@ Revised 2026-11-24 (single revision; no second check). One line per failed resul
 
 ## Spec changes
 
-- p10 split (new p46); controlling ideas of p03, p07, p10, p13, p14, p20, p21, p23, p26, p27, p29, p30, p34, p35, p36, p37, p38, p43; `kinds` and `merchant-risk` transition_in; `kinds` flow rationale; `max_words` 6500 -> 6825 (5%); `revised` and changelog dated 2026-11-24.
+- p10 split (new p46); controlling ideas of p03, p07, p10, p13, p14, p20, p21, p23, p26, p27, p29, p30, p34, p35, p36, p37, p38, p43; `kinds` and `merchant-risk` transition_in; `kinds` flow rationale; `max_words` 6500 -> 6825 (5%); `revised` and changelog dated 2026-11-17.
 
 ## Checks
 

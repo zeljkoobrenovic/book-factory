@@ -1,6 +1,6 @@
 # Revision log — 30-tax (draft check round 1, ESCALATE)
 
-Revised 2026-11-24. One line per failed result. No fact, number, date, quotation, hedge, source, figure, caption or `[[link]]` changed.
+Revised 2026-11-17. One line per failed result. No fact, number, date, quotation, hedge, source, figure, caption or `[[link]]` changed.
 
 ## Major
 
@@ -34,7 +34,7 @@ Revised 2026-11-24. One line per failed result. No fact, number, date, quotation
 
 ## Spec changes
 
-- stripe-tax paragraphs reordered (p17, p15, p16, p12, p13, p14, p33), transitions and controlling ideas updated, section flow rationale and transition `introduces` rewritten; p16 split into p16 and p33; p18 split into p18 and p34; p08 controlling idea notes the table reading; p19 carry-over updated; `max_words` 5000 -> 5250 (5%); changelog entry dated 2026-11-24.
+- stripe-tax paragraphs reordered (p17, p15, p16, p12, p13, p14, p33), transitions and controlling ideas updated, section flow rationale and transition `introduces` rewritten; p16 split into p16 and p33; p18 split into p18 and p34; p08 controlling idea notes the table reading; p19 carry-over updated; `max_words` 5000 -> 5250 (5%); changelog entry dated 2026-11-17.
 
 ## Checks
 

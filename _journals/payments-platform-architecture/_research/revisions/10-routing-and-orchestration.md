@@ -1,6 +1,6 @@
 # Revision after draft check, round 2 — 10-routing-and-orchestration
 
-Date: 2026-11-24. Report judged: round 2 (after one revision by the checker), 16 failed results: 9 major, 7 minor. One line per failed result. Words: 5,887 before, 6,165 after (`max_words` 6,500, unchanged). `timetoread` 24 to 27. Apart from the editor-authorized corrections listed below, no fact, number, date, quotation, hedge, figure, caption, callout, source entry or `[[link]]` was changed.
+Date: 2026-11-17. Report judged: round 2 (after one revision by the checker), 16 failed results: 9 major, 7 minor. One line per failed result. Words: 5,887 before, 6,165 after (`max_words` 6,500, unchanged). `timetoread` 24 to 27. Apart from the editor-authorized corrections listed below, no fact, number, date, quotation, hedge, figure, caption, callout, source entry or `[[link]]` was changed.
 
 ## transition_expresses_declared_relationship
 

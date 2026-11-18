@@ -1,6 +1,6 @@
 # Revision after draft check, round 1 — 13-balances-and-funds-flows
 
-Date: 2026-11-24. Report judged: round 1, 17 failed results (12 major, 4 minor, 1 waived). One line per failed result. Words (structure count): 5,924 before, 6,274 after (`max_words` 6,500, unchanged). `timetoread` 25 to 27.
+Date: 2026-11-17. Report judged: round 1, 17 failed results (12 major, 4 minor, 1 waived). One line per failed result. Words (structure count): 5,924 before, 6,274 after (`max_words` 6,500, unchanged). `timetoread` 25 to 27.
 
 ## one_controlling_idea_per_paragraph
 

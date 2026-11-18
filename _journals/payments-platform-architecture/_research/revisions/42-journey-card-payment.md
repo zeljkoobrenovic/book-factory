@@ -1,0 +1,25 @@
+# Revision of 42-journey-card-payment (round-1 check, 2026-11-17)
+
+- flow_is_followable (Intro ¶2 restates ¶1): agreed; ¶2 no longer repeats "the fifth" (the bank's approval moved into ¶1's sentence); it now adds the derivation of €117.47 (€120.00 less the €2.53 fee) and the note that steps are numbered by hand-off, not by the clock. Spec p02 updated.
+- flow_is_followable (reference table terms): agreed; one-clause glosses in the cells for PSP reference, PaymentIntent, Charge, sales day and batch, balance transaction, balance account; "The funding unit" row label explained.
+- flow_is_followable (Keel codes): agreed; where Keel is first named, K2, K3 and K4 each get one clause from the ledger. Spec p07 evidence added.
+- flow_is_followable (step order, step 4 before step 1): agreed; Intro ¶2 says once that the steps are numbered by hand-off, not by the clock, naming step four.
+- flow_is_followable ("exemption", "liability shift"): agreed; liability shift defined before Adyen's quotation uses it; exemption glossed from the glossary.
+- flow_is_followable ("five records" for six): agreed; now "six records" in prose and spec p13 (row, webhook, token, risk result, approval, hold).
+- flow_is_followable (`authorized` unexplained): agreed; glossed as the state for an amount held and not yet collected (chapter 8), which Mila's row skipped.
+- flow_is_followable ("Two cautions."): agreed; "First," and "Second," mark them.
+- flow_is_followable ("settlement batch", "Sales day payout" in step 8): agreed; sales day and batch now glossed in the scene table; Sales day payout glossed at its use.
+- flow_is_followable (steps 9-10 order; "Larkfield's own event ID"): agreed; step 10 opens by saying the bookings become money a day after the entries are written, and names Thursday 11 March; event ID glossed.
+- flow_is_followable (appositive "The approval, an API response and a webhook"): agreed; "which arrived as".
+- flow_is_followable (Stripe replay jargon): agreed; Custom connected account, destination charge, `on_behalf_of` and application fee glossed from chapter 33; the unsupported "so" removed.
+- flow_is_followable (Stripe gaps paragraph overloaded): agreed; spec repair: p28 split into p28 (capture gap, with Stripe's two `succeeded` sentences) and p28b (funds gap: Payout Delay, Instant Payouts, Adyen's terms vs annual report). One connecting sentence added ("Neither sentence says what the network can do after it.").
+- minor (€117.47 not derived): fixed in Intro ¶2.
+- minor (membership aside): fixed; the membership is introduced in the aside.
+- minor (switch to the CAPTURE-event case): fixed ("which is not Mila's case").
+- minor (debit card not stated): fixed ("such as Mila's Dutch Visa debit card", ledger).
+- minor (Tuesday-night/Wednesday timing never stated): fixed; the sentence now states the timing it assumes.
+- minor (10/7/28 days in loss table): fixed; lead-in says what each figure is (glossary; verification row 47).
+- minor (two rows numbered 10 in Stripe table): fixed; second row is "10. Split: when funds are payable".
+- minor (table before replay, fault spec): not changed; one reader only, and the judge found the order sound.
+- intro_predicts_content (minor, stretches without steps): fixed; roadmap names the steps in each stretch. Spec p05 updated.
+- Length: 5,577 words (max_words 6,500). timetoread 24 min.

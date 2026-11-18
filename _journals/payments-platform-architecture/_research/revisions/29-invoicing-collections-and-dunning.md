@@ -1,6 +1,6 @@
 # Revision log — 29-invoicing-collections-and-dunning (draft check round 1, ESCALATE)
 
-Revised 2026-11-24. One line per failed result. No fact, number, date, quotation, hedge, source, figure, caption or `[[link]]` changed, except the content corrections listed below.
+Revised 2026-11-17. One line per failed result. No fact, number, date, quotation, hedge, source, figure, caption or `[[link]]` changed, except the content corrections listed below.
 
 ## Major
 
@@ -13,7 +13,7 @@ Revised 2026-11-24. One line per failed result. No fact, number, date, quotation
 - flow, p05 Renewal Wave named but not explained: fixed in draft, one clause from the ledger ("Larkfield's name for its monthly peak").
 - flow, p09 "seven" and the terminal-state digression: fixed in draft. Counts now agree with the table ("the five states and seven of the transitions"); the terminal-state sentence moved, unchanged, to the end of the paragraph in parentheses.
 - flow, p13 tangent (both readers): fixed in draft by the new opening sentence (see transition above). Kept in place (decision log: one paragraph at the end of the invoice section).
-- flow, p16 interrupts the attempts argument (spec fault; both readers): spec repair. p16 moved, unchanged except its opening sentence, from attempts-against-a-debt to designs, directly before p31 (rule 7 of the 24 November changes). Not merged into p31: p31's prose does not repeat p16's figures, so a merge would only lengthen one paragraph. Transitions rewritten on both sides (p16 contrast with the designs' rule; p31 additional_support, "as thin and dated"). The move also fixes the known_before_new finding on Smart Retries, the account updater and Auto Rescue, now all explained before p16. AC-3 still met: the no-independent-measurement sentence is kept verbatim.
+- flow, p16 interrupts the attempts argument (spec fault; both readers): spec repair. p16 moved, unchanged except its opening sentence, from attempts-against-a-debt to designs, directly before p31 (rule 7 of the 17 November changes). Not merged into p31: p31's prose does not repeat p16's figures, so a merge would only lengthen one paragraph. Transitions rewritten on both sides (p16 contrast with the designs' rule; p31 additional_support, "as thin and dated"). The move also fixes the known_before_new finding on Smart Retries, the account updater and Auto Rescue, now all explained before p16. AC-3 still met: the no-independent-measurement sentence is kept verbatim.
 - flow, p22/p23 rescue window and Auto Rescue before p28 (spec fault): fixed in draft with a gloss at first use in p22 (Auto Rescue, "Adyen's feature that retries refused payments for the merchant"; rescue window, "the period during which Adyen keeps trying"). p28's duplicate gloss of the rescue window removed.
 - flow, p30 refers to an instruction quoted only later: fixed in draft. p28 now states, as its spec evidence lists, that Adyen tells the merchant to cancel the rescue when the shopper provides a new payment method or cancels; p30 says "above". "exactly those cases" became "those cases", since the instruction does not name paying another way.
 - flow, p32 table introduces facts the body never stated (both readers): content correction. Both facts are verified (verification rows 82 and 83). Stated in the body first: the "account closure or fraud" case and "no code list" in p28; the 42-day SEPA rescue window for the account in p22.
@@ -40,7 +40,7 @@ Revised 2026-11-24. One line per failed result. No fact, number, date, quotation
 
 ## Spec changes
 
-- p16 moved to designs before p31, new controlling idea opening and transition_in; p31 transition_in rewritten; attempts section `how` and flow rationale, designs flow rationale updated; p22, p26, p28, p34, p39 controlling ideas extended to match the prose; the open question on flow notes records the move; `max_words` 6500 -> 6825 (5%); changelog entry dated 2026-11-24.
+- p16 moved to designs before p31, new controlling idea opening and transition_in; p31 transition_in rewritten; attempts section `how` and flow rationale, designs flow rationale updated; p22, p26, p28, p34, p39 controlling ideas extended to match the prose; the open question on flow notes records the move; `max_words` 6500 -> 6825 (5%); changelog entry dated 2026-11-17.
 
 ## Checks
 

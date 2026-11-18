@@ -1,6 +1,6 @@
 # Sweep — second half (Parts VI–IX, chapters 27–47, 49, 50)
 
-Sweep of 24 November 2026 for rulings 41–48. Pages checked: `part-6-intro` … `part-9-intro`, chapters 27–47, 49, 50 (prose, tables, evidence-stops sections, take-aways, captions, Sources notes, page specs, journal entries). Not touched: `48-the-bets-compared`, `part-10-intro`. No new research; every replacement uses the owning chapter's wording and Sources entry.
+Sweep of 17 November 2026 for rulings 41–48. Pages checked: `part-6-intro` … `part-9-intro`, chapters 27–47, 49, 50 (prose, tables, evidence-stops sections, take-aways, captions, Sources notes, page specs, journal entries). Not touched: `48-the-bets-compared`, `part-10-intro`. No new research; every replacement uses the owning chapter's wording and Sources entry.
 
 ## Prose changes
 
@@ -17,7 +17,7 @@ Sweep of 24 November 2026 for rulings 41–48. Pages checked: `part-6-intro` …
 | 47-case-adyen, Where the Evidence Stops | Bullet "Where merchants' funds are held." | Retitled "Which banks hold merchants' funds." (the terms state the holder and the documentation a country per settlement currency; the banks are unnamed). | 47g (owner ch. 16) |
 | part-9-intro | "Adyen publishes no chargeback fee" | "Adyen's chargeback fee is set by contract" | 46f (owner ch. 45) |
 
-## Page-spec units aligned (changelog line of 2026-11-24 in each)
+## Page-spec units aligned (changelog line of 2026-11-17 in each)
 
 - 42: p28 controlling idea and evidence (Payout Delay; Annual Report caveat).
 - 34: p29 evidence (typical 14 and 28 days).

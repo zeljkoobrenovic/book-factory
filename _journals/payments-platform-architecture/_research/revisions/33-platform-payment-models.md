@@ -1,6 +1,6 @@
 # Revision after draft check, round 1 — 33-platform-payment-models
 
-Date: 2026-11-24. Report judged: round 1, 29 failed results (1 blocker, 18 major, 10 minor) and 1 waived. One line per failed result. Words: 6,500 before, 6,819 after; `max_words` raised 5% from 6,500 to 6,825 (glosses required by AC-3 and the readers; restatement trimmed elsewhere). `timetoread` 28 to 30. Apart from the corrections listed under "Content", no fact, number, date, quotation, hedge, figure, source entry or `[[link]]` was changed.
+Date: 2026-11-17. Report judged: round 1, 29 failed results (1 blocker, 18 major, 10 minor) and 1 waived. One line per failed result. Words: 6,500 before, 6,819 after; `max_words` raised 5% from 6,500 to 6,825 (glosses required by AC-3 and the readers; restatement trimmed elsewhere). `timetoread` 28 to 30. Apart from the corrections listed under "Content", no fact, number, date, quotation, hedge, figure, source entry or `[[link]]` was changed.
 
 ## one_controlling_idea_per_paragraph
 

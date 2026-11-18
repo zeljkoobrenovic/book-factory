@@ -1,6 +1,6 @@
 # Revision after draft check, round 1 — 15-payment-reconciliation-and-reporting
 
-Date: 2026-11-24. Report judged: round 1, 17 failed or waived results (8 major draft, 1 major spec, 1 waived, 7 minor). Words: 6,136 after (`max_words` 6,500, unchanged). `timetoread` 25 to 27. Apart from the corrections listed below, no fact, number, date, quotation, hedge, figure, caption, source entry or `[[link]]` was changed.
+Date: 2026-11-17. Report judged: round 1, 17 failed or waived results (8 major draft, 1 major spec, 1 waived, 7 minor). Words: 6,136 after (`max_words` 6,500, unchanged). `timetoread` 25 to 27. Apart from the corrections listed below, no fact, number, date, quotation, hedge, figure, caption, source entry or `[[link]]` was changed.
 
 ## evidence_is_explained
 
@@ -30,7 +30,7 @@ Date: 2026-11-24. Report judged: round 1, 17 failed or waived results (8 major d
 - Sales day payout: fixed, glossed at first use; the later duplicate gloss removed.
 - Connected Accounts: fixed, glossed after the quotation.
 - RECONCILED: fixed ("this book's companion on finance systems").
-- Payable batch (minor, spec): fixed by a gloss in p02 and in the KEY POINTS callout (ruling 3 of 24 November).
+- Payable batch (minor, spec): fixed by a gloss in p02 and in the KEY POINTS callout (ruling 3 of 17 November).
 
 ## no_weak_conclusion_pattern
 

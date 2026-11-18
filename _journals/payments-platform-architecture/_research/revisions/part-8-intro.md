@@ -1,0 +1,21 @@
+# Revision of part-8-intro (round-1 check, 2026-11-17)
+
+- transition p09 ("takes that hosting difference to the day load arrives at once"): agreed; the link sentence now says the connection from chapter 40: the hosting difference decides whether capacity for a peak is scaled on demand or bought ahead, and either way a merchant's peak meets the per-customer limit first.
+- transition p10 ("takes up the problem the peak leaves open"): agreed; the link sentence now states the problem from chapters 40 and 41: a payment system cannot be stopped for its peaks, and the one peak-season near miss on record, at Adyen, was set off by a change.
+- flow p02 ("the order", "them"): agreed; now "Engineers who count failure in minutes of downtime would call the late run the worse."
+- flow p02 (recap interrupts the argument): agreed; the Parts II-VII recap moved after the late-versus-wrong argument, comma added, condition list shortened.
+- flow p03 ("the fourth of these"): agreed; now "Larkfield's October run met the peak case unplanned: its burst waited a day. In November nothing was chosen to give way, and the record did." Spec p03 aligned.
+- flow p04 ("five different things"): agreed; named as the five kinds of figure published as uptime (target, yearly, peak-weekend, rolling, contractual), from chapter 37.
+- flow p05 (spec; roadmap repeats the chapter list): agreed; p05 no longer lists the five questions (the chapter section does) and now states the ordering principle; roadmap promise, p05 controlling idea, evidence and transition reworded in the spec.
+- flow p07 (shard gloss late; "clusters filled in rotation"; "them"): agreed; shard glossed in place, rotation explained ("receive new work in rotation", chapter 38), "the shards or the clusters", and the system-wide transaction named as what gives way.
+- flow p07 ("146 purchases *(illustrative)*"): agreed; now "(146, an illustrative count)" so the status is stated as a property of the count; not removed, since the ledger marks it illustrative.
+- flow p08 ("A localization law decides first"): agreed; now says it decides where data lives and that identifiers that crossed the border stop at it (chapter 39's partition table and fingerprint case).
+- flow p09/p10 (link sentences): as above.
+- flow KEY POINTS (identifier, rollout not mapped to chapters): agreed; the residency paragraph now names identifiers, the safe-change paragraph names the reach of a rollout, and the data-stores paragraph the system-wide transaction. Callout unchanged.
+- flow Where to Begin (spec; "from what must hold ... to what threatens it"): agreed; the principle moved into p05 in the true order (failure separates path and record; growth, law and load test the record; change last because it set off the earlier incidents), from journal-spec.json part-8 flow.rationale; that rationale's last sentence, the post spec's flow.rationale, conclusion.synthesis and p11 corrected to match.
+- flow minor ("made by accident in 2026"): fixed; now "renewals late by accident in 2026, and late on purpose under Keel".
+- flow minor (KEY POINTS "may not be recorded twice"): not changed; callouts may be touched only to gloss a term (author's change 3). For the editor: "must not be recorded twice or lost".
+- known_before_new ("cell design"): agreed; glossed "isolated copies of a system, each serving a share of traffic" (chapter 37 names cell architecture without defining it; the gloss is a general definition, no company claim).
+- known_before_new ("edge"): agreed; glossed from chapter 37: "the outer layer of servers that receives every payment request".
+- conclusion_synthesizes_and_answers_so_what: agreed; Where to Begin now says: faced with an outage, a peak or a risky deploy, ask first what may be late, because a money path should be late before it is wrong.
+- Length: 1,260 words; max_words raised 5% from 1,200 to 1,260. timetoread stays 5 min.

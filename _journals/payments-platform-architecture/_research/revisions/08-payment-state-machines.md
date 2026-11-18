@@ -1,4 +1,4 @@
-# 08-payment-state-machines — revision after draft check round 1 (2026-11-24)
+# 08-payment-state-machines — revision after draft check round 1 (2026-11-17)
 
 One line per failed result. Words: 5,507 before, 5,975 after (`max_words` 6,500, unchanged). `timetoread` 24 → 26 min. Callouts, figures, captions, links and Sources untouched; the only content correction is the one the editor authorized (marked EDITOR).
 

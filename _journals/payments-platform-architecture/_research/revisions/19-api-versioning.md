@@ -1,6 +1,6 @@
 # Revision after draft check, round 1 — 19-api-versioning
 
-Date: 2026-11-24. Report judged: spec `1427c4424be60ee6`, draft `4298cccc9aa0ce0e` (20 failed results: 1 blocker, 16 major, 3 minor; 1 waived). One line per failed result. Words: 6,271 before, 6,730 after; `max_words` raised 4.6% (6,500 to 6,800). `timetoread` 27 to 29. Apart from the editor-authorized changes listed, no fact, number, date, quotation, hedge, figure, caption, source entry or `[[link]]` was changed.
+Date: 2026-11-17. Report judged: spec `1427c4424be60ee6`, draft `4298cccc9aa0ce0e` (20 failed results: 1 blocker, 16 major, 3 minor; 1 waived). One line per failed result. Words: 6,271 before, 6,730 after; `max_words` raised 4.6% (6,500 to 6,800). `timetoread` 27 to 29. Apart from the editor-authorized changes listed, no fact, number, date, quotation, hedge, figure, caption, source entry or `[[link]]` was changed.
 
 ## one_controlling_idea_per_paragraph
 

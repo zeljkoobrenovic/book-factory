@@ -1,6 +1,6 @@
 # Revision after draft check, round 1 — 28-usage-metering-and-rating
 
-Date: 2026-11-24. Report judged: round 1, 31 failed results (17 major, 14 minor) and 1 waived. One line per failed result. Words (check_draft structure): 5,992 before, 6,339 after (spec `max_words` 6,500, unchanged). `timetoread` 26 to 28. Apart from the corrections listed under "Content", no fact, number, date, quotation, hedge, figure, caption, source entry or `[[link]]` was changed.
+Date: 2026-11-17. Report judged: round 1, 31 failed results (17 major, 14 minor) and 1 waived. One line per failed result. Words (check_draft structure): 5,992 before, 6,339 after (spec `max_words` 6,500, unchanged). `timetoread` 26 to 28. Apart from the corrections listed under "Content", no fact, number, date, quotation, hedge, figure, caption, source entry or `[[link]]` was changed.
 
 ## evidence_is_explained
 
@@ -35,7 +35,7 @@ Date: 2026-11-24. Report judged: round 1, 31 failed results (17 major, 14 minor)
 - "In short": fixed (house format; transition strengthened): "Set side by side, the documented facts about meters, designs, credits and acquisitions separate the two providers on six aspects."
 - Identifier limit as a fourth item: fixed; "Beside the three rules sits a limit on the identifier itself, not a fourth rule".
 - Forced connectives: removed "Likewise", "Furthermore", "As a result", "Similarly", "Moreover", "To illustrate", "For example", "Therefore" and one "By contrast"; the remaining connectives express a declared relationship.
-- "through sales": fixed; "by arrangement with Stripe's sales team" (Stripe page: "Contact sales" for up to 200,000 events per second; fetched 2026-11-24).
+- "through sales": fixed; "by arrangement with Stripe's sales team" (Stripe page: "Contact sales" for up to 200,000 events per second; fetched 2026-11-17).
 - Price change as an aggregation limit: fixed; "The invoice is not recomputed at finalization, so the late usage has nowhere to go", contrasted with the query design.
 - Studio Noord's Adyen/Stripe aside: fixed; the sentence now says why it matters (the meter is Stripe's whichever provider members pay through).
 - "Billed twice, one level above the payment" in the callout: fixed; gloss added "in the usage count, before any charge is made".

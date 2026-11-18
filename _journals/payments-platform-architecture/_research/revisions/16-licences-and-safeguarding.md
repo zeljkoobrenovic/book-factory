@@ -1,6 +1,6 @@
 # Revision after draft check, round 1 — 16-licences-and-safeguarding
 
-Date: 2026-11-24. Report judged: round 1, 25 failed or waived results (2 blocker, 15 major, 8 minor). Words: 6,199 after (`max_words` 6,500, unchanged). `timetoread` 25 to 27. Apart from the corrections listed below, no fact, number, date, quotation, hedge, figure, caption, source entry or `[[link]]` was changed.
+Date: 2026-11-17. Report judged: round 1, 25 failed or waived results (2 blocker, 15 major, 8 minor). Words: 6,199 after (`max_words` 6,500, unchanged). `timetoread` 25 to 27. Apart from the corrections listed below, no fact, number, date, quotation, hedge, figure, caption, source entry or `[[link]]` was changed.
 
 ## Blockers
 

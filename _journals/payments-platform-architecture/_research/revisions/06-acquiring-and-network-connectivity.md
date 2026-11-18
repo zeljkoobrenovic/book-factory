@@ -1,6 +1,6 @@
 # Revision after draft check, round 1 — 06-acquiring-and-network-connectivity
 
-Date: 2026-11-24. Report judged: spec `8822bc85ad1bc19f`, draft `b0f417a5a50b6b5c` (25 failed results: 2 blockers, 19 major, 4 minor). One line per failed result. Words: 5,993 before, 6,595 after; `max_words` raised 2.3% (6,500 to 6,650). `timetoread` 25 to 29. Apart from the editor-authorized corrections listed at the end, no fact, number, date, quotation, hedge, figure, caption, source entry or existing `[[link]]` was changed.
+Date: 2026-11-17. Report judged: spec `8822bc85ad1bc19f`, draft `b0f417a5a50b6b5c` (25 failed results: 2 blockers, 19 major, 4 minor). One line per failed result. Words: 5,993 before, 6,595 after; `max_words` raised 2.3% (6,500 to 6,650). `timetoread` 25 to 29. Apart from the editor-authorized corrections listed at the end, no fact, number, date, quotation, hedge, figure, caption, source entry or existing `[[link]]` was changed.
 
 ## one_controlling_idea_per_paragraph
 

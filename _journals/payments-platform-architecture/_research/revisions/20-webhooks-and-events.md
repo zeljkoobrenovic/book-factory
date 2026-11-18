@@ -1,6 +1,6 @@
 # Revision after draft check, round 1 — 20-webhooks-and-events
 
-Date: 2026-11-24. Report judged: spec `1bed38f356c44be7`, draft `af75703a08bd96c5` (11 failed results: 8 major, 3 minor; 1 waived). One line per failed result. Words: 6,022 before, 6,389 after (`max_words` 6,500, unchanged). `timetoread` 26 to 28. Apart from the editor-authorized changes listed, no fact, number, date, quotation, hedge, figure, caption, source entry or `[[link]]` was changed. One `[[platform-payment-models]]` link was added with the gloss of Adyen for Platforms.
+Date: 2026-11-17. Report judged: spec `1bed38f356c44be7`, draft `af75703a08bd96c5` (11 failed results: 8 major, 3 minor; 1 waived). One line per failed result. Words: 6,022 before, 6,389 after (`max_words` 6,500, unchanged). `timetoread` 26 to 28. Apart from the editor-authorized changes listed, no fact, number, date, quotation, hedge, figure, caption, source entry or `[[link]]` was changed. One `[[platform-payment-models]]` link was added with the gloss of Adyen for Platforms.
 
 ## evidence_is_explained
 

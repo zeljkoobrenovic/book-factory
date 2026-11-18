@@ -1,0 +1,696 @@
+{
+  "spec": "_journals/payments-platform-architecture/posts/38-payment-data-stores-and-consistency/spec.json",
+  "draft": "_journals/payments-platform-architecture/posts/38-payment-data-stores-and-consistency/index.md",
+  "spec_sha": "94c3517de17a9eb7",
+  "draft_sha": "890f0c1947534ad3",
+  "run_at": "2026-11-17T22:53:43+01:00",
+  "round": 1,
+  "verdict": "escalate",
+  "reverse_outline": [
+    {
+      "draft_locator": "Introduction callout",
+      "summary": "chapter goals: providers' published database records, their limits, and cross-system consistency without a shared transaction",
+      "matched_spec_paragraph": null
+    },
+    {
+      "draft_locator": "Introduction callout",
+      "summary": "three key points: boundary before database choice, no cross-shard transactions published, outbox as small-scale equivalent",
+      "matched_spec_paragraph": null
+    },
+    {
+      "draft_locator": "Introduction callout",
+      "summary": "failure patterns addressed: phantom payment, double charge, copying large-scale designs",
+      "matched_spec_paragraph": null
+    },
+    {
+      "draft_locator": "Introduction ¶1",
+      "summary": "Stripe's shard migration deliberately rejects traffic for under two seconds",
+      "matched_spec_paragraph": "p01"
+    },
+    {
+      "draft_locator": "Introduction ¶2",
+      "summary": "link to previous chapter: lagging record must stay correct across divided databases with no single transaction",
+      "matched_spec_paragraph": "p02"
+    },
+    {
+      "draft_locator": "Introduction ¶3",
+      "summary": "thesis: consistency comes from local transactions, safe retries, messages and later checks, so the boundary matters more than the product",
+      "matched_spec_paragraph": "p03"
+    },
+    {
+      "draft_locator": "Introduction ¶4",
+      "summary": "running example: Mila's paid pass and the write this chapter covers",
+      "matched_spec_paragraph": "p04"
+    },
+    {
+      "draft_locator": "Introduction ¶5",
+      "summary": "roadmap of the chapter's sections",
+      "matched_spec_paragraph": "p05"
+    },
+    {
+      "draft_locator": "Setting the Scene at Larkfield: Paid, and Not Activated ¶1",
+      "summary": "Larkfield's commit-then-call flow left 146 paid purchases unactivated",
+      "matched_spec_paragraph": "p06"
+    },
+    {
+      "draft_locator": "Setting the Scene at Larkfield: Paid, and Not Activated ¶2",
+      "summary": "engineer's proposed fix: queue plus distributed transaction",
+      "matched_spec_paragraph": "p07"
+    },
+    {
+      "draft_locator": "Setting the Scene at Larkfield: Paid, and Not Activated ¶3",
+      "summary": "head of payments reframes with three questions about co-changing records, lag and verification",
+      "matched_spec_paragraph": "p08"
+    },
+    {
+      "draft_locator": "What Has to Be Exact: Consistency Boundaries by Kind of Data ¶1",
+      "summary": "different payment data needs different exactness: records exact, balances and reports may lag",
+      "matched_spec_paragraph": "p09"
+    },
+    {
+      "draft_locator": "What Has to Be Exact: Consistency Boundaries by Kind of Data ¶2",
+      "summary": "definition of consistency boundary as one local transaction within one database",
+      "matched_spec_paragraph": "p10"
+    },
+    {
+      "draft_locator": "What Has to Be Exact: Consistency Boundaries by Kind of Data ¶3",
+      "summary": "why distributed transactions are avoided, decisively because providers offer none to join",
+      "matched_spec_paragraph": "p11"
+    },
+    {
+      "draft_locator": "When One Database Is Not Enough: What a Shard Keeps and What It Breaks ¶1",
+      "summary": "what a shard is and the three things lost across shards",
+      "matched_spec_paragraph": "p12"
+    },
+    {
+      "draft_locator": "When One Database Is Not Enough: What a Shard Keeps and What It Breaks ¶2",
+      "summary": "shard key choice trades one locality for another",
+      "matched_spec_paragraph": "p13"
+    },
+    {
+      "draft_locator": "When One Database Is Not Enough: What a Shard Keeps and What It Breaks ¶3",
+      "summary": "contrasting approaches that sidestep sharding: Spanner at Square, TigerBeetle's argument",
+      "matched_spec_paragraph": "p14"
+    },
+    {
+      "draft_locator": "What Stripe Has Published: A Document Database and a Platform That Moves Data ¶1",
+      "summary": "Stripe's MongoDB-based DocDB architecture and scale",
+      "matched_spec_paragraph": "p15"
+    },
+    {
+      "draft_locator": "What Stripe Has Published: A Document Database and a Platform That Moves Data ¶2",
+      "summary": "Data Movement Platform steps and the version-gated traffic switch",
+      "matched_spec_paragraph": "p16"
+    },
+    {
+      "draft_locator": "What Stripe Has Published: A Document Database and a Platform That Moves Data ¶3",
+      "summary": "move sacrifices brief availability not data; where retries happen",
+      "matched_spec_paragraph": "p17"
+    },
+    {
+      "draft_locator": "What Stripe Has Published: A Document Database and a Platform That Moves Data ¶4",
+      "summary": "Stripe's dual-write schema migration pattern: copy, compare, switch",
+      "matched_spec_paragraph": "p18"
+    },
+    {
+      "draft_locator": "What Stripe Has Published: A Document Database and a Platform That Moves Data ¶5",
+      "summary": "Stripe Ledger's after-the-fact verification via clearing accounts",
+      "matched_spec_paragraph": "p19"
+    },
+    {
+      "draft_locator": "What Stripe Has Published: A Document Database and a Platform That Moves Data ¶6",
+      "summary": "gaps in Stripe's public record on transactions and replication",
+      "matched_spec_paragraph": "p20"
+    },
+    {
+      "draft_locator": "What Adyen Has Published: PostgreSQL, Accounting Clusters and Partitions ¶1",
+      "summary": "Adyen's choice of PostgreSQL and its cluster shape and sizes",
+      "matched_spec_paragraph": "p21"
+    },
+    {
+      "draft_locator": "What Adyen Has Published: PostgreSQL, Accounting Clusters and Partitions ¶2",
+      "summary": "accounting split into round-robin clusters without rebalancing, now nearing limits",
+      "matched_spec_paragraph": "p22"
+    },
+    {
+      "draft_locator": "What Adyen Has Published: PostgreSQL, Accounting Clusters and Partitions ¶3",
+      "summary": "payouts across clusters replaced transactions with inter-cluster messages",
+      "matched_spec_paragraph": "p23"
+    },
+    {
+      "draft_locator": "What Adyen Has Published: PostgreSQL, Accounting Clusters and Partitions ¶4",
+      "summary": "zero-sum accounting templates at write time / edge saves payments locally for later processing, an outbox shape",
+      "matched_spec_paragraph": "p24"
+    },
+    {
+      "draft_locator": "What Adyen Has Published: PostgreSQL, Accounting Clusters and Partitions ¶5",
+      "summary": "table partitioning within one database and its operational constraints",
+      "matched_spec_paragraph": "p25"
+    },
+    {
+      "draft_locator": "What Adyen Has Published: PostgreSQL, Accounting Clusters and Partitions ¶6",
+      "summary": "what Adyen leaves unpublished about clusters and replication / CockroachDB store for idempotency",
+      "matched_spec_paragraph": "p26"
+    },
+    {
+      "draft_locator": "Stripe and Adyen: Where They Differ ¶1",
+      "summary": "introduces side-by-side comparison table with author's interpretation",
+      "matched_spec_paragraph": "p27"
+    },
+    {
+      "draft_locator": "Stripe and Adyen: Where They Differ ¶2",
+      "summary": "integrators see little difference; copy the constraint, not the database",
+      "matched_spec_paragraph": "p28"
+    },
+    {
+      "draft_locator": "What Both Records Imply: No Transaction Spans the Money Path ¶1",
+      "summary": "inference that both keep money consistent from local writes, retries, messages and checks",
+      "matched_spec_paragraph": "p29"
+    },
+    {
+      "draft_locator": "What Both Records Imply: No Transaction Spans the Money Path ¶2",
+      "summary": "exactly-once effect via recording applied messages idempotently",
+      "matched_spec_paragraph": "p30"
+    },
+    {
+      "draft_locator": "What Both Records Imply: No Transaction Spans the Money Path ¶3",
+      "summary": "idempotency cannot catch missing messages; after-the-fact comparison needed",
+      "matched_spec_paragraph": "p31"
+    },
+    {
+      "draft_locator": "The Same Design at Small Scale: A Local Transaction, an Outbox and an Idempotent Consumer ¶1",
+      "summary": "definition of the outbox pattern and its relay",
+      "matched_spec_paragraph": "p32"
+    },
+    {
+      "draft_locator": "The Same Design at Small Scale: A Local Transaction, an Outbox and an Idempotent Consumer ¶2",
+      "summary": "four ways to link state change and message, compared by crash outcome",
+      "matched_spec_paragraph": "p33"
+    },
+    {
+      "draft_locator": "The Same Design at Small Scale: A Local Transaction, an Outbox and an Idempotent Consumer ¶3",
+      "summary": "outbox shifts burden to duplicate- and order-tolerant consumers and periodic comparison",
+      "matched_spec_paragraph": "p34"
+    },
+    {
+      "draft_locator": "In Practice at Larkfield: The Payment Record Store and Its Outbox ¶1",
+      "summary": "walkthrough of Mila's payment through Larkfield's outbox and idempotent consumer",
+      "matched_spec_paragraph": "p35"
+    },
+    {
+      "draft_locator": "In Practice at Larkfield: The Payment Record Store and Its Outbox ¶2",
+      "summary": "allowed lag and check for each downstream item",
+      "matched_spec_paragraph": "p36"
+    },
+    {
+      "draft_locator": "In Practice at Larkfield: The Payment Record Store and Its Outbox ¶3",
+      "summary": "steps of Larkfield's online schema migration with reconciliation",
+      "matched_spec_paragraph": "p37"
+    },
+    {
+      "draft_locator": "When It Goes Wrong: A Stalled Relay, a Repeated Message and a Row That Was Never Written ¶1",
+      "summary": "stalled relay causes visible, self-healing delay",
+      "matched_spec_paragraph": "p38"
+    },
+    {
+      "draft_locator": "When It Goes Wrong: A Stalled Relay, a Repeated Message and a Row That Was Never Written ¶2",
+      "summary": "duplicate or reordered messages need consumer's own atomic boundary",
+      "matched_spec_paragraph": "p39"
+    },
+    {
+      "draft_locator": "When It Goes Wrong: A Stalled Relay, a Repeated Message and a Row That Was Never Written ¶3",
+      "summary": "silent missing outbox row caught only by nightly comparison",
+      "matched_spec_paragraph": "p40"
+    },
+    {
+      "draft_locator": "What to Take Away ¶1",
+      "summary": "established facts about published stores and their gaps",
+      "matched_spec_paragraph": "p41"
+    },
+    {
+      "draft_locator": "What to Take Away ¶2",
+      "summary": "context-dependent choices: sharding, key, outbox vs CDC, lag",
+      "matched_spec_paragraph": "p42"
+    },
+    {
+      "draft_locator": "What to Take Away ¶3",
+      "summary": "author's views: boundary over product, inference status, consistency needs a named check",
+      "matched_spec_paragraph": "p43"
+    },
+    {
+      "draft_locator": "Questions to Ask ¶1",
+      "summary": "review questions for consistency design",
+      "matched_spec_paragraph": "p44"
+    },
+    {
+      "draft_locator": "Questions to Ask ¶2",
+      "summary": "hand-off to next chapter on data residency",
+      "matched_spec_paragraph": "p45"
+    }
+  ],
+  "results": [
+    {
+      "criterion": "structure",
+      "check": "reverse_outline_matches_spec",
+      "verdict": "pass",
+      "severity": "blocker",
+      "finding": "sections, unit counts and unit forms match the spec"
+    },
+    {
+      "criterion": "reverse_outline_matches_spec",
+      "check": "reverse_outline_matches_spec",
+      "verdict": "pass",
+      "finding": "All 45 outline summaries match the controlling ideas of the aligned spec paragraphs p01-p45 in spec order; the three introduction callouts match no spec paragraph, as expected.",
+      "severity": "blocker"
+    },
+    {
+      "criterion": "one_controlling_idea_per_paragraph",
+      "check": "one_controlling_idea_per_paragraph",
+      "verdict": "pass",
+      "finding": "Adyen ¶4 (marked two_ideas) is one idea with two instances: the spec's controlling idea for p24 is 'two published mechanisms keep the books right despite the split', and the paragraph opens with exactly that sentence. All other units except Adyen ¶6 were summarised with one idea.",
+      "severity": "major"
+    },
+    {
+      "criterion": "one_controlling_idea_per_paragraph",
+      "check": "one_controlling_idea_per_paragraph",
+      "verdict": "fail",
+      "spec_locus": "/sections/4/paragraphs/5",
+      "draft_locus": "What Adyen Has Published: PostgreSQL, Accounting Clusters and Partitions ¶6",
+      "quote": "One more store is named once. For API idempotency at its stateless edge, part one of the 2021 series says: “The information needs to be available locally, so we eventually decided on integrating Cockroach, a distributed database, with our PALs.”",
+      "finding": "The paragraph joins two ideas: what Adyen has not published, and a published second store for idempotency keys with its vendor follow-up. The outliner needed two summaries and flow reader A read the Cockroach part as an afterthought. The spec's p26 controlling idea itself bundles both.",
+      "fault": "spec",
+      "severity": "major"
+    },
+    {
+      "criterion": "paragraph_traces_to_thesis",
+      "check": "paragraph_traces_to_thesis",
+      "verdict": "pass",
+      "finding": "Every unit ties to a supporting claim: scene and p09-p11 to C1; p12-p14 to C2; p15-p20 to C3; p21-p26 to C4; p27-p31 to C3/C4/C5; p32-p40 to C5; the conclusion lists to C1-C5. The partitioning paragraph (Adyen ¶5) traces to C4's 2023-2025 record, though its purpose is not stated (failed under evidence_is_explained and flow_is_followable).",
+      "severity": "major"
+    },
+    {
+      "criterion": "evidence_is_explained",
+      "check": "evidence_is_explained",
+      "verdict": "pass",
+      "finding": "The tables (requirements, shard placement, Where They Differ, four designs, Larkfield lag table), Figures 1-3 and most quotations are followed or framed by a sentence saying what they show (e.g. 'The habit is the same as in the shard move: copy, compare, then switch'; 'As I read it, sharding the books replaced ... with messages'; the two INFERENCE callouts).",
+      "severity": "major"
+    },
+    {
+      "criterion": "evidence_is_explained",
+      "check": "evidence_is_explained",
+      "verdict": "fail",
+      "spec_locus": "/sections/4/paragraphs/4",
+      "draft_locus": "What Adyen Has Published: PostgreSQL, Accounting Clusters and Partitions ¶5",
+      "quote": "“I still have nightmares about incident number 2016. We were preparing for one of the most critical seasons for our merchants – December shopping– when the CPU unexpectedly spiked.” Adding one more partition would have overloaded one of its most critical databases. (“2016” is an incident number, not a year.)",
+      "finding": "The incident quotation is followed only by a paraphrase and a note on the number; no sentence says what it shows for the chapter (the spec's 'shows': that dividing data inside one database still carries an operational cost). Both flow readers could not tell why it is there.",
+      "fault": "draft",
+      "severity": "major"
+    },
+    {
+      "criterion": "transition_expresses_declared_relationship",
+      "check": "transition_expresses_declared_relationship",
+      "verdict": "pass",
+      "finding": "The transitions at p02-p05, p07-p34 except the section openers noted below, p36, p38-p45 express their declared relationships and pick up the declared known information (e.g. 'The previous chapter explains why that is not a contradiction'; 'Why not make the boundary larger, as Tom proposed?'; 'A boundary of one database is comfortable until the data no longer fits'; 'For a team with one database and one other system to inform, those four parts have a common name'; 'The store's own shape also had to change'). The house-format conclusion lists open with labels ('Established.', 'Depends on context.', 'The author's synthesis.') that state their relationship.",
+      "severity": "major"
+    },
+    {
+      "criterion": "transition_expresses_declared_relationship",
+      "check": "transition_expresses_declared_relationship",
+      "verdict": "fail",
+      "spec_locus": "/sections/0/transition_in",
+      "draft_locus": "Setting the Scene at Larkfield: Paid, and Not Activated ¶1",
+      "quote": "Larkfield is the fictional studio-software platform this book follows ([[meet-larkfield]]).",
+      "finding": "Declared: example, carrying 'the claim that consistency depends on where the boundary is drawn' into 'a case in which no boundary had been drawn at all'. The section opens with a gloss of Larkfield and never picks up the boundary claim; the 'no boundary drawn' framing is left to the reader. Not covered by the waiver: this is the leading sentence, not the section's position.",
+      "fault": "draft",
+      "severity": "major"
+    },
+    {
+      "criterion": "transition_expresses_declared_relationship",
+      "check": "transition_expresses_declared_relationship",
+      "verdict": "fail",
+      "spec_locus": "/sections/3/transition_in",
+      "draft_locus": "What Stripe Has Published: A Document Database and a Platform That Moves Data ¶1",
+      "quote": "Stripe's fullest account is the 2024 post already quoted.",
+      "finding": "Declared: example, carrying 'the costs of sharding in general' into 'the first of two published accounts of living with them'. The opening picks up the introduction's quotation instead and does not connect the Stripe account to the costs of sharding just set out.",
+      "fault": "draft",
+      "severity": "major"
+    },
+    {
+      "criterion": "flow_is_followable",
+      "check": "flow_is_followable",
+      "verdict": "pass",
+      "finding": "Both readers describe the post-level order as problem, concept, scale, evidence, comparison, inference, small-scale design, application, failure, which agrees with the declared problem_solution pattern and its prerequisite_order, comparison and large_to_small sub-patterns; both found every section's position clear except the points failed below, and both credit the roadmap.",
+      "severity": "major"
+    },
+    {
+      "criterion": "flow_is_followable",
+      "check": "flow_is_followable",
+      "verdict": "fail",
+      "spec_locus": "/sections/3/paragraphs/3",
+      "draft_locus": "What Stripe Has Published: A Document Database and a Platform That Moves Data ¶4",
+      "quote": "Moving data between shards is one kind of **online migration**: changing where or how live data is stored while the system keeps serving requests. Stripe's 2017 engineering post describes the other kind, changing the shape of the data",
+      "finding": "Both readers could not see why the 2017 schema-migration paragraph sits in the Stripe section; its purpose appears only about eighty lines later at Larkfield's migration. The spec's section flow deliberately keeps it here, so the difficulty comes from the order.",
+      "fault": "spec",
+      "corroborated_by": "flow-B, item 9 (flow-A, item 9)",
+      "severity": "major"
+    },
+    {
+      "criterion": "flow_is_followable",
+      "check": "flow_is_followable",
+      "verdict": "fail",
+      "spec_locus": "/sections/8/paragraphs/2",
+      "draft_locus": "In Practice at Larkfield: The Payment Record Store and Its Outbox ¶3",
+      "quote": "The store's own shape also had to change without a maintenance window. Keel replaces amount columns on the payment row with child rows for attempts, captures, refunds and disputes",
+      "finding": "Both readers lost the thread at the switch from the outbox to a schema migration inside the Larkfield section, with only 'also' as a bridge; the roadmap (spec introduction.roadmap) never announces the migration, so the reader is not prepared for it.",
+      "fault": "spec",
+      "corroborated_by": "flow-B, item 15 (flow-A, item 17)",
+      "severity": "major"
+    },
+    {
+      "criterion": "flow_is_followable",
+      "check": "flow_is_followable",
+      "verdict": "fail",
+      "spec_locus": "/sections/2/paragraphs/2",
+      "draft_locus": "When One Database Is Not Enough: What a Shard Keeps and What It Breaks ¶3",
+      "quote": "Two published contrasts avoid the trade instead of making it.",
+      "finding": "Flow reader A could not tell why the Square/TigerBeetle paragraph is there; reader B called it a detour that delays the case studies and would move it next to 'what is worth copying'. The paragraph's own last sentence ('neither is how Stripe or Adyen describes its own stores') undercuts its place. The readers' fix is a move, so the fault is the declared order.",
+      "fault": "spec",
+      "corroborated_by": "flow-B, section 2 and section 4 (flow-A, item 6)",
+      "severity": "major"
+    },
+    {
+      "criterion": "flow_is_followable",
+      "check": "flow_is_followable",
+      "verdict": "fail",
+      "spec_locus": "/sections/3/paragraphs/1",
+      "draft_locus": "What Stripe Has Published: A Document Database and a Platform That Moves Data ¶2",
+      "quote": "The coordinator raises the version on the source shard, and from then “all reads and writes on the chunk on the source shard are rejected”.",
+      "finding": "Both readers re-read this paragraph: 'the coordinator' appears with a definite article but is never introduced, and the version-token quotation before it is dense, so why rejecting writes is safe is hard to follow.",
+      "fault": "draft",
+      "corroborated_by": "flow-B, item 8 (flow-A, item 8)",
+      "severity": "major"
+    },
+    {
+      "criterion": "flow_is_followable",
+      "check": "flow_is_followable",
+      "verdict": "fail",
+      "spec_locus": "/sections/4/paragraphs/3",
+      "draft_locus": "What Adyen Has Published: PostgreSQL, Accounting Clusters and Partitions ¶4",
+      "quote": "The acceptance layer at Adyen's edge, abbreviated PAL (“Payments Acceptance Layer” in part one of the series, “Payment Processing Layer” in part two), “saves the payment in a local database",
+      "finding": "Both readers lost the main clause (the database-backed queue, the chapter's outbox shape at Adyen) behind the parenthetical on the two expansions of PAL.",
+      "fault": "draft",
+      "corroborated_by": "flow-B, item 11 (flow-A, item 11)",
+      "severity": "major"
+    },
+    {
+      "criterion": "flow_is_followable",
+      "check": "flow_is_followable",
+      "verdict": "fail",
+      "spec_locus": "/sections/4/paragraphs/4",
+      "draft_locus": "What Adyen Has Published: PostgreSQL, Accounting Clusters and Partitions ¶5",
+      "quote": "Adyen's newer posts are about a different division. A **partition** is a slice of one table inside one database, so a transaction still covers all of it.",
+      "finding": "Both readers could not tell what the partitioning paragraph and its incident anecdote contribute to the chapter's question; the prose never says what it shows (a division inside one transaction still has an operational cost), and the anecdote is left hanging.",
+      "fault": "draft",
+      "corroborated_by": "flow-B, item 12 (flow-A, item 12)",
+      "severity": "major"
+    },
+    {
+      "criterion": "flow_is_followable",
+      "check": "flow_is_followable",
+      "verdict": "fail",
+      "spec_locus": "/sections/6/paragraphs/0",
+      "draft_locus": "What Both Records Imply: No Transaction Spans the Money Path ¶1",
+      "quote": "The table has a row neither company fills in: a transaction that covers more than one shard or cluster.",
+      "finding": "Both readers went back to the table and found a row on moving money across shards that both columns fill in; the sentence means a conceptually missing row, but its literal wording points at the table and contradicts it.",
+      "fault": "draft",
+      "corroborated_by": "flow-B, item 13 (flow-A, item 14)",
+      "severity": "major"
+    },
+    {
+      "criterion": "flow_is_followable",
+      "check": "flow_is_followable",
+      "verdict": "fail",
+      "spec_locus": "/sections/8/paragraphs/0",
+      "draft_locus": "In Practice at Larkfield: The Payment Record Store and Its Outbox ¶1",
+      "quote": "Larkfield's outbox has been live since 1 March 2027, so take Mila's pass.",
+      "finding": "Both readers noted that the 'so' makes no sense and that the story jumps from Tom's proposal and Femke's questions to an outbox already live; the decision that closes the scene's story is never narrated.",
+      "fault": "draft",
+      "corroborated_by": "flow-B, item 14 (flow-A, item 16)",
+      "severity": "major"
+    },
+    {
+      "criterion": "flow_is_followable",
+      "check": "flow_is_followable",
+      "verdict": "fail",
+      "spec_locus": "/sections/1/paragraphs/0",
+      "draft_locus": "What Has to Be Exact: Consistency Boundaries by Kind of Data ¶1",
+      "quote": "Adyen said so in a 2021 engineering post when it compared its payment-accepting edge with its books: “Whereas for the latter the priority was uptime, for the accounting systems",
+      "finding": "Reader A re-read this: in the lead-in 'the latter' would mean the books, but in the quotation it means the edge; the quotation's antecedent is missing.",
+      "fault": "draft",
+      "severity": "minor"
+    },
+    {
+      "criterion": "flow_is_followable",
+      "check": "flow_is_followable",
+      "verdict": "fail",
+      "spec_locus": "/sections/1/paragraphs/0",
+      "draft_locus": "What Has to Be Exact: Consistency Boundaries by Kind of Data ¶1",
+      "quote": "The record of a payment must be exact when it is written. Balances shown to people, reports and analytics may run behind, as long as they say so. The table is my reference version for a merchant's system, not a provider's design.",
+      "finding": "Reader A had to stop to see whose system the table describes: the paragraph moves from three provider quotations to a merchant's table in one sentence.",
+      "fault": "draft",
+      "severity": "minor"
+    },
+    {
+      "criterion": "flow_is_followable",
+      "check": "flow_is_followable",
+      "verdict": "fail",
+      "spec_locus": "/introduction/paragraphs/2",
+      "draft_locus": "Introduction ¶3",
+      "quote": "The last step of that reading is my inference, and the chapter marks it as one.",
+      "finding": "Reader B could not tell what 'the last step' refers to: the listed last item, verification afterwards, is documented, and the key points call the whole reading an inference.",
+      "fault": "draft",
+      "severity": "minor"
+    },
+    {
+      "criterion": "flow_is_followable",
+      "check": "flow_is_followable",
+      "verdict": "fail",
+      "spec_locus": "/introduction/paragraphs/3",
+      "draft_locus": "Introduction ¶4",
+      "quote": "This chapter covers that write, and the stores under every later write for the same payment, at Larkfield and under the provider's API.",
+      "finding": "Reader A (and the intro reader) needed a moment to parse 'the stores ... under the provider's API' as the provider's own databases.",
+      "fault": "draft",
+      "severity": "minor"
+    },
+    {
+      "criterion": "flow_is_followable",
+      "check": "flow_is_followable",
+      "verdict": "fail",
+      "spec_locus": "/sections/3/paragraphs/5",
+      "draft_locus": "What Stripe Has Published: A Document Database and a Platform That Moves Data ¶6",
+      "quote": "The nearest account is an April 2026 post on fee credits: a transfer between Stripe's internal financial accounts follows “a three-phase lifecycle through the ledger: submitted → prepared → disbursed”.",
+      "finding": "Reader B could not see why the fee-credits post is included, since the text says it shows neither storage nor shards.",
+      "fault": "draft",
+      "severity": "minor"
+    },
+    {
+      "criterion": "flow_is_followable",
+      "check": "flow_is_followable",
+      "verdict": "fail",
+      "spec_locus": "/sections/4/paragraphs/5",
+      "draft_locus": "What Adyen Has Published: PostgreSQL, Accounting Clusters and Partitions ¶6",
+      "quote": "The one later account is a secondary source: a customer story by the database's vendor, Cockroach Labs, of February 2023",
+      "finding": "Reader A read the Cockroach idempotency store, placed after the 'not public' list, as an afterthought whose link to the idempotency argument is not drawn. The spec places it in p26.",
+      "fault": "spec",
+      "severity": "minor"
+    },
+    {
+      "criterion": "flow_is_followable",
+      "check": "flow_is_followable",
+      "verdict": "fail",
+      "spec_locus": "/sections/6/paragraphs/2",
+      "draft_locus": "What Both Records Imply: No Transaction Spans the Money Path ¶3",
+      "quote": "Adyen's matching of partner reports, which after sharding became (2021) “a two-step framework that would first parse a file and then split it into the relevant parts for each cluster”.",
+      "finding": "Reader A met this as new evidence in the inference section, not in the Adyen section where the other 2021 material was set out, and wondered whether it had been missed earlier.",
+      "fault": "draft",
+      "severity": "minor"
+    },
+    {
+      "criterion": "known_before_new",
+      "check": "known_before_new",
+      "verdict": "pass",
+      "finding": "The terms on the does_not_know list are defined where they are first developed: shard (glossed in Introduction ¶1, defined in the shard section), consistency boundary, online migration and outbox each get a bold definition; inference is labelled with INFERENCE callouts.",
+      "severity": "major"
+    },
+    {
+      "criterion": "known_before_new",
+      "check": "known_before_new",
+      "verdict": "fail",
+      "spec_locus": "/sections/0/paragraphs/0",
+      "draft_locus": "Setting the Scene at Larkfield: Paid, and Not Activated ¶3",
+      "quote": "Keel already asks the third question of the providers: decision K2 confirms every state against the provider's own record, and K3 requires the ledger's clearing accounts to return to zero.",
+      "finding": "Keel, K2 and K3 are used with no gloss in this chapter; both flow readers had to guess what they are.",
+      "fault": "draft",
+      "corroborated_by": "flow-A, item 1; flow-B, item 1",
+      "severity": "major"
+    },
+    {
+      "criterion": "known_before_new",
+      "check": "known_before_new",
+      "verdict": "fail",
+      "spec_locus": "/sections/0/paragraphs/2",
+      "draft_locus": "Setting the Scene at Larkfield: Paid, and Not Activated ¶3",
+      "quote": "K3 requires the ledger's clearing accounts to return to zero.",
+      "finding": "'Clearing account' is used here and only explained about fifty lines later in the Stripe section ('an account that should return to zero once a flow completes'); both flow readers reported it.",
+      "fault": "draft",
+      "corroborated_by": "flow-A, item 1; flow-B, item 1",
+      "severity": "major"
+    },
+    {
+      "criterion": "known_before_new",
+      "check": "known_before_new",
+      "verdict": "fail",
+      "spec_locus": "/introduction/thesis_statement",
+      "draft_locus": "Introduction callout and Introduction ¶3",
+      "quote": "If it holds, the database product matters less for money than **where the consistency boundary is drawn**",
+      "finding": "'Consistency boundary' (on the does_not_know list) is used in the key points, the failure-patterns callout and the introduction before its definition in the second section; Introduction ¶3 glosses it briefly, but both flow readers reported it as used before it is defined.",
+      "fault": "draft",
+      "corroborated_by": "flow-A, item 4; flow-B, item 4",
+      "severity": "major"
+    },
+    {
+      "criterion": "known_before_new",
+      "check": "known_before_new",
+      "verdict": "fail",
+      "spec_locus": "/sections/3/paragraphs/0",
+      "draft_locus": "What Stripe Has Published: A Document Database and a Platform That Moves Data ¶1",
+      "quote": "which find the right shard through “a chunk metadata service that maps chunks to database shards”",
+      "finding": "'Chunk' is never defined, and the next paragraph and Figure 2 depend on it; both flow readers had to infer it.",
+      "fault": "draft",
+      "corroborated_by": "flow-A, item 7; flow-B, item 7",
+      "severity": "major"
+    },
+    {
+      "criterion": "known_before_new",
+      "check": "known_before_new",
+      "verdict": "fail",
+      "spec_locus": "/sections/2/paragraphs/0",
+      "draft_locus": "When One Database Is Not Enough: What a Shard Keeps and What It Breaks ¶1",
+      "quote": "Across shards, three things stop being free: a transaction, a query over all the data, and moving data to even out the load.",
+      "finding": "Reader A found the third item odd and noted that the key points already used 'rebalancing' and the next table names the same idea 'Rebalancing' without linking the two.",
+      "fault": "draft",
+      "severity": "minor"
+    },
+    {
+      "criterion": "known_before_new",
+      "check": "known_before_new",
+      "verdict": "fail",
+      "spec_locus": "/sections/1/paragraphs/2",
+      "draft_locus": "What Has to Be Exact: Consistency Boundaries by Kind of Data ¶3",
+      "quote": "“it is not viable to use a traditional distributed transaction (2PC) that spans the database and the message broker”",
+      "finding": "Reader B noted that two-phase commit and prepare-and-commit are never explained; the cost is small because the three reasons carry the argument.",
+      "fault": "draft",
+      "severity": "minor"
+    },
+    {
+      "criterion": "known_before_new",
+      "check": "known_before_new",
+      "verdict": "fail",
+      "spec_locus": "/sections/1/paragraphs/0",
+      "draft_locus": "What Has to Be Exact: Consistency Boundaries by Kind of Data ¶1",
+      "quote": "And by Adyen's 2024 post on table partitioning, heavy reporting queries ran against “an aggregated (and summarized) version of the original data from all shards”",
+      "finding": "Reader B: 'table partitioning' and 'shards' appear before the chapter separates the two (shard is defined in the next section, partition only in the Adyen section).",
+      "fault": "draft",
+      "severity": "minor"
+    },
+    {
+      "criterion": "known_before_new",
+      "check": "known_before_new",
+      "verdict": "fail",
+      "spec_locus": "/sections/3/paragraphs/4",
+      "draft_locus": "What Stripe Has Published: A Document Database and a Platform That Moves Data ¶5",
+      "quote": "Here it matters that the published check comes after the writes, which is why I call it detection.",
+      "finding": "Reader A: 'detection' reads as an established term, but its contrast with prevention appears only later, in the comparison table.",
+      "fault": "draft",
+      "severity": "minor"
+    },
+    {
+      "criterion": "known_before_new",
+      "check": "known_before_new",
+      "verdict": "fail",
+      "spec_locus": "/sections/8/paragraphs/2",
+      "draft_locus": "In Practice at Larkfield: The Payment Record Store and Its Outbox ¶3",
+      "quote": "Switch reads to the child rows once the differences have stayed at zero for a full first-of-month renewal run.",
+      "finding": "Reader B: 'first-of-month renewal run' is not explained here.",
+      "fault": "draft",
+      "severity": "minor"
+    },
+    {
+      "criterion": "no_weak_introduction_pattern",
+      "check": "no_weak_introduction_pattern",
+      "verdict": "pass",
+      "finding": "The introduction opens on a puzzling, sourced scenario (Stripe rejecting reads and writes for two seconds on purpose), bridges from the previous chapter, states a disputable thesis and gives a roadmap; none of the weak patterns applies.",
+      "severity": "major"
+    },
+    {
+      "criterion": "no_weak_conclusion_pattern",
+      "check": "no_weak_conclusion_pattern",
+      "verdict": "pass",
+      "finding": "The conclusion sorts the chapter's points into established, conditional and the author's synthesis, adds review questions and hands off by contrast; it does not open with 'in conclusion', introduce a new subtopic, hold body evidence or end on a rephrased thesis alone.",
+      "severity": "major"
+    },
+    {
+      "criterion": "conclusion_synthesizes_and_answers_so_what",
+      "check": "conclusion_synthesizes_and_answers_so_what",
+      "verdict": "pass",
+      "finding": "The synthesis bullets state what no single section states ('the database product matters less for money than the boundary ... what their accounts share is the discipline around the store'; 'consistent' is incomplete until it names the check and who looks at it), and the conditional list and eight questions say what a team does with it.",
+      "severity": "major"
+    },
+    {
+      "criterion": "conclusion_calls_back_to_introduction",
+      "check": "conclusion_calls_back_to_introduction",
+      "verdict": "pass",
+      "finding": "The conclusion returns to the two seconds under 'what it lets give way': 'under two seconds of rejected requests during a move at Stripe (2024)', framing the refusal as the relaxation chosen to keep the record right, as callback.how requires.",
+      "severity": "major"
+    },
+    {
+      "criterion": "intro_predicts_content",
+      "check": "intro_predicts_content",
+      "verdict": "pass",
+      "finding": "The intro reader predicted every section in order (scene, what must be exact, sharding, Stripe, Adyen, comparison and inference with what is not public, outbox at Larkfield, failures, hand-off), the kind of evidence (dated primary posts, Larkfield example, a comparison table, inference marked) and the careful declarative tone. It did not foresee the online-migration thread, which the spec's roadmap also omits (see flow_is_followable).",
+      "severity": "major"
+    },
+    {
+      "criterion": "AC-1",
+      "check": "custom",
+      "verdict": "pass",
+      "finding": "The cold reader gives the full expected answer: payment state and outbox row in one local transaction, a relay that repeats until acknowledged, a booking app that stores the event id in the same transaction so a repeat changes nothing, and a nightly comparison of paid payments against activated passes for the row that was never written.",
+      "severity": "major"
+    },
+    {
+      "criterion": "AC-2",
+      "check": "custom",
+      "verdict": "fail",
+      "spec_locus": "/sections/4/paragraphs/2",
+      "draft_locus": "What Adyen Has Published: PostgreSQL, Accounting Clusters and Partitions ¶3",
+      "quote": "As I read it, sharding the books replaced what one database could do in one transaction with messages. The post does not describe them.",
+      "finding": "The reader got the core: the debit is no longer one local transaction, money must move between clusters, Adyen's 'quite painful' and 'back and forth messages', and the protocol is not public. But the expected answer also has the reader add that such messages must be idempotent and verified; the reader only notes that a message 'can fail or arrive twice' and names no remedy. The Adyen passage ends on 'The post does not describe them' without tying the messages to idempotency and a later check, which the draft does only generically in the inference section.",
+      "fault": "draft",
+      "severity": "major"
+    },
+    {
+      "criterion": "AC-3",
+      "check": "custom",
+      "verdict": "pass",
+      "finding": "The no-spanning-transaction claim is labelled as the author's inference in the introduction, in the key points, in an INFERENCE, NOT DOCUMENTED callout and in the synthesis ('my inference from published mechanisms'); what is not public is listed for Stripe (¶6 of its section: data outside DocDB, transaction boundaries, read consistency, write acknowledgement, replication) and for Adyen (¶6: cluster count, cross-cluster atomicity, rebalancing, synchronous replication, failover).",
+      "severity": "blocker"
+    },
+    {
+      "criterion": "AC-4",
+      "check": "custom",
+      "verdict": "pass",
+      "finding": "Scale figures carry year and unit (Stripe: over five million queries per second, petabytes, 2,000+ shards, 2024; Adyen: 5,000+ transactions per second and 74 TB in 2018, hundreds of terabytes in 2021, 20TB tables in 2023), and the comparison row states 'Not comparable: different years and different units'.",
+      "severity": "major"
+    }
+  ]
+}

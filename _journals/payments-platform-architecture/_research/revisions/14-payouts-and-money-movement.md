@@ -1,6 +1,6 @@
 # Revision after draft check, round 1 — 14-payouts-and-money-movement
 
-Date: 2026-11-24. Report judged: round 1, 19 failed results (12 major, 7 minor). One line per failed result. Words (structure count): 5,549 before, 5,827 after (`max_words` 6,500, unchanged). `timetoread` 24 to 25.
+Date: 2026-11-17. Report judged: round 1, 19 failed results (12 major, 7 minor). One line per failed result. Words (structure count): 5,549 before, 5,827 after (`max_words` 6,500, unchanged). `timetoread` 24 to 25.
 
 ## transition_expresses_declared_relationship
 

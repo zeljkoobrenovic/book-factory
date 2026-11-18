@@ -1,6 +1,6 @@
 # Revision after draft check, round 1 — 26-kyc-aml-and-regulation
 
-Date: 2026-11-24. Report judged: round 1, 15 failed results (12 major, 3 minor) and 1 waived. One line per failed result. Words: 6,482 before, 6,682 after (the spec declares no `max_words`; under the book's 6,900 cap). `timetoread` 27 to 29. Apart from the change listed under "Content", no fact, number, date, quotation, hedge, figure, caption, callout, source entry or `[[link]]` was changed.
+Date: 2026-11-17. Report judged: round 1, 15 failed results (12 major, 3 minor) and 1 waived. One line per failed result. Words: 6,482 before, 6,682 after (the spec declares no `max_words`; under the book's 6,900 cap). `timetoread` 27 to 29. Apart from the change listed under "Content", no fact, number, date, quotation, hedge, figure, caption, callout, source entry or `[[link]]` was changed.
 
 ## transition_expresses_declared_relationship
 

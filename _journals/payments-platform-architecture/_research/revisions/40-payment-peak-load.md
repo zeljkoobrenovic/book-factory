@@ -1,0 +1,23 @@
+# Revision of 40-payment-peak-load (round-1 report, 2026-11-17)
+
+- paragraph_traces_to_thesis S3 (spec): already fixed by the editor (S3 now names Adyen's load tests and freeze; only payment rate limits remain unpublished; ruling 42a). Logged as fixed; open question 2, which still called AC-4 and how_why stale, updated.
+- evidence_is_explained p12: closing sentence added: capacity rented, reshaped and tested past the worst case; the 2026 headroom remark concerns one component and is not a capacity figure. Opening sentence now says neither account ends in a number a merchant could plan with (Flow-A's purpose point).
+- flow scene (timeline, K5/K1): scene opens with the order of events (1 October and 1 November 2026 under the old job; Femke joins January 2027 to lead Keel; review April 2027), says Keel's decisions are numbered K1 to K8, and notes sources were read November 2026 while scenes are set in 2027. K1 glossed in When It Goes Wrong as "the Keel decision on idempotency keys".
+- flow p12 ("That 2024 post"): now "Stripe's 2024 engineering post on its document databases"; the load-test definition moved next to Patil's load test.
+- flow p14 near miss (spec, local order): p14 moved after p15 in spec and prose (after the freeze, as reader A proposed); opening "A freeze guards against change, not against load, and change, not capacity, was the weak point..."; transitions and section flow rationale updated.
+- flow p23 ("Two rows are attested"): names the calendar and ceiling rows and their support; says the pacing and door rows are designs the merchant builds on its own side.
+- flow p26 ("every other cell is a fact cited above"): made true by stating the facts in the body: Stripe's "contact Stripe Support" before an upcoming event (rate-limits page, re-fetched; p16), Adyen's backoff with jitter on 429 (verification row 34; p17), the 2020 Adyen post titled "we design for 20x" (p13). Sentence now says "cited earlier in this chapter".
+- flow p29 ("splits as volume does"): now "as Larkfield's member payment volume did in 2026, 44% on Stripe and 56% on Adyen" (ledger).
+- flow p29 (62/38 slack): now "An 18-hour window leaves about seven hours beyond that 11.1-hour floor for refusals, slowdowns and checkout traffic"; spec p29 aligned.
+- minor p32 (pre-pacing incident): labeled "before Keel, on an unpaced peak day, and the lesson holds when paced".
+- minor p10 (six documents vs five rows): the six documents are named.
+- minor p18 (shed 503): "Any other error, a shed request included, or a timeout is an unknown outcome".
+- minor p18 (quote about caching): introduced as Stripe naming rate limiting among the errors that leave no stored result.
+- minor p19 (Adyen 2020 example delaying the table): moved before the table's announcement and framed as a provider using a queue as control on a path where nobody waits.
+- minor p02 (hosting sentence pulls away from the paradox; spec): opening "Size, and how each provider gets it, is the obvious suspect." ties the hosting sentence to the hook; spec unit unchanged.
+- minor p22 ("downstream" for own receivers; spec): "one more limit downstream, past the answer rather than past the request".
+- waived (house-format position of Where They Differ): no change.
+- known_before_new idempotency key: gloss moved to first use (end of p19); repeat gloss in p32 removed.
+- known_before_new code 91: now "the network code behind these declines is response code 91, which Adyen's mapping of Visa codes describes as 'Issuer or switch is inoperative'" (the page is already in Sources; re-fetched).
+- known_before_new Figure 3 caption (issuer-unavailable): p18's figure sentence now names the issuer-unavailable decline and glosses the issuer before the figure; caption untouched.
+- Length: 5,973 words; max_words raised 5,700 -> 5,985 (5%). timetoread 25 -> 26 min.

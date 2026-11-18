@@ -1,6 +1,6 @@
 # Revision after draft check, round 1 — part-6-intro
 
-Date: 2026-11-24. Report judged: round 1, 20 failed results (14 major, 6 minor). One line per failed result. Words: 1,198 before, 1,228 after (`max_words` raised 1,200 to 1,240, 3%). `timetoread` stays 5. Apart from the Sources line (corrected as instructed), no fact, number, date, quotation, hedge, figure image, caption, callout, source entry or `[[link]]` was changed; the numbers added to the page (the 28-of-365 basis, 180 and 96 events, the four tax steps, the reasons for Femke's two noes) are the spec's own evidence, taken from chapters 28, 30, 31 and 32 and the ledger.
+Date: 2026-11-17. Report judged: round 1, 20 failed results (14 major, 6 minor). One line per failed result. Words: 1,198 before, 1,228 after (`max_words` raised 1,200 to 1,240, 3%). `timetoread` stays 5. Apart from the Sources line (corrected as instructed), no fact, number, date, quotation, hedge, figure image, caption, callout, source entry or `[[link]]` was changed; the numbers added to the page (the 28-of-365 basis, 180 and 96 events, the four tax steps, the reasons for Femke's two noes) are the spec's own evidence, taken from chapters 28, 30, 31 and 32 and the ledger.
 
 ## evidence_is_explained
 

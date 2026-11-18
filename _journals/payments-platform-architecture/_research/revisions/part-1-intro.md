@@ -1,4 +1,4 @@
-# part-1-intro — revision after draft check round 2 (2026-11-24)
+# part-1-intro — revision after draft check round 2 (2026-11-17)
 
 One line per failed result. Words: 1,199 before, 1,200 after (`max_words` 1,200, unchanged). `timetoread` 5 min, unchanged. Callouts, figures, captions, links and Sources untouched.
 

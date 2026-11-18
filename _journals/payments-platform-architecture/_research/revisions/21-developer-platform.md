@@ -1,6 +1,6 @@
 # Revision log — 21-developer-platform (draft check round 1, ESCALATE)
 
-Revised 2026-11-24. One line per failed result. No fact, number, date, quotation, hedge, source, figure, caption or `[[link]]` changed.
+Revised 2026-11-17. One line per failed result. No fact, number, date, quotation, hedge, source, figure, caption or `[[link]]` changed.
 
 ## Major
 
@@ -19,7 +19,7 @@ Revised 2026-11-24. One line per failed result. No fact, number, date, quotation
 
 ## Spec changes
 
-- p31 split, new p34; p06, p19, p25 controlling ideas; conclusion takeaway wording; `max_words` 5000 -> 5250 (5%; the page was at exactly 5,000 and has no connective text of that size to trim); `revised` and changelog entry dated 2026-11-24.
+- p31 split, new p34; p06, p19, p25 controlling ideas; conclusion takeaway wording; `max_words` 5000 -> 5250 (5%; the page was at exactly 5,000 and has no connective text of that size to trim); `revised` and changelog entry dated 2026-11-17.
 
 ## Checks
 

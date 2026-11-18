@@ -1,4 +1,4 @@
-# 03-clearing-and-settlement — revision after draft check round 1 (2026-11-24)
+# 03-clearing-and-settlement — revision after draft check round 1 (2026-11-17)
 
 One line per failed result. Words: 6,132 before, 6,327 after (`max_words` 6,500, unchanged). `timetoread` 26 → 28 min. Callouts, figures, captions, links and Sources untouched.
 

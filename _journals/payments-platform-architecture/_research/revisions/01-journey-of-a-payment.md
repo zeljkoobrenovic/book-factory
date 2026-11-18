@@ -1,4 +1,4 @@
-# 01-journey-of-a-payment — revision after draft check round 1 (2026-11-24)
+# 01-journey-of-a-payment — revision after draft check round 1 (2026-11-17)
 
 One line per failed result. Words: 6,203 before, 6,489 after (`max_words` 6,500, unchanged). `timetoread` 27 → 28 min. Callouts, figures, captions, links and Sources untouched.
 

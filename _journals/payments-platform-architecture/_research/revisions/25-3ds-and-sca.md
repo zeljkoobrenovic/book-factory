@@ -1,6 +1,6 @@
 # Revision after draft check, round 1 — 25-3ds-and-sca
 
-Date: 2026-11-24. Report judged: round 1, 23 failed results (18 major, 5 minor). One line per failed result. Words: 6,498 before, 6,822 after (`max_words` raised 6,500 to 6,825, 5%). `timetoread` 28 to 30. Apart from the corrections listed, no fact, number, date, quotation, hedge, figure image, caption text, callout, source entry or `[[link]]` was changed.
+Date: 2026-11-17. Report judged: round 1, 23 failed results (18 major, 5 minor). One line per failed result. Words: 6,498 before, 6,822 after (`max_words` raised 6,500 to 6,825, 5%). `timetoread` 28 to 30. Apart from the corrections listed, no fact, number, date, quotation, hedge, figure image, caption text, callout, source entry or `[[link]]` was changed.
 
 ## evidence_is_explained
 

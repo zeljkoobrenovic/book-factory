@@ -1,4 +1,4 @@
-# 04-refunds-reversals-and-disputes — revision after draft check round 2 (2026-11-24)
+# 04-refunds-reversals-and-disputes — revision after draft check round 2 (2026-11-17)
 
 One line per failed result. Words: 6,498 before, 6,791 after (`max_words` raised from 6,500 to 6,800, 4.6%). `timetoread` 28 → 30 min. Callouts, captions, links and Sources untouched; one figure moved (below), no figure or caption text changed.
 

@@ -1,6 +1,6 @@
 # Sweep — first half (preface pages, Parts I–V intros, chapters 01–26)
 
-Sweep of 24 November 2026 for rulings 41–48. No new research: every replacement follows the owning chapter's current text. `introduction` and `how-payments-got-complicated` were not touched.
+Sweep of 17 November 2026 for rulings 41–48. No new research: every replacement follows the owning chapter's current text. `introduction` and `how-payments-got-complicated` were not touched.
 
 ## Prose changes
 
@@ -19,7 +19,7 @@ Sweep of 24 November 2026 for rulings 41–48. No new research: every replacemen
 | 16 licences-and-safeguarding | Key point: "Neither publishes which accounts hold the money." | "Neither names the banks that hold the money." | 47g |
 | 22 tokenization-vaulting-and-pci | "Neither company's export pages say whether network tokens travel; the next chapter takes that up." | adds "Adyen's terms (2025) describe a service that shares them"; Sources entry added; one connective sentence trimmed ("Now the choice in front of an integrator can be read.") to stay within 6,500 words | 48d |
 
-Spec units aligned on each of these pages (controlling ideas, evidence, open question), with one changelog line dated 2026-11-24.
+Spec units aligned on each of these pages (controlling ideas, evidence, open question), with one changelog line dated 2026-11-17.
 
 ## Journal-spec entries corrected (also in each page's spec.json)
 
