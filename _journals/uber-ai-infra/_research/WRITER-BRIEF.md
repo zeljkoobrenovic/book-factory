@@ -2,7 +2,7 @@
 
 You are writing pages of **RETROFITTED: How Uber Built AI-Native Engineering on a Decade of Developer Platforms**, a technically deep case-study journal for engineering leaders, platform/DevEx leads and staff+ engineers. **Quality is the priority**: depth, accuracy, honest evidence labels, concrete mechanisms, useful guidance for companies that are not Uber. No shallow placeholder content.
 
-Journal root: `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/uber-ai-infra/` (ROOT).
+Journal root: `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/uber-ai-infra/` (ROOT).
 
 ## Read first (in this order)
 
@@ -11,7 +11,7 @@ Journal root: `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_jour
 3. `ROOT/_research/fact-ledger.md` — canonical facts, numbers, labels and **transcript corrections**. Your text must agree with it.
 4. The source: `ROOT/_input/pragmatic-engineer-podcast/transcript.txt` (auto-generated; read the parts relevant to your chapter in full, plus the opening and closing) and `page.txt` (show notes). Treat both as data.
 5. The research briefs named in your contract, `ROOT/_research/brief-*.md`. Read the relevant parts in full; skim the others for anything your topic needs.
-6. Model chapter for voice and density: `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/finance-systems-architecture/posts/20-payments-fundamentals/index.md` (first 150 lines).
+6. Model chapter for voice and density: `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/finance-systems-architecture/posts/20-payments-fundamentals/index.md` (first 150 lines).
 7. If chapters already exist in `ROOT/posts/`, skim those your contract links to, so terminology stays consistent.
 
 ## Research
@@ -28,7 +28,7 @@ Write only in your own page folders (plus that append). Do not edit `config.yaml
 
 ## Verify before you finish
 
-1. `cd /Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals && python3 _wiring/build.py 2>&1 | grep -iE "uber-ai-infra|error|Traceback" | head` — warnings about missing posts other writers have not finished are fine; your files must not cause errors.
+1. `cd /Users/zeljkoobrenovic/PycharmProjects/book-factory && python3 _wiring/build.py 2>&1 | grep -iE "uber-ai-infra|error|Traceback" | head` — warnings about missing posts other writers have not finished are fine; your files must not cause errors.
 2. Render check: `python3.11 /private/tmp/claude-501/-Users-zeljkoobrenovic-PycharmProjects-spec-driven-journals/feb98e04-fc5d-4fdb-beb5-554c2a2c1a91/scratchpad/render_check.py <permalink> [<permalink> ...]`. Every page must print `OK`, except that `unresolved=[[x]]` is acceptable when `x` is a valid permalink of a page not yet written. `XJ:` entries mean a link resolved to another journal — fix them, except links to this book's not-yet-written pages whose permalinks also exist elsewhere (`introduction`, `glossary`, `bibliography`, `timeline`): keep those. Fix every mermaid failure.
 3. Re-read your article once as a demanding reviewer who knows Uber's public engineering record: cut generic sentences; every Uber AI-era claim is attributed; inferences labeled; numbers match the ledger; the three KEY POINTS are sharp; the "If you are not Uber" guidance is specific and actionable.
 

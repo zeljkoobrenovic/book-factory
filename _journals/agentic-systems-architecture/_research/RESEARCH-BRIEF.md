@@ -2,7 +2,7 @@
 
 You are preparing one verified research brief for **Architecting Agentic Systems**, a serious architecture book for software architects, senior engineers and technical leaders who design and operate agentic systems (LLM-driven systems that plan, call tools and act over multiple steps). It follows the format and evidence discipline of its sibling books in this repository: *Architecting a Vehicle Data and Dealer SaaS Platform* (`_journals/vehicle-data-dealer-saas-architecture/`), BOOKED (`_journals/stays-marketplace-architecture/`), LISTED (`_journals/listing-systems-architecture/`).
 
-ROOT = `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/agentic-systems-architecture/`
+ROOT = `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/agentic-systems-architecture/`
 
 Research date: **28 October 2026**. Your knowledge may be older than this; anything that changes (protocol versions, SDK features, model names, prices, regulation application dates) must be verified against a current source, and anything you cannot verify must be flagged ⚠.
 
@@ -12,7 +12,7 @@ The book argues that an agentic system is an ordinary distributed system with on
 
 ## Format to match
 
-Read the first 60 lines of `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/listing-systems-architecture/_research/brief-search-discovery.md` and copy its conventions exactly:
+Read the first 60 lines of `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/listing-systems-architecture/_research/brief-search-discovery.md` and copy its conventions exactly:
 
 - Title `# Research brief: <topic>` and a "Prepared 28 October 2026 for chapter writers of *Architecting Agentic Systems*" line.
 - A "How to read this brief" section with the three tags: **[VERIFIED: url, published YYYY-MM(-DD)]** (you fetched the page in this session and it supports the claim; date = publication date, or "n.d., accessed 2026-10" for undated docs), **[WIDELY REPORTED: url, YYYY]** (reputable secondary source), **[ASSUMPTION/JUDGEMENT]** (industry knowledge or inference; every statement about a proprietary system a company has not described).

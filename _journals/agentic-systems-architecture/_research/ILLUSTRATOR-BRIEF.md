@@ -1,12 +1,12 @@
 # Illustrator Brief — Architecting Agentic Systems visual layer
 
-You are adding the visual layer to some pages of **Architecting Agentic Systems**. ROOT is `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/agentic-systems-architecture/`.
+You are adding the visual layer to some pages of **Architecting Agentic Systems**. ROOT is `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/agentic-systems-architecture/`.
 
 The sibling books (BOOKED, LISTED, the vehicle-data book) replaced their mermaid diagrams with generated illustrations and added conceptual figures. This book does the same. Your pages need two things:
 - **(A)** Check and finish the diagram illustrations. These are already generated.
 - **(B)** Add conceptual figures.
 
-`GEMINI_API_KEY` is set in the environment. Never print it. Run all commands from the repository root, `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals`.
+`GEMINI_API_KEY` is set in the environment. Never print it. Run all commands from the repository root, `/Users/zeljkoobrenovic/PycharmProjects/book-factory`.
 
 ## Read first
 

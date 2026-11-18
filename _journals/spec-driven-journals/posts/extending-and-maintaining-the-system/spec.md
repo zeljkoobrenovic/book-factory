@@ -53,9 +53,9 @@ Which docs this spec drives beyond the main article (`index.md`).
 ## Sources
 
 - **Internal**
-  - [README.md](https://github.com/zeljkoobrenovic/spec-driven-journals/blob/main/README.md) - common tasks and constraints.
-  - [_start/README.md](https://github.com/zeljkoobrenovic/spec-driven-journals/blob/main/_start/README.md) - start-page role.
-  - [_wiring/README.md](https://github.com/zeljkoobrenovic/spec-driven-journals/blob/main/_wiring/README.md) - validation and build contracts.
+  - [README.md](https://github.com/zeljkoobrenovic/book-factory/blob/main/README.md) - common tasks and constraints.
+  - [_start/README.md](https://github.com/zeljkoobrenovic/book-factory/blob/main/_start/README.md) - start-page role.
+  - [_wiring/README.md](https://github.com/zeljkoobrenovic/book-factory/blob/main/_wiring/README.md) - validation and build contracts.
   - [[build-pipeline-and-rendering-model]] - implementation contract.
   - [[cross-links-assets-and-blocks]] - content extension points.
 - **External**

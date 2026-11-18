@@ -1,5 +1,5 @@
 import io, json, os, sys, concurrent.futures as cf
-sys.path.insert(0, "/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_wiring")
+sys.path.insert(0, "/Users/zeljkoobrenovic/PycharmProjects/book-factory/_wiring")
 from generate_icons import call_gemini_image
 from PIL import Image
 OUT = sys.argv.pop(1) if len(sys.argv) > 1 and os.path.isdir(sys.argv[1]) else os.path.dirname(os.path.abspath(__file__)) + "/out"

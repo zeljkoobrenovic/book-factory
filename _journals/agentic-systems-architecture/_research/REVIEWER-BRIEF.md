@@ -1,6 +1,6 @@
 # Reviewer Brief — part review and repair
 
-You are reviewing and repairing one part of **Architecting Agentic Systems** after its chapters were written by parallel writers. ROOT = `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/agentic-systems-architecture/`.
+You are reviewing and repairing one part of **Architecting Agentic Systems** after its chapters were written by parallel writers. ROOT = `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/agentic-systems-architecture/`.
 
 ## Read first
 
@@ -23,7 +23,7 @@ Do not edit chapters outside your part. Record cross-part problems (a contradict
 
 ## Verify
 
-- `cd /Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals && python3 _wiring/build.py 2>&1 | grep -iE "agentic" | head` (transient errors from other journals' parallel builds can be ignored if a rerun passes).
+- `cd /Users/zeljkoobrenovic/PycharmProjects/book-factory && python3 _wiring/build.py 2>&1 | grep -iE "agentic" | head` (transient errors from other journals' parallel builds can be ignored if a rerun passes).
 - `python3.11 ROOT/_research/tools/render_check.py <permalinks of your part>` — no mermaid failures and no XJ entries other than not-yet-written `part-N`/reference pages.
 
 ## Deliverable

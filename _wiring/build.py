@@ -28,7 +28,7 @@ DOCS_DIR = ROOT / "docs"
 INCLUDES_DIR = DOCS_DIR / "_includes"
 # Public root of docs/, for the absolute URLs that link previews (Open Graph) need.
 # A journal served elsewhere overrides it with `site_url:` in its config.yaml.
-SITE_URL = "https://zeljkoobrenovic.github.io/spec-driven-journals"
+SITE_URL = "https://zeljkoobrenovic.github.io/book-factory"
 
 
 # --- tiny YAML subset parser ----------------------------------------------

@@ -2,7 +2,7 @@
 
 You are writing pages of **Architecting Agentic Systems**, a serious, technically deep architecture book for software architects, senior engineers and technical leaders who design and operate agentic systems. **Quality is the priority**: depth, accuracy, coherence, concrete examples, verifiable references, no hype and no shallow survey content.
 
-Journal root: `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/agentic-systems-architecture/` (ROOT).
+Journal root: `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/agentic-systems-architecture/` (ROOT).
 
 ## Read first (in this order)
 
@@ -10,7 +10,7 @@ Journal root: `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_jour
 2. `ROOT/PLAN.md`: the whole book plan. Find your contract(s) and skim the neighbours' contracts so you do not re-teach what they own.
 3. `ROOT/_research/scenario-ledger.md`: the canonical fictional Ostrell facts, including every line under "Additions by chapter". Your examples must agree with it. Then `ROOT/_research/consistency-issues.md`: canonical rulings on terminology and on which interview-design choices the book adopts or rejects. They win over the sources.
 4. The research briefs named in your contract (`ROOT/_research/brief-*.md`) and the digests (`ROOT/_research/digest-*.md`). Read the relevant parts in full; skim the rest for anything your topic needs. The digests describe the author's interview designs: use them as **design examples** with their source path and step, never as deployed systems. Where digests note inconsistencies between sources, reconcile them in your chapter (say which design you adopt and why).
-5. Model chapter for voice and density: `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/vehicle-data-dealer-saas-architecture/posts/24-dms-integration/index.md` (read at least the first 200 lines; its figures are images now, but in this book you write mermaid diagrams).
+5. Model chapter for voice and density: `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/vehicle-data-dealer-saas-architecture/posts/24-dms-integration/index.md` (read at least the first 200 lines; its figures are images now, but in this book you write mermaid diagrams).
 6. If chapters already exist in `ROOT/posts/`, skim the ones your contract links to, so terminology and examples stay consistent.
 
 ## Research
@@ -24,14 +24,14 @@ Keep the article (front matter to the start of "Sources and Evidence") **at or u
 ## Deliverables per page
 
 - `ROOT/posts/<folder>/index.md`: the article, written to the style guide.
-- `ROOT/posts/<folder>/spec.md`: the spec, written to the style guide. The template is at `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_wiring/spec-template.md`.
+- `ROOT/posts/<folder>/spec.md`: the spec, written to the style guide. The template is at `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_wiring/spec-template.md`.
 - Optionally, append canonical new Ostrell facts to "Additions by chapter" in `scenario-ledger.md`. Append only: other writers work in parallel. Use one small append edit, and re-read the file's tail immediately before you edit it.
 
 Write only in your own page folders, plus that one append. Do not edit `config.yaml`, other pages, or files outside ROOT.
 
 ## Verify before you finish
 
-1. Run the build: `cd /Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals && python3 _wiring/build.py 2>&1 | grep -iE "error|Traceback" | head`. "missing post" warnings for pages other writers have not finished are fine; your own files must not cause errors. A transient error from a parallel build can be ignored if a rerun passes.
+1. Run the build: `cd /Users/zeljkoobrenovic/PycharmProjects/book-factory && python3 _wiring/build.py 2>&1 | grep -iE "error|Traceback" | head`. "missing post" warnings for pages other writers have not finished are fine; your own files must not cause errors. A transient error from a parallel build can be ignored if a rerun passes.
 2. Run the render check on your pages: `python3.11 ROOT/_research/tools/render_check.py <permalink> [<permalink> ...]`. Every page must print `OK`.
    - **`unresolved=[[x]]`** means the link points to a page that is not written yet. Acceptable only if `x` is a valid permalink from the style guide.
    - **`XJ:` entries** mean a link resolved to another journal outside the allowed sibling list, and must be fixed. Exception: keep links to this book's not-yet-written pages whose permalinks also exist in other books (`introduction`, `toolkit`, `glossary`, `bibliography`, `part-1` … `part-11`).

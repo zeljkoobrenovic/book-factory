@@ -4,7 +4,7 @@ timetoread: 2 min
 
 A journal is a small source tree: one `config.yaml`, a `posts/` folder, optional assets, and per-post folders that keep the article, its spec, and its media together. Anyone who understands that shape can add or inspect a journal without reading the generator first.
 
-The contract is simple. A directory under `_journals/` with a `config.yaml` is a journal; without one, the build skips it. The config is the table of contents — title, description, and sections listing post paths relative to `posts/`. The YAML order is the reading order. Output goes to `docs/<journal>/`, which is removed and recreated on every build of that journal: source lives in the [Spec-Driven Journals](https://github.com/zeljkoobrenovic/spec-driven-journals) repository, the generated site is only the reading surface.
+The contract is simple. A directory under `_journals/` with a `config.yaml` is a journal; without one, the build skips it. The config is the table of contents — title, description, and sections listing post paths relative to `posts/`. The YAML order is the reading order. Output goes to `docs/<journal>/`, which is removed and recreated on every build of that journal: source lives in the [Spec-Driven Journals](https://github.com/zeljkoobrenovic/book-factory) repository, the generated site is only the reading surface.
 
 **What changes**
 

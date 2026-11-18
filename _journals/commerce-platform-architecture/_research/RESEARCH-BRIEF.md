@@ -2,7 +2,7 @@
 
 You are preparing one verified research brief for **ORDERED: Architecting Commerce Platforms**, a book that teaches readers who are **new to commerce architecture** how commerce systems fit together, why the architectural decisions matter, and how they evolve with scale. It follows the evidence discipline of its sibling books (BOOKED, LISTED, RECONCILED, *Architecting a Vehicle Data and Dealer SaaS Platform*).
 
-ROOT = `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/commerce-platform-architecture/`
+ROOT = `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/commerce-platform-architecture/`
 
 ## The book's frame
 
@@ -12,7 +12,7 @@ The book's running example is fictional; your brief is about **real, public, dat
 
 ## A private starting point you may read, with rules
 
-The author's private journal *FEDERATED* (`/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/hidden-katapull-group-cto/`) contains seven research briefs in `_research/briefs/` (platforms and ERP landscape, Shopify architecture, Shopify commerce surface and agentic commerce, regulation, two briefs on Katapull's labels, and a Productscape digest) and an appendix of about 250 sources at `posts/08-sources/index.md`. You **may read them to find sources quickly**. Rules:
+The author's private journal *FEDERATED* (`/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/hidden-katapull-group-cto/`) contains seven research briefs in `_research/briefs/` (platforms and ERP landscape, Shopify architecture, Shopify commerce surface and agentic commerce, regulation, two briefs on Katapull's labels, and a Productscape digest) and an appendix of about 250 sources at `posts/08-sources/index.md`. You **may read them to find sources quickly**. Rules:
 
 - Everything you carry over must be **re-verified in this session** by fetching the URL; tag it by what you found, not by the old tag.
 - Never copy any line that cites a "supplied brief", "the brief", "productscape" or "Katapull internal"; those rest on a confidential document. Facts about Katapull and its labels are allowed **only** when they come from public pages or press that you fetched.
@@ -20,7 +20,7 @@ The author's private journal *FEDERATED* (`/Users/zeljkoobrenovic/PycharmProject
 
 ## Format to match
 
-Read the first 60 lines of `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/vehicle-data-dealer-saas-architecture/_research/brief-dms-integration.md` and copy its conventions:
+Read the first 60 lines of `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/vehicle-data-dealer-saas-architecture/_research/brief-dms-integration.md` and copy its conventions:
 
 - Title `# Research brief: <topic>` and a "Prepared 7 November 2026 for chapter writers of *ORDERED: Architecting Commerce Platforms*" line.
 - A "How to read this brief" section with the three tags: **[VERIFIED: url, published YYYY-MM(-DD)]** (you fetched the page in this session and it supports the claim; date = publication date, or "n.d." for undated product pages, with "accessed 2026-11" noted), **[WIDELY REPORTED: url, YYYY]** (reputable secondary source), **[ASSUMPTION/JUDGEMENT]** (industry knowledge or inference; every statement about a proprietary system a company has not described).

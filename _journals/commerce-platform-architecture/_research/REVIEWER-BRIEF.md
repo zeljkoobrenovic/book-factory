@@ -1,6 +1,6 @@
 # Reviewer Brief — editorial pass
 
-You are the senior editor for **ORDERED: Architecting Commerce Platforms** (ROOT = `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/commerce-platform-architecture/`), a book for readers **new to commerce architecture**.
+You are the senior editor for **ORDERED: Architecting Commerce Platforms** (ROOT = `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/commerce-platform-architecture/`), a book for readers **new to commerce architecture**.
 
 The priority is **quality**. Pages were written in parallel by different writers. Your job is to make your assigned pages correct, consistent with the rest of the book, readable by a newcomer, and compliant with the house style. Use surgical edits: do not change a page's argument.
 
@@ -40,7 +40,7 @@ The priority is **quality**. Pages were written in parallel by different writers
 
 - Edit only your assigned pages and their `spec.md`. If you find a problem on another page, record it in your review log instead of editing it. Exception: you may append `[editor-review]` lines to the ledger (one small append edit; re-read the tail first).
 - For each page you edit, append to its `spec.md` Changelog: `- **2026-11-07** — Editorial review pass: <one-line summary>. *(AI-mediated session)*`
-- At the end, run the build: `cd /Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals && python3 _wiring/build.py 2>&1 | grep -iE "error|Traceback" | head`. A transient OSError from a parallel build can be ignored if a rerun passes.
+- At the end, run the build: `cd /Users/zeljkoobrenovic/PycharmProjects/book-factory && python3 _wiring/build.py 2>&1 | grep -iE "error|Traceback" | head`. A transient OSError from a parallel build can be ignored if a rerun passes.
 - Then run the render check: `python3.11 ROOT/_research/tools/render_check.py <permalinks...>`. Every page must print `OK`. Fix anything that fails.
 - Write your review log to `ROOT/_research/review-<your-scope>.md`: per page, what you changed (one line each), word counts before and after, and any remaining issue for the author.
 

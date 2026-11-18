@@ -33,7 +33,7 @@ import urllib.request
 sys.dont_write_bytecode=True
 J=Path(__file__).resolve().parent.parent
 if not (J/'config.yaml').exists():
-    J=Path('/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/private-techuity')
+    J=Path('/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/private-techuity')
 ROOT=J.parent.parent
 HELPER=ROOT/'.codex/skills/article-illustrator/scripts/generate_illustrations_nanobanana.py'
 sys.path.insert(0,str(HELPER.parent))

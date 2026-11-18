@@ -1,6 +1,6 @@
 # Reviewer Brief — RECONCILED final editorial pass
 
-You are the senior editor for **RECONCILED: Architecting Finance Systems** (ROOT = `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/finance-systems-architecture/`). The user's priority is **quality**. Chapters were written in parallel by different writers; your job is to make your assigned chapters correct, consistent with the rest of the book, and compliant with the house style — with **minimal, surgical edits**. Do not rewrite chapters, change their arguments, or shorten them wholesale.
+You are the senior editor for **RECONCILED: Architecting Finance Systems** (ROOT = `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/finance-systems-architecture/`). The user's priority is **quality**. Chapters were written in parallel by different writers; your job is to make your assigned chapters correct, consistent with the rest of the book, and compliant with the house style — with **minimal, surgical edits**. Do not rewrite chapters, change their arguments, or shorten them wholesale.
 
 ## Read first
 
@@ -22,7 +22,7 @@ You are the senior editor for **RECONCILED: Architecting Finance Systems** (ROOT
 
 - Edit only your assigned files (plus their `spec.md`). If you find a problem in another part's chapter, record it in your report instead of editing it.
 - For each chapter you edit, append to its `spec.md` Changelog: `- **2026-10-18** — Editorial review pass: <one-line summary>. *(AI-mediated session)*`
-- At the end run `cd /Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals && python3 _wiring/build.py 2>&1 | grep -iE "error|Traceback" | head` (a transient ai-notes asset error from parallel builds can be ignored if a rerun passes) and then run the render check: `python3.11 /private/tmp/claude-501/-Users-zeljkoobrenovic-PycharmProjects-spec-driven-journals/d17de6c1-27df-4ac8-963a-4f42cb16c093/scratchpad/render_check.py <permalink> <permalink> ...` with your chapters' permalinks — every page must show `OK` (no failed mermaid, no unresolved links). Fix anything that fails.
+- At the end run `cd /Users/zeljkoobrenovic/PycharmProjects/book-factory && python3 _wiring/build.py 2>&1 | grep -iE "error|Traceback" | head` (a transient ai-notes asset error from parallel builds can be ignored if a rerun passes) and then run the render check: `python3.11 /private/tmp/claude-501/-Users-zeljkoobrenovic-PycharmProjects-spec-driven-journals/d17de6c1-27df-4ac8-963a-4f42cb16c093/scratchpad/render_check.py <permalink> <permalink> ...` with your chapters' permalinks — every page must show `OK` (no failed mermaid, no unresolved links). Fix anything that fails.
 - Write your review log to `ROOT/_research/review-<your-scope>.md`: per chapter, what you changed (one line each) and any remaining issue for the author.
 
 ## Report back

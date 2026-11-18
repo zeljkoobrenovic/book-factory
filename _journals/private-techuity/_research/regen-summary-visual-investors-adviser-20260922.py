@@ -13,7 +13,7 @@ import base64, hashlib, importlib.util, json, os, sys, urllib.request, urllib.pa
 from pathlib import Path
 
 sys.dont_write_bytecode = True
-ROOT = Path('/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals')
+ROOT = Path('/Users/zeljkoobrenovic/PycharmProjects/book-factory')
 J = ROOT / '_journals/private-techuity'
 HELPER = ROOT / '.codex/skills/article-illustrator/scripts/generate_illustrations_nanobanana.py'
 

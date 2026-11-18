@@ -1,10 +1,10 @@
 # Illustrator Brief — RECONCILED inline figures
 
-You are adding inline article figures to pages of **LISTED** (ROOT = `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/listing-systems-architecture/`). The user explicitly asked to **illustrate the articles and generate the images** (`GEMINI_API_KEY` is set in the environment — never print it).
+You are adding inline article figures to pages of **LISTED** (ROOT = `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/listing-systems-architecture/`). The user explicitly asked to **illustrate the articles and generate the images** (`GEMINI_API_KEY` is set in the environment — never print it).
 
 ## Read first
 
-1. The skill: `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/.claude/skills/article-illustrator/SKILL.md` — follow its placeholder format, contract rules and asset paths exactly (with the overrides below).
+1. The skill: `/Users/zeljkoobrenovic/PycharmProjects/book-factory/.claude/skills/article-illustrator/SKILL.md` — follow its placeholder format, contract rules and asset paths exactly (with the overrides below).
 2. For each assigned page: its `index.md` (whole) and `spec.md`. Note the existing `**Figure N:**` mermaid diagrams so you do not duplicate them.
 
 ## What to add
@@ -19,7 +19,7 @@ Match the book's header images: "polished business explainer illustration, flat 
 
 ## Generation procedure (per page)
 
-Script dir: `S=/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/.claude/skills/article-illustrator/scripts`
+Script dir: `S=/Users/zeljkoobrenovic/PycharmProjects/book-factory/.claude/skills/article-illustrator/scripts`
 
 1. Insert the placeholders; validate: `python3 $S/extract_illustration_placeholders.py <index.md>`.
 2. Dry run: `python3 $S/generate_illustrations_nanobanana.py <index.md> --dry-run --print-prompts`.
@@ -33,7 +33,7 @@ Do NOT touch other pages, `config.yaml`, or the scenario ledger. Do not change p
 
 ## Verify at the end
 
-`cd /Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals && python3 _wiring/build.py 2>&1 | grep -iE "error|Traceback" | head` (a transient error from parallel builds in another journal can be ignored if a rerun passes), then `python3.11 /private/tmp/claude-501/-Users-zeljkoobrenovic-PycharmProjects-spec-driven-journals/fae6a289-cfa0-449a-8385-7b4381f86340/scratchpad/render_check.py <permalinks...>` — all OK — and confirm no `illustration-placeholder` remains: `grep -l illustration-placeholder <index.md files>` must print nothing.
+`cd /Users/zeljkoobrenovic/PycharmProjects/book-factory && python3 _wiring/build.py 2>&1 | grep -iE "error|Traceback" | head` (a transient error from parallel builds in another journal can be ignored if a rerun passes), then `python3.11 /private/tmp/claude-501/-Users-zeljkoobrenovic-PycharmProjects-spec-driven-journals/fae6a289-cfa0-449a-8385-7b4381f86340/scratchpad/render_check.py <permalinks...>` — all OK — and confirm no `illustration-placeholder` remains: `grep -l illustration-placeholder <index.md files>` must print nothing.
 
 ## Report back
 

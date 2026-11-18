@@ -2,7 +2,7 @@
 import pathlib, sys
 from playwright.sync_api import sync_playwright
 
-DOCS = pathlib.Path("/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/docs/vehicle-data-dealer-saas-architecture")
+DOCS = pathlib.Path("/Users/zeljkoobrenovic/PycharmProjects/book-factory/docs/vehicle-data-dealer-saas-architecture")
 only = set(sys.argv[1:])
 
 pages = sorted(p for p in DOCS.glob("*.html") if not p.name.endswith(".spec.html") and p.name != "index.html")

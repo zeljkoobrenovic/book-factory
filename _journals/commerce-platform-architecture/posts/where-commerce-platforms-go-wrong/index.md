@@ -18,7 +18,7 @@ logo: "assets/images/where-commerce-platforms-go-wrong/logo.jpeg"
 > * **The patterns travel in chains, which start at an unowned connector, an unwatched dependency or a decision copied without its reasons.** Fixing the downstream symptom rarely holds; naming the origin usually does.
 
 <br>
-The storefront accepts a sale, but the warehouse never receives the order. Both systems can remain available while the customer waits for a parcel nobody is preparing. Other failures follow the same shape: prices, stock or status cross a handoff (the point where one system passes a fact to the next) incorrectly. This guide names sixteen recurring patterns so you can recognize the warning signs, trace the mechanism and choose a remedy. The [[introduction]] gives the wider argument.
+The storefront accepts a sale, but the warehouse never receives the order. Both systems can remain available while the customer waits for a parcel nobody is preparing. Other failures follow the same shape: prices, stock or status cross a handoff (the point where one system passes a fact to the next) incorrectly. This guide names sixteen recurring patterns so you can recognize the warning signs, trace the mechanism and choose a remedy. [[how-commerce-got-complicated]] shows where those handoffs came from.
 
 Many patterns accumulate through reasonable local decisions: an app for a campaign, a script for a new channel or a shortcut for support. The risk shows only in their combined effect, which travels in chains from an unowned connector, an unwatched dependency or a copied decision. Find that origin and assign responsibility, not blame.
 

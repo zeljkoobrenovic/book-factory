@@ -2,7 +2,7 @@
 
 You are preparing one verified research brief for **Architecting a Vehicle Data and Dealer SaaS Platform**, a serious architecture book for chief architects, principal engineers and engineering leaders. It follows the format and evidence discipline of its sibling books LISTED (`_journals/listing-systems-architecture/`), BOOKED (`_journals/stays-marketplace-architecture/`) and RECONCILED (`_journals/finance-systems-architecture/`).
 
-ROOT = `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/vehicle-data-dealer-saas-architecture/`
+ROOT = `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/vehicle-data-dealer-saas-architecture/`
 
 ## The book's frame
 
@@ -15,7 +15,7 @@ The book's geography is **Europe-first (Netherlands, Belgium, Germany, United Ki
 
 ## Format to match
 
-Read the first 60 lines of `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/listing-systems-architecture/_research/brief-search-discovery.md` and copy its conventions exactly:
+Read the first 60 lines of `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/listing-systems-architecture/_research/brief-search-discovery.md` and copy its conventions exactly:
 
 - Title `# Research brief: <topic>` and a "Prepared 22 October 2026 for chapter writers of *Architecting a Vehicle Data and Dealer SaaS Platform*" line.
 - A "How to read this brief" section with the three tags: **[VERIFIED: url, published YYYY-MM(-DD)]** (you fetched the page in this session and it supports the claim; date = publication date, or "n.d." for undated product pages, with "accessed 2026-10" noted), **[WIDELY REPORTED: url, YYYY]** (reputable secondary source), **[ASSUMPTION/JUDGEMENT]** (industry knowledge or inference; every statement about a proprietary system a company has not described).

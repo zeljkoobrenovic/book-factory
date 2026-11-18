@@ -1,6 +1,6 @@
 # Glossary row harvesting brief (BOOKED)
 
-You are harvesting glossary rows for the BOOKED book's glossary page. ROOT = /Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/stays-marketplace-architecture
+You are harvesting glossary rows for the BOOKED book's glossary page. ROOT = /Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/stays-marketplace-architecture
 You do NOT write the glossary page. You write ONE scratch file of table rows (path given in your task) and return a short report.
 
 ## What to do, per chapter assigned to you

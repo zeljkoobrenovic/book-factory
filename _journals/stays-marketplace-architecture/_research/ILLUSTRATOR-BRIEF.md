@@ -1,6 +1,6 @@
 # Illustrator Brief — BOOKED visual layer
 
-You are adding the visual layer to pages of **BOOKED** (ROOT = `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/stays-marketplace-architecture/`).
+You are adding the visual layer to pages of **BOOKED** (ROOT = `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/stays-marketplace-architecture/`).
 
 The author asked for the book to match its sibling books LISTED and RECONCILED, which use generated illustrations instead of mermaid. Your pages need two things:
 - **(A)** Convert every mermaid diagram into a generated illustration, keeping its caption verbatim.
@@ -10,12 +10,12 @@ The author asked for the book to match its sibling books LISTED and RECONCILED, 
 
 ## Read first
 
-1. The skill `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/.claude/skills/article-illustrator/SKILL.md`, for the placeholder format, asset paths and script usage.
+1. The skill `/Users/zeljkoobrenovic/PycharmProjects/book-factory/.claude/skills/article-illustrator/SKILL.md`, for the placeholder format, asset paths and script usage.
 2. The diagram converter `ROOT/_research/diagram-illustrations/mermaid_to_illustration.py`. Read its docstring and STYLE suffix.
-3. One converted sibling figures file, as a model for prompts. Read `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/finance-systems-architecture/_research/diagram-illustrations/figs/20-payments-fundamentals.json`.
+3. One converted sibling figures file, as a model for prompts. Read `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/finance-systems-architecture/_research/diagram-illustrations/figs/20-payments-fundamentals.json`.
 4. For each assigned page: its `index.md` (whole) and `spec.md`.
 
-Scripts: `S=/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/.claude/skills/article-illustrator/scripts`. Each page's folder name is `<folder>`.
+Scripts: `S=/Users/zeljkoobrenovic/PycharmProjects/book-factory/.claude/skills/article-illustrator/scripts`. Each page's folder name is `<folder>`.
 
 ## Phase A — convert the mermaid diagrams (per page)
 
@@ -66,7 +66,7 @@ Scripts: `S=/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/.claude/
 
 ## Verify at the end
 
-- Build: `cd /Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals && python3 _wiring/build.py 2>&1 | grep -iE "error|Traceback" | head`. A transient OSError from a parallel build can be ignored if a rerun passes.
+- Build: `cd /Users/zeljkoobrenovic/PycharmProjects/book-factory && python3 _wiring/build.py 2>&1 | grep -iE "error|Traceback" | head`. A transient OSError from a parallel build can be ignored if a rerun passes.
 - Render check: `python3.11 ROOT/_research/tools/render_check.py <permalinks...>`. Every page must print `OK`, with `mermaid=0`.
 - Placeholders: `grep -l illustration-placeholder <index.md files>` must print nothing.
 

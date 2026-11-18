@@ -6,8 +6,8 @@ How commerce systems fit together, why the architectural decisions behind them m
 
 ## Layout
 
-- `config.yaml` — reading order, **68 configured pages**, each with a companion `spec.md`. Public permalinks are stable.
-  - Preface: 3 pages.
+- `config.yaml` — reading order, **69 configured pages**, each with a companion `spec.md`. Public permalinks are stable.
+  - Preface: 4 pages.
   - Parts I–X: each opens with an unnumbered part introduction; 45 chapters in folders `01`–`45`.
   - Part XI PRACTICE: an introduction and four public case studies, folders `46`–`49`.
   - Appendix: illustrated beginner's tutorial on Universal Commerce Protocol (UCP).

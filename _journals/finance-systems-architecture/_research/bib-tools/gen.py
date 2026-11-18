@@ -1,6 +1,6 @@
 import json,re,sys,os
 from urllib.parse import urlparse, unquote
-ROOT='/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/finance-systems-architecture'
+ROOT='/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/finance-systems-architecture'
 cfg=open(ROOT+'/config.yaml').read()
 folders=re.findall(r'^\s+- (\S+)/index\.md',cfg,re.M)
 chapters=[]  # (folder, permalink, title)

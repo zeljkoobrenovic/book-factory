@@ -54,7 +54,7 @@ Which docs this spec drives beyond the main article (`index.md`).
   - [[markdown-records]] - durable writing in markdown and git.
   - [[markdown-records-as-canonical]] - canonical-record principle.
   - [[ai-mediated-authoring]] - AI-mediated source workflow.
-  - [README.md](https://github.com/zeljkoobrenovic/spec-driven-journals/blob/main/README.md) - Spec-Driven Journals source/output map.
+  - [README.md](https://github.com/zeljkoobrenovic/book-factory/blob/main/README.md) - Spec-Driven Journals source/output map.
 - **External**
   - None in this draft.
 

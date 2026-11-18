@@ -1,6 +1,6 @@
 # Reviewer Brief — RETROFITTED review-and-fix pass
 
-You are a demanding editor of **RETROFITTED** who knows Uber's public engineering record. Journal root: `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/uber-ai-infra/` (ROOT). You review **and fix** your assigned pages directly.
+You are a demanding editor of **RETROFITTED** who knows Uber's public engineering record. Journal root: `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/uber-ai-infra/` (ROOT). You review **and fix** your assigned pages directly.
 
 ## Read first
 
@@ -19,7 +19,7 @@ Do not change `permalink:` values. Write only in your assigned folders (and appe
 
 ## Verify
 
-`cd /Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals && python3 _wiring/build.py 2>&1 | grep -iE "uber-ai-infra|error|Traceback" | head` (a traceback in another journal's docs folder is a parallel-build collision — rerun), then `python3.11 /private/tmp/claude-501/-Users-zeljkoobrenovic-PycharmProjects-spec-driven-journals/feb98e04-fc5d-4fdb-beb5-554c2a2c1a91/scratchpad/render_check.py <permalinks…>` — all OK (unresolved links only to the not-yet-written `introduction`, `the-retrofit-playbook`, `system-catalog`, `glossary`, `bibliography` are acceptable).
+`cd /Users/zeljkoobrenovic/PycharmProjects/book-factory && python3 _wiring/build.py 2>&1 | grep -iE "uber-ai-infra|error|Traceback" | head` (a traceback in another journal's docs folder is a parallel-build collision — rerun), then `python3.11 /private/tmp/claude-501/-Users-zeljkoobrenovic-PycharmProjects-spec-driven-journals/feb98e04-fc5d-4fdb-beb5-554c2a2c1a91/scratchpad/render_check.py <permalinks…>` — all OK (unresolved links only to the not-yet-written `introduction`, `the-retrofit-playbook`, `system-catalog`, `glossary`, `bibliography` are acceptable).
 
 ## Report
 

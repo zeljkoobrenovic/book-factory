@@ -2,7 +2,7 @@
 
 You are digesting the author's own system-design interview datasets as source material for **Architecting Agentic Systems**, an architecture book for software architects, senior engineers and technical leaders who design and operate agentic systems.
 
-ROOT = `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/agentic-systems-architecture/`
+ROOT = `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/agentic-systems-architecture/`
 SOURCES = `/Users/zeljkoobrenovic/PycharmProjects/system-design-interviews/data/book/`
 
 Each source directory holds an `interview.json` (title, description, highLevelArchitecture nodes/links, requirements, capacity, api, dataModel, technologyChoices with tradeoffs, and `steps` — the design evolves naive → evolved one failure at a time, each step with a description and a diagram view), usually a `REVIEW.md` (the author's critical review of the dataset — read it: it names gaps and weaknesses), a `LINKEDIN.md`, and `assets/`. Read the JSON **in full** (use python to print it readably; do not skim only titles) and the REVIEW.md.

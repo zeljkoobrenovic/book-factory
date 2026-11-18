@@ -62,7 +62,7 @@ Architecture, in this book, is the discipline of answering three questions for e
 
 ## The Failure Patterns
 
-Commerce platforms break promises through recurring patterns, each of which looked reasonable when chosen. The next page, [[where-commerce-platforms-go-wrong]], unpacks **sixteen** of them. Here are only their names, grouped in four families:
+Commerce platforms break promises through recurring patterns, each of which looked reasonable when chosen. A later page of this preface, [[where-commerce-platforms-go-wrong]], unpacks **sixteen** of them. Here are only their names, grouped in four families:
 
 - **Truth**, a fact with two writers or no owner: **The Phantom Stock**, **Schrödinger's Order**, **The Familiar Stranger**, **The Boomerang** and **The Price Nobody Can Explain**.
 - **Integration**, a message with no identifying key, no contract or no owner: **The Spaghetti Junction**, **The Message in a Bottle** and **The Pulled Rug**.
@@ -100,11 +100,11 @@ Kestrel & Pine is a composite of patterns common among growing omnichannel brand
 
 At that merchant the book follows **the order's journey**: the path one order takes from a shopper's search to the doorstep, back again as a return, and into the books. Eva's jacket is that order. Its canonical facts never change: ordered Tuesday 13 April 2027 at 21:14, picked and packed at Kestrel & Pine's Duiven warehouse on Wednesday, delivered by PostNL on Thursday 15 April, and exchanged for a size L through the returns portal on Monday 19 April.
 
-The book is laid out around that journey: three preface pages, eleven parts, an appendix tutorial and four reference pages. Each part asks one question:
+The book is laid out around that journey: four preface pages, eleven parts, an appendix tutorial and four reference pages. Each part asks one question:
 
 | Section | The question it answers | Chapters |
 | --- | --- | --- |
-| **Preface** | What is the book for, how do commerce platforms go wrong, and which merchant do the examples follow? | This page, [[where-commerce-platforms-go-wrong]], [[meet-kestrel-and-pine]] |
+| **Preface** | What is the book for, how do commerce platforms go wrong, and which merchant do the examples follow? | This page, [[how-commerce-got-complicated]], [[where-commerce-platforms-go-wrong]], [[meet-kestrel-and-pine]] |
 | **[[part-1]]** | What is a commerce platform, who sells what to whom, and which system owns which fact? | 1–5: the order's journey, business models, the capability map, systems of record, the 2026 platform landscape |
 | **[[part-2]]** | What does the shop sell, at what price and discount, how do shoppers find it, and is it really in stock? | 6–10: product information, pricing, promotions, search, inventory and availability |
 | **[[part-3]]** | How does a cart become a paid order with one record, and how does that order reach the books? | 11–14: checkout, payments, order management, tax and invoicing |
@@ -212,7 +212,7 @@ I developed the book through AI-mediated authoring: I set the concept, the struc
 
 ## Where to Go Next
 
-If you read in order, turn next to [[where-commerce-platforms-go-wrong]] for the sixteen patterns, then to [[meet-kestrel-and-pine]], so that every chapter's opening scene lands in a company you know, and begin Part I with [[journey-of-an-order]]. If a decision is waiting, use the routing table above and come back to Part I when a term is unclear.
+If you read in order, turn next to [[how-commerce-got-complicated]], which walks from a market stall to an order like Eva's and shows where the promises and their records came from, then to [[where-commerce-platforms-go-wrong]] for the sixteen patterns, then to [[meet-kestrel-and-pine]], so that every chapter's opening scene lands in a company you know, and begin Part I with [[journey-of-an-order]]. If a decision is waiting, use the routing table above and come back to Part I when a term is unclear.
 
 Either way, keep Eva's five promises in mind: this jacket, at this price, in stock, on Thursday, returnable. Every chapter is about one of them, and about which system keeps it. The parts, the routing table, the stage tables and the kinds of statement all ask of a promise which system makes it, which keeps it and how far the answer holds for a business of your shape. Ask that before you ask which product to buy.
 

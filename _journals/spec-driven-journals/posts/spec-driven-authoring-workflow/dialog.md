@@ -66,7 +66,7 @@ timetoread: 8 min listen
 
 **Ben:** And "inspect" means what, concretely?
 
-**Ana:** The article lists it. Check the generated index page, the post page, the spec page when a spec exists, the modality tabs when summary, dialog, or comics files exist, and the copied assets. Then grep the generated output for `[[` — visible double brackets mean an unresolved cross-link made it to the page. After publication, the public generated site at zeljkoobrenovic.github.io/spec-driven-journals is the reading surface to inspect, while source changes are still reviewed in the GitHub repository.
+**Ana:** The article lists it. Check the generated index page, the post page, the spec page when a spec exists, the modality tabs when summary, dialog, or comics files exist, and the copied assets. Then grep the generated output for `[[` — visible double brackets mean an unresolved cross-link made it to the page. After publication, the public generated site at zeljkoobrenovic.github.io/book-factory is the reading surface to inspect, while source changes are still reviewed in the GitHub repository.
 
 **Ben:** And when the page reads badly, I just fix the HTML, right? It's sitting right there in `docs/`.
 

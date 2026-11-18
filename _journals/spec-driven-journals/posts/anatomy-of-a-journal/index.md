@@ -36,7 +36,7 @@ Generated output goes to:
 docs/<journal>/
 ```
 
-The generated directory is removed and recreated during a build of that journal, so it should never be treated as the editing surface. In [Spec-Driven Journals](https://github.com/zeljkoobrenovic/spec-driven-journals), source lives in the official project repository, while the generated reading surface is [zeljkoobrenovic.github.io/spec-driven-journals](https://zeljkoobrenovic.github.io/spec-driven-journals/).
+The generated directory is removed and recreated during a build of that journal, so it should never be treated as the editing surface. In [Spec-Driven Journals](https://github.com/zeljkoobrenovic/book-factory), source lives in the official project repository, while the generated reading surface is [zeljkoobrenovic.github.io/book-factory](https://zeljkoobrenovic.github.io/book-factory/).
 
 ## Config File
 

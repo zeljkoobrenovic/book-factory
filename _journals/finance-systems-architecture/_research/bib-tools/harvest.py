@@ -1,5 +1,5 @@
 import re, os, json, sys
-ROOT='/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/finance-systems-architecture'
+ROOT='/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/finance-systems-architecture'
 cfg=open(ROOT+'/config.yaml').read()
 posts=re.findall(r'^\s+- (\S+)/index\.md',cfg,re.M)
 out=[]

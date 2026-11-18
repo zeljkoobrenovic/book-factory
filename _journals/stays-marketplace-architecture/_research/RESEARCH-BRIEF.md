@@ -2,7 +2,7 @@
 
 You are preparing one verified research brief for **BOOKED: Architecting Travel Accommodation and Hosted Stays Marketplaces**, a serious architecture book for chief architects, principal engineers and engineering leaders. It follows the format and evidence discipline of its sibling book LISTED.
 
-ROOT = `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/stays-marketplace-architecture/`
+ROOT = `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/stays-marketplace-architecture/`
 
 ## The book's frame
 
@@ -13,7 +13,7 @@ The book covers two marketplace types and compares them wherever their architect
 
 ## Format to match
 
-Read the first 60 lines of `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/listing-systems-architecture/_research/brief-search-discovery.md` and copy its conventions exactly:
+Read the first 60 lines of `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/listing-systems-architecture/_research/brief-search-discovery.md` and copy its conventions exactly:
 
 - Title `# Research brief: <topic>` and a "Prepared 21 October 2026 for chapter writers of *BOOKED…*" line.
 - A "How to read this brief" section with the three tags: **[VERIFIED: url, published YYYY-MM(-DD)]** (you fetched the page in this session and it supports the claim; date = publication date), **[WIDELY REPORTED: url, YYYY]** (reputable secondary source), **[ASSUMPTION/JUDGEMENT]** (industry knowledge or inference; every statement about a proprietary system a company has not described).

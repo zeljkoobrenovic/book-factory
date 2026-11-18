@@ -1,10 +1,10 @@
 # Illustrator Brief — RETROFITTED inline figures (staging phase)
 
-You are staging inline article figures for pages of **RETROFITTED** (ROOT = `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/uber-ai-infra/`). The user asked for the full visual layer. In this phase you **stage placeholders only** — the Gemini key is not available yet; generation happens in a later phase.
+You are staging inline article figures for pages of **RETROFITTED** (ROOT = `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/uber-ai-infra/`). The user asked for the full visual layer. In this phase you **stage placeholders only** — the Gemini key is not available yet; generation happens in a later phase.
 
 ## Read first
 
-1. The skill: `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/.claude/skills/article-illustrator/SKILL.md` — follow its placeholder format, contract rules and asset paths exactly. The `<post-slug>` in asset paths is the **post folder name** (e.g. `assets/images/12-minion/<id>.jpeg`).
+1. The skill: `/Users/zeljkoobrenovic/PycharmProjects/book-factory/.claude/skills/article-illustrator/SKILL.md` — follow its placeholder format, contract rules and asset paths exactly. The `<post-slug>` in asset paths is the **post folder name** (e.g. `assets/images/12-minion/<id>.jpeg`).
 2. For each assigned page: its `index.md` (whole) and `spec.md`. Note the existing `**Figure N:**` mermaid diagrams so you do not duplicate them.
 
 ## What to add
@@ -19,7 +19,7 @@ You are staging inline article figures for pages of **RETROFITTED** (ROOT = `/Us
 
 ## Staging procedure (per page)
 
-Script dir: `S=/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/.claude/skills/article-illustrator/scripts`
+Script dir: `S=/Users/zeljkoobrenovic/PycharmProjects/book-factory/.claude/skills/article-illustrator/scripts`
 
 1. Insert the placeholders (`"status": "pending"`).
 2. Validate: `python3 $S/extract_illustration_placeholders.py <index.md>`.

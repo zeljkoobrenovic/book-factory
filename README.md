@@ -1,4 +1,4 @@
-# Spec-Driven Journals
+# Book Factory
 
 This repository publishes Organization's durable technical writing as a set of
 small static journal sites. Source content lives under `_journals/`, the build
@@ -9,7 +9,7 @@ There is no application framework and no dependency install step for the core
 build. The site generator is a small Python standard-library script, HTML
 templates, CSS, and client-side JavaScript.
 
-See generated examples journals here: [zeljkoobrenovic.github.io/spec-driven-journals](https://zeljkoobrenovic.github.io/spec-driven-journals/)
+See generated examples journals here: [zeljkoobrenovic.github.io/book-factory](https://zeljkoobrenovic.github.io/book-factory/)
 
 ## Quick Start
 

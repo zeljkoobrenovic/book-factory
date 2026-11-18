@@ -1,6 +1,6 @@
 import re, os, sys
 D = os.path.dirname(os.path.abspath(__file__))
-OUT = '/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/stays-marketplace-architecture/posts/glossary/index.md'
+OUT = '/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/stays-marketplace-architecture/posts/glossary/index.md'
 SECTIONS = [('reading', 'g-reading'), ('part-1', 'g-marketplace'), ('part-2', 'g-supply'), ('part-3', 'g-inventory'),
             ('part-4', 'g-discovery'), ('part-5', 'g-booking'), ('part-6', 'g-money'), ('part-7', 'g-trust'),
             ('part-8', 'g-platform'), ('part-9', 'g-leadership'), ('corvane', 'g-corvane')]

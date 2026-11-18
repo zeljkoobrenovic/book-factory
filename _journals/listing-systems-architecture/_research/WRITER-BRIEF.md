@@ -2,7 +2,7 @@
 
 You are writing pages of **LISTED: Architecting Large-Scale Classifieds and Marketplace Platforms**, a serious, technically deep architecture book for chief architects, principal engineers and engineering leaders of listing marketplaces. **Quality is the priority**: depth, accuracy, coherence, concrete examples, no shallow placeholder content.
 
-Journal root: `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/listing-systems-architecture/` (ROOT).
+Journal root: `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/listing-systems-architecture/` (ROOT).
 
 ## Read first (in this order)
 
@@ -10,7 +10,7 @@ Journal root: `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_jour
 2. `ROOT/PLAN.md` — the whole book plan; find your contract(s) and skim the neighbours' contracts so you do not re-teach what they own.
 3. `ROOT/_research/scenario-ledger.md` — canonical fictional Veldmark facts. Your examples must agree with it.
 4. The research briefs named in your contract, in `ROOT/_research/brief-*.md`, and `ROOT/_research/productscape-digest.md` (generalized domain model: customers, capabilities, data assets, streams, stressors). Read the relevant parts in full; skim the others for anything your topic needs.
-5. Model chapter for voice and density: `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/finance-systems-architecture/posts/20-payments-fundamentals/index.md` (read at least the first 150 lines).
+5. Model chapter for voice and density: `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/finance-systems-architecture/posts/20-payments-fundamentals/index.md` (read at least the first 150 lines).
 6. If chapters already exist in `ROOT/posts/`, skim those your contract links to, so terminology and examples stay consistent.
 
 ## Research
@@ -22,14 +22,14 @@ Research tips (from the briefing phase): Medium article pages often return 403, 
 ## Deliverables per page
 
 - `ROOT/posts/<folder>/index.md` — the article, per the style guide.
-- `ROOT/posts/<folder>/spec.md` — the spec, per the style guide (template at `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_wiring/spec-template.md`).
+- `ROOT/posts/<folder>/spec.md` — the spec, per the style guide (template at `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_wiring/spec-template.md`).
 - Optionally append canonical new Veldmark facts to "Additions by chapter" in `scenario-ledger.md` (append only — other writers work in parallel; use one small append edit, re-reading the file's tail immediately before editing).
 
 Write only in your own page folders (plus that append). Do not edit `config.yaml`, other pages, or files outside ROOT.
 
 ## Verify before you finish
 
-1. Run `cd /Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals && python3 _wiring/build.py 2>&1 | grep -iE "listing-systems|error|Traceback" | head` — missing files for pages other writers have not finished are fine; your files must not cause errors. (A transient error from a parallel build in another journal can be ignored if a rerun passes.)
+1. Run `cd /Users/zeljkoobrenovic/PycharmProjects/book-factory && python3 _wiring/build.py 2>&1 | grep -iE "listing-systems|error|Traceback" | head` — missing files for pages other writers have not finished are fine; your files must not cause errors. (A transient error from a parallel build in another journal can be ignored if a rerun passes.)
 2. Run the render check on your pages: `python3.11 /private/tmp/claude-501/-Users-zeljkoobrenovic-PycharmProjects-spec-driven-journals/fae6a289-cfa0-449a-8385-7b4381f86340/scratchpad/render_check.py <permalink> [<permalink> ...]`. Every page must print `OK`. `unresolved=[[x]]` means a link to a page not yet written — acceptable only if `x` is a valid permalink from the style guide (it will resolve once that page exists); `XJ:` entries mean a link resolved to another journal and must be fixed — **except** links to this book's not-yet-written pages whose permalinks also exist in the finance book (`toolkit`, `glossary`, `bibliography`, `introduction`, `long-term-evolution`, `part-1`…`part-9`): keep those links; they resolve in-journal once the page exists. Do not remove them. Fix every mermaid failure.
 3. Re-read your article once as a demanding chief-architect reviewer: cut generic sentences; every company claim has a dated source; inferences are labeled; Veldmark numbers match the ledger; the three KEY POINTS are sharp; the trade-offs are real.
 

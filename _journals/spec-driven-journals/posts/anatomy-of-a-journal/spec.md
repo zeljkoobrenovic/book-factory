@@ -51,8 +51,8 @@ Which docs this spec drives beyond the main article (`index.md`).
 ## Sources
 
 - **Internal**
-  - [_journals/README.md](https://github.com/zeljkoobrenovic/spec-driven-journals/blob/main/_journals/README.md) - journal structure and front matter.
-  - [AGENTS.md](https://github.com/zeljkoobrenovic/spec-driven-journals/blob/main/AGENTS.md) - generator contract and conventions.
+  - [_journals/README.md](https://github.com/zeljkoobrenovic/book-factory/blob/main/_journals/README.md) - journal structure and front matter.
+  - [AGENTS.md](https://github.com/zeljkoobrenovic/book-factory/blob/main/AGENTS.md) - generator contract and conventions.
   - [[what-are-spec-driven-journals]] - series framing.
 - **External**
   - None in this draft.

@@ -2,7 +2,7 @@
 
 You are writing pages of **ORDERED: Architecting Commerce Platforms**, a serious, technically accurate architecture book written for readers who are **new to commerce architecture**. **Quality is the priority**: depth, accuracy, coherence, concrete examples, plain language, no shallow placeholder content and no undefined jargon.
 
-Journal root: `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/commerce-platform-architecture/` (ROOT).
+Journal root: `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/commerce-platform-architecture/` (ROOT).
 
 ## Read first (in this order)
 
@@ -10,7 +10,7 @@ Journal root: `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_jour
 2. `ROOT/PLAN.md`: positioning, the teaching discipline, and the chapter contracts. Find your contract(s) and skim the neighbours' contracts so you do not re-teach what they own.
 3. `ROOT/_research/scenario-ledger.md`: the canonical fictional Kestrel & Pine facts, including every line under "Additions by chapter". Your examples must agree with it.
 4. The research briefs named in your contract, in `ROOT/_research/brief-*.md`. Read the relevant parts in full and skim the others for anything your topic needs.
-5. Model chapter for density and evidence handling: `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/vehicle-data-dealer-saas-architecture/posts/12-valuation-engine/index.md` (read at least the first 200 lines). It is written for experts; keep its rigor but write at a newcomer's altitude, as the style guide says.
+5. Model chapter for density and evidence handling: `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/vehicle-data-dealer-saas-architecture/posts/12-valuation-engine/index.md` (read at least the first 200 lines). It is written for experts; keep its rigor but write at a newcomer's altitude, as the style guide says.
 6. If chapters already exist in `ROOT/posts/`, skim the ones your contract links to (and `meet-kestrel-and-pine` if present), so terminology and examples stay consistent.
 
 ## Research
@@ -26,14 +26,14 @@ Keep the article (front matter to the start of "Sources and Evidence") **at or u
 ## Deliverables per page
 
 - `ROOT/posts/<folder>/index.md`: the article, written to the style guide.
-- `ROOT/posts/<folder>/spec.md`: the spec, written to the style guide. The template is at `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_wiring/spec-template.md`.
+- `ROOT/posts/<folder>/spec.md`: the spec, written to the style guide. The template is at `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_wiring/spec-template.md`.
 - Optionally, append canonical new Kestrel & Pine facts to "Additions by chapter" in `scenario-ledger.md`. Append only: other writers work in parallel. Use one small append edit, and re-read the file's tail immediately before you edit it.
 
 Write only in your own page folders, plus that one append. Do not edit `config.yaml`, other pages, or files outside ROOT.
 
 ## Verify before you finish
 
-1. Run the build: `cd /Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals && python3 _wiring/build.py 2>&1 | grep -iE "error|Traceback" | head`.
+1. Run the build: `cd /Users/zeljkoobrenovic/PycharmProjects/book-factory && python3 _wiring/build.py 2>&1 | grep -iE "error|Traceback" | head`.
    - "missing post" warnings for pages other writers have not finished are fine. Your own files must not cause errors.
    - A transient error from a parallel build can be ignored if a rerun passes.
 2. Run the render check on your pages: `python3.11 ROOT/_research/tools/render_check.py <permalink> [<permalink> ...]`. Every page must print `OK`.

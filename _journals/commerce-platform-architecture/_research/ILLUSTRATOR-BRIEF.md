@@ -1,10 +1,10 @@
 # Illustrator Brief — ORDERED visual layer
 
-You are adding the visual layer to pages of **ORDERED: Architecting Commerce Platforms** (ROOT = `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/commerce-platform-architecture/`), a book for readers new to commerce architecture. It must match its sibling books (BOOKED, LISTED, Architecting Agentic Systems), which use generated illustrations instead of mermaid. For each assigned page:
+You are adding the visual layer to pages of **ORDERED: Architecting Commerce Platforms** (ROOT = `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/commerce-platform-architecture/`), a book for readers new to commerce architecture. It must match its sibling books (BOOKED, LISTED, Architecting Agentic Systems), which use generated illustrations instead of mermaid. For each assigned page:
 - **(A)** Redraw every mermaid diagram as a generated illustration, keeping its caption.
 - **(B)** Add conceptual inline figures.
 
-`GEMINI_API_KEY` is set in the environment. Never print it. Repository root: `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals` (run scripts from there).
+`GEMINI_API_KEY` is set in the environment. Never print it. Repository root: `/Users/zeljkoobrenovic/PycharmProjects/book-factory` (run scripts from there).
 
 ## Read first
 
@@ -46,7 +46,7 @@ Scripts: `S=.claude/skills/article-illustrator/scripts`. Reference screenshots o
 
 ## Verify at the end
 
-- Build: `cd /Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals && python3 _wiring/build.py 2>&1 | grep -iE "error|Traceback" | head` (errors from other journals or a transient OSError from a parallel build can be ignored if a rerun passes).
+- Build: `cd /Users/zeljkoobrenovic/PycharmProjects/book-factory && python3 _wiring/build.py 2>&1 | grep -iE "error|Traceback" | head` (errors from other journals or a transient OSError from a parallel build can be ignored if a rerun passes).
 - Render check: `python3.11 ROOT/_research/tools/render_check.py <permalinks...>`: every page `OK` with `mermaid=0`.
 - `grep -l illustration-placeholder <index.md files>` prints nothing.
 - Log any figure accepted with a known flaw to `ROOT/_research/figure-issues.md` (one small append; re-read its tail first; create it if missing).

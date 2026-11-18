@@ -52,8 +52,8 @@ Which docs this spec drives beyond the main article (`index.md`).
 
 - **Internal**
   - [[spec-driven-authoring]] - rationale for sibling specs.
-  - [README.md](https://github.com/zeljkoobrenovic/spec-driven-journals/blob/main/README.md) - editing workflow.
-  - [_wiring/spec-template.md](https://github.com/zeljkoobrenovic/spec-driven-journals/blob/main/_wiring/spec-template.md) - canonical spec shape.
+  - [README.md](https://github.com/zeljkoobrenovic/book-factory/blob/main/README.md) - editing workflow.
+  - [_wiring/spec-template.md](https://github.com/zeljkoobrenovic/book-factory/blob/main/_wiring/spec-template.md) - canonical spec shape.
   - [[anatomy-of-a-journal]] - file layout.
 - **External**
   - None in this draft.

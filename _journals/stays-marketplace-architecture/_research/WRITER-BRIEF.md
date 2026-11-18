@@ -2,7 +2,7 @@
 
 You are writing pages of **BOOKED: Architecting Travel Accommodation and Hosted Stays Marketplaces**, a serious, technically deep architecture book for chief architects, principal engineers and engineering leaders of travel and stays marketplaces. **Quality is the priority**: depth, accuracy, coherence, concrete examples, no shallow placeholder content.
 
-Journal root: `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/stays-marketplace-architecture/` (ROOT).
+Journal root: `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/stays-marketplace-architecture/` (ROOT).
 
 ## Read first (in this order)
 
@@ -10,7 +10,7 @@ Journal root: `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_jour
 2. `ROOT/PLAN.md`: the whole book plan. Find your contract(s) and skim the neighbours' contracts so you do not re-teach what they own.
 3. `ROOT/_research/scenario-ledger.md`: the canonical fictional Corvane facts. Your examples must agree with it.
 4. The research briefs named in your contract, in `ROOT/_research/brief-*.md`, and the parts of `ROOT/_research/productscape-digest.md` that cover your contract's domains (brick ids). Read the relevant parts in full and skim the others for anything your topic needs.
-5. Model chapter for voice and density: `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/listing-systems-architecture/posts/20-ranking/index.md` (read at least the first 200 lines).
+5. Model chapter for voice and density: `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/listing-systems-architecture/posts/20-ranking/index.md` (read at least the first 200 lines).
 6. If chapters already exist in `ROOT/posts/`, skim the ones your contract links to, so terminology and examples stay consistent.
 
 ## Research
@@ -31,14 +31,14 @@ Keep the article (front matter to the start of "Sources and Evidence") **at or u
 ## Deliverables per page
 
 - `ROOT/posts/<folder>/index.md`: the article, written to the style guide.
-- `ROOT/posts/<folder>/spec.md`: the spec, written to the style guide. The template is at `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_wiring/spec-template.md`.
+- `ROOT/posts/<folder>/spec.md`: the spec, written to the style guide. The template is at `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_wiring/spec-template.md`.
 - Optionally, append canonical new Corvane facts to "Additions by chapter" in `scenario-ledger.md`. Append only: other writers work in parallel. Use one small append edit, and re-read the file's tail immediately before you edit it.
 
 Write only in your own page folders, plus that one append. Do not edit `config.yaml`, other pages, or files outside ROOT.
 
 ## Verify before you finish
 
-1. Run the build: `cd /Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals && python3 _wiring/build.py 2>&1 | grep -iE "error|Traceback" | head`.
+1. Run the build: `cd /Users/zeljkoobrenovic/PycharmProjects/book-factory && python3 _wiring/build.py 2>&1 | grep -iE "error|Traceback" | head`.
    - "missing post" warnings for pages other writers have not finished are fine. Your own files must not cause errors.
    - A transient error from a parallel build can be ignored if a rerun passes.
 2. Run the render check on your pages: `python3.11 ROOT/_research/tools/render_check.py <permalink> [<permalink> ...]`. Every page must print `OK`.

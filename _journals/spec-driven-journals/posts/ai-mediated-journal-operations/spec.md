@@ -52,7 +52,7 @@ Which docs this spec drives beyond the main article (`index.md`).
 
 - **Internal**
   - [[ai-mediated-authoring]] - durable rationale and workflow.
-  - [AGENTS.md](https://github.com/zeljkoobrenovic/spec-driven-journals/blob/main/AGENTS.md) - agent-facing operating instructions.
+  - [AGENTS.md](https://github.com/zeljkoobrenovic/book-factory/blob/main/AGENTS.md) - agent-facing operating instructions.
   - [[spec-driven-authoring-workflow]] - local workflow.
 - **External**
   - None in this draft.

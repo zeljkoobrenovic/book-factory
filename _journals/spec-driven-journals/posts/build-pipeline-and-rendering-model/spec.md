@@ -51,9 +51,9 @@ Which docs this spec drives beyond the main article (`index.md`).
 ## Sources
 
 - **Internal**
-  - [_wiring/build.py](https://github.com/zeljkoobrenovic/spec-driven-journals/blob/main/_wiring/build.py) - generator implementation.
-  - [_templates/post.html](https://github.com/zeljkoobrenovic/spec-driven-journals/blob/main/_templates/post.html) - client-side renderer.
-  - [_wiring/README.md](https://github.com/zeljkoobrenovic/spec-driven-journals/blob/main/_wiring/README.md) - build overview.
+  - [_wiring/build.py](https://github.com/zeljkoobrenovic/book-factory/blob/main/_wiring/build.py) - generator implementation.
+  - [_templates/post.html](https://github.com/zeljkoobrenovic/book-factory/blob/main/_templates/post.html) - client-side renderer.
+  - [_wiring/README.md](https://github.com/zeljkoobrenovic/book-factory/blob/main/_wiring/README.md) - build overview.
   - [[anatomy-of-a-journal]] - source layout.
 - **External**
   - None in this draft.

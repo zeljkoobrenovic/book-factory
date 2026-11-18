@@ -1,6 +1,6 @@
 # Reviewer Brief — LISTED editorial pass
 
-You are the senior editor for **LISTED: Architecting Large-Scale Classifieds and Marketplace Platforms** (ROOT = `/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/listing-systems-architecture/`). The user's priority is **quality**. Pages were written in parallel by different writers; your job is to make your assigned pages correct, consistent with the rest of the book, and compliant with the house style — with **minimal, surgical edits**. Do not rewrite pages, change their arguments, or shorten them wholesale.
+You are the senior editor for **LISTED: Architecting Large-Scale Classifieds and Marketplace Platforms** (ROOT = `/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/listing-systems-architecture/`). The user's priority is **quality**. Pages were written in parallel by different writers; your job is to make your assigned pages correct, consistent with the rest of the book, and compliant with the house style — with **minimal, surgical edits**. Do not rewrite pages, change their arguments, or shorten them wholesale.
 
 ## Read first
 
@@ -22,7 +22,7 @@ You are the senior editor for **LISTED: Architecting Large-Scale Classifieds and
 
 - Edit only your assigned pages (plus their `spec.md`). If you find a problem in another page, record it in your review log instead of editing it.
 - For each page you edit, append to its `spec.md` Changelog: `- **2026-10-19** — Editorial review pass: <one-line summary>. *(AI-mediated session)*`
-- At the end run `cd /Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals && python3 _wiring/build.py 2>&1 | grep -iE "error|Traceback" | head` (a transient error from another journal's parallel build can be ignored if a rerun passes), then `python3.11 /private/tmp/claude-501/-Users-zeljkoobrenovic-PycharmProjects-spec-driven-journals/fae6a289-cfa0-449a-8385-7b4381f86340/scratchpad/render_check.py <permalinks...>` — every page must print `OK` (no failed mermaid, no unresolved links, no `XJ:` entries). Fix anything that fails.
+- At the end run `cd /Users/zeljkoobrenovic/PycharmProjects/book-factory && python3 _wiring/build.py 2>&1 | grep -iE "error|Traceback" | head` (a transient error from another journal's parallel build can be ignored if a rerun passes), then `python3.11 /private/tmp/claude-501/-Users-zeljkoobrenovic-PycharmProjects-spec-driven-journals/fae6a289-cfa0-449a-8385-7b4381f86340/scratchpad/render_check.py <permalinks...>` — every page must print `OK` (no failed mermaid, no unresolved links, no `XJ:` entries). Fix anything that fails.
 - Write your review log to `ROOT/_research/review-<your-scope>.md`: per page, what you changed (one line each) and any remaining issue for the author.
 
 ## Report back

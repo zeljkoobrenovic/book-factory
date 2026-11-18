@@ -1,5 +1,5 @@
 import re,sys,glob
-ROOT='/Users/zeljkoobrenovic/PycharmProjects/spec-driven-journals/_journals/stays-marketplace-architecture/posts/'
+ROOT='/Users/zeljkoobrenovic/PycharmProjects/book-factory/_journals/stays-marketplace-architecture/posts/'
 for folder in sys.argv[1:]:
     t=open(glob.glob(ROOT+folder+'*/index.md')[0]).read()
     t=t.split('## Sources and Evidence')[0]

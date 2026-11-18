@@ -53,8 +53,8 @@ Which docs this spec drives beyond the main article (`index.md`).
 ## Sources
 
 - **Internal**
-  - [README.md](https://github.com/zeljkoobrenovic/spec-driven-journals/blob/main/README.md) - Spec-Driven Journals overview and quick start.
-  - [AGENTS.md](https://github.com/zeljkoobrenovic/spec-driven-journals/blob/main/AGENTS.md) - detailed build and authoring contract.
+  - [README.md](https://github.com/zeljkoobrenovic/book-factory/blob/main/README.md) - Spec-Driven Journals overview and quick start.
+  - [AGENTS.md](https://github.com/zeljkoobrenovic/book-factory/blob/main/AGENTS.md) - detailed build and authoring contract.
   - [[markdown-records]] - markdown records as durable technical writing.
   - [[spec-driven-authoring]] - specs as working contracts.
 - **External**

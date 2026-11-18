@@ -50,9 +50,9 @@ Which docs this spec drives beyond the main article (`index.md`).
 ## Sources
 
 - **Internal**
-  - [AGENTS.md](https://github.com/zeljkoobrenovic/spec-driven-journals/blob/main/AGENTS.md) - cross-link, asset, and block contracts.
-  - [_templates/post.html](https://github.com/zeljkoobrenovic/spec-driven-journals/blob/main/_templates/post.html) - renderer implementation.
-  - [_wiring/build.py](https://github.com/zeljkoobrenovic/spec-driven-journals/blob/main/_wiring/build.py) - cross-link and block parsing.
+  - [AGENTS.md](https://github.com/zeljkoobrenovic/book-factory/blob/main/AGENTS.md) - cross-link, asset, and block contracts.
+  - [_templates/post.html](https://github.com/zeljkoobrenovic/book-factory/blob/main/_templates/post.html) - renderer implementation.
+  - [_wiring/build.py](https://github.com/zeljkoobrenovic/book-factory/blob/main/_wiring/build.py) - cross-link and block parsing.
   - [[build-pipeline-and-rendering-model]] - implementation context.
 - **External**
   - None in this draft.
