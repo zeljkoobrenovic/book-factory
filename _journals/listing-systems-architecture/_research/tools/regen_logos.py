@@ -25,6 +25,7 @@ BACKUP = "logo-infographic.jpeg"
 # Hand-written scenes: no real company names, brands, logos or real people.
 SCENES = {
     'introduction': "a reader standing at the start of a winding road through a small town of market stalls, each stall with a noticeboard of item cards, where buyers and sellers meet and shake hands; labels 'Supply', 'Demand', 'Match'",
+    'how-classifieds-got-complicated': "a red public telephone box on a street corner at sunrise, a young woman inside holding an open newspaper of small ads with one ad circled and the receiver to her ear, and beside the box, on a garden fence, a blue bicycle with a small blank card taped to it; in the sky above, a few small speech-bubble notifications with a bell float toward a phone in her pocket; labels 'Then', 'Now'",
     'where-listing-systems-go-wrong': "a large public noticeboard in a town square where some cards have faded, some are duplicated, one has fallen to the ground, and a puzzled buyer looks at an empty spot; labels 'Stale', 'Duplicate', 'Lost'",
     'meet-veldmark': "a friendly modern headquarters building with four doors side by side, one with a sofa in the window for general classifieds, one with a car, one with a house and one with a laptop for an agent office, all on one shared foundation; label 'One platform'",
     'part-1-intro': "a busy town market square seen from above, with stalls for cars, houses and second-hand goods, buyers walking between them and a noticeboard at the centre; labels 'Buyers', 'Sellers'",

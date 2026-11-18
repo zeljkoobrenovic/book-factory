@@ -6,7 +6,7 @@ How architects and engineering leaders design, scale, govern and evolve the syst
 
 ## Layout
 
-- `config.yaml` — reading order: Preface (3 pages), Parts I–VIII (each with an unnumbered part introduction; 45 chapters, folders `01`–`45`), Part IX PRACTICE (introduction and six public case studies, folders `46`–`51`) and Reference (toolkit, glossary, bibliography): **66 configured pages**, each with a companion `spec.md`. Public permalinks are unprefixed and stable.
+- `config.yaml` — reading order: Preface (4 pages), Parts I–VIII (each with an unnumbered part introduction; 45 chapters, folders `01`–`45`), Part IX PRACTICE (introduction and six public case studies, folders `46`–`51`) and Reference (toolkit, glossary, bibliography): **67 configured pages**, each with a companion `spec.md`. Public permalinks are unprefixed and stable.
 - `PLAN.md` — positioning, structure and one contract per chapter (question, scope, Veldmark thread, terms each chapter owns, research briefs).
 - `posts/<folder>/index.md` + `spec.md` — each page and the spec it was written against (spec-driven authoring, see the repository `CLAUDE.md`).
 - `_research/` — private working material, not published:

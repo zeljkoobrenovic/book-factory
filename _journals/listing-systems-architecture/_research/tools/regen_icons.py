@@ -29,6 +29,7 @@ STYLE = (
 
 SUBJECTS = {
     "introduction": "an open book",
+    "how-classifieds-got-complicated": "an old-fashioned telephone handset",
     "meet-veldmark": "a simple office building",
     "where-listing-systems-go-wrong": "a warning triangle with an exclamation mark",
     "part-1-intro": "a shopping basket",

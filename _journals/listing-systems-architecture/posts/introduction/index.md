@@ -32,7 +32,7 @@ If you are a Chief Architect, you know what to do next: follow one listing from 
 ![Four team dashboards show green checks while a pipeline beneath them leaks listings at every joint between its segments, so fewer reach the buyer.](assets/images/introduction/green-dashboards-leaking-pipeline.jpeg)
 **Figure 1:** *Every team's own report can be green while matches leak at the hand-offs between systems, which is why the general manager's question is an architecture question.*
 
-This book is about answering that kind of question, and about designing marketplaces where it is asked less often. The scene is invented; its examples return later as cases from Veldmark, the book's fictional marketplace group. This page covers, in order: who the book is for; the argument and why the book exists; how its statements are labeled and sourced; its parts, and a table that finds the chapter for your decision; the failure patterns; Veldmark and the book's toolkit of templates; and how the book is kept current. The next two pages, [[where-listing-systems-go-wrong]] and [[meet-veldmark]], unpack the patterns and the group; Part I then begins with the business behind the listings.
+This book is about answering that kind of question, and about designing marketplaces where it is asked less often. The scene is invented; its examples return later as cases from Veldmark, the book's fictional marketplace group. This page covers, in order: who the book is for; the argument and why the book exists; how its statements are labeled and sourced; its parts, and a table that finds the chapter for your decision; the failure patterns; Veldmark and the book's toolkit of templates; and how the book is kept current. The next three pages, [[how-classifieds-got-complicated]], [[where-listing-systems-go-wrong]] and [[meet-veldmark]], show in plain words how classifieds grew this complicated and unpack the patterns and the group; Part I then begins with the business behind the listings.
 
 ## Who This Book Is For
 
@@ -107,11 +107,11 @@ Three of these distinctions are easy to lose. A Veldmark figure, such as six min
 
 ## How the Book Is Organized
 
-Those are the rules for weighing what the book says; next is how it is laid out. The book opens with three preface pages, continues with eight parts that form a learning path along the machine, tests the patterns against public cases in Part IX, the ninth part, and ends with reference material.
+Those are the rules for weighing what the book says; next is how it is laid out. The book opens with four preface pages, continues with eight parts that form a learning path along the machine, tests the patterns against public cases in Part IX, the ninth part, and ends with reference material.
 
 | Section | Question it answers | Chapters |
 | --- | --- | --- |
-| **Preface** | What is this book for, how do listing systems fail, and which group do the examples follow? | This page, [[where-listing-systems-go-wrong]], [[meet-veldmark]] |
+| **Preface** | What is this book for, how do listing systems fail, and which group do the examples follow? | This page, [[how-classifieds-got-complicated]], [[where-listing-systems-go-wrong]], [[meet-veldmark]] |
 | **[[part-1]]** MARKETPLACE | What business is behind the listings, and why does it decide the architecture? | 1–6: taxonomy, liquidity, industry history, capabilities, bounded contexts, verticals |
 | **[[part-2]]** LISTING | What is the thing being sold, and how should it be modeled? | 7–12: listing aggregate, categories, attributes, media, location, sellers and accounts |
 | **[[part-3]]** SUPPLY | How does inventory get in, and how fast does it become searchable? | 13–17: ingestion, normalization and enrichment, entity resolution, publication, professional tooling |
@@ -188,7 +188,7 @@ I developed the book through AI-mediated authoring: I set the concept, the struc
 
 ## Where to Go Next
 
-That is the argument, the routes into the book and the rules for weighing it. If you read in order, turn next to [[where-listing-systems-go-wrong]]. It takes the pattern names listed on this page one at a time, shows each as a way the liquidity machine loses matches, and will help you recognize which are already in your marketplace. Then read [[meet-veldmark]], so that every chapter's opening scene lands in a group you know. If a decision is waiting, use the routing table and come back to the preface later.
+That is the argument, the routes into the book and the rules for weighing it. If you read in order, turn next to [[how-classifieds-got-complicated]], a short walk from the newspaper's small ads to today's alerts that shows where the hand-offs and copies behind the sold bike came from. Then [[where-listing-systems-go-wrong]] takes the pattern names listed on this page one at a time, shows each as a way the liquidity machine loses matches, and will help you recognize which are already in your marketplace. Then read [[meet-veldmark]], so that every chapter's opening scene lands in a group you know. If a decision is waiting, use the routing table and come back to the preface later.
 
 Either way, keep the general manager's question in mind: why does a smaller competitor turn its listings into more contacts? The parts, the routing table, the failure patterns and Veldmark all turn that question into one you can ask of any design: which liquidity does it protect or spend, and at which boundary? Asked that way, the general manager's question, which no team's green report answers, can be traced to a hand-off and an owner. Every chapter answers it for one stage of the machine or one hand-off between stages.
 
