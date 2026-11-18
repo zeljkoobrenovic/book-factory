@@ -1,6 +1,6 @@
 ---
 status: accepted
-revised: 2026-10-20
+revised: 2026-11-18
 ---
 
 # Spec: Unreconciled: Fourteen Ways Finance Architecture Goes Wrong
@@ -58,7 +58,7 @@ Article only for now. Pattern illustrations (one per pattern, as in OWNED) are a
   - `_research/style-guide.md` — pattern names and warning signs.
   - `_research/scenario-ledger.md` — Northmere facts.
   - `_research/productscape-digest.md` — challenges, misconceptions and stressors that inform the mechanisms.
-  - [[meet-northmere]], [[introduction]] — neighboring preface pages.
+  - [[meet-northmere]], [[introduction]], [[how-finance-got-complicated]] — neighboring preface pages.
 - **External**
   - PCAOB, AS 2201 Appendix A — definitions of material weakness and significant deficiency.
   - Martin Fowler, *Strangler Fig* — incremental replacement behind the Big-Bang Bravado remedy.
@@ -83,3 +83,4 @@ Article only for now. Pattern illustrations (one per pattern, as in OWNED) are a
 - **2026-10-20** — Replaced the mermaid diagram with a generated illustration (article-illustrator), captions unchanged. *(AI-mediated session)*
 - **2026-10-20** — Sharpening pass: 6,329 → 6,413 prose words; new lead paragraph ties the page to the introduction's argument and names what depends on it; diagnostic table promoted to its own section, "First Indicators to Ask For"; pattern statements moved ahead of term definitions in four "What it looks like" paragraphs; spec criteria updated for the lead and for the chains figure (no longer a mermaid diagram). *(AI-mediated session)*
 - **2026-10-20** — Header image regenerated with the fourteen current pattern names and their four families. *(AI-mediated session)*
+- **2026-11-18** — Lead links back to the new preceding page [[how-finance-got-complicated]], whose tally maps each of the fourteen patterns to the step that made it possible. *(AI-mediated session)*

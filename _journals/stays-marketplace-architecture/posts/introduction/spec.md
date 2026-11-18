@@ -1,6 +1,6 @@
 ---
 status: accepted
-revised: 2026-10-22
+revised: 2026-11-18
 ---
 
 # Spec: Introduction: Architecture for a Perishable Promise
@@ -23,7 +23,7 @@ Chief and enterprise architects of travel groups, principal and staff engineers,
 - [x] Has a routing table of 12–18 decisions, each starting chapter checked against that chapter's KEY POINTS, using only valid permalinks (plus allowed sibling links `entity-resolution`, `payments-fundamentals`, `designing-financial-ledgers`).
 - [x] Explains the five kinds of statement in a table, with dated examples of why company and regulatory claims carry dates (Expedia's 2024 earnings releases; Spain's 2024 registry decree and its 2026 annulment).
 - [x] States provenance: two generic Productscape models (34 and 21 bricks, 55 in total, 12 overlapping), not descriptions of Booking.com or Airbnb, linked to [[domain-coverage]]; no internal material.
-- [x] Describes Corvane in one paragraph consistent with the ledger and [[meet-corvane]], names the three deliberately excluded gaps from [[domain-coverage]], and ends with the living-journal note and a hand-off to [[where-stay-platforms-go-wrong]].
+- [x] Describes Corvane in one paragraph consistent with the ledger and [[meet-corvane]], names the three deliberately excluded gaps from [[domain-coverage]], and ends with the living-journal note and a hand-off to [[how-stays-got-complicated]] and then [[where-stay-platforms-go-wrong]].
 - [x] 3,000–4,500 words before Sources and Evidence (about 4,450 excluding figure markup).
 
 ## Non-goals
@@ -68,3 +68,4 @@ Chief and enterprise architects of travel groups, principal and staff engineers,
 - **2026-10-21** — Editorial review pass: aligned the sharing-grades table with capability map v2 (cancellation policy is a shared engine; stay rules and payment arrangement are shared contracts), American spelling, timetoread. *(AI-mediated session)*
 - **2026-10-21** — Visual layer: converted 1 mermaid diagrams to illustrations and added 1 conceptual figures (article-illustrator). *(AI-mediated session)*
 - **2026-10-22** — Sharpening pass: 3,398 → 3,341 prose words; excerpt split into two sentences; one paragraph-closing recap of Parts IX–X cut (the organization table and Figure 2 carry it); hand-off and failure-pattern lead tightened; no headings changed. *(AI-mediated session)*
+- **2026-11-18** — Preface grows to four pages: the organization table and the hand-off now include [[how-stays-got-complicated]] before [[where-stay-platforms-go-wrong]]; "three preface pages" became four. *(AI-mediated session)*

@@ -92,11 +92,11 @@ Every chapter in Parts II to VIII has a section titled **"Hotels and Homes: Wher
 
 ## How the Book Is Organized
 
-The book opens with three preface pages, follows the promise through eight parts, turns to the Chief Architect's agenda in Part IX, tests the patterns against public cases in Part X and ends with reference material. Each part's argument fits in a sentence:
+The book opens with four preface pages, follows the promise through eight parts, turns to the Chief Architect's agenda in Part IX, tests the patterns against public cases in Part X and ends with reference material. Each part's argument fits in a sentence:
 
 | Section | The part's argument | Chapters |
 | --- | --- | --- |
-| **Preface** | What the book is for, how stay platforms fail, and which group the examples follow | This page, [[where-stay-platforms-go-wrong]], [[meet-corvane]] |
+| **Preface** | What the book is for, how selling a night got this complicated, how stay platforms fail, and which group the examples follow | This page, [[how-stays-got-complicated]], [[where-stay-platforms-go-wrong]], [[meet-corvane]] |
 | **[[part-1]]** MARKETPLACE | **The type is decided by where the truth lives**, and the economics are requirements: revenue arrives on stayed nights, costs on every search | 1–4: marketplace types and history, economics, capability maps, bounded contexts |
 | **[[part-2]]** SUPPLY | **Supply is master data with many writers**: separate what exists from how it is sold, and record who asserted each fact | 5–10: property and listing model, onboarding, content and mapping, connectivity, calendar sync, extranets and host tools |
 | **[[part-3]]** INVENTORY | **Reads and writes need different answers**: serve offers from read models with a measured staleness budget, and guarantee at the commit point | 11–15: ARI model, availability engine, inventory integrity, dynamic pricing, promotions and loyalty |
@@ -191,7 +191,7 @@ The book is about stays. Three neighboring subjects are covered only where they 
 
 ## The Failure Patterns
 
-Stays platforms rarely break the promise of a night through one bad decision. They break it through recurring patterns that each looked reasonable when chosen: one more rate plan, one more ranking boost, one more refund macro. The next page, [[where-stay-platforms-go-wrong]], names sixteen of them, from **Phantom Availability**, **The Double-Booked Night** and **Connectivity Roulette** through **Price Drift**, **Lost at the Front Desk** and **Policy Spaghetti** to **Ledgerless Money**, **City-by-City Firefighting**, **Built for Sunny Days** and **The Unwatched Model**. Each comes with its warning signs, mechanism, cost, the marketplace type it hits hardest and the chapters that address it. The family at the reception desk met **Lost at the Front Desk**. Every chapter opens by naming the patterns it works on.
+Stays platforms rarely break the promise of a night through one bad decision. They break it through recurring patterns that each looked reasonable when chosen: one more rate plan, one more ranking boost, one more refund macro. [[where-stay-platforms-go-wrong]] names sixteen of them, from **Phantom Availability**, **The Double-Booked Night** and **Connectivity Roulette** through **Price Drift**, **Lost at the Front Desk** and **Policy Spaghetti** to **Ledgerless Money**, **City-by-City Firefighting**, **Built for Sunny Days** and **The Unwatched Model**. Each comes with its warning signs, mechanism, cost, the marketplace type it hits hardest and the chapters that address it. The family at the reception desk met **Lost at the Front Desk**. Every chapter opens by naming the patterns it works on.
 
 ## A Living Journal
 
@@ -201,7 +201,7 @@ I developed the book through AI-mediated authoring: I set the concept, the struc
 
 ## Where to Go Next
 
-If you read in order, turn next to [[where-stay-platforms-go-wrong]]. Then read [[meet-corvane]], so that every chapter's opening scene lands in a group you know, and begin Part I with [[two-stay-marketplaces]]. If you start from the routing table instead, keep the family at the reception desk in mind: who promised them the room, and why did the promise not reach the people who had to keep it? Every chapter answers part of that question.
+If you read in order, turn next to [[how-stays-got-complicated]], a short walk from a knock on an inn door to today's platforms that shows how one night came to be promised by so many parties; then to [[where-stay-platforms-go-wrong]], which names the ways that promise breaks. Then read [[meet-corvane]], so that every chapter's opening scene lands in a group you know, and begin Part I with [[two-stay-marketplaces]]. If you start from the routing table instead, keep the family at the reception desk in mind: who promised them the room, and why did the promise not reach the people who had to keep it? Every chapter answers part of that question.
 
 ## Sources and Evidence
 

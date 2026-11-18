@@ -73,7 +73,7 @@ Because of that gap, a finance estate assembled platform by platform, each chose
 ![Five finance platforms each marked as working, with coins and records leaking from the bridges between them while an architect surveys all the seams from above.](assets/images/introduction/failures-at-the-boundaries.jpeg)
 **Figure 2:** *Each platform can work as specified while the estate fails at the seams between them; the boundaries belong to no project, which is why the Chief Architect's whole-estate view matters.*
 
-The next page, [[where-finance-architecture-goes-wrong]], names fourteen recurring failure patterns, from The Shadow Ledger and The Suspense Swamp to The Borrowed Roadmap and Nobody's Bot, and links each to the chapters that address it. Every chapter in Parts I to IV opens with a callout naming the patterns it works on.
+The next page, [[how-finance-got-complicated]], shows in plain words how a finance estate came to hold so many records of the same money, one step at a time. The page after it, [[where-finance-architecture-goes-wrong]], names fourteen recurring failure patterns, from The Shadow Ledger and The Suspense Swamp to The Borrowed Roadmap and Nobody's Bot, and links each to the chapters that address it. Every chapter in Parts I to IV opens with a callout naming the patterns it works on.
 
 ## How This Book Is Written
 
@@ -96,11 +96,11 @@ Three confusions are the easiest to make. A Northmere figure, such as the 2,300 
 
 ## How the Book Is Organized
 
-The book opens with three preface pages, continues with four parts that form a learning path, tests the patterns against a public case study in Part V, and ends with reference material.
+The book opens with four preface pages, continues with four parts that form a learning path, tests the patterns against a public case study in Part V, and ends with reference material.
 
 | Part | Question it answers | Chapters |
 | --- | --- | --- |
-| **Preface** | What is this book for, what goes wrong in finance estates, and which enterprise do the examples follow? | This page, [[where-finance-architecture-goes-wrong]], [[meet-northmere]] |
+| **Preface** | What is this book for, how did finance estates get this complicated, what goes wrong in them, and which enterprise do the examples follow? | This page, [[how-finance-got-complicated]], [[where-finance-architecture-goes-wrong]], [[meet-northmere]] |
 | **[[part-1]]** | What must an architect understand about the enterprise and its finance domain before judging any platform? | 1–12: the Chief Architect's role, capabilities, the portfolio, the landscape layers, accounting, processes, data, controls, integration, global scale, sourcing and modernization patterns |
 | **[[part-2]]** | What is each core finance platform for, how does it work, where should it stop and what does depending on it cost? | 13–23: custom platforms and ledgers, SAP S/4HANA, Workday, Oracle Fusion, BlackLine, OneStream, payments fundamentals, Adyen, Stripe and the satellite platforms |
 | **[[part-3]]** | How do money and data cross platform boundaries, and how is every crossing proven? | 24–33: transaction to report, payments to ledger, data flows, systems of record, multiple ERPs, redundancy and coupling, canonical events, traceability, onboarding and incremental modernization |
@@ -167,7 +167,7 @@ I developed and revised the book through AI-mediated authoring: I set the concep
 
 ## Where to Go Next
 
-If you read in order, turn next to [[where-finance-architecture-goes-wrong]]: it names the fourteen failure patterns that the rest of the book keeps returning to, and it will help you recognize which of them are already in your own estate. Then read [[meet-northmere]], so that the scene at the start of every chapter lands in a group you already know. If a decision is waiting, use the routing table above and come back to the preface when you have time. Either way, keep the CFO's question in mind. Every chapter is, in the end, part of the answer to why the close takes nine days, and to what an architecture would look like in which it could always be reconciled.
+If you read in order, turn next to [[how-finance-got-complicated]], a short walk from a trader's cash box to today's estate that introduces the book's concepts in the order the world needed them, and then to [[where-finance-architecture-goes-wrong]]: it names the fourteen failure patterns that the rest of the book keeps returning to, and it will help you recognize which of them are already in your own estate. Then read [[meet-northmere]], so that the scene at the start of every chapter lands in a group you already know. If a decision is waiting, use the routing table above and come back to the preface when you have time. Either way, keep the CFO's question in mind. Every chapter is, in the end, part of the answer to why the close takes nine days, and to what an architecture would look like in which it could always be reconciled.
 
 ## Visual Summary
 

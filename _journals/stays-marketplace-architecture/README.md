@@ -6,8 +6,8 @@ How architects and engineering leaders design, scale, govern and evolve the syst
 
 ## Layout
 
-- `config.yaml` — reading order, **68 configured pages**, each with a companion `spec.md`. Public permalinks are stable.
-  - Preface: 3 pages.
+- `config.yaml` — reading order, **69 configured pages**, each with a companion `spec.md`. Public permalinks are stable.
+  - Preface: 4 pages.
   - Parts I–IX: each opens with an unnumbered part introduction; 47 chapters in folders `01`–`47`.
   - Part X PRACTICE: an introduction and four public case studies, folders `48`–`51`.
   - Reference: domain coverage, toolkit, glossary, bibliography.

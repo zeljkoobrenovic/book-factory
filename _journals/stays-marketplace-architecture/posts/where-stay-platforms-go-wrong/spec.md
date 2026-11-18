@@ -1,6 +1,6 @@
 ---
 status: accepted
-revised: 2026-10-22
+revised: 2026-11-18
 ---
 
 # Spec: Overbooked: Sixteen Ways Stay Platforms Go Wrong
@@ -68,3 +68,4 @@ Chief and enterprise architects, principal engineers and engineering leaders of 
 - **2026-10-21** — Editorial review pass: verified pattern names, hits-hardest values and the 51-chapter matrix against every chapter callout; trimmed framing prose; American spelling; timetoread. *(AI-mediated session)*
 - **2026-10-21** — Visual layer: converted 2 mermaid diagrams to illustrations and added 1 conceptual figures (article-illustrator). *(AI-mediated session)*
 - **2026-10-22** — Sharpening pass: 7,901 → 7,857 prose words; no heading or structural changes; removed the cost-categories reading note and two repeated clauses, tightened four sentences; spec unchanged. *(AI-mediated session)*
+- **2026-11-18** — Opening now refers back to [[how-stays-got-complicated]], the new preface page before this one, instead of re-explaining how the parties accumulated. *(AI-mediated session)*

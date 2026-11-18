@@ -1,6 +1,6 @@
 ---
 status: accepted
-revised: 2026-10-20
+revised: 2026-11-18
 ---
 
 # Spec: Introduction: Architecture Where Every Number Must Reconcile
@@ -19,10 +19,10 @@ Chief and Enterprise Architects, finance-systems and solution architects, integr
 - [ ] Opening scene: the CFO's nine-day-close question shown to be an architecture question; Northmere introduced as fictional.
 - [ ] States who the book is for and what it assumes and does not assume.
 - [ ] Explains the title: reconciliation defined, the design claim stated, the five reconciliations listed briefly, with ch. 43 named as the place that closes the loop.
-- [ ] Explains why the book exists (the gap between vendor documentation and EA practice; the Chief Architect's vantage point) and hands to [[where-finance-architecture-goes-wrong]].
+- [ ] Explains why the book exists (the gap between vendor documentation and EA practice; the Chief Architect's vantage point) and hands to [[how-finance-got-complicated]] and then [[where-finance-architecture-goes-wrong]].
 - [ ] Explains vendor-neutrality, the four evidence labels and how to tell them apart, "as of October 2026", and the living journal with "View spec" links and changelogs.
 - [ ] Structure table (Part | Question | Chapters) covering preface, Parts I–IV, Part V and reference; a routing table "Start With the Decision in Front of You" with 10–14 realistic rows using only valid permalinks.
-- [ ] A six-term glossary teaser (ledger, subledger, reconciliation, close, system of record, PSP) pointing to [[glossary]]; guidance on using Northmere and the [[toolkit]]; a first-person provenance note that does not name the source company; a closing hand-off to [[where-finance-architecture-goes-wrong]] and [[meet-northmere]]. 3,000–4,000 words.
+- [ ] A six-term glossary teaser (ledger, subledger, reconciliation, close, system of record, PSP) pointing to [[glossary]]; guidance on using Northmere and the [[toolkit]]; a first-person provenance note that does not name the source company; a closing hand-off to [[how-finance-got-complicated]], [[where-finance-architecture-goes-wrong]] and [[meet-northmere]]. 3,000–4,000 words.
 
 ## Non-goals
 
@@ -72,3 +72,4 @@ Article only for now.
 - **2026-10-20** — Book title renamed from "RECONCILED: Enterprise Architecture for Financial Systems" to "RECONCILED: Architecting Finance Systems" at the author's request. *(AI-mediated session)*
 - **2026-10-20** — Sharpening pass: 3,157 → 3,140 words; no headings renamed; three paragraph openings made to state their point (Why This Book Exists ×2, the evidence-label paragraph). Spec: removed the answered Open question on `part-5` (the structure table now links it). *(AI-mediated session)*
 - **2026-10-20** — Consistency pass across the book: headings and terms aligned with the style guide and glossary (Setting the Scene at Northmere, From X to Y hand-offs, Trade-offs, Integration with, Total Cost of Ownership, Architecture Advisory Forum, anticorruption, hand-off) and cross-chapter contradictions resolved against the scenario ledger. *(AI-mediated session)*
+- **2026-11-18** — Preface grows to four pages: the new history page [[how-finance-got-complicated]] is announced before the patterns page, added to the structure table, and made the next page in "Where to Go Next". *(AI-mediated session)*

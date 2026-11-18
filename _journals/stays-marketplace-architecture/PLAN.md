@@ -31,7 +31,7 @@ The book starts from two Productscape domain models in the author's sibling repo
 
 | Section | Pages | Reader purpose |
 | --- | --- | --- |
-| Preface | Introduction; Overbooked: Sixteen Ways Stay Platforms Go Wrong; Meet Corvane | Purpose, routes through the book, the named failure patterns, the running example |
+| Preface | Introduction; From Inn Door to Instant Book: How Stays Got This Complicated; Overbooked: Sixteen Ways Stay Platforms Go Wrong; Meet Corvane | Purpose, routes through the book, how the field got this complicated, the named failure patterns, the running example |
 | Part I — MARKETPLACE | intro + 4 chapters | The business of a night's stay: the two marketplace types and their history, economics, capability maps, bounded contexts |
 | Part II — SUPPLY | intro + 6 chapters | Properties, homes and the partners behind them: the property and listing model, onboarding, content and media, connectivity, calendar sync, extranets and host tools |
 | Part III — INVENTORY | intro + 5 chapters | Availability, rates and price: the ARI model, the availability engine, inventory integrity, dynamic pricing, promotions and loyalty |
@@ -44,7 +44,7 @@ The book starts from two Productscape domain models in the author's sibling repo
 | Part X — PRACTICE | intro + 4 case studies | Public cases: Booking.com, Airbnb, Expedia Group and Vrbo, Agoda and Trip.com |
 | Reference | Domain Coverage; Toolkit; Glossary; Bibliography | Model-to-chapter map, templates, definitions, sources |
 
-68 pages: 3 preface pages, 10 part introductions, 51 chapters (folders `01`–`51`), 4 reference pages.
+69 pages: 4 preface pages, 10 part introductions, 51 chapters (folders `01`–`51`), 4 reference pages.
 
 ## Comparison discipline
 
@@ -59,6 +59,8 @@ Each contract gives: **folder → permalink**, title, the core question, what it
 ### Preface
 
 **introduction → `introduction`** — *Introduction: Architecture for a Perishable Promise.* Why this book exists; the Chief Architect's vantage point over two marketplace types; who it is for; the ten parts as a learning path; a "start with the decision in front of you" routing table; how the book compares hotels and homes; how to read evidence labels (documented fact with date, industry practice, reference-architecture inference, recommendation, illustration); Corvane in one paragraph; living-journal note.
+
+**how-stays-got-complicated → `how-stays-got-complicated`** — *From Inn Door to Instant Book: How Stays Got This Complicated.* [ADDED 2026-11-18] Q: Why did selling a night, once settled at an inn door, come to need so many systems and parties? A plain-language walk in nine steps (inn door, letter ahead, guidebook and travel agent, chain's central office, airline systems, online travel agency, comparing everyone, homes as stays, today), each with its need, the concept it introduced (linked to the owning chapter), what it made possible for guest and host, and what it cost; a tally table ending in the failure-pattern names and an anchor timeline of sourced dates. Running question: is the room really free for these nights, and who stands behind the promise? Thesis: each way of selling a night was a good bargain that let a guest book a room she could not see and let a hotel or host fill a night that would otherwise be lost, at the price of one more copy of the room book and one more party behind the promise, and none was retired. Corvane only in the last step (King's Day, Seville). Not a history: [[two-stay-marketplaces]] owns the history. Owns: no terms (introduces each and links its owner). Briefs: none; dates from primary sources (field-evolution skill).
 
 **where-stay-platforms-go-wrong → `where-stay-platforms-go-wrong`** — *Overbooked: Sixteen Ways Stay Platforms Go Wrong.* The sixteen named failure patterns (see style guide), each with a quote, warning signs, the mechanism, the cost, which marketplace type it hits hardest, and the chapters that address it.
 
