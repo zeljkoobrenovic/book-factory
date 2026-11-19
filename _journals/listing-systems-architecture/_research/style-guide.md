@@ -39,17 +39,17 @@ timetoread: <N> min read
 Then, in this order (exact labels):
 
 ```markdown
-> **IN THIS CHAPTER, YOU WILL:** <one or two sentences>
-
-> **WHY THE BUSINESS CARES:** <one or two sentences, from the marketplace GM's / CPO's / CFO's view>
-
-> **WHY ARCHITECTS SHOULD CARE:** <one or two sentences>
+> **IN THIS CHAPTER, YOU WILL:** <one sentence>
 
 > **KEY POINTS:**
 >
 > * **<Bolded lead phrase.>** <One or two sentences.>
 > * **<…>** <…>
 > * **<…>** <…>
+
+> **BUSINESS RELEVANCE:** <one or two sentences, from the marketplace GM's / CPO's / CFO's view>
+
+> **ARCHITECTURAL RELEVANCE:** <one or two sentences>
 
 > **[FAILURE PATTERNS THIS CHAPTER ADDRESSES](where-listing-systems-go-wrong.html):**
 >

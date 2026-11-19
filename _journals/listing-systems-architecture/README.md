@@ -23,4 +23,4 @@ The book grew out of two generic Productscape marketplace domain models and publ
 
 ## Conventions
 
-Same reference format as RECONCILED (`_journals/finance-systems-architecture`) and OWNED (`_journals/private-techuity`): callout blocks (IN THIS CHAPTER / WHY THE BUSINESS CARES / WHY ARCHITECTS SHOULD CARE / KEY POINTS / FAILURE PATTERNS), a running fictional example, tables of contrasts, mermaid figures, `[[permalink]]` cross-links, and a Sources and Evidence section per page.
+Same reference format as RECONCILED (`_journals/finance-systems-architecture`) and OWNED (`_journals/private-techuity`): callout blocks (IN THIS CHAPTER / KEY POINTS / BUSINESS RELEVANCE / ARCHITECTURAL RELEVANCE / FAILURE PATTERNS), a running fictional example, tables of contrasts, mermaid figures, `[[permalink]]` cross-links, and a Sources and Evidence section per page.
